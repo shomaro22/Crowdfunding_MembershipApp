@@ -1,0 +1,36 @@
+package entity
+
+import "errors"
+
+var (
+	ErrBadEmail        = errors.New("invalid email")
+	ErrWeakPassword    = errors.New("password must be at least 8 characters")
+	ErrBadRole         = errors.New("invalid role")
+	ErrBadAccount      = errors.New("invalid account status")
+	ErrBadSeller       = errors.New("invalid seller status")
+	ErrBadAdmin        = errors.New("invalid admin role")
+	ErrBadProject      = errors.New("invalid project status")
+	ErrBadDuration     = errors.New("invalid duration type")
+	ErrBadMembership   = errors.New("invalid membership type")
+	ErrBadSupporter    = errors.New("invalid supporter status")
+	ErrBadBilling      = errors.New("invalid billing mode")
+	ErrBadPurchase     = errors.New("invalid purchase status")
+	ErrBadPayment      = errors.New("invalid payment method")
+	ErrBadRegistration = errors.New("invalid registration status")
+	ErrBadReport       = errors.New("invalid report status")
+	ErrBadReportTarget = errors.New("invalid report target type")
+	ErrBadIDDoc        = errors.New("invalid identity document type")
+	ErrBadBatch        = errors.New("invalid batch job status")
+	ErrBadOAuth        = errors.New("invalid oauth provider")
+	ErrBadAction       = errors.New("invalid activity action")
+
+	ErrNotActive     = errors.New("account is not active")
+	ErrSellerPending = errors.New("seller is not approved")
+	ErrDupSupporter  = errors.New("active supporter already exists for this project")
+	ErrNoBenefits    = errors.New("supporter is not active")
+	ErrPlanTooLow    = errors.New("plan rank is insufficient for this content")
+	ErrNotPublic     = errors.New("project is not publicly available")
+	ErrBadMessage    = errors.New("message content is required and must be at most 4000 characters")
+	ErrBadTitle      = errors.New("title must be 1 to 200 characters")
+	ErrBadPrice      = errors.New("plan price must be between 1 and 100000 JPY")
+)
