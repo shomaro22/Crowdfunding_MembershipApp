@@ -181,16 +181,16 @@ func TestValidateSellerKYC(t *testing.T) {
 	if err := ValidateSellerKYC("山田 太郎", birth, "東京都千代田区", true); err != nil {
 		t.Fatalf("expected ok: %v", err)
 	}
-	if err := ValidateSellerKYC("", birth, "東京都", true); err != ErrBadSellerKYC {
+	if err := ValidateSellerKYC("", birth, "東京都", true); err != ErrBadKYC {
 		t.Fatalf("empty name: %v", err)
 	}
-	if err := ValidateSellerKYC("山田", time.Time{}, "東京都", true); err != ErrBadSellerKYC {
+	if err := ValidateSellerKYC("山田", time.Time{}, "東京都", true); err != ErrBadKYC {
 		t.Fatalf("zero birth date: %v", err)
 	}
-	if err := ValidateSellerKYC("山田", birth, "  ", true); err != ErrBadSellerKYC {
+	if err := ValidateSellerKYC("山田", birth, "  ", true); err != ErrBadKYC {
 		t.Fatalf("empty address: %v", err)
 	}
-	if err := ValidateSellerKYC("山田", birth, "東京都", false); err != ErrBadSellerKYC {
+	if err := ValidateSellerKYC("山田", birth, "東京都", false); err != ErrBadKYC {
 		t.Fatalf("photo_present false: %v", err)
 	}
 }
