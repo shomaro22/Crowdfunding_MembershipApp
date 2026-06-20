@@ -1,0 +1,3071 @@
+openapi: 3.0.3
+info:
+  title: Crowdfunding Membership App API
+  version: 1.0.0
+  description: |
+    NewFF_App を React + Go で再構築するための OpenAPI Specification。
+    状態更新は HTTP API、メッセージのリアルタイム配信は WebSocket を利用する。
+    認証は **ReToken**（httpOnly Cookie）+ **AuthToken**（クライアントメモリのみ）。
+    Google OAuth で得る Google 側トークンと、Credentials / OAuth ログイン後に発行する AuthToken / ReToken は別物とする。
+
+servers:
+  - url: http://localhost:8080
+    description: local development
+
+tags:
+  - name: Health
+  - name: Auth
+  - name: Projects
+  - name: Supporters
+  - name: Purchases
+  - name: Payments
+  - name: Messages
+  - name: Favorites
+  - name: Seller
+  - name: Media
+  - name: Admin
+  - name: WebSocket
+  - name: Operations
+
+security:
+  - bearerAuth: []
+
+paths:
+  /health:
+    get:
+      tags: [Health]
+      summary: Health check
+      description: Returns API liveness and dependency status (PostgreSQL, Redis).
+      operationId: getHealth
+      security: []
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthResponse"
+              example:
+                status: ok
+                db: ok
+                redis: ok
+
+  /auth/register:
+    post:
+      tags: [Auth]
+      summary: Register buyer account (requires admin approval before login)
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RegisterRequest"
+      responses:
+        "201":
+          description: Registered
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RegisterResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /auth/register/seller:
+    post:
+      tags: [Auth]
+      summary: Register seller account with driver's license KYC (requires admin approval)
+      description: |
+        Multipart submission. **運転免許証（DRIVERS_LICENSE）のみ**対象。
+        出品者が申告したメタデータ（氏名・生年月日・住所等）と免許証表面・裏面画像を提出する。
+        管理者が目視照合する（eKYC 連携なし）。外国籍向けフロー・マイナンバー・パスポート・在留カードはスコープ外。
+      security: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [registration, identity_document_front, identity_document_back]
+              properties:
+                registration:
+                  type: string
+                  description: JSON string of SellerRegisterPayload
+                identity_document_front:
+                  type: string
+                  format: binary
+                  description: Driver's license front (face photo, name, birth date, address visible)
+                identity_document_back:
+                  type: string
+                  format: binary
+                  description: Driver's license back (required)
+      responses:
+        "201":
+          description: Seller registration submitted (pending admin KYC review)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SellerRegisterResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "413":
+          description: Identity document image too large
+        "415":
+          description: Unsupported image media type
+        "429":
+          $ref: "#/components/responses/RateLimited"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /auth/login:
+    post:
+      tags: [Auth]
+      summary: Login (Credentials)
+      description: |
+        成功時は AuthToken（Body）+ ReToken（httpOnly Cookie）を返す（§5.1.3）。
+        ADMIN/SELLER で TOTP 有効時は `requires_2fa: true` のみ返し、POST /auth/2fa/challenge で AuthToken を取得する。
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginRequest"
+      responses:
+        "200":
+          description: Logged in
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LoginResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          description: User inactive
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /auth/forgot-password:
+    post:
+      tags: [Auth]
+      summary: Request password reset (always returns 200 for privacy)
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ForgotPasswordRequest"
+      responses:
+        "200":
+          description: Accepted
+        "400":
+          $ref: "#/components/responses/BadRequest"
+
+  /auth/reset-password:
+    post:
+      tags: [Auth]
+      summary: Reset password by token
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ResetPasswordRequest"
+      responses:
+        "200":
+          description: Password reset completed
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /re:
+    post:
+      tags: [Auth]
+      summary: Reissue AuthToken (ReToken in httpOnly Cookie)
+      description: |
+        Cookie 自動送信で ReToken を検証し、新しい AuthToken を返す。
+        Rate Limit 対象名は `re`（§9.2）。
+      security: []
+      responses:
+        "200":
+          description: New AuthToken
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+
+  /auth/logout:
+    post:
+      tags: [Auth]
+      summary: Logout and revoke ReToken
+      responses:
+        "200":
+          description: Logged out
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /auth/2fa/setup:
+    post:
+      tags: [Auth]
+      summary: Begin TOTP setup (returns QR / secret for authenticator app)
+      responses:
+        "200":
+          description: Setup payload
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /auth/2fa/verify:
+    post:
+      tags: [Auth]
+      summary: Confirm TOTP setup and enable 2FA (after POST /auth/2fa/setup)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [code]
+              properties:
+                code:
+                  type: string
+                  description: 6-digit TOTP code from authenticator app
+      responses:
+        "200":
+          description: 2FA enabled
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /auth/2fa/challenge:
+    post:
+      tags: [Auth]
+      summary: Complete login 2FA challenge and issue AuthToken
+      description: |
+        Called after POST /auth/login when 2FA is required (ADMIN/SELLER with TOTP enabled, or BUYER with optional 2FA).
+        Rate Limit 対象名は `2fa/challenge`（§9.2: user or email 5 回/分）。
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [code]
+              properties:
+                code:
+                  type: string
+                  description: 6-digit TOTP code (backup codes also accepted per §5.1.6)
+      responses:
+        "200":
+          description: AuthToken issued; ReToken in httpOnly Cookie
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LoginResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+
+  /auth/check-email:
+    get:
+      tags: [Auth]
+      summary: Check email availability
+      security: []
+      parameters:
+        - in: query
+          name: email
+          required: true
+          schema:
+            type: string
+            format: email
+      responses:
+        "200":
+          description: Availability result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CheckEmailResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+
+  /auth/google:
+    get:
+      tags: [Auth]
+      summary: Start Google OAuth (BUYER only). Redirects to Google consent screen.
+      security: []
+      parameters:
+        - in: query
+          name: from
+          required: false
+          schema:
+            type: string
+          description: Post-login return path (stored in OAuth state)
+      responses:
+        "302":
+          description: Redirect to Google authorization URL
+        "429":
+          $ref: "#/components/responses/RateLimited"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /auth/google/callback:
+    get:
+      tags: [Auth]
+      summary: Google OAuth callback. Sets ReToken Cookie and redirects with OAuth Callback Code.
+      security: []
+      parameters:
+        - in: query
+          name: code
+          schema:
+            type: string
+        - in: query
+          name: state
+          schema:
+            type: string
+        - in: query
+          name: error
+          schema:
+            type: string
+      responses:
+        "302":
+          description: Redirect to PUBLIC_APP_URL/auth/callback (success or error query)
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /auth/oauth/exchange:
+    post:
+      tags: [Auth]
+      summary: Exchange one-time OAuth callback code for AuthToken (memory-only on client)
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [code]
+              properties:
+                code:
+                  type: string
+                  description: One-time code from /auth/callback redirect
+      responses:
+        "200":
+          description: AuthToken issued; ReToken in httpOnly Cookie
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LoginResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /me:
+    get:
+      tags: [Auth]
+      summary: Get current user
+      responses:
+        "200":
+          description: Current user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MeResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          description: User inactive
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /me/change-password:
+    post:
+      tags: [Auth]
+      summary: Change current user password
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ChangePasswordRequest"
+      responses:
+        "200":
+          description: Changed
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /me/profile:
+    get:
+      tags: [Auth]
+      summary: Get profile
+      responses:
+        "200":
+          description: Profile
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserProfile"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+    put:
+      tags: [Auth]
+      summary: Update profile
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateProfileRequest"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserProfile"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /me/notifications:
+    get:
+      tags: [Auth]
+      summary: Get derived notifications (unread messages, project updates)
+      responses:
+        "200":
+          description: Notifications
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NotificationsResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /projects:
+    get:
+      tags: [Projects]
+      summary: List public active projects
+      description: |
+        Returns projects where `status = ACTIVE` AND
+        (`duration_type = UNLIMITED` OR `end_date >= NOW()`).
+        無期限プロジェクトは `end_date` が null。
+      security: []
+      parameters:
+        - in: query
+          name: search
+          schema:
+            type: string
+        - in: query
+          name: sort
+          schema:
+            type: string
+            enum: [newest, supporters, ending_soon]
+            default: newest
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+        - in: query
+          name: offset
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+      responses:
+        "200":
+          description: Project list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListProjectsResponse"
+        "500":
+          $ref: "#/components/responses/InternalError"
+    post:
+      tags: [Projects]
+      summary: Create project (seller only, status=PENDING)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateProjectRequest"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectDetail"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /projects/mine:
+    get:
+      tags: [Projects]
+      summary: List seller's own projects (all statuses)
+      responses:
+        "200":
+          description: Seller projects
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListProjectsResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /projects/{projectId}:
+    get:
+      tags: [Projects]
+      summary: Get project detail
+      security: []
+      parameters:
+        - $ref: "#/components/parameters/ProjectId"
+      responses:
+        "200":
+          description: Project detail
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectDetail"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    put:
+      tags: [Projects]
+      summary: Update project (owner seller)
+      parameters:
+        - $ref: "#/components/parameters/ProjectId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateProjectRequest"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectDetail"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /projects/{projectId}/delete-request:
+    post:
+      tags: [Projects]
+      summary: Request project deletion (seller)
+      parameters:
+        - $ref: "#/components/parameters/ProjectId"
+      responses:
+        "200":
+          description: Delete requested
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectDetail"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /projects/{projectId}/plans:
+    get:
+      tags: [Projects]
+      summary: List project plans
+      security: []
+      parameters:
+        - $ref: "#/components/parameters/ProjectId"
+      responses:
+        "200":
+          description: Plans
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ProjectPlan"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /supporters:
+    get:
+      tags: [Supporters]
+      summary: List current user's supporters (auto-applies pending plan changes)
+      responses:
+        "200":
+          description: Supporter list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListSupportersResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /supporters/apply-plans:
+    post:
+      tags: [Supporters]
+      summary: Batch apply pending plan changes (cron or internal)
+      security: []
+      responses:
+        "200":
+          description: Applied
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  applied_count:
+                    type: integer
+
+  /supporters/{supporterId}/upgrade:
+    post:
+      tags: [Supporters]
+      summary: Schedule plan upgrade (creates Stripe PaymentIntent for price diff)
+      parameters:
+        - $ref: "#/components/parameters/SupporterId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpgradePlanRequest"
+      responses:
+        "200":
+          description: Upgrade initiated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UpgradePlanResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /supporters/{supporterId}/upgrade-confirm:
+    post:
+      tags: [Supporters]
+      summary: Confirm upgrade after PaymentIntent succeeded
+      parameters:
+        - $ref: "#/components/parameters/SupporterId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [payment_intent_id]
+              properties:
+                payment_intent_id:
+                  type: string
+      responses:
+        "200":
+          description: Confirmed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Supporter"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /supporters/{supporterId}/cancel:
+    post:
+      tags: [Supporters]
+      summary: Cancel supporter at period end
+      parameters:
+        - $ref: "#/components/parameters/SupporterId"
+      responses:
+        "200":
+          description: Cancelled
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Supporter"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /supporters/{supporterId}/rejoin:
+    post:
+      tags: [Supporters]
+      summary: Rejoin from CANCELLED status
+      parameters:
+        - $ref: "#/components/parameters/SupporterId"
+      responses:
+        "200":
+          description: Rejoined
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Supporter"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /supporters/{supporterId}/billing/change:
+    post:
+      tags: [Supporters]
+      summary: Change billing mode or payment method (effective from next current_period_end)
+      description: |
+        §5.3.4。AUTO → KONBINI は Subscription cancel_at_period_end。
+        KONBINI → AUTO は次周期から Subscription 新規作成 + PM 登録。
+        AUTO 内の PM 変更は Stripe Customer default PaymentMethod 更新。
+      parameters:
+        - $ref: "#/components/parameters/SupporterId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ChangeBillingRequest"
+      responses:
+        "200":
+          description: Billing change scheduled
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Supporter"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /purchases:
+    get:
+      tags: [Purchases]
+      summary: List current user's purchases
+      responses:
+        "200":
+          description: Purchase list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListPurchasesResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /payments/checkout:
+    post:
+      tags: [Payments]
+      summary: Create Stripe Checkout Session (redirect flow)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateCheckoutSessionRequest"
+      responses:
+        "200":
+          description: Session created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CheckoutSessionResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+
+  /payments/intent:
+    post:
+      tags: [Payments]
+      summary: Create Stripe PaymentIntent (embedded Payment Element)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreatePaymentIntentRequest"
+      responses:
+        "200":
+          description: PaymentIntent created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaymentIntentResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+
+  /payments/verify/checkout:
+    post:
+      tags: [Payments]
+      summary: Client-side fallback to verify Checkout Session
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [session_id]
+              properties:
+                session_id:
+                  type: string
+      responses:
+        "200":
+          description: Verified
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Supporter"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /payments/verify/intent:
+    post:
+      tags: [Payments]
+      summary: Client-side fallback to verify PaymentIntent
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [payment_intent_id]
+              properties:
+                payment_intent_id:
+                  type: string
+      responses:
+        "200":
+          description: Verified
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Supporter"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /stripe/webhook:
+    post:
+      tags: [Payments]
+      summary: Stripe webhook handler
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        "200":
+          description: Processed
+        "400":
+          description: Invalid signature or payload
+
+  /messages:
+    get:
+      tags: [Messages]
+      summary: List messages grouped by project
+      responses:
+        "200":
+          description: Message threads
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListMessageThreadsResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+    post:
+      tags: [Messages]
+      summary: Send message (requires active supporter relationship)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SendMessageRequest"
+      responses:
+        "201":
+          description: Sent
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Message"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+
+  /messages/{messageId}/read:
+    post:
+      tags: [Messages]
+      summary: Mark message as read
+      parameters:
+        - in: path
+          name: messageId
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Marked read
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /favorites:
+    get:
+      tags: [Favorites]
+      summary: List user favorites
+      responses:
+        "200":
+          description: Favorites
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListFavoritesResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+    post:
+      tags: [Favorites]
+      summary: Add or remove favorite
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ToggleFavoriteRequest"
+      responses:
+        "200":
+          description: Toggled
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FavoriteStatus"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "409":
+          $ref: "#/components/responses/Conflict"
+
+  /favorites/check/{projectId}:
+    get:
+      tags: [Favorites]
+      summary: Check if project is favorited
+      parameters:
+        - $ref: "#/components/parameters/ProjectId"
+      responses:
+        "200":
+          description: Status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FavoriteStatus"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /seller/dashboard/stats:
+    get:
+      tags: [Seller]
+      summary: Seller dashboard statistics
+      responses:
+        "200":
+          description: Stats
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SellerDashboardStats"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /seller/supporters:
+    get:
+      tags: [Seller]
+      summary: List supporters across seller's projects
+      parameters:
+        - in: query
+          name: project_id
+          schema:
+            type: string
+            format: uuid
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            default: 50
+        - in: query
+          name: offset
+          schema:
+            type: integer
+            default: 0
+      responses:
+        "200":
+          description: Supporters
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListSupportersResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /seller/supporters/export:
+    get:
+      tags: [Seller]
+      summary: Export supporters as CSV
+      parameters:
+        - in: query
+          name: project_id
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: CSV file
+          content:
+            text/csv:
+              schema:
+                type: string
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /seller/projects/analysis:
+    get:
+      tags: [Seller]
+      summary: Project analytics
+      responses:
+        "200":
+          description: Analysis data
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectAnalysisResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /media/images:
+    post:
+      tags: [Media]
+      summary: Upload image
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+      responses:
+        "201":
+          description: Uploaded
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MediaUploadResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "413":
+          description: Payload too large
+        "415":
+          description: Unsupported media type
+        "429":
+          $ref: "#/components/responses/RateLimited"
+
+  /admin/stats:
+    get:
+      tags: [Admin]
+      summary: Admin dashboard statistics
+      responses:
+        "200":
+          description: Stats
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminStats"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /admin/users:
+    get:
+      tags: [Admin]
+      summary: List users
+      parameters:
+        - in: query
+          name: role
+          schema:
+            $ref: "#/components/schemas/UserRole"
+        - in: query
+          name: search
+          schema:
+            type: string
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            default: 50
+        - in: query
+          name: offset
+          schema:
+            type: integer
+            default: 0
+      responses:
+        "200":
+          description: Users
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListUsersResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /admin/users/{userId}:
+    put:
+      tags: [Admin]
+      summary: Update user (role, isActive, etc.)
+      parameters:
+        - $ref: "#/components/parameters/UserId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AdminUpdateUserRequest"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    delete:
+      tags: [Admin]
+      summary: Delete user
+      parameters:
+        - $ref: "#/components/parameters/UserId"
+      responses:
+        "204":
+          description: Deleted
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /admin/projects:
+    get:
+      tags: [Admin]
+      summary: List all projects (all statuses)
+      parameters:
+        - in: query
+          name: status
+          schema:
+            $ref: "#/components/schemas/ProjectStatus"
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            default: 50
+        - in: query
+          name: offset
+          schema:
+            type: integer
+            default: 0
+      responses:
+        "200":
+          description: Projects
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListProjectsResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /admin/projects/{projectId}:
+    patch:
+      tags: [Admin]
+      summary: Update project status
+      parameters:
+        - $ref: "#/components/parameters/ProjectId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status:
+                  $ref: "#/components/schemas/ProjectStatus"
+                reason:
+                  type: string
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectDetail"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    delete:
+      tags: [Admin]
+      summary: Hard delete project
+      parameters:
+        - $ref: "#/components/parameters/ProjectId"
+      responses:
+        "204":
+          description: Deleted
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /admin/projects/{projectId}/delete-request:
+    patch:
+      tags: [Admin]
+      summary: Approve or reject seller delete request
+      parameters:
+        - $ref: "#/components/parameters/ProjectId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [action]
+              properties:
+                action:
+                  type: string
+                  enum: [approve, reject]
+                reason:
+                  type: string
+      responses:
+        "200":
+          description: Processed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectDetail"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /admin/purchases:
+    get:
+      tags: [Admin]
+      summary: List all purchases
+      parameters:
+        - in: query
+          name: status
+          schema:
+            $ref: "#/components/schemas/PurchaseStatus"
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            default: 50
+        - in: query
+          name: offset
+          schema:
+            type: integer
+            default: 0
+      responses:
+        "200":
+          description: Purchases
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListPurchasesResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /reports:
+    post:
+      tags: [Reports]
+      summary: Submit a report (project, message, or user)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateReportRequest"
+      responses:
+        "201":
+          description: Report created
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "409":
+          $ref: "#/components/responses/Conflict"
+
+  /admin/reports:
+    get:
+      tags: [Admin]
+      summary: List reports for moderation
+      parameters:
+        - in: query
+          name: status
+          schema:
+            $ref: "#/components/schemas/ReportStatus"
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            default: 50
+        - in: query
+          name: offset
+          schema:
+            type: integer
+            default: 0
+      responses:
+        "200":
+          description: Report list
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /admin/reports/{reportId}:
+    patch:
+      tags: [Admin]
+      summary: Update report status and resolution
+      parameters:
+        - in: path
+          name: reportId
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Updated
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /admin/purchases/{purchaseId}:
+    patch:
+      tags: [Admin]
+      summary: Update purchase payment status (PAID / CANCELLED / REFUNDED)
+      parameters:
+        - in: path
+          name: purchaseId
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status:
+                  $ref: "#/components/schemas/PurchaseStatus"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Purchase"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /admin/reviews/users:
+    get:
+      tags: [Admin]
+      summary: List pending buyer (BUYER) registration applications
+      parameters:
+        - in: query
+          name: is_active
+          schema:
+            type: boolean
+            default: false
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            default: 50
+        - in: query
+          name: offset
+          schema:
+            type: integer
+            default: 0
+      responses:
+        "200":
+          description: Pending buyer registrations
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListUsersResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /admin/reviews/users/{userId}/approve:
+    post:
+      tags: [Admin]
+      summary: Approve buyer registration (sets is_active=true)
+      parameters:
+        - $ref: "#/components/parameters/UserId"
+      responses:
+        "200":
+          description: Approved
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /admin/reviews/users/{userId}/reject:
+    post:
+      tags: [Admin]
+      summary: Reject buyer registration
+      parameters:
+        - $ref: "#/components/parameters/UserId"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                reason:
+                  type: string
+      responses:
+        "200":
+          description: Rejected
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /admin/seller-registrations:
+    get:
+      tags: [Admin]
+      summary: List seller (SELLER) KYC registration applications (§5.1.8)
+      parameters:
+        - in: query
+          name: status
+          schema:
+            allOf:
+              - $ref: "#/components/schemas/RegistrationStatus"
+            default: PENDING
+      responses:
+        "200":
+          description: Registrations
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListSellerRegistrationsResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /admin/seller-registrations/{registrationId}:
+    get:
+      tags: [Admin]
+      summary: Get seller KYC detail with signed URLs for identity images (§5.1.8)
+      parameters:
+        - in: path
+          name: registrationId
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Registration detail with short-lived signed URLs for identity images
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SellerRegistrationDetail"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /admin/seller-registrations/{registrationId}/approve:
+    post:
+      tags: [Admin]
+      summary: Approve seller KYC (account_status=ACTIVE, seller_status=ACTIVE, §5.1.8)
+      parameters:
+        - in: path
+          name: registrationId
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Approved
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SellerRegistration"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /admin/seller-registrations/{registrationId}/reject:
+    post:
+      tags: [Admin]
+      summary: Reject seller KYC with reason (§5.1.8)
+      parameters:
+        - in: path
+          name: registrationId
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [reason]
+              properties:
+                reason:
+                  type: string
+                  description: Rejection reason shown to applicant / stored in audit log
+      responses:
+        "200":
+          description: Rejected
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SellerRegistration"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /admin/activity:
+    get:
+      tags: [Admin, Operations]
+      summary: Query user activity logs (favorites, purchases, messages, etc.)
+      parameters:
+        - in: query
+          name: user_id
+          schema:
+            type: string
+            format: uuid
+        - in: query
+          name: action
+          schema:
+            type: string
+            example: favorite.add
+        - in: query
+          name: resource
+          schema:
+            type: string
+        - in: query
+          name: resource_id
+          schema:
+            type: string
+        - in: query
+          name: ip
+          schema:
+            type: string
+        - in: query
+          name: from
+          schema:
+            type: string
+            format: date-time
+        - in: query
+          name: to
+          schema:
+            type: string
+            format: date-time
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            default: 50
+        - in: query
+          name: offset
+          schema:
+            type: integer
+            default: 0
+      responses:
+        "200":
+          description: Activity logs
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListActivityLogsResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /admin/batches:
+    get:
+      tags: [Admin, Operations]
+      summary: List batch job run history
+      parameters:
+        - in: query
+          name: job_name
+          schema:
+            type: string
+        - in: query
+          name: status
+          schema:
+            type: string
+            enum: [RUNNING, SUCCESS, FAILED]
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            default: 20
+      responses:
+        "200":
+          description: Batch runs
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListBatchJobRunsResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /admin/batches/{jobName}/run:
+    post:
+      tags: [Admin, Operations]
+      summary: Manually trigger a batch job
+      parameters:
+        - in: path
+          name: jobName
+          required: true
+          schema:
+            type: string
+            enum: [apply_plans, expire_supporters, expire_projects, reconcile_stripe, purge_tokens]
+        - in: query
+          name: dry_run
+          schema:
+            type: boolean
+            default: false
+      responses:
+        "202":
+          description: Job accepted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BatchJobRun"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /admin/security:
+    get:
+      tags: [Admin, Operations]
+      summary: Security event summary (failed logins, rate limits)
+      parameters:
+        - in: query
+          name: from
+          schema:
+            type: string
+            format: date-time
+        - in: query
+          name: to
+          schema:
+            type: string
+            format: date-time
+      responses:
+        "200":
+          description: Security events
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SecurityEventsResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /admin/audit-logs:
+    get:
+      tags: [Admin]
+      summary: Query audit logs
+      parameters:
+        - in: query
+          name: action
+          schema:
+            type: string
+        - in: query
+          name: resource
+          schema:
+            type: string
+        - in: query
+          name: admin_id
+          schema:
+            type: string
+            format: uuid
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            default: 50
+        - in: query
+          name: offset
+          schema:
+            type: integer
+            default: 0
+      responses:
+        "200":
+          description: Audit logs
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListAuditLogsResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /ws:
+    get:
+      tags: [WebSocket]
+      summary: |
+        WebSocket upgrade for real-time messaging（仕様書 §17.2）。
+        `POST /ws/token` で発行した one-time `ws_token` のみで接続する。
+        `?access_token=` および JWT / AuthToken をクエリに載せることは禁止（ログ・Referer 漏洩防止）。
+        Client sends subscribe/unsubscribe/ping/typing; server sends message_created/read_updated.
+      security: []
+      parameters:
+        - in: query
+          name: ws_token
+          required: true
+          schema:
+            type: string
+          description: One-time token from POST /ws/token（60s TTL・1 回限り）。Bearer / AuthToken クエリは不可。
+      responses:
+        "101":
+          description: |
+            Switching Protocols. Client frames use WSClientSubscribe;
+            server frames use WSMessageCreatedEvent or WSReadUpdatedEvent.
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: "#/components/schemas/WSClientSubscribe"
+                  - $ref: "#/components/schemas/WSMessageCreatedEvent"
+                  - $ref: "#/components/schemas/WSReadUpdatedEvent"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: AuthToken (自社 JWT, 15 min). Google OAuth tokens are not accepted here.
+
+  parameters:
+    ProjectId:
+      in: path
+      name: projectId
+      required: true
+      schema:
+        type: string
+        format: uuid
+    SupporterId:
+      in: path
+      name: supporterId
+      required: true
+      schema:
+        type: string
+        format: uuid
+    UserId:
+      in: path
+      name: userId
+      required: true
+      schema:
+        type: string
+        format: uuid
+
+  responses:
+    BadRequest:
+      description: Invalid request
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    Unauthorized:
+      description: Unauthorized
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    Forbidden:
+      description: Forbidden
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    NotFound:
+      description: Not found
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    Conflict:
+      description: Conflict
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    RateLimited:
+      description: Rate limit exceeded
+      headers:
+        Retry-After:
+          schema:
+            type: integer
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/RateLimitedResponse"
+    InternalError:
+      description: Internal server error
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+
+  schemas:
+    HealthResponse:
+      type: object
+      required: [status, db, redis]
+      properties:
+        status:
+          type: string
+          description: Overall API status
+          enum: [ok]
+          example: ok
+        db:
+          type: string
+          description: PostgreSQL connectivity
+          enum: [ok, error, skipped]
+          example: ok
+        redis:
+          type: string
+          description: Redis connectivity
+          enum: [ok, error, skipped]
+          example: ok
+
+    ErrorResponse:
+      type: object
+      required: [error, code]
+      properties:
+        error:
+          type: string
+        code:
+          type: string
+
+    RateLimitedResponse:
+      allOf:
+        - $ref: "#/components/schemas/ErrorResponse"
+        - type: object
+          properties:
+            retry_after_seconds:
+              type: integer
+
+    UserRole:
+      type: string
+      enum: [BUYER, SELLER, ADMIN]
+
+    ProjectStatus:
+      type: string
+      enum: [PENDING, ACTIVE, COMPLETED, EXPIRED, CANCELLED, DELETE_REQUESTED, DELETED]
+
+    DurationType:
+      type: string
+      enum: [UNLIMITED, LIMITED]
+      description: |
+        UNLIMITED … end_date は null。LIMITED … end_date 必須かつ start_date より後（§5.2.1）。
+
+    MembershipType:
+      type: string
+      enum: [BRONZE, SILVER, GOLD]
+
+    SupporterStatus:
+      type: string
+      enum: [ACTIVE, PENDING_RENEWAL, EXPIRED, CANCELLED]
+      description: |
+        PENDING_RENEWAL … KONBINI 更新未払い。current_period_end までは特典利用可（§5.3.2a）。
+
+    BillingMode:
+      type: string
+      enum: [AUTO, KONBINI]
+      description: |
+        AUTO … Stripe Subscription 自動更新。KONBINI … 周期ごとに Checkout/Invoice 手動払込（§5.3.2）。
+
+    PurchaseStatus:
+      type: string
+      enum: [PENDING, PAID, CANCELLED, REFUNDED, DISPUTED, FAILED]
+
+    PaymentMethod:
+      type: string
+      enum: [CARD, KONBINI, APPLE_PAY, GOOGLE_PAY]
+
+    RegistrationStatus:
+      type: string
+      enum: [PENDING, APPROVED, REJECTED]
+
+    ReportStatus:
+      type: string
+      enum: [PENDING, IN_REVIEW, RESOLVED, DISMISSED]
+
+    ReportTargetType:
+      type: string
+      enum: [PROJECT, MESSAGE, USER]
+
+    CreateReportRequest:
+      type: object
+      required: [target_type, target_id, reason]
+      properties:
+        target_type:
+          $ref: "#/components/schemas/ReportTargetType"
+        target_id:
+          type: string
+          format: uuid
+        reason:
+          type: string
+        detail:
+          type: string
+
+    RegisterRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          minLength: 8
+        name:
+          type: string
+
+    RegisterResponse:
+      type: object
+      description: Buyer is created with is_active=false; no tokens until admin approval
+      properties:
+        user:
+          $ref: "#/components/schemas/User"
+        message:
+          type: string
+          example: Registration pending admin approval
+
+    IdentityDocumentType:
+      type: string
+      enum:
+        - DRIVERS_LICENSE
+      description: |
+        運転免許証のみ対象。表面・裏面の両方が必須。
+
+    SellerRegisterPayload:
+      type: object
+      description: |
+        multipart の `registration` フィールドに JSON 文字列として渡す（§5.1.8）。
+        運転免許証（DRIVERS_LICENSE）照合用メタデータ + アカウント情報。
+      required:
+        - email
+        - password
+        - full_name
+        - birth_date
+        - address
+        - photo_present
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          minLength: 8
+        full_name:
+          type: string
+          description: 免許証記載の氏名（例 山田 太郎）
+        birth_date:
+          type: string
+          format: date
+          description: 免許証記載の生年月日（例 1990-01-01）
+        address:
+          type: string
+          description: 免許証記載の住所
+        photo_present:
+          type: boolean
+          description: 表面に顔写真が写っていることの申告（管理者が目視確認）
+
+    SellerRegisterRequest:
+      description: Alias of SellerRegisterPayload (embedded in multipart registration field)
+      allOf:
+        - $ref: "#/components/schemas/SellerRegisterPayload"
+
+    SellerRegisterResponse:
+      type: object
+      properties:
+        user:
+          $ref: "#/components/schemas/User"
+        registration:
+          $ref: "#/components/schemas/SellerRegistration"
+
+    LoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+
+    LoginResponse:
+      type: object
+      properties:
+        auth_token:
+          type: string
+          description: Short-lived AuthToken (JWT); store in memory only, NOT localStorage
+        user:
+          $ref: "#/components/schemas/User"
+        requires_2fa:
+          type: boolean
+          description: |
+            true のとき AuthToken は未発行。POST /auth/2fa/challenge で TOTP 検証後に AuthToken を取得する（§5.1.6）。
+
+    ReResponse:
+      type: object
+      properties:
+        auth_token:
+          type: string
+          description: New AuthToken (JWT); store in memory only
+
+    ForgotPasswordRequest:
+      type: object
+      required: [email]
+      properties:
+        email:
+          type: string
+          format: email
+
+    ResetPasswordRequest:
+      type: object
+      required: [token, password]
+      properties:
+        token:
+          type: string
+        password:
+          type: string
+          minLength: 8
+
+    ChangePasswordRequest:
+      type: object
+      required: [current_password, new_password]
+      properties:
+        current_password:
+          type: string
+        new_password:
+          type: string
+          minLength: 8
+
+    CheckEmailResponse:
+      type: object
+      properties:
+        available:
+          type: boolean
+
+    MeResponse:
+      type: object
+      properties:
+        user:
+          $ref: "#/components/schemas/User"
+
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        email:
+          type: string
+          format: email
+        name:
+          type: string
+          nullable: true
+        role:
+          $ref: "#/components/schemas/UserRole"
+        is_active:
+          type: boolean
+        avatar_url:
+          type: string
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    UserProfile:
+      allOf:
+        - $ref: "#/components/schemas/User"
+
+    UpdateProfileRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        avatar_url:
+          type: string
+
+    ProjectPlan:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        project_id:
+          type: string
+          format: uuid
+        membership_type:
+          $ref: "#/components/schemas/MembershipType"
+        price:
+          type: integer
+          description: JPY
+        max_supporters:
+          type: integer
+          nullable: true
+        benefits:
+          type: string
+        is_active:
+          type: boolean
+        supporter_count:
+          type: integer
+
+    ProjectSummary:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        title:
+          type: string
+        description:
+          type: string
+        target_amount:
+          type: integer
+        current_amount:
+          type: integer
+        supporter_count:
+          type: integer
+        duration_type:
+          $ref: "#/components/schemas/DurationType"
+        start_date:
+          type: string
+          format: date-time
+        end_date:
+          type: string
+          format: date-time
+          nullable: true
+          description: null when duration_type=UNLIMITED（§5.2.1）
+        image_url:
+          type: string
+          nullable: true
+        status:
+          $ref: "#/components/schemas/ProjectStatus"
+        seller:
+          $ref: "#/components/schemas/User"
+        plans:
+          type: array
+          items:
+            $ref: "#/components/schemas/ProjectPlan"
+
+    ProjectDetail:
+      allOf:
+        - $ref: "#/components/schemas/ProjectSummary"
+        - type: object
+          properties:
+            images:
+              type: array
+              items:
+                $ref: "#/components/schemas/ProjectImage"
+            delete_request:
+              type: boolean
+
+    ProjectImage:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        image_url:
+          type: string
+        is_main:
+          type: boolean
+        order:
+          type: integer
+
+    CreateProjectRequest:
+      type: object
+      required: [title, description, target_amount, duration_type, start_date, plans]
+      properties:
+        title:
+          type: string
+          maxLength: 200
+        description:
+          type: string
+        target_amount:
+          type: integer
+          minimum: 0
+        duration_type:
+          $ref: "#/components/schemas/DurationType"
+        start_date:
+          type: string
+          format: date-time
+        end_date:
+          type: string
+          format: date-time
+          nullable: true
+          description: Required when duration_type=LIMITED; must be null when UNLIMITED（§5.2.1）
+        image_url:
+          type: string
+        plans:
+          type: array
+          minItems: 3
+          maxItems: 3
+          items:
+            type: object
+            required: [membership_type, price, benefits]
+            properties:
+              membership_type:
+                $ref: "#/components/schemas/MembershipType"
+              price:
+                type: integer
+                minimum: 1
+                maximum: 100000
+              max_supporters:
+                type: integer
+              benefits:
+                type: string
+
+    UpdateProjectRequest:
+      type: object
+      properties:
+        title:
+          type: string
+        description:
+          type: string
+        target_amount:
+          type: integer
+        duration_type:
+          $ref: "#/components/schemas/DurationType"
+        start_date:
+          type: string
+          format: date-time
+        end_date:
+          type: string
+          format: date-time
+          nullable: true
+        image_url:
+          type: string
+        is_reapply:
+          type: boolean
+          description: If true, status returns to PENDING
+
+    ListProjectsResponse:
+      type: object
+      properties:
+        projects:
+          type: array
+          items:
+            $ref: "#/components/schemas/ProjectSummary"
+        total:
+          type: integer
+        limit:
+          type: integer
+        offset:
+          type: integer
+
+    Supporter:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        project_id:
+          type: string
+          format: uuid
+        plan_id:
+          type: string
+          format: uuid
+        user_id:
+          type: string
+          format: uuid
+        status:
+          $ref: "#/components/schemas/SupporterStatus"
+        billing_mode:
+          $ref: "#/components/schemas/BillingMode"
+        start_date:
+          type: string
+          format: date-time
+          description: Alias of current_period_start
+        end_date:
+          type: string
+          format: date-time
+          description: Alias of current_period_end（§5.3.0）
+        pending_plan_id:
+          type: string
+          format: uuid
+          nullable: true
+        plan_change_date:
+          type: string
+          format: date-time
+          nullable: true
+        project:
+          $ref: "#/components/schemas/ProjectSummary"
+        plan:
+          $ref: "#/components/schemas/ProjectPlan"
+        pending_plan:
+          $ref: "#/components/schemas/ProjectPlan"
+
+    ListSupportersResponse:
+      type: object
+      properties:
+        supporters:
+          type: array
+          items:
+            $ref: "#/components/schemas/Supporter"
+        total:
+          type: integer
+
+    UpgradePlanRequest:
+      type: object
+      required: [plan_id]
+      properties:
+        plan_id:
+          type: string
+          format: uuid
+
+    UpgradePlanResponse:
+      type: object
+      properties:
+        supporter:
+          $ref: "#/components/schemas/Supporter"
+        payment_intent_client_secret:
+          type: string
+          nullable: true
+          description: Present only for upgrade (higher price)
+
+    ChangeBillingRequest:
+      type: object
+      required: [billing_mode]
+      properties:
+        billing_mode:
+          $ref: "#/components/schemas/BillingMode"
+        payment_method:
+          $ref: "#/components/schemas/PaymentMethod"
+          description: Required when switching to AUTO or changing PM within AUTO
+
+    Purchase:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        project_id:
+          type: string
+          format: uuid
+        supporter_id:
+          type: string
+          format: uuid
+          nullable: true
+          description: NULL when Supporter not yet created (e.g. first KONBINI unpaid)
+        buyer_id:
+          type: string
+          format: uuid
+        quantity:
+          type: integer
+        total_price:
+          type: integer
+        status:
+          $ref: "#/components/schemas/PurchaseStatus"
+        payment_method:
+          $ref: "#/components/schemas/PaymentMethod"
+        created_at:
+          type: string
+          format: date-time
+        project:
+          $ref: "#/components/schemas/ProjectSummary"
+        buyer:
+          $ref: "#/components/schemas/User"
+
+    ListPurchasesResponse:
+      type: object
+      properties:
+        purchases:
+          type: array
+          items:
+            $ref: "#/components/schemas/Purchase"
+        total:
+          type: integer
+
+    CreateCheckoutSessionRequest:
+      type: object
+      required: [project_id, plan_id]
+      properties:
+        project_id:
+          type: string
+          format: uuid
+        plan_id:
+          type: string
+          format: uuid
+        payment_method:
+          $ref: "#/components/schemas/PaymentMethod"
+        success_url:
+          type: string
+          format: uri
+        cancel_url:
+          type: string
+          format: uri
+
+    CheckoutSessionResponse:
+      type: object
+      properties:
+        session_id:
+          type: string
+        url:
+          type: string
+          format: uri
+
+    CreatePaymentIntentRequest:
+      type: object
+      required: [project_id, plan_id]
+      properties:
+        project_id:
+          type: string
+          format: uuid
+        plan_id:
+          type: string
+          format: uuid
+
+    PaymentIntentResponse:
+      type: object
+      properties:
+        client_secret:
+          type: string
+        payment_intent_id:
+          type: string
+
+    Message:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        project_id:
+          type: string
+          format: uuid
+        sender_id:
+          type: string
+          format: uuid
+        receiver_id:
+          type: string
+          format: uuid
+        content:
+          type: string
+        is_read:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+        sender:
+          $ref: "#/components/schemas/User"
+        receiver:
+          $ref: "#/components/schemas/User"
+
+    SendMessageRequest:
+      type: object
+      required: [project_id, receiver_id, content]
+      properties:
+        project_id:
+          type: string
+          format: uuid
+        receiver_id:
+          type: string
+          format: uuid
+        content:
+          type: string
+          maxLength: 4000
+
+    MessageThread:
+      type: object
+      properties:
+        project_id:
+          type: string
+          format: uuid
+        project_title:
+          type: string
+        partner:
+          $ref: "#/components/schemas/User"
+        messages:
+          type: array
+          items:
+            $ref: "#/components/schemas/Message"
+        unread_count:
+          type: integer
+
+    ListMessageThreadsResponse:
+      type: object
+      properties:
+        threads:
+          type: array
+          items:
+            $ref: "#/components/schemas/MessageThread"
+
+    ToggleFavoriteRequest:
+      type: object
+      required: [project_id, action]
+      properties:
+        project_id:
+          type: string
+          format: uuid
+        action:
+          type: string
+          enum: [add, remove]
+
+    FavoriteStatus:
+      type: object
+      properties:
+        project_id:
+          type: string
+          format: uuid
+        is_favorited:
+          type: boolean
+
+    ListFavoritesResponse:
+      type: object
+      properties:
+        favorites:
+          type: array
+          items:
+            $ref: "#/components/schemas/ProjectSummary"
+
+    SellerDashboardStats:
+      type: object
+      properties:
+        total_projects:
+          type: integer
+        active_projects:
+          type: integer
+        total_supporters:
+          type: integer
+        total_revenue:
+          type: integer
+
+    ProjectAnalysisResponse:
+      type: object
+      properties:
+        projects:
+          type: array
+          items:
+            type: object
+            properties:
+              project_id:
+                type: string
+                format: uuid
+              title:
+                type: string
+              supporter_count:
+                type: integer
+              revenue:
+                type: integer
+              plan_breakdown:
+                type: object
+                additionalProperties:
+                  type: integer
+
+    MediaUploadResponse:
+      type: object
+      properties:
+        url:
+          type: string
+          format: uri
+
+    AdminStats:
+      type: object
+      properties:
+        total_users:
+          type: integer
+        total_projects:
+          type: integer
+        total_purchases:
+          type: integer
+        total_revenue:
+          type: integer
+        recent_users:
+          type: array
+          items:
+            $ref: "#/components/schemas/User"
+
+    ListUsersResponse:
+      type: object
+      properties:
+        users:
+          type: array
+          items:
+            $ref: "#/components/schemas/User"
+        total:
+          type: integer
+
+    AdminUpdateUserRequest:
+      type: object
+      properties:
+        email:
+          type: string
+          format: email
+        name:
+          type: string
+        role:
+          $ref: "#/components/schemas/UserRole"
+        is_active:
+          type: boolean
+
+    SellerRegistration:
+      type: object
+      description: 出品者 KYC 申請（§5.1.8）。運転免許証（DRIVERS_LICENSE）のみ。
+      properties:
+        id:
+          type: string
+          format: uuid
+        user_id:
+          type: string
+          format: uuid
+        full_name:
+          type: string
+          description: 免許証照合用に申告された氏名
+        birth_date:
+          type: string
+          format: date
+        address:
+          type: string
+        photo_present:
+          type: boolean
+        identity_document_type:
+          $ref: "#/components/schemas/IdentityDocumentType"
+          description: 常に DRIVERS_LICENSE
+        has_identity_document_front:
+          type: boolean
+          description: 表面画像 storage key が存在する（承認前必須）
+        has_identity_document_back:
+          type: boolean
+          description: 裏面画像 storage key が存在する（承認前必須）
+        status:
+          $ref: "#/components/schemas/RegistrationStatus"
+        rejection_reason:
+          type: string
+          nullable: true
+        reviewed_at:
+          type: string
+          format: date-time
+          nullable: true
+        reviewed_by:
+          type: string
+          format: uuid
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        user:
+          $ref: "#/components/schemas/User"
+
+    SellerRegistrationDetail:
+      allOf:
+        - $ref: "#/components/schemas/SellerRegistration"
+        - type: object
+          properties:
+            identity_document_front_url:
+              type: string
+              format: uri
+              description: Short-lived signed URL for admin preview only
+            identity_document_back_url:
+              type: string
+              format: uri
+              nullable: true
+
+    ListSellerRegistrationsResponse:
+      type: object
+      properties:
+        registrations:
+          type: array
+          items:
+            $ref: "#/components/schemas/SellerRegistration"
+        total:
+          type: integer
+
+    AuditLog:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        admin_id:
+          type: string
+          format: uuid
+        admin_email:
+          type: string
+        action:
+          type: string
+        resource:
+          type: string
+        resource_id:
+          type: string
+        details:
+          type: string
+          nullable: true
+        reason:
+          type: string
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+
+    ListAuditLogsResponse:
+      type: object
+      properties:
+        logs:
+          type: array
+          items:
+            $ref: "#/components/schemas/AuditLog"
+        total:
+          type: integer
+
+    ActivityLog:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        user_id:
+          type: string
+          format: uuid
+          nullable: true
+        action:
+          type: string
+          example: favorite.add
+        resource:
+          type: string
+        resource_id:
+          type: string
+        ip_address:
+          type: string
+        user_agent:
+          type: string
+        request_id:
+          type: string
+        metadata:
+          type: object
+          additionalProperties: true
+        created_at:
+          type: string
+          format: date-time
+        user:
+          $ref: "#/components/schemas/User"
+
+    ListActivityLogsResponse:
+      type: object
+      properties:
+        logs:
+          type: array
+          items:
+            $ref: "#/components/schemas/ActivityLog"
+        total:
+          type: integer
+
+    BatchJobRun:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        job_name:
+          type: string
+        status:
+          type: string
+          enum: [RUNNING, SUCCESS, FAILED]
+        started_at:
+          type: string
+          format: date-time
+        finished_at:
+          type: string
+          format: date-time
+          nullable: true
+        processed:
+          type: integer
+        failed:
+          type: integer
+        error_message:
+          type: string
+          nullable: true
+        triggered_by:
+          type: string
+
+    ListBatchJobRunsResponse:
+      type: object
+      properties:
+        runs:
+          type: array
+          items:
+            $ref: "#/components/schemas/BatchJobRun"
+        total:
+          type: integer
+
+    SecurityEventsResponse:
+      type: object
+      properties:
+        login_failed_count:
+          type: integer
+        rate_limited_count:
+          type: integer
+        top_ips:
+          type: array
+          items:
+            type: object
+            properties:
+              ip:
+                type: string
+              count:
+                type: integer
+
+    WSClientSubscribe:
+      type: object
+      required: [type, project_id]
+      properties:
+        type:
+          type: string
+          enum: [subscribe, unsubscribe]
+        schema_version:
+          type: integer
+          enum: [1]
+        project_id:
+          type: string
+          format: uuid
+
+    WSMessageCreatedEvent:
+      type: object
+      required: [type, schema_version, project_id, message]
+      properties:
+        type:
+          type: string
+          enum: [message_created]
+        schema_version:
+          type: integer
+          enum: [1]
+        project_id:
+          type: string
+          format: uuid
+        message:
+          $ref: "#/components/schemas/Message"
+
+    WSReadUpdatedEvent:
+      type: object
+      required: [type, schema_version, project_id, message_id, reader_id]
+      properties:
+        type:
+          type: string
+          enum: [read_updated]
+        schema_version:
+          type: integer
+          enum: [1]
+        project_id:
+          type: string
+          format: uuid
+        message_id:
+          type: string
+          format: uuid
+        reader_id:
+          type: string
+          format: uuid
+
+    NotificationsResponse:
+      type: object
+      properties:
+        unread_messages:
+          type: integer
+        items:
+          type: array
+          items:
+            type: object
+            properties:
+              type:
+                type: string
+                enum: [unread_message, project_update]
+              title:
+                type: string
+              created_at:
+                type: string
+                format: date-time
