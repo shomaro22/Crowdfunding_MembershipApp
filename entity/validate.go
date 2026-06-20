@@ -79,6 +79,30 @@ func ValidateMessage(content string) error {
 	return nil
 }
 
+// ValidateSellerKYC は免許証照合用メタデータを検証する。
+func ValidateSellerKYC(fullName string, birthDate time.Time, address string, photoPresent bool) error {
+	if strings.TrimSpace(fullName) == "" {
+		return ErrBadSellerKYC
+	}
+	if birthDate.IsZero() {
+		return ErrBadSellerKYC
+	}
+	if strings.TrimSpace(address) == "" {
+		return ErrBadSellerKYC
+	}
+	if !photoPresent {
+		return ErrBadSellerKYC
+	}
+	return nil
+}
+
+func ValidateSellerIDDoc(docType IDDocType) error {
+	if !docType.Valid() {
+		return ErrBadIDDoc
+	}
+	return nil
+}
+
 func ValidateDuration(duration DurationType, start time.Time, end *time.Time) error {
 	if !duration.Valid() {
 		return ErrBadDuration
