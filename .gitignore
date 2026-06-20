@@ -1,0 +1,11 @@
+.env
+data/
+*.exe
+*.test
+
+# OS
+.DS_Store
+
+# フロント（将来）
+node_modules/
+dist/
