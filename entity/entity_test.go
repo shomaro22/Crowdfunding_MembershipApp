@@ -49,12 +49,18 @@ func TestPurchaseDisputed(t *testing.T) {
 	}
 }
 
-func TestIdentityDocBack(t *testing.T) {
-	if !IDDriversLicense.NeedsBack() {
-		t.Fatal("drivers license requires back")
+func TestSellerIDDoc(t *testing.T) {
+	if !IDDriversLicense.Valid() {
+		t.Fatal("DRIVERS_LICENSE should be valid")
 	}
-	if IDMyNumberCard.NeedsBack() {
-		t.Fatal("my number card is front only")
+	if IDDocType("MY_NUMBER_CARD").Valid() {
+		t.Fatal("only DRIVERS_LICENSE is in scope per §5.1.8")
+	}
+	if err := ValidateSellerIDDoc(IDDriversLicense); err != nil {
+		t.Fatalf("expected ok: %v", err)
+	}
+	if err := ValidateSellerIDDoc("PASSPORT"); err != ErrBadIDDoc {
+		t.Fatalf("expected ErrBadIDDoc, got %v", err)
 	}
 }
 
@@ -170,25 +176,55 @@ func TestJSONMetadata(t *testing.T) {
 	}
 }
 
+func TestValidateSellerKYC(t *testing.T) {
+	birth := time.Date(1990, 1, 1, 0, 0, 0, 0, time.UTC)
+	if err := ValidateSellerKYC("山田 太郎", birth, "東京都千代田区", true); err != nil {
+		t.Fatalf("expected ok: %v", err)
+	}
+	if err := ValidateSellerKYC("", birth, "東京都", true); err != ErrBadSellerKYC {
+		t.Fatalf("empty name: %v", err)
+	}
+	if err := ValidateSellerKYC("山田", time.Time{}, "東京都", true); err != ErrBadSellerKYC {
+		t.Fatalf("zero birth date: %v", err)
+	}
+	if err := ValidateSellerKYC("山田", birth, "  ", true); err != ErrBadSellerKYC {
+		t.Fatalf("empty address: %v", err)
+	}
+	if err := ValidateSellerKYC("山田", birth, "東京都", false); err != ErrBadSellerKYC {
+		t.Fatalf("photo_present false: %v", err)
+	}
+}
+
 func TestSellerRegApprove(t *testing.T) {
 	front := "kyc/front.jpg"
+	back := "kyc/back.jpg"
+	birth := time.Date(1990, 1, 1, 0, 0, 0, 0, time.UTC)
+
 	reg := SellerReg{
-		Status:     RegPending,
-		IDDocType:  IDMyNumberCard,
-		IDFrontKey: &front,
+		Status:       RegPending,
+		FullName:     "山田 太郎",
+		BirthDate:    birth,
+		Address:      "東京都千代田区",
+		PhotoPresent: true,
+		IDFrontKey:   &front,
+		IDBackKey:    &back,
 	}
 	if !reg.CanApprove() {
-		t.Fatal("front-only document should be approvable with front key")
+		t.Fatal("complete application should be approvable")
+	}
+	if reg.IDDocType() != IDDriversLicense {
+		t.Fatal("KYC scope is drivers license only")
 	}
 
-	reg.IDDocType = IDDriversLicense
+	reg.IDBackKey = nil
 	if reg.CanApprove() {
-		t.Fatal("drivers license without back should not be approvable")
+		t.Fatal("missing back image should not be approvable")
 	}
-	back := "kyc/back.jpg"
+
 	reg.IDBackKey = &back
-	if !reg.CanApprove() {
-		t.Fatal("drivers license with both sides should be approvable")
+	reg.PhotoPresent = false
+	if reg.CanApprove() {
+		t.Fatal("missing photo_present should not be approvable")
 	}
 }
 
