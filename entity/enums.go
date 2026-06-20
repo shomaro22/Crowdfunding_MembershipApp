@@ -10,7 +10,7 @@ const (
 	UserRoleAdmin  UserRole = "ADMIN"
 )
 
-//roleのs
+//roleのr
 func (r UserRole) Valid() bool {
 	switch r {
 	case UserRoleBuyer, UserRoleSeller, UserRoleAdmin:
@@ -29,7 +29,7 @@ const (
 	AccountStatusBanned    AccountStatus = "BANNED"
 )
 
-//SellerStatusのs
+//AccountsStatusのs
 func (s AccountStatus) Valid() bool {
 	switch s {
 	case AccountStatusPending, AccountStatusActive, AccountStatusSuspended, AccountStatusBanned:
@@ -197,8 +197,8 @@ const (
 	PurchaseStatusPaid      PurchaseStatus = "PAID"
 	PurchaseStatusCancelled PurchaseStatus = "CANCELLED"
 	PurchaseStatusRefunded  PurchaseStatus = "REFUNDED"
-	PurchaseStatusDisputed  PurchaseStatus = "DISPUTED" // OpenAPI 未定義、仕様準拠
-	PurchaseStatusFailed    PurchaseStatus = "FAILED"   // OpenAPI 未定義、仕様準拠
+	PurchaseStatusDisputed  PurchaseStatus = "DISPUTED" 
+	PurchaseStatusFailed    PurchaseStatus = "FAILED"   
 )
 
 func (s PurchaseStatus) Valid() bool {
@@ -246,28 +246,13 @@ func (s RegStatus) Valid() bool {
 	}
 }
 
+// IDDocType は運転免許証のみ。
 type IDDocType string
 
-const (
-	IDDriversLicense IDDocType = "DRIVERS_LICENSE"
-	IDMyNumberCard   IDDocType = "MY_NUMBER_CARD"
-	IDResidenceCard  IDDocType = "RESIDENCE_CARD"
-	IDPassport       IDDocType = "PASSPORT"
-	IDResidentRecord IDDocType = "RESIDENT_RECORD"
-)
+const IDDriversLicense IDDocType = "DRIVERS_LICENSE"
 
 func (t IDDocType) Valid() bool {
-	switch t {
-	case IDDriversLicense, IDMyNumberCard,
-		IDResidenceCard, IDPassport, IDResidentRecord:
-		return true
-	default:
-		return false
-	}
-}
-
-func (t IDDocType) NeedsBack() bool {
-	return t == IDDriversLicense || t == IDResidenceCard
+	return t == IDDriversLicense
 }
 
 type ReportStatus string
