@@ -1,0 +1,115 @@
+package usecase
+
+import (
+	"context"
+	"strings"
+	"time"
+
+	"crowdfund-app/auth"
+	"crowdfund-app/entity"
+	"crowdfund-app/repository"
+	"crowdfund-app/storage"
+
+	"github.com/google/uuid"
+)
+
+type SellerRegIn struct {
+	Email        string
+	Password     string
+	FullName     string
+	BirthDate    time.Time
+	Address      string
+	PhotoPresent bool
+	Front        storage.KYCImage
+	Back         storage.KYCImage
+}
+
+type SellerRegOut struct {
+	User         *entity.User
+	Registration *entity.SellerReg
+}
+
+func (a *AuthUseCase) RegisterSeller(ctx context.Context, in SellerRegIn, meta AuthMeta) (*SellerRegOut, error) {
+	if a.KYCStore == nil || a.SellerRegs == nil || a.DB == nil {
+		return nil, ErrNotFound
+	}
+
+	normalized, err := entity.ValidateBuyerReg(in.Email, in.Password)
+	if err != nil {
+		switch err {
+		case entity.ErrBadEmail:
+			return nil, ErrInvalidEmail
+		case entity.ErrWeakPassword:
+			return nil, ErrWeakPassword
+		default:
+			return nil, err
+		}
+	}
+	if err := entity.ValidateSellerKYC(in.FullName, in.BirthDate, in.Address, in.PhotoPresent); err != nil {
+		return nil, err
+	}
+
+	exists, err := a.Users.EmailExists(ctx, normalized)
+	if err != nil {
+		return nil, err
+	}
+	if exists {
+		return nil, ErrEmailInUse
+	}
+
+	userID := uuid.New()
+	frontKey, err := a.KYCStore.Save(ctx, userID, "front", in.Front)
+	if err != nil {
+		return nil, err
+	}
+	backKey, err := a.KYCStore.Save(ctx, userID, "back", in.Back)
+	if err != nil {
+		_ = a.KYCStore.Remove(ctx, frontKey)
+		return nil, err
+	}
+
+	hash, err := auth.HashPassword(in.Password)
+	if err != nil {
+		_ = a.KYCStore.Remove(ctx, frontKey, backKey)
+		return nil, err
+	}
+
+	now := time.Now().UTC()
+	u := &entity.User{
+		ID:            userID,
+		Email:         normalized,
+		PasswordHash:  hash,
+		Role:          entity.UserRoleSeller,
+		AccountStatus: entity.AccountStatusPending,
+		SellerStatus:  entity.SellerStatusPending,
+		CreatedAt:     now,
+		UpdatedAt:     now,
+	}
+	reg := &entity.SellerReg{
+		ID:           uuid.New(),
+		UserID:       userID,
+		FullName:     strings.TrimSpace(in.FullName),
+		BirthDate:    in.BirthDate,
+		Address:      strings.TrimSpace(in.Address),
+		PhotoPresent: in.PhotoPresent,
+		IDFrontKey:   &frontKey,
+		IDBackKey:    &backKey,
+		Status:       entity.RegPending,
+		CreatedAt:    now,
+		UpdatedAt:    now,
+	}
+
+	err = repository.WithTx(ctx, a.DB, func(txCtx context.Context) error {
+		if err := a.Users.Create(txCtx, u); err != nil {
+			return err
+		}
+		return a.SellerRegs.Create(txCtx, reg)
+	})
+	if err != nil {
+		_ = a.KYCStore.Remove(ctx, frontKey, backKey)
+		return nil, err
+	}
+
+	a.logActivity(ctx, &u.ID, entity.SellerRegister, "seller_registration", reg.ID.String(), meta, nil)
+	return &SellerRegOut{User: u, Registration: reg}, nil
+}
