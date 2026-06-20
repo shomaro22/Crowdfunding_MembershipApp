@@ -82,16 +82,16 @@ func ValidateMessage(content string) error {
 // ValidateSellerKYC は免許証照合用メタデータを検証する。
 func ValidateSellerKYC(fullName string, birthDate time.Time, address string, photoPresent bool) error {
 	if strings.TrimSpace(fullName) == "" {
-		return ErrBadSellerKYC
+		return ErrBadKYC
 	}
 	if birthDate.IsZero() {
-		return ErrBadSellerKYC
+		return ErrBadKYC
 	}
 	if strings.TrimSpace(address) == "" {
-		return ErrBadSellerKYC
+		return ErrBadKYC
 	}
 	if !photoPresent {
-		return ErrBadSellerKYC
+		return ErrBadKYC
 	}
 	return nil
 }
