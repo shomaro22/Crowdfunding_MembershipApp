@@ -16,6 +16,7 @@ type AuthClaims struct {
 	Role          entity.UserRole
 	TwoFAVerified bool
 	AdminRole     *entity.AdminRole
+	TokenVersion  int64
 }
 
 type TokenService struct {
@@ -39,6 +40,7 @@ func (s *TokenService) Issue(claims AuthClaims) (string, error) {
 		"sub":          claims.UserID.String(),
 		"role":         string(claims.Role),
 		"2fa_verified": claims.TwoFAVerified,
+		"tv":           claims.TokenVersion,
 		"exp":          now.Add(s.ttl).Unix(),
 		"iat":          now.Unix(),
 	}
@@ -77,6 +79,9 @@ func (s *TokenService) Parse(raw string) (AuthClaims, error) {
 	out.Role = entity.UserRole(roleStr)
 	if v, ok := mc["2fa_verified"].(bool); ok {
 		out.TwoFAVerified = v
+	}
+	if tv, ok := mc["tv"].(float64); ok {
+		out.TokenVersion = int64(tv)
 	}
 	if ar, ok := mc["admin_role"].(string); ok && ar != "" {
 		r := entity.AdminRole(ar)
