@@ -17,12 +17,13 @@ func (a *AuthUseCase) GetUser(ctx context.Context, userID uuid.UUID) (*entity.Us
 	if u == nil {
 		return nil, ErrNotFound
 	}
-	if !u.IsActive() {
-		return nil, ErrInactiveUser
-	}
 	return u, nil
 }
 
 func (a *AuthUseCase) ParseToken(raw string) (auth.AuthClaims, error) {
 	return a.Tokens.Parse(raw)
+}
+
+func (a *AuthUseCase) SigningKey() []byte {
+	return a.TOTPKey
 }

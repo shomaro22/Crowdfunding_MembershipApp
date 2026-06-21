@@ -67,6 +67,7 @@ func (h *AuthController) Login(c echo.Context) error {
 		return mapAuthError(err)
 	}
 	if res.Requires2FA {
+		auth.SetPending2FA(c, h.CookieCfg, h.Auth.SigningKey(), res.User.ID)
 		return c.JSON(http.StatusOK, map[string]any{
 			"requires_2fa": true,
 			"user":         userToJSON(res.User),

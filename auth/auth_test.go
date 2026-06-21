@@ -19,6 +19,7 @@ func TestIssueParse(t *testing.T) {
 		Role:          entity.UserRoleAdmin,
 		TwoFAVerified: true,
 		AdminRole:     &adminRole,
+		TokenVersion:  1,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -38,6 +39,9 @@ func TestIssueParse(t *testing.T) {
 	}
 	if claims.AdminRole == nil || *claims.AdminRole != adminRole {
 		t.Fatalf("admin role mismatch")
+	}
+	if claims.TokenVersion != 1 {
+		t.Fatalf("token version mismatch")
 	}
 }
 
