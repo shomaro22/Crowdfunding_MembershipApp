@@ -54,9 +54,15 @@ type AuthUseCase struct {
 	ReTokens     repository.ReTokenRepo
 	ResetToks    repository.ResetRepo
 	Activity     repository.ActivityRepo
+	OAuth        repository.OAuthRepo
+	OAuthCache   repository.OAuthCache
+	TOTPBackup   repository.TOTPBackupRepo
 	Tokens       *auth.TokenService
 	Mailer       Mailer
 	KYCStore     storage.KYCStore
+	Google       *auth.GoogleOAuth
+	TOTPKey      []byte
+	TOTPIssuer   string
 	DB           *gorm.DB
 	AppPublicURL string
 }
@@ -109,6 +115,7 @@ func (a *AuthUseCase) issueSession(ctx context.Context, u *entity.User, verified
 		Role:          u.Role,
 		TwoFAVerified: verified2FA,
 		AdminRole:     u.AdminRole,
+		TokenVersion:  u.TokenVersion,
 	})
 	if err != nil {
 		return nil, err
@@ -129,4 +136,11 @@ func (a *AuthUseCase) issueSession(ctx context.Context, u *entity.User, verified
 		return nil, err
 	}
 	return &SessionTokens{AuthToken: authToken, ReToken: plain}, nil
+}
+
+func (a *AuthUseCase) invalidateSessions(ctx context.Context, userID uuid.UUID) error {
+	if _, err := a.Users.BumpTokenVer(ctx, userID); err != nil {
+		return err
+	}
+	return a.ReTokens.RevokeAllForUser(ctx, userID, time.Now().UTC())
 }

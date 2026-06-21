@@ -7,7 +7,7 @@ import (
 	"github.com/google/uuid"
 )
 
-// SellerReg は出品者 KYC 申請（5.1.8）。運転免許証のみ。画像は storage key のみ保持する。
+// SellerReg は出品者 KYC 申請。運転免許証のみ。画像は storage key のみ保持する。
 type SellerReg struct {
 	ID           uuid.UUID  `gorm:"type:uuid;primaryKey;default:gen_random_uuid()"`
 	UserID       uuid.UUID  `gorm:"type:uuid;not null;index"`

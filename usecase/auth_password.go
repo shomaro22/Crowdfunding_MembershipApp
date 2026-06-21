@@ -76,7 +76,7 @@ func (a *AuthUseCase) ResetPassword(ctx context.Context, plainToken, newPassword
 	if err := a.ResetToks.MarkUsed(ctx, row.ID, now); err != nil {
 		return err
 	}
-	return a.ReTokens.RevokeAllForUser(ctx, u.ID, now)
+	return a.invalidateSessions(ctx, u.ID)
 }
 
 func (a *AuthUseCase) ChangePassword(ctx context.Context, userID uuid.UUID, current, newPassword string) error {
@@ -100,5 +100,5 @@ func (a *AuthUseCase) ChangePassword(ctx context.Context, userID uuid.UUID, curr
 	if err := a.Users.Update(ctx, u); err != nil {
 		return err
 	}
-	return a.ReTokens.RevokeAllForUser(ctx, u.ID, now)
+	return a.invalidateSessions(ctx, u.ID)
 }
