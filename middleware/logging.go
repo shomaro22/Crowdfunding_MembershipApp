@@ -7,7 +7,7 @@ import (
 	"github.com/labstack/echo/v4"
 )
 
-const ContextRequestIDKey = "request_id"
+const CtxRequestID = "request_id"
 
 func RequestID() echo.MiddlewareFunc {
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
@@ -16,7 +16,7 @@ func RequestID() echo.MiddlewareFunc {
 			if id == "" {
 				id = uuid.NewString()
 			}
-			c.Set(ContextRequestIDKey, id)
+			c.Set(CtxRequestID, id)
 			c.Response().Header().Set("X-Request-ID", id)
 			return next(c)
 		}
@@ -27,7 +27,7 @@ func RequestLogger() echo.MiddlewareFunc {
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(c echo.Context) error {
 			err := next(c)
-			reqID, _ := c.Get(ContextRequestIDKey).(string)
+			reqID, _ := c.Get(CtxRequestID).(string)
 			attrs := []any{
 				"request_id", reqID,
 				"method", c.Request().Method,

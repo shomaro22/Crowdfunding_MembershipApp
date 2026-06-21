@@ -22,7 +22,7 @@ func CurrentUserID(c echo.Context) (uuid.UUID, error) {
 }
 
 func authMeta(c echo.Context) usecase.AuthMeta {
-	reqID, _ := c.Get(middleware.ContextRequestIDKey).(string)
+	reqID, _ := c.Get(middleware.CtxRequestID).(string)
 	return usecase.AuthMeta{
 		IPAddress: c.RealIP(),
 		UserAgent: c.Request().UserAgent(),
@@ -77,6 +77,14 @@ func mapAuthError(err error) *echo.HTTPError {
 		return echo.NewHTTPError(http.StatusUnauthorized, apiError("invalid token", "INVALID_TOKEN"))
 	case errors.Is(err, usecase.ErrNotFound):
 		return echo.NewHTTPError(http.StatusNotFound, apiError("not found", "NOT_FOUND"))
+	case errors.Is(err, usecase.ErrInvalid2FACode):
+		return echo.NewHTTPError(http.StatusUnauthorized, apiError("invalid 2fa code", "INVALID_2FA_CODE"))
+	case errors.Is(err, usecase.Err2FAAlreadyEnabled):
+		return echo.NewHTTPError(http.StatusConflict, apiError("2fa already enabled", "2FA_ALREADY_ENABLED"))
+	case errors.Is(err, usecase.ErrOAuthUnavailable):
+		return echo.NewHTTPError(http.StatusServiceUnavailable, apiError("oauth unavailable", "OAUTH_UNAVAILABLE"))
+	case errors.Is(err, usecase.ErrOAuthForbidden):
+		return echo.NewHTTPError(http.StatusForbidden, apiError("oauth forbidden", "OAUTH_FORBIDDEN"))
 	default:
 		return echo.NewHTTPError(http.StatusInternalServerError, apiError("internal error", "INTERNAL_ERROR"))
 	}

@@ -19,6 +19,7 @@ type User struct {
 	AdminRole          *AdminRole    `gorm:"column:admin_role;type:varchar"`
 	TOTPEnabled        bool          `gorm:"column:totp_enabled;not null;default:false"`
 	TOTPSecret         *string       `gorm:"column:totp_secret_encrypted;type:varchar"`
+	TokenVersion       int64         `gorm:"column:token_version;not null;default:0"`
 	CreatedAt          time.Time     `gorm:"not null"`
 	UpdatedAt          time.Time     `gorm:"not null"`
 }
