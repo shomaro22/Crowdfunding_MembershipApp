@@ -11,6 +11,7 @@ import (
 	"crowdfund-app/auth"
 	"crowdfund-app/controller"
 	"crowdfund-app/db"
+	"crowdfund-app/entity"
 	"crowdfund-app/middleware"
 	"crowdfund-app/repository"
 	"crowdfund-app/router"
@@ -77,6 +78,11 @@ func buildApp() (*echo.Echo, string, error) {
 	reTokenRepo := repository.NewReTokenRepo(gormDB)
 	resetRepo := repository.NewResetRepo(gormDB)
 	activityRepo := repository.NewActivityRepo(gormDB)
+	auditRepo := repository.NewAuditRepo(gormDB)
+	oauthRepo := repository.NewOAuthRepo(gormDB)
+	totpBackupRepo := repository.NewTOTPBackupRepo(gormDB)
+	oauthCache := repository.NewOAuthCache(rdb)
+	rateLimitRepo := repository.NewRateLimitRepo(rdb)
 	kycStore := storage.NewLocalKYC(privateRoot)
 
 	tokenSvc := auth.NewTokenService([]byte(jwtSecret), auth.DefaultAuthTTL)
@@ -86,15 +92,41 @@ func buildApp() (*echo.Echo, string, error) {
 		ReTokens:     reTokenRepo,
 		ResetToks:    resetRepo,
 		Activity:     activityRepo,
+		OAuth:        oauthRepo,
+		OAuthCache:   oauthCache,
+		TOTPBackup:   totpBackupRepo,
 		Tokens:       tokenSvc,
 		KYCStore:     kycStore,
+		TOTPKey:      []byte(jwtSecret),
+		TOTPIssuer:   strings.TrimSpace(os.Getenv("TOTP_ISSUER")),
 		DB:           gormDB,
 		AppPublicURL: os.Getenv("PUBLIC_APP_URL"),
+	}
+	if googleOAuth, err := auth.GoogleFromEnv(auth.NewStateBridge(oauthCache)); err == nil {
+		authUC.Google = googleOAuth
+	} else {
+		slog.Info("google oauth disabled", "reason", err.Error())
 	}
 
 	cookieCfg := auth.CookieFromEnv()
 	authCtl := controller.NewAuthController(authUC, cookieCfg)
 	healthCtl := &controller.HealthController{SQL: gormDB, RDB: rdb}
+
+	apiPublicURL := strings.TrimSpace(os.Getenv("API_PUBLIC_URL"))
+	if apiPublicURL == "" {
+		apiPublicURL = "http://localhost:" + port
+	}
+	adminUC := &usecase.AdminUseCase{
+		Users:      userRepo,
+		SellerRegs: sellerRegRepo,
+		Audit:      auditRepo,
+		KYC:        kycStore,
+		DB:         gormDB,
+		APIBase:    apiPublicURL,
+		SignSecret: []byte(jwtSecret),
+	}
+	adminCtl := controller.NewAdminController(adminUC)
+	kycFileCtl := controller.NewKYCFileController(kycStore, []byte(jwtSecret))
 
 	validateSession := func(c echo.Context, claims auth.AuthClaims) error {
 		u, err := userRepo.FindByID(c.Request().Context(), claims.UserID)
@@ -104,7 +136,10 @@ func buildApp() (*echo.Echo, string, error) {
 		if u == nil || !u.IsActive() {
 			return echo.NewHTTPError(http.StatusForbidden, map[string]string{"error": "user inactive", "code": "USER_INACTIVE"})
 		}
-		c.Set(middleware.ContextUserRoleKey, string(u.Role))
+		if claims.TokenVersion != u.TokenVersion {
+			return echo.NewHTTPError(http.StatusUnauthorized, map[string]string{"error": "token revoked", "code": "TOKEN_REVOKED"})
+		}
+		c.Set(middleware.CtxUserRole, string(u.Role))
 		return nil
 	}
 
@@ -133,12 +168,23 @@ func buildApp() (*echo.Echo, string, error) {
 	protected := []echo.MiddlewareFunc{
 		middleware.JWTAuth(authUC.ParseToken, validateSession),
 	}
+	adminOnly := append(
+		append([]echo.MiddlewareFunc{}, protected...),
+		middleware.RequireRole(entity.UserRoleAdmin),
+		middleware.Require2FA(),
+	)
+	rateLimiter := middleware.NewRateLimiter(rateLimitRepo)
 
 	e := router.New(router.Config{
 		PreAuthMiddleware: preAuth,
 		Health:            healthCtl,
 		Auth:              authCtl,
+		Admin:             adminCtl,
+		KYCFiles:          kycFileCtl,
+		RateLimit:         rateLimiter,
+		OAuthEnabled:      authUC.Google != nil,
 		Protected:         protected,
+		AdminOnly:         adminOnly,
 	})
 	return e, ":" + port, nil
 }

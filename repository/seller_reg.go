@@ -12,7 +12,10 @@ import (
 
 type SellerRegRepo interface {
 	Create(ctx context.Context, r *entity.SellerReg) error
+	Update(ctx context.Context, r *entity.SellerReg) error
+	FindByID(ctx context.Context, id uuid.UUID) (*entity.SellerReg, error)
 	FindByUserID(ctx context.Context, userID uuid.UUID) (*entity.SellerReg, error)
+	List(ctx context.Context, status entity.RegStatus, limit, offset int) ([]entity.SellerReg, int64, error)
 }
 
 type sellerRegRepo struct {
@@ -34,6 +37,22 @@ func (r *sellerRegRepo) Create(ctx context.Context, reg *entity.SellerReg) error
 	return r.withDB(ctx).Create(reg).Error
 }
 
+func (r *sellerRegRepo) Update(ctx context.Context, reg *entity.SellerReg) error {
+	return r.withDB(ctx).Save(reg).Error
+}
+
+func (r *sellerRegRepo) FindByID(ctx context.Context, id uuid.UUID) (*entity.SellerReg, error) {
+	var m entity.SellerReg
+	err := r.withDB(ctx).Where("id = ?", id).First(&m).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &m, nil
+}
+
 func (r *sellerRegRepo) FindByUserID(ctx context.Context, userID uuid.UUID) (*entity.SellerReg, error) {
 	var m entity.SellerReg
 	err := r.withDB(ctx).Where("user_id = ?", userID).First(&m).Error
@@ -44,6 +63,27 @@ func (r *sellerRegRepo) FindByUserID(ctx context.Context, userID uuid.UUID) (*en
 		return nil, err
 	}
 	return &m, nil
+}
+
+func (r *sellerRegRepo) List(ctx context.Context, status entity.RegStatus, limit, offset int) ([]entity.SellerReg, int64, error) {
+	q := r.withDB(ctx).Model(&entity.SellerReg{}).Where("status = ?", status)
+	var total int64
+	if err := q.Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+	if limit <= 0 {
+		limit = 50
+	}
+	if limit > 200 {
+		limit = 200
+	}
+	if offset < 0 {
+		offset = 0
+	}
+	var rows []entity.SellerReg
+	err := r.withDB(ctx).Where("status = ?", status).
+		Order("created_at DESC").Limit(limit).Offset(offset).Find(&rows).Error
+	return rows, total, err
 }
 
 type txKey struct{}
