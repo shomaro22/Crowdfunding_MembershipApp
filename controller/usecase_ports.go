@@ -22,4 +22,13 @@ type AuthUseCase interface {
 	GetUser(ctx context.Context, userID uuid.UUID) (*entity.User, error)
 	EmailFree(ctx context.Context, email string) (bool, error)
 	ParseToken(raw string) (auth.AuthClaims, error)
+	Setup2FA(ctx context.Context, userID uuid.UUID) (*usecase.TOTPSetupResult, error)
+	Verify2FASetup(ctx context.Context, userID uuid.UUID, code string) (*usecase.TOTPVerifyResult, error)
+	Challenge2FA(ctx context.Context, pendingToken, code string, meta usecase.AuthMeta) (*usecase.LoginResult, error)
+	GoogleAuthURL(from string) (string, error)
+	GoogleCallback(ctx context.Context, code, state string, meta usecase.AuthMeta) (*usecase.OAuthCBOut, error)
+	ExchangeOAuthCode(ctx context.Context, code string, meta usecase.AuthMeta) (*usecase.LoginResult, error)
+	OAuthSuccessRedirect(from, code string) string
+	OAuthErrorRedirect(reason string) string
+	SigningKey() []byte
 }

@@ -1,0 +1,176 @@
+package usecase
+
+import (
+	"context"
+	"strings"
+	"time"
+
+	"crowdfund-app/entity"
+	"crowdfund-app/repository"
+	"crowdfund-app/storage"
+
+	"github.com/google/uuid"
+	"gorm.io/gorm"
+)
+
+type AdminUseCase struct {
+	Users      repository.UserRepo
+	SellerRegs repository.SellerRegRepo
+	Audit      repository.AuditRepo
+	KYC        storage.KYCStore
+	DB         *gorm.DB
+	APIBase    string
+	SignSecret []byte
+}
+
+type SellerRegView struct {
+	Registration *entity.SellerReg
+	User         *entity.User
+	FrontURL     *string
+	BackURL      *string
+}
+
+func (a *AdminUseCase) ListBuyerPending(ctx context.Context, limit, offset int) ([]entity.User, int64, error) {
+	return a.Users.ListByRoleStatus(ctx, entity.UserRoleBuyer, entity.AccountStatusPending, limit, offset)
+}
+
+func (a *AdminUseCase) ApproveBuyer(ctx context.Context, adminID, userID uuid.UUID, reason *string) (*entity.User, error) {
+	u, err := a.Users.FindByID(ctx, userID)
+	if err != nil || u == nil {
+		return nil, ErrNotFound
+	}
+	if u.Role != entity.UserRoleBuyer || u.AccountStatus != entity.AccountStatusPending {
+		return nil, ErrInvalidState
+	}
+	now := time.Now().UTC()
+	u.AccountStatus = entity.AccountStatusActive
+	u.UpdatedAt = now
+	if err := a.Users.Update(ctx, u); err != nil {
+		return nil, err
+	}
+	a.writeAudit(ctx, adminID, "buyer_registration.approve", "user", u.ID.String(), reason, nil)
+	return u, nil
+}
+
+func (a *AdminUseCase) RejectBuyer(ctx context.Context, adminID, userID uuid.UUID, reason *string) (*entity.User, error) {
+	u, err := a.Users.FindByID(ctx, userID)
+	if err != nil || u == nil {
+		return nil, ErrNotFound
+	}
+	if u.Role != entity.UserRoleBuyer || u.AccountStatus != entity.AccountStatusPending {
+		return nil, ErrInvalidState
+	}
+	now := time.Now().UTC()
+	u.AccountStatus = entity.AccountStatusSuspended
+	u.UpdatedAt = now
+	if err := a.Users.Update(ctx, u); err != nil {
+		return nil, err
+	}
+	a.writeAudit(ctx, adminID, "buyer_registration.reject", "user", u.ID.String(), reason, nil)
+	return u, nil
+}
+
+func (a *AdminUseCase) ListSellerRegs(ctx context.Context, status entity.RegStatus, limit, offset int) ([]entity.SellerReg, int64, error) {
+	if !status.Valid() {
+		status = entity.RegPending
+	}
+	return a.SellerRegs.List(ctx, status, limit, offset)
+}
+
+func (a *AdminUseCase) GetSellerReg(ctx context.Context, id uuid.UUID) (*SellerRegView, error) {
+	reg, err := a.SellerRegs.FindByID(ctx, id)
+	if err != nil || reg == nil {
+		return nil, ErrNotFound
+	}
+	u, err := a.Users.FindByID(ctx, reg.UserID)
+	if err != nil || u == nil {
+		return nil, ErrNotFound
+	}
+	now := time.Now().UTC()
+	out := &SellerRegView{Registration: reg, User: u}
+	if reg.HasIDFront() {
+		tok := storage.SignKYCAccess(a.SignSecret, *reg.IDFrontKey, now)
+		url := storage.KYCAccessURL(a.APIBase, tok)
+		out.FrontURL = &url
+	}
+	if reg.HasIDBack() {
+		tok := storage.SignKYCAccess(a.SignSecret, *reg.IDBackKey, now)
+		url := storage.KYCAccessURL(a.APIBase, tok)
+		out.BackURL = &url
+	}
+	return out, nil
+}
+
+func (a *AdminUseCase) ApproveSellerReg(ctx context.Context, adminID, regID uuid.UUID) (*entity.SellerReg, error) {
+	reg, err := a.SellerRegs.FindByID(ctx, regID)
+	if err != nil || reg == nil {
+		return nil, ErrNotFound
+	}
+	if !reg.CanApprove() {
+		return nil, ErrInvalidState
+	}
+	u, err := a.Users.FindByID(ctx, reg.UserID)
+	if err != nil || u == nil {
+		return nil, ErrNotFound
+	}
+	now := time.Now().UTC()
+	err = repository.WithTx(ctx, a.DB, func(txCtx context.Context) error {
+		u.AccountStatus = entity.AccountStatusActive
+		u.SellerStatus = entity.SellerStatusActive
+		u.UpdatedAt = now
+		if err := a.Users.Update(txCtx, u); err != nil {
+			return err
+		}
+		reg.Status = entity.RegApproved
+		reg.ReviewedAt = &now
+		reg.ReviewedBy = &adminID
+		reg.UpdatedAt = now
+		return a.SellerRegs.Update(txCtx, reg)
+	})
+	if err != nil {
+		return nil, err
+	}
+	a.writeAudit(ctx, adminID, "seller_registration.approve", "seller_registration", reg.ID.String(), nil, nil)
+	return reg, nil
+}
+
+func (a *AdminUseCase) RejectSellerReg(ctx context.Context, adminID, regID uuid.UUID, reason string) (*entity.SellerReg, error) {
+	reason = strings.TrimSpace(reason)
+	if reason == "" {
+		return nil, ErrBadRequest
+	}
+	reg, err := a.SellerRegs.FindByID(ctx, regID)
+	if err != nil || reg == nil {
+		return nil, ErrNotFound
+	}
+	if reg.Status != entity.RegPending {
+		return nil, ErrInvalidState
+	}
+	now := time.Now().UTC()
+	reg.Status = entity.RegRejected
+	reg.RejectReason = &reason
+	reg.ReviewedAt = &now
+	reg.ReviewedBy = &adminID
+	reg.UpdatedAt = now
+	if err := a.SellerRegs.Update(ctx, reg); err != nil {
+		return nil, err
+	}
+	a.writeAudit(ctx, adminID, "seller_registration.reject", "seller_registration", reg.ID.String(), &reason, nil)
+	return reg, nil
+}
+
+func (a *AdminUseCase) writeAudit(ctx context.Context, adminID uuid.UUID, action, resource, resourceID string, reason, details *string) {
+	if a.Audit == nil {
+		return
+	}
+	_ = a.Audit.Create(ctx, &entity.AuditLog{
+		ID:         uuid.New(),
+		AdminID:    adminID,
+		Action:     action,
+		Resource:   resource,
+		ResourceID: resourceID,
+		Reason:     reason,
+		Details:    details,
+		CreatedAt:  time.Now().UTC(),
+	})
+}
