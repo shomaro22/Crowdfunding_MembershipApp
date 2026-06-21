@@ -11,8 +11,8 @@ import (
 )
 
 const (
-	ContextUserIDKey   = "userID"
-	ContextUserRoleKey = "role"
+	CtxUserID   = "userID"
+	CtxUserRole = "role"
 )
 
 type TokenParser func(raw string) (auth.AuthClaims, error)
@@ -29,7 +29,7 @@ func BearerToken(c echo.Context) string {
 }
 
 func AuthUserID(c echo.Context) (uuid.UUID, bool) {
-	v := c.Get(ContextUserIDKey)
+	v := c.Get(CtxUserID)
 	if v == nil {
 		return uuid.Nil, false
 	}
@@ -45,7 +45,7 @@ func AuthUserID(c echo.Context) (uuid.UUID, bool) {
 }
 
 func AuthUserRole(c echo.Context) (entity.UserRole, bool) {
-	r, ok := c.Get(ContextUserRoleKey).(string)
+	r, ok := c.Get(CtxUserRole).(string)
 	if !ok || r == "" {
 		return "", false
 	}
@@ -60,8 +60,9 @@ func JWTAuth(parse TokenParser, validate SessionValidator) echo.MiddlewareFunc {
 			if err != nil {
 				return echo.NewHTTPError(401, map[string]string{"error": "unauthorized", "code": "UNAUTHORIZED"})
 			}
-			c.Set(ContextUserIDKey, claims.UserID)
-			c.Set(ContextUserRoleKey, string(claims.Role))
+			c.Set(CtxUserID, claims.UserID)
+			c.Set(CtxUserRole, string(claims.Role))
+			c.Set(CtxTwoFAVerified, claims.TwoFAVerified)
 			if validate != nil {
 				if err := validate(c, claims); err != nil {
 					return err

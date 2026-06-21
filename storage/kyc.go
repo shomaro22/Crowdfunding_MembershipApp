@@ -28,6 +28,7 @@ type KYCImage struct {
 type KYCStore interface {
 	Save(ctx context.Context, userID uuid.UUID, side string, img KYCImage) (key string, err error)
 	Remove(ctx context.Context, keys ...string) error
+	Open(key string) (*os.File, string, error)
 }
 
 type LocalKYCStore struct {
@@ -84,4 +85,26 @@ func (s *LocalKYCStore) Remove(_ context.Context, keys ...string) error {
 		_ = os.Remove(abs)
 	}
 	return nil
+}
+
+func (s *LocalKYCStore) Open(key string) (*os.File, string, error) {
+	key = filepath.Clean(key)
+	if strings.Contains(key, "..") {
+		return nil, "", ErrBadMedia
+	}
+	abs := filepath.Join(s.Root, key)
+	f, err := os.Open(abs)
+	if err != nil {
+		return nil, "", err
+	}
+	ct := "application/octet-stream"
+	switch filepath.Ext(abs) {
+	case ".jpg", ".jpeg":
+		ct = "image/jpeg"
+	case ".png":
+		ct = "image/png"
+	case ".webp":
+		ct = "image/webp"
+	}
+	return f, ct, nil
 }
