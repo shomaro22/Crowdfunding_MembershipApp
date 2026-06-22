@@ -79,6 +79,7 @@ func buildApp() (*echo.Echo, string, error) {
 	resetRepo := repository.NewResetRepo(gormDB)
 	activityRepo := repository.NewActivityRepo(gormDB)
 	auditRepo := repository.NewAuditRepo(gormDB)
+	projectRepo := repository.NewProjectRepo(gormDB)
 	oauthRepo := repository.NewOAuthRepo(gormDB)
 	totpBackupRepo := repository.NewTOTPBackupRepo(gormDB)
 	oauthCache := repository.NewOAuthCache(rdb)
@@ -119,6 +120,7 @@ func buildApp() (*echo.Echo, string, error) {
 	adminUC := &usecase.AdminUseCase{
 		Users:      userRepo,
 		SellerRegs: sellerRegRepo,
+		Projects:   projectRepo,
 		Audit:      auditRepo,
 		KYC:        kycStore,
 		DB:         gormDB,
@@ -127,6 +129,8 @@ func buildApp() (*echo.Echo, string, error) {
 	}
 	adminCtl := controller.NewAdminController(adminUC)
 	kycFileCtl := controller.NewKYCFileController(kycStore, []byte(jwtSecret))
+	projectUC := &usecase.ProjectUseCase{Projects: projectRepo, Users: userRepo}
+	projectCtl := controller.NewProjectController(projectUC)
 
 	validateSession := func(c echo.Context, claims auth.AuthClaims) error {
 		u, err := userRepo.FindByID(c.Request().Context(), claims.UserID)
@@ -168,6 +172,11 @@ func buildApp() (*echo.Echo, string, error) {
 	protected := []echo.MiddlewareFunc{
 		middleware.JWTAuth(authUC.ParseToken, validateSession),
 	}
+	optionalJWT := []echo.MiddlewareFunc{
+		middleware.OptionalJWTAuth(authUC.ParseToken, validateSession),
+	}
+	sellerRead := append(append([]echo.MiddlewareFunc{}, protected...), middleware.RequireRole(entity.UserRoleSeller))
+	sellerWrite := append(append([]echo.MiddlewareFunc{}, sellerRead...), middleware.Require2FA())
 	adminOnly := append(
 		append([]echo.MiddlewareFunc{}, protected...),
 		middleware.RequireRole(entity.UserRoleAdmin),
@@ -179,11 +188,15 @@ func buildApp() (*echo.Echo, string, error) {
 		PreAuthMiddleware: preAuth,
 		Health:            healthCtl,
 		Auth:              authCtl,
+		Projects:          projectCtl,
 		Admin:             adminCtl,
 		KYCFiles:          kycFileCtl,
 		RateLimit:         rateLimiter,
 		OAuthEnabled:      authUC.Google != nil,
 		Protected:         protected,
+		OptionalJWT:       optionalJWT,
+		SellerRead:        sellerRead,
+		SellerWrite:       sellerWrite,
 		AdminOnly:         adminOnly,
 	})
 	return e, ":" + port, nil

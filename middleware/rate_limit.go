@@ -56,13 +56,19 @@ func (l *RateLimiter) Middleware(policy RatePolicy) echo.MiddlewareFunc {
 	}
 }
 
+type rateLimitErrorBody struct {
+	Error             string `json:"error"`
+	Code              string `json:"code"`
+	RetryAfterSeconds int    `json:"retry_after_seconds"`
+}
+
 func rateLimited(retryAfterSec int) *echo.HTTPError {
 	if retryAfterSec < 1 {
 		retryAfterSec = 1
 	}
-	return echo.NewHTTPError(http.StatusTooManyRequests, map[string]any{
-		"error":               "rate limit exceeded",
-		"code":                "RATE_LIMITED",
-		"retry_after_seconds": retryAfterSec,
+	return echo.NewHTTPError(http.StatusTooManyRequests, rateLimitErrorBody{
+		Error:             "rate limit exceeded",
+		Code:              "RATE_LIMITED",
+		RetryAfterSeconds: retryAfterSec,
 	})
 }

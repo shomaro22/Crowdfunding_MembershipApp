@@ -18,4 +18,5 @@ var (
 	Err2FAAlreadyEnabled  = errors.New("2fa already enabled")
 	ErrOAuthUnavailable   = errors.New("oauth unavailable")
 	ErrOAuthForbidden     = errors.New("oauth forbidden")
+	ErrForbidden          = errors.New("forbidden")
 )

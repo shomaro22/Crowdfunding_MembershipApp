@@ -56,12 +56,13 @@ func (s *TokenService) Parse(raw string) (AuthClaims, error) {
 	if len(s.secret) == 0 || raw == "" {
 		return out, ErrInvalidToken
 	}
-	tok, err := jwt.Parse(raw, func(t *jwt.Token) (any, error) {
+	keyFunc := jwt.Keyfunc(func(t *jwt.Token) (interface{}, error) {
 		if t.Method != jwt.SigningMethodHS256 {
 			return nil, ErrInvalidToken
 		}
 		return s.secret, nil
 	})
+	tok, err := jwt.Parse(raw, keyFunc)
 	if err != nil || !tok.Valid {
 		return out, ErrInvalidToken
 	}
