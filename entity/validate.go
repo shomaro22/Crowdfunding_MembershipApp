@@ -117,3 +117,50 @@ func ValidateDuration(duration DurationType, start time.Time, end *time.Time) er
 	}
 	return nil
 }
+
+type PlanInput struct {
+	MembershipType MembershipType
+	Price          int
+	MaxSupporters  *int
+	Benefits       string
+}
+
+func ValidateProject(title, description string, targetAmount int64, duration DurationType, start time.Time, end *time.Time, plans []PlanInput) error {
+	if err := ValidateTitle(title); err != nil {
+		return err
+	}
+	if strings.TrimSpace(description) == "" {
+		return ErrBadProject
+	}
+	if targetAmount < 0 {
+		return ErrBadProject
+	}
+	if err := ValidateDuration(duration, start, end); err != nil {
+		return err
+	}
+	if len(plans) != 3 {
+		return ErrBadProject
+	}
+	seen := map[MembershipType]bool{}
+	for _, p := range plans {
+		if !p.MembershipType.Valid() {
+			return ErrBadMembership
+		}
+		if seen[p.MembershipType] {
+			return ErrBadProject
+		}
+		seen[p.MembershipType] = true
+		if strings.TrimSpace(p.Benefits) == "" {
+			return ErrBadProject
+		}
+		if err := ValidatePrice(p.Price); err != nil {
+			return err
+		}
+	}
+	for _, mt := range []MembershipType{MembershipBronze, MembershipSilver, MembershipGold} {
+		if !seen[mt] {
+			return ErrBadProject
+		}
+	}
+	return nil
+}

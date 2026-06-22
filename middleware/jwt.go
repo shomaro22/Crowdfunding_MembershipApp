@@ -72,3 +72,28 @@ func JWTAuth(parse TokenParser, validate SessionValidator) echo.MiddlewareFunc {
 		}
 	}
 }
+
+// OptionalJWTAuth sets user context when a valid Bearer token is present; otherwise continues anonymously.
+func OptionalJWTAuth(parse TokenParser, validate SessionValidator) echo.MiddlewareFunc {
+	return func(next echo.HandlerFunc) echo.HandlerFunc {
+		return func(c echo.Context) error {
+			raw := BearerToken(c)
+			if raw == "" {
+				return next(c)
+			}
+			claims, err := parse(raw)
+			if err != nil {
+				return next(c)
+			}
+			c.Set(CtxUserID, claims.UserID)
+			c.Set(CtxUserRole, string(claims.Role))
+			c.Set(CtxTwoFAVerified, claims.TwoFAVerified)
+			if validate != nil {
+				if err := validate(c, claims); err != nil {
+					return next(c)
+				}
+			}
+			return next(c)
+		}
+	}
+}
