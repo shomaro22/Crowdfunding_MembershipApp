@@ -28,18 +28,22 @@ func RequestLogger() echo.MiddlewareFunc {
 		return func(c echo.Context) error {
 			err := next(c)
 			reqID, _ := c.Get(CtxRequestID).(string)
-			attrs := []any{
-				"request_id", reqID,
-				"method", c.Request().Method,
-				"path", c.Request().URL.Path,
-				"status", c.Response().Status,
-			}
 			if err != nil {
-				attrs = append(attrs, "error", err.Error())
-				slog.Error("request", attrs...)
+				slog.Error("request",
+					slog.String("request_id", reqID),
+					slog.String("method", c.Request().Method),
+					slog.String("path", c.Request().URL.Path),
+					slog.Int("status", c.Response().Status),
+					slog.String("error", err.Error()),
+				)
 				return err
 			}
-			slog.Info("request", attrs...)
+			slog.Info("request",
+				slog.String("request_id", reqID),
+				slog.String("method", c.Request().Method),
+				slog.String("path", c.Request().URL.Path),
+				slog.Int("status", c.Response().Status),
+			)
 			return nil
 		}
 	}

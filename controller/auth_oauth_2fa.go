@@ -39,9 +39,9 @@ func (h *AuthController) Verify2FA(c echo.Context) error {
 	if err != nil {
 		return mapAuthError(err)
 	}
-	return c.JSON(http.StatusOK, map[string]any{
-		"enabled":      true,
-		"backup_codes": res.BackupCodes,
+	return c.JSON(http.StatusOK, verify2FAResponse{
+		Enabled:     true,
+		BackupCodes: res.BackupCodes,
 	})
 }
 
@@ -62,9 +62,9 @@ func (h *AuthController) Challenge2FA(c echo.Context) error {
 	}
 	auth.ClearPending2FA(c, h.CookieCfg)
 	auth.SetReCookie(c, h.CookieCfg, res.ReToken)
-	return c.JSON(http.StatusOK, map[string]any{
-		"auth_token": res.AuthToken,
-		"user":       userToJSON(res.User),
+	return c.JSON(http.StatusOK, authTokenResponse{
+		AuthToken: res.AuthToken,
+		User:      userToJSON(res.User),
 	})
 }
 
@@ -102,9 +102,9 @@ func (h *AuthController) OAuthExchange(c echo.Context) error {
 	if err != nil {
 		return mapAuthError(err)
 	}
-	return c.JSON(http.StatusOK, map[string]any{
-		"auth_token": res.AuthToken,
-		"user":       userToJSON(res.User),
+	return c.JSON(http.StatusOK, authTokenResponse{
+		AuthToken: res.AuthToken,
+		User:      userToJSON(res.User),
 	})
 }
 
