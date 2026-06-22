@@ -1,6 +1,7 @@
 package entity
 
 import (
+	"encoding/json"
 	"testing"
 	"time"
 )
@@ -162,7 +163,15 @@ func TestActivityAction(t *testing.T) {
 }
 
 func TestJSONMetadata(t *testing.T) {
-	orig := JSONMetadata{"project_id": "abc", "amount": float64(1000)}
+	type purchaseMeta struct {
+		ProjectID string  `json:"project_id"`
+		Amount    float64 `json:"amount"`
+	}
+	raw, err := json.Marshal(purchaseMeta{ProjectID: "abc", Amount: 1000})
+	if err != nil {
+		t.Fatal(err)
+	}
+	orig := JSONMetadata(raw)
 	val, err := orig.Value()
 	if err != nil {
 		t.Fatal(err)
@@ -171,8 +180,12 @@ func TestJSONMetadata(t *testing.T) {
 	if err := decoded.Scan(val); err != nil {
 		t.Fatal(err)
 	}
-	if decoded["project_id"] != "abc" {
-		t.Fatalf("got %v", decoded)
+	var got purchaseMeta
+	if err := json.Unmarshal([]byte(decoded), &got); err != nil {
+		t.Fatal(err)
+	}
+	if got.ProjectID != "abc" || got.Amount != 1000 {
+		t.Fatalf("got %+v", got)
 	}
 }
 
