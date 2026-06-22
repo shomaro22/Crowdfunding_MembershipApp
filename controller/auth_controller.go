@@ -51,9 +51,9 @@ func (h *AuthController) Register(c echo.Context) error {
 	if err != nil {
 		return mapAuthError(err)
 	}
-	return c.JSON(http.StatusCreated, map[string]any{
-		"user":    userToJSON(u),
-		"message": "Registration pending admin approval",
+	return c.JSON(http.StatusCreated, registerResponse{
+		User:    userToJSON(u),
+		Message: "Registration pending admin approval",
 	})
 }
 
@@ -68,15 +68,15 @@ func (h *AuthController) Login(c echo.Context) error {
 	}
 	if res.Requires2FA {
 		auth.SetPending2FA(c, h.CookieCfg, h.Auth.SigningKey(), res.User.ID)
-		return c.JSON(http.StatusOK, map[string]any{
-			"requires_2fa": true,
-			"user":         userToJSON(res.User),
+		return c.JSON(http.StatusOK, login2FAResponse{
+			Requires2FA: true,
+			User:        userToJSON(res.User),
 		})
 	}
 	auth.SetReCookie(c, h.CookieCfg, res.ReToken)
-	return c.JSON(http.StatusOK, map[string]any{
-		"auth_token": res.AuthToken,
-		"user":       userToJSON(res.User),
+	return c.JSON(http.StatusOK, authTokenResponse{
+		AuthToken: res.AuthToken,
+		User:      userToJSON(res.User),
 	})
 }
 
