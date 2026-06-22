@@ -61,6 +61,57 @@ func apiError(msg, code string) map[string]string {
 	return map[string]string{"error": msg, "code": code}
 }
 
+type registerResponse struct {
+	User    userJSON `json:"user"`
+	Message string   `json:"message"`
+}
+
+type login2FAResponse struct {
+	Requires2FA bool     `json:"requires_2fa"`
+	User        userJSON `json:"user"`
+}
+
+type authTokenResponse struct {
+	AuthToken string   `json:"auth_token"`
+	User      userJSON `json:"user"`
+}
+
+type verify2FAResponse struct {
+	Enabled     bool     `json:"enabled"`
+	BackupCodes []string `json:"backup_codes"`
+}
+
+type sellerCreateJSON struct {
+	User         userJSON      `json:"user"`
+	Registration sellerRegJSON `json:"registration"`
+}
+
+type usersPageJSON struct {
+	Users []userJSON `json:"users"`
+	Total int64      `json:"total"`
+}
+
+type sellerRegsPageJSON struct {
+	Registrations []sellerRegJSON `json:"registrations"`
+	Total         int64           `json:"total"`
+}
+
+type sellerRegViewJSON struct {
+	sellerRegJSON
+	User     userJSON `json:"user"`
+	FrontURL *string  `json:"identity_document_front_url,omitempty"`
+	BackURL  *string  `json:"identity_document_back_url,omitempty"`
+}
+
+func sellerRegViewToJSON(d *usecase.SellerRegView) sellerRegViewJSON {
+	return sellerRegViewJSON{
+		sellerRegJSON: sellerRegToJSON(d.Registration),
+		User:          userToJSON(d.User),
+		FrontURL:      d.FrontURL,
+		BackURL:       d.BackURL,
+	}
+}
+
 func mapAuthError(err error) *echo.HTTPError {
 	switch {
 	case errors.Is(err, usecase.ErrInvalidCredentials):

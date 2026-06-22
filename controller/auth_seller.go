@@ -108,9 +108,9 @@ func (h *AuthController) RegisterSeller(c echo.Context) error {
 		return mapSellerRegError(err)
 	}
 
-	return c.JSON(http.StatusCreated, map[string]any{
-		"user":         userToJSON(res.User),
-		"registration": sellerRegToJSON(res.Registration),
+	return c.JSON(http.StatusCreated, sellerCreateJSON{
+		User:         userToJSON(res.User),
+		Registration: sellerRegToJSON(res.Registration),
 	})
 }
 

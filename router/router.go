@@ -10,12 +10,16 @@ import (
 type Config struct {
 	Health            *controller.HealthController
 	Auth              *controller.AuthController
+	Projects          *controller.ProjectController
 	Admin             *controller.AdminController
 	KYCFiles          *controller.KYCFileController
 	RateLimit         *middleware.RateLimiter
 	OAuthEnabled      bool
 	PreAuthMiddleware []echo.MiddlewareFunc
 	Protected         []echo.MiddlewareFunc
+	OptionalJWT       []echo.MiddlewareFunc
+	SellerRead        []echo.MiddlewareFunc
+	SellerWrite       []echo.MiddlewareFunc
 	AdminOnly         []echo.MiddlewareFunc
 }
 
@@ -56,12 +60,22 @@ func New(cfg Config) *echo.Echo {
 			e.POST("/auth/oauth/exchange", cfg.Auth.OAuthExchange, rl(middleware.PolicyOAuthExchange))
 		}
 
-		protected := e.Group("", cfg.Protected...)
-		protected.POST("/auth/logout", cfg.Auth.Logout)
-		protected.GET("/me", cfg.Auth.Me)
-		protected.POST("/me/change-password", cfg.Auth.ChangePassword)
-		protected.POST("/auth/2fa/setup", cfg.Auth.Setup2FA)
-		protected.POST("/auth/2fa/verify", cfg.Auth.Verify2FA)
+		pm := cfg.Protected
+		e.POST("/auth/logout", cfg.Auth.Logout, pm...)
+		e.GET("/me", cfg.Auth.Me, pm...)
+		e.POST("/me/change-password", cfg.Auth.ChangePassword, pm...)
+		e.POST("/auth/2fa/setup", cfg.Auth.Setup2FA, pm...)
+		e.POST("/auth/2fa/verify", cfg.Auth.Verify2FA, pm...)
+	}
+
+	if cfg.Projects != nil {
+		e.GET("/projects", cfg.Projects.ListPublic)
+		e.GET("/projects/mine", cfg.Projects.ListMine, cfg.SellerRead...)
+		e.POST("/projects", cfg.Projects.Create, cfg.SellerWrite...)
+		opt := cfg.OptionalJWT
+		e.GET("/projects/:projectId", cfg.Projects.Get, opt...)
+		e.PUT("/projects/:projectId", cfg.Projects.Update, cfg.SellerWrite...)
+		e.POST("/projects/:projectId/delete-request", cfg.Projects.RequestDelete, cfg.SellerWrite...)
 	}
 
 	if cfg.KYCFiles != nil {
@@ -77,6 +91,10 @@ func New(cfg Config) *echo.Echo {
 		admin.GET("/seller-registrations/:registrationId", cfg.Admin.GetSellerReg)
 		admin.POST("/seller-registrations/:registrationId/approve", cfg.Admin.ApproveSellerReg)
 		admin.POST("/seller-registrations/:registrationId/reject", cfg.Admin.RejectSellerReg)
+		admin.GET("/projects", cfg.Admin.ListProjects)
+		admin.PATCH("/projects/:projectId", cfg.Admin.PatchProject)
+		admin.DELETE("/projects/:projectId", cfg.Admin.DeleteProject)
+		admin.PATCH("/projects/:projectId/delete-request", cfg.Admin.PatchDeleteReq)
 	}
 
 	return e

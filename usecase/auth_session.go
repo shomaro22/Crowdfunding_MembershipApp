@@ -28,7 +28,7 @@ func (a *AuthUseCase) Login(ctx context.Context, email, password string, meta Au
 		return nil, ErrInactiveUser
 	}
 	if u.NeedsTOTP() && u.TOTPEnabled {
-		a.logActivity(ctx, &u.ID, entity.UserLogin, "user", u.ID.String(), meta, entity.JSONMetadata{"step": "2fa_pending"})
+		a.logActivity(ctx, &u.ID, entity.UserLogin, "user", u.ID.String(), meta, entity.StepMeta("2fa_pending"))
 		return &LoginResult{User: u, Requires2FA: true}, nil
 	}
 	tokens, err := a.issueSession(ctx, u, twoFAVerified(u))

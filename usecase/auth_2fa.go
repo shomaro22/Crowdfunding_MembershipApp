@@ -94,14 +94,14 @@ func (a *AuthUseCase) Challenge2FA(ctx context.Context, pendingToken, code strin
 		return nil, Err2FANotConfigured
 	}
 	if !a.verifyTOTPOrBackup(ctx, u, code) {
-		a.logActivity(ctx, &u.ID, entity.UserLoginFail, "user", u.ID.String(), meta, entity.JSONMetadata{"step": "2fa_fail"})
+		a.logActivity(ctx, &u.ID, entity.UserLoginFail, "user", u.ID.String(), meta, entity.StepMeta("2fa_fail"))
 		return nil, ErrInvalid2FACode
 	}
 	tokens, err := a.issueSession(ctx, u, true)
 	if err != nil {
 		return nil, err
 	}
-	a.logActivity(ctx, &u.ID, entity.UserLogin, "user", u.ID.String(), meta, entity.JSONMetadata{"step": "2fa_ok"})
+	a.logActivity(ctx, &u.ID, entity.UserLogin, "user", u.ID.String(), meta, entity.StepMeta("2fa_ok"))
 	return &LoginResult{
 		User:      u,
 		AuthToken: tokens.AuthToken,
