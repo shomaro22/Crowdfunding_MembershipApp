@@ -66,7 +66,7 @@ func (a *AuthUseCase) GoogleCallback(ctx context.Context, code, state string, me
 	if err := a.OAuthCache.SetCallbackCode(ctx, cbCode, u.ID, oauthCallbackCodeTTL); err != nil {
 		return nil, err
 	}
-	a.logActivity(ctx, &u.ID, entity.UserLogin, "user", u.ID.String(), meta, entity.JSONMetadata{"provider": "google"})
+	a.logActivity(ctx, &u.ID, entity.UserLogin, "user", u.ID.String(), meta, entity.ProviderMeta("google"))
 	return &OAuthCBOut{
 		ReToken:      tokens.ReToken,
 		CallbackCode: cbCode,

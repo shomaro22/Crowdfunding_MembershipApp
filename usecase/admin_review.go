@@ -16,6 +16,7 @@ import (
 type AdminUseCase struct {
 	Users      repository.UserRepo
 	SellerRegs repository.SellerRegRepo
+	Projects   repository.ProjectRepo
 	Audit      repository.AuditRepo
 	KYC        storage.KYCStore
 	DB         *gorm.DB
