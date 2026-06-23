@@ -30,11 +30,24 @@ type SellerRegOut struct {
 }
 
 func (a *AuthUseCase) RegisterSeller(ctx context.Context, in SellerRegIn, meta AuthMeta) (*SellerRegOut, error) {
+	var (
+		normalized string
+		err        error
+		exists     bool
+		userID     uuid.UUID
+		frontKey   string
+		backKey    string
+		hash       string
+		now        time.Time
+		u          *entity.User
+		reg        *entity.SellerReg
+	)
+
 	if a.KYCStore == nil || a.SellerRegs == nil || a.DB == nil {
 		return nil, ErrNotFound
 	}
 
-	normalized, err := entity.ValidateBuyerReg(in.Email, in.Password)
+	normalized, err = entity.ValidateBuyerReg(in.Email, in.Password)
 	if err != nil {
 		switch err {
 		case entity.ErrBadEmail:
@@ -45,11 +58,11 @@ func (a *AuthUseCase) RegisterSeller(ctx context.Context, in SellerRegIn, meta A
 			return nil, err
 		}
 	}
-	if err := entity.ValidateSellerKYC(in.FullName, in.BirthDate, in.Address, in.PhotoPresent); err != nil {
+	if err = entity.ValidateSellerKYC(in.FullName, in.BirthDate, in.Address, in.PhotoPresent); err != nil {
 		return nil, err
 	}
 
-	exists, err := a.Users.EmailExists(ctx, normalized)
+	exists, err = a.Users.EmailExists(ctx, normalized)
 	if err != nil {
 		return nil, err
 	}
@@ -57,25 +70,25 @@ func (a *AuthUseCase) RegisterSeller(ctx context.Context, in SellerRegIn, meta A
 		return nil, ErrEmailInUse
 	}
 
-	userID := uuid.New()
-	frontKey, err := a.KYCStore.Save(ctx, userID, "front", in.Front)
+	userID = uuid.New()
+	frontKey, err = a.KYCStore.Save(ctx, userID, "front", in.Front)
 	if err != nil {
 		return nil, err
 	}
-	backKey, err := a.KYCStore.Save(ctx, userID, "back", in.Back)
+	backKey, err = a.KYCStore.Save(ctx, userID, "back", in.Back)
 	if err != nil {
 		_ = a.KYCStore.Remove(ctx, frontKey)
 		return nil, err
 	}
 
-	hash, err := auth.HashPassword(in.Password)
+	hash, err = auth.HashPassword(in.Password)
 	if err != nil {
 		_ = a.KYCStore.Remove(ctx, frontKey, backKey)
 		return nil, err
 	}
 
-	now := time.Now().UTC()
-	u := &entity.User{
+	now = time.Now().UTC()
+	u = &entity.User{
 		ID:            userID,
 		Email:         normalized,
 		PasswordHash:  hash,
@@ -85,7 +98,7 @@ func (a *AuthUseCase) RegisterSeller(ctx context.Context, in SellerRegIn, meta A
 		CreatedAt:     now,
 		UpdatedAt:     now,
 	}
-	reg := &entity.SellerReg{
+	reg = &entity.SellerReg{
 		ID:           uuid.New(),
 		UserID:       userID,
 		FullName:     strings.TrimSpace(in.FullName),
@@ -100,8 +113,10 @@ func (a *AuthUseCase) RegisterSeller(ctx context.Context, in SellerRegIn, meta A
 	}
 
 	err = repository.WithTx(ctx, a.DB, func(txCtx context.Context) error {
-		if err := a.Users.Create(txCtx, u); err != nil {
-			return err
+		var txErr error
+
+		if txErr = a.Users.Create(txCtx, u); txErr != nil {
+			return txErr
 		}
 		return a.SellerRegs.Create(txCtx, reg)
 	})

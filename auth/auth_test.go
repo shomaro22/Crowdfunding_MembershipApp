@@ -10,11 +10,21 @@ import (
 )
 
 func TestIssueParse(t *testing.T) {
-	secret := []byte("01234567890123456789012345678901")
-	svc := NewTokenService(secret, time.Minute)
-	uid := uuid.New()
-	adminRole := entity.AdminRoleSuperAdmin
-	token, err := svc.Issue(AuthClaims{
+	var (
+		secret    []byte
+		svc       *TokenService
+		uid       uuid.UUID
+		adminRole entity.AdminRole
+		token     string
+		err       error
+		claims    AuthClaims
+	)
+
+	secret = []byte("01234567890123456789012345678901")
+	svc = NewTokenService(secret, time.Minute)
+	uid = uuid.New()
+	adminRole = entity.AdminRoleSuperAdmin
+	token, err = svc.Issue(AuthClaims{
 		UserID:        uid,
 		Role:          entity.UserRoleAdmin,
 		TwoFAVerified: true,
@@ -24,7 +34,7 @@ func TestIssueParse(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	claims, err := svc.Parse(token)
+	claims, err = svc.Parse(token)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -46,7 +56,12 @@ func TestIssueParse(t *testing.T) {
 }
 
 func TestHashPassword(t *testing.T) {
-	hash, err := HashPassword("secret123")
+	var (
+		hash string
+		err  error
+	)
+
+	hash, err = HashPassword("secret123")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -59,12 +74,19 @@ func TestHashPassword(t *testing.T) {
 }
 
 func TestOpaqueToken(t *testing.T) {
-	plain, err := OpaqueHex()
+	var (
+		plain string
+		err   error
+		h1    string
+		h2    string
+	)
+
+	plain, err = OpaqueHex()
 	if err != nil || len(plain) != 64 {
 		t.Fatalf("expected 64 hex chars, got %q", plain)
 	}
-	h1 := OpaqueHash(plain)
-	h2 := OpaqueHash(plain)
+	h1 = OpaqueHash(plain)
+	h2 = OpaqueHash(plain)
 	if h1 != h2 || h1 == plain {
 		t.Fatal("hash mismatch or not hashed")
 	}

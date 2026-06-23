@@ -16,10 +16,17 @@ func TestUserRole(t *testing.T) {
 }
 
 func TestAccountLogin(t *testing.T) {
+	var (
+		statuses = []AccountStatus{AccountStatusPending, AccountStatusSuspended, AccountStatusBanned}
+		i        int
+		s        AccountStatus
+	)
+
 	if !AccountStatusActive.CanLogin() {
 		t.Fatal("ACTIVE should allow login")
 	}
-	for _, s := range []AccountStatus{AccountStatusPending, AccountStatusSuspended, AccountStatusBanned} {
+	for i = range statuses {
+		s = statuses[i]
 		if s.CanLogin() {
 			t.Fatalf("%s should not allow login", s)
 		}
@@ -51,48 +58,62 @@ func TestPurchaseDisputed(t *testing.T) {
 }
 
 func TestSellerIDDoc(t *testing.T) {
+	var err error
+
 	if !IDDriversLicense.Valid() {
 		t.Fatal("DRIVERS_LICENSE should be valid")
 	}
 	if IDDocType("MY_NUMBER_CARD").Valid() {
 		t.Fatal("only DRIVERS_LICENSE is in scope per §5.1.8")
 	}
-	if err := ValidateSellerIDDoc(IDDriversLicense); err != nil {
+	if err = ValidateSellerIDDoc(IDDriversLicense); err != nil {
 		t.Fatalf("expected ok: %v", err)
 	}
-	if err := ValidateSellerIDDoc("PASSPORT"); err != ErrBadIDDoc {
+	if err = ValidateSellerIDDoc("PASSPORT"); err != ErrBadIDDoc {
 		t.Fatalf("expected ErrBadIDDoc, got %v", err)
 	}
 }
 
 func TestNormalizeEmail(t *testing.T) {
-	got := NormalizeEmail("  Foo@Example.COM ")
+	var got string
+
+	got = NormalizeEmail("  Foo@Example.COM ")
 	if got != "foo@example.com" {
 		t.Fatalf("got %q", got)
 	}
 }
 
 func TestValidateEmail(t *testing.T) {
-	email, err := ValidateEmail("buyer@example.com")
+	var (
+		email string
+		err   error
+	)
+
+	email, err = ValidateEmail("buyer@example.com")
 	if err != nil || email != "buyer@example.com" {
 		t.Fatalf("valid email: %v %q", err, email)
 	}
-	if _, err := ValidateEmail("not-an-email"); err == nil {
+	_, err = ValidateEmail("not-an-email")
+	if err == nil {
 		t.Fatal("expected invalid email error")
 	}
 }
 
 func TestValidatePassword(t *testing.T) {
-	if err := ValidatePassword("short"); err != ErrWeakPassword {
+	var err error
+
+	if err = ValidatePassword("short"); err != ErrWeakPassword {
 		t.Fatalf("expected weak password, got %v", err)
 	}
-	if err := ValidatePassword("longenough"); err != nil {
+	if err = ValidatePassword("longenough"); err != nil {
 		t.Fatalf("expected ok, got %v", err)
 	}
 }
 
 func TestUserIsActive(t *testing.T) {
-	u := User{AccountStatus: AccountStatusActive}
+	var u User
+
+	u = User{AccountStatus: AccountStatusActive}
 	if !u.IsActive() {
 		t.Fatal("ACTIVE user should be is_active=true for API")
 	}
@@ -103,7 +124,9 @@ func TestUserIsActive(t *testing.T) {
 }
 
 func TestSellerLogin(t *testing.T) {
-	u := User{
+	var u User
+
+	u = User{
 		Role:          UserRoleSeller,
 		AccountStatus: AccountStatusActive,
 		SellerStatus:  SellerStatusPending,
@@ -118,10 +141,18 @@ func TestSellerLogin(t *testing.T) {
 }
 
 func TestSupporterBenefits(t *testing.T) {
-	now := time.Date(2026, 6, 18, 12, 0, 0, 0, time.UTC)
-	end := now.Add(24 * time.Hour)
+	var (
+		now     time.Time
+		end     time.Time
+		active  ProjectSupporter
+		renewal ProjectSupporter
+		expired ProjectSupporter
+	)
 
-	active := ProjectSupporter{
+	now = time.Date(2026, 6, 18, 12, 0, 0, 0, time.UTC)
+	end = now.Add(24 * time.Hour)
+
+	active = ProjectSupporter{
 		Status:           SupporterStatusActive,
 		CurrentPeriodEnd: end,
 	}
@@ -129,7 +160,7 @@ func TestSupporterBenefits(t *testing.T) {
 		t.Fatal("active supporter within period should have benefits")
 	}
 
-	renewal := ProjectSupporter{
+	renewal = ProjectSupporter{
 		Status:           SupporterStatusPendingRenewal,
 		CurrentPeriodEnd: end,
 	}
@@ -137,7 +168,7 @@ func TestSupporterBenefits(t *testing.T) {
 		t.Fatal("PENDING_RENEWAL within period should retain benefits per §5.3.2a")
 	}
 
-	expired := ProjectSupporter{
+	expired = ProjectSupporter{
 		Status:           SupporterStatusPendingRenewal,
 		CurrentPeriodEnd: now.Add(-time.Hour),
 	}
@@ -147,15 +178,21 @@ func TestSupporterBenefits(t *testing.T) {
 }
 
 func TestActivityAction(t *testing.T) {
-	actions := []ActivityAction{
-		UserLogin,
-		UserRegister,
-		FavoriteAdd,
-		PurchaseCreated,
-		MessageSent,
-		ReportCreated,
-	}
-	for _, a := range actions {
+	var (
+		actions = []ActivityAction{
+			UserLogin,
+			UserRegister,
+			FavoriteAdd,
+			PurchaseCreated,
+			MessageSent,
+			ReportCreated,
+		}
+		i int
+		a ActivityAction
+	)
+
+	for i = range actions {
+		a = actions[i]
 		if !a.Valid() {
 			t.Fatalf("action %q should be valid per §16.3", a)
 		}
@@ -167,21 +204,29 @@ func TestJSONMetadata(t *testing.T) {
 		ProjectID string  `json:"project_id"`
 		Amount    float64 `json:"amount"`
 	}
-	raw, err := json.Marshal(purchaseMeta{ProjectID: "abc", Amount: 1000})
+
+	var (
+		raw     []byte
+		err     error
+		orig    JSONMetadata
+		val     interface{}
+		decoded JSONMetadata
+		got     purchaseMeta
+	)
+
+	raw, err = json.Marshal(purchaseMeta{ProjectID: "abc", Amount: 1000})
 	if err != nil {
 		t.Fatal(err)
 	}
-	orig := JSONMetadata(raw)
-	val, err := orig.Value()
+	orig = JSONMetadata(raw)
+	val, err = orig.Value()
 	if err != nil {
 		t.Fatal(err)
 	}
-	var decoded JSONMetadata
-	if err := decoded.Scan(val); err != nil {
+	if err = decoded.Scan(val); err != nil {
 		t.Fatal(err)
 	}
-	var got purchaseMeta
-	if err := json.Unmarshal([]byte(decoded), &got); err != nil {
+	if err = json.Unmarshal([]byte(decoded), &got); err != nil {
 		t.Fatal(err)
 	}
 	if got.ProjectID != "abc" || got.Amount != 1000 {
@@ -190,30 +235,42 @@ func TestJSONMetadata(t *testing.T) {
 }
 
 func TestValidateSellerKYC(t *testing.T) {
-	birth := time.Date(1990, 1, 1, 0, 0, 0, 0, time.UTC)
-	if err := ValidateSellerKYC("山田 太郎", birth, "東京都千代田区", true); err != nil {
+	var (
+		birth time.Time
+		err   error
+	)
+
+	birth = time.Date(1990, 1, 1, 0, 0, 0, 0, time.UTC)
+	if err = ValidateSellerKYC("山田 太郎", birth, "東京都千代田区", true); err != nil {
 		t.Fatalf("expected ok: %v", err)
 	}
-	if err := ValidateSellerKYC("", birth, "東京都", true); err != ErrBadKYC {
+	if err = ValidateSellerKYC("", birth, "東京都", true); err != ErrBadKYC {
 		t.Fatalf("empty name: %v", err)
 	}
-	if err := ValidateSellerKYC("山田", time.Time{}, "東京都", true); err != ErrBadKYC {
+	if err = ValidateSellerKYC("山田", time.Time{}, "東京都", true); err != ErrBadKYC {
 		t.Fatalf("zero birth date: %v", err)
 	}
-	if err := ValidateSellerKYC("山田", birth, "  ", true); err != ErrBadKYC {
+	if err = ValidateSellerKYC("山田", birth, "  ", true); err != ErrBadKYC {
 		t.Fatalf("empty address: %v", err)
 	}
-	if err := ValidateSellerKYC("山田", birth, "東京都", false); err != ErrBadKYC {
+	if err = ValidateSellerKYC("山田", birth, "東京都", false); err != ErrBadKYC {
 		t.Fatalf("photo_present false: %v", err)
 	}
 }
 
 func TestSellerRegApprove(t *testing.T) {
-	front := "kyc/front.jpg"
-	back := "kyc/back.jpg"
-	birth := time.Date(1990, 1, 1, 0, 0, 0, 0, time.UTC)
+	var (
+		front string
+		back  string
+		birth time.Time
+		reg   SellerReg
+	)
 
-	reg := SellerReg{
+	front = "kyc/front.jpg"
+	back = "kyc/back.jpg"
+	birth = time.Date(1990, 1, 1, 0, 0, 0, 0, time.UTC)
+
+	reg = SellerReg{
 		Status:       RegPending,
 		FullName:     "山田 太郎",
 		BirthDate:    birth,
@@ -242,16 +299,22 @@ func TestSellerRegApprove(t *testing.T) {
 }
 
 func TestDurationDates(t *testing.T) {
-	start := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
-	end := time.Date(2026, 12, 31, 0, 0, 0, 0, time.UTC)
+	var (
+		start time.Time
+		end   time.Time
+		err   error
+	)
 
-	if err := ValidateDuration(DurationLimited, start, &end); err != nil {
+	start = time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
+	end = time.Date(2026, 12, 31, 0, 0, 0, 0, time.UTC)
+
+	if err = ValidateDuration(DurationLimited, start, &end); err != nil {
 		t.Fatalf("limited with end: %v", err)
 	}
-	if err := ValidateDuration(DurationUnlimited, start, nil); err != nil {
+	if err = ValidateDuration(DurationUnlimited, start, nil); err != nil {
 		t.Fatalf("unlimited without end: %v", err)
 	}
-	if err := ValidateDuration(DurationUnlimited, start, &end); err == nil {
+	if err = ValidateDuration(DurationUnlimited, start, &end); err == nil {
 		t.Fatal("unlimited with end should fail")
 	}
 }

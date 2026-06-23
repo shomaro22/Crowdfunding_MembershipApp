@@ -40,7 +40,18 @@ func NewLocalKYC(root string) *LocalKYCStore {
 }
 
 func (s *LocalKYCStore) Save(_ context.Context, userID uuid.UUID, side string, img KYCImage) (string, error) {
-	ext, ok := allowedKYCTypes[strings.ToLower(strings.TrimSpace(img.ContentType))]
+	var (
+		ext     string
+		ok      bool
+		dir     string
+		name    string
+		absPath string
+		f       *os.File
+		n       int64
+		key     string
+		err     error
+	)
+	ext, ok = allowedKYCTypes[strings.ToLower(strings.TrimSpace(img.ContentType))]
 	if !ok {
 		return "", ErrBadMedia
 	}
@@ -48,20 +59,21 @@ func (s *LocalKYCStore) Save(_ context.Context, userID uuid.UUID, side string, i
 		return "", ErrTooLarge
 	}
 
-	dir := filepath.Join(s.Root, "kyc", userID.String())
-	if err := os.MkdirAll(dir, 0o700); err != nil {
+	dir = filepath.Join(s.Root, "kyc", userID.String())
+	err = os.MkdirAll(dir, 0o700)
+	if err != nil {
 		return "", err
 	}
 
-	name := fmt.Sprintf("%s_%s%s", uuid.NewString(), side, ext)
-	absPath := filepath.Join(dir, name)
-	f, err := os.OpenFile(absPath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o600)
+	name = fmt.Sprintf("%s_%s%s", uuid.NewString(), side, ext)
+	absPath = filepath.Join(dir, name)
+	f, err = os.OpenFile(absPath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o600)
 	if err != nil {
 		return "", err
 	}
 	defer f.Close()
 
-	n, err := io.Copy(f, io.LimitReader(img.Reader, MaxKYCBytes+1))
+	n, err = io.Copy(f, io.LimitReader(img.Reader, MaxKYCBytes+1))
 	if err != nil {
 		_ = os.Remove(absPath)
 		return "", err
@@ -71,33 +83,43 @@ func (s *LocalKYCStore) Save(_ context.Context, userID uuid.UUID, side string, i
 		return "", ErrTooLarge
 	}
 
-	key := filepath.ToSlash(filepath.Join("kyc", userID.String(), name))
+	key = filepath.ToSlash(filepath.Join("kyc", userID.String(), name))
 	return key, nil
 }
 
 func (s *LocalKYCStore) Remove(_ context.Context, keys ...string) error {
-	for _, key := range keys {
+	var (
+		key string
+		abs string
+	)
+	for _, key = range keys {
 		key = filepath.Clean(key)
 		if strings.Contains(key, "..") {
 			continue
 		}
-		abs := filepath.Join(s.Root, key)
+		abs = filepath.Join(s.Root, key)
 		_ = os.Remove(abs)
 	}
 	return nil
 }
 
 func (s *LocalKYCStore) Open(key string) (*os.File, string, error) {
+	var (
+		abs string
+		f   *os.File
+		ct  string
+		err error
+	)
 	key = filepath.Clean(key)
 	if strings.Contains(key, "..") {
 		return nil, "", ErrBadMedia
 	}
-	abs := filepath.Join(s.Root, key)
-	f, err := os.Open(abs)
+	abs = filepath.Join(s.Root, key)
+	f, err = os.Open(abs)
 	if err != nil {
 		return nil, "", err
 	}
-	ct := "application/octet-stream"
+	ct = "application/octet-stream"
 	switch filepath.Ext(abs) {
 	case ".jpg", ".jpeg":
 		ct = "image/jpeg"

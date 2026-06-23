@@ -12,7 +12,8 @@ const CtxRequestID = "request_id"
 func RequestID() echo.MiddlewareFunc {
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(c echo.Context) error {
-			id := c.Request().Header.Get("X-Request-ID")
+			var id string
+			id = c.Request().Header.Get("X-Request-ID")
 			if id == "" {
 				id = uuid.NewString()
 			}
@@ -26,8 +27,12 @@ func RequestID() echo.MiddlewareFunc {
 func RequestLogger() echo.MiddlewareFunc {
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(c echo.Context) error {
-			err := next(c)
-			reqID, _ := c.Get(CtxRequestID).(string)
+			var (
+				err   error
+				reqID string
+			)
+			err = next(c)
+			reqID, _ = c.Get(CtxRequestID).(string)
 			if err != nil {
 				slog.Error("request",
 					slog.String("request_id", reqID),

@@ -36,17 +36,23 @@ func (a *AdminUseCase) ListBuyerPending(ctx context.Context, limit, offset int) 
 }
 
 func (a *AdminUseCase) ApproveBuyer(ctx context.Context, adminID, userID uuid.UUID, reason *string) (*entity.User, error) {
-	u, err := a.Users.FindByID(ctx, userID)
+	var (
+		u   *entity.User
+		err error
+		now time.Time
+	)
+
+	u, err = a.Users.FindByID(ctx, userID)
 	if err != nil || u == nil {
 		return nil, ErrNotFound
 	}
 	if u.Role != entity.UserRoleBuyer || u.AccountStatus != entity.AccountStatusPending {
 		return nil, ErrInvalidState
 	}
-	now := time.Now().UTC()
+	now = time.Now().UTC()
 	u.AccountStatus = entity.AccountStatusActive
 	u.UpdatedAt = now
-	if err := a.Users.Update(ctx, u); err != nil {
+	if err = a.Users.Update(ctx, u); err != nil {
 		return nil, err
 	}
 	a.writeAudit(ctx, adminID, "buyer_registration.approve", "user", u.ID.String(), reason, nil)
@@ -54,17 +60,23 @@ func (a *AdminUseCase) ApproveBuyer(ctx context.Context, adminID, userID uuid.UU
 }
 
 func (a *AdminUseCase) RejectBuyer(ctx context.Context, adminID, userID uuid.UUID, reason *string) (*entity.User, error) {
-	u, err := a.Users.FindByID(ctx, userID)
+	var (
+		u   *entity.User
+		err error
+		now time.Time
+	)
+
+	u, err = a.Users.FindByID(ctx, userID)
 	if err != nil || u == nil {
 		return nil, ErrNotFound
 	}
 	if u.Role != entity.UserRoleBuyer || u.AccountStatus != entity.AccountStatusPending {
 		return nil, ErrInvalidState
 	}
-	now := time.Now().UTC()
+	now = time.Now().UTC()
 	u.AccountStatus = entity.AccountStatusSuspended
 	u.UpdatedAt = now
-	if err := a.Users.Update(ctx, u); err != nil {
+	if err = a.Users.Update(ctx, u); err != nil {
 		return nil, err
 	}
 	a.writeAudit(ctx, adminID, "buyer_registration.reject", "user", u.ID.String(), reason, nil)
@@ -79,48 +91,67 @@ func (a *AdminUseCase) ListSellerRegs(ctx context.Context, status entity.RegStat
 }
 
 func (a *AdminUseCase) GetSellerReg(ctx context.Context, id uuid.UUID) (*SellerRegView, error) {
-	reg, err := a.SellerRegs.FindByID(ctx, id)
+	var (
+		reg  *entity.SellerReg
+		err  error
+		u    *entity.User
+		now  time.Time
+		out  *SellerRegView
+		tok  string
+		url  string
+	)
+
+	reg, err = a.SellerRegs.FindByID(ctx, id)
 	if err != nil || reg == nil {
 		return nil, ErrNotFound
 	}
-	u, err := a.Users.FindByID(ctx, reg.UserID)
+	u, err = a.Users.FindByID(ctx, reg.UserID)
 	if err != nil || u == nil {
 		return nil, ErrNotFound
 	}
-	now := time.Now().UTC()
-	out := &SellerRegView{Registration: reg, User: u}
+	now = time.Now().UTC()
+	out = &SellerRegView{Registration: reg, User: u}
 	if reg.HasIDFront() {
-		tok := storage.SignKYCAccess(a.SignSecret, *reg.IDFrontKey, now)
-		url := storage.KYCAccessURL(a.APIBase, tok)
+		tok = storage.SignKYCAccess(a.SignSecret, *reg.IDFrontKey, now)
+		url = storage.KYCAccessURL(a.APIBase, tok)
 		out.FrontURL = &url
 	}
 	if reg.HasIDBack() {
-		tok := storage.SignKYCAccess(a.SignSecret, *reg.IDBackKey, now)
-		url := storage.KYCAccessURL(a.APIBase, tok)
+		tok = storage.SignKYCAccess(a.SignSecret, *reg.IDBackKey, now)
+		url = storage.KYCAccessURL(a.APIBase, tok)
 		out.BackURL = &url
 	}
 	return out, nil
 }
 
 func (a *AdminUseCase) ApproveSellerReg(ctx context.Context, adminID, regID uuid.UUID) (*entity.SellerReg, error) {
-	reg, err := a.SellerRegs.FindByID(ctx, regID)
+	var (
+		reg *entity.SellerReg
+		err error
+		u   *entity.User
+		now time.Time
+	)
+
+	reg, err = a.SellerRegs.FindByID(ctx, regID)
 	if err != nil || reg == nil {
 		return nil, ErrNotFound
 	}
 	if !reg.CanApprove() {
 		return nil, ErrInvalidState
 	}
-	u, err := a.Users.FindByID(ctx, reg.UserID)
+	u, err = a.Users.FindByID(ctx, reg.UserID)
 	if err != nil || u == nil {
 		return nil, ErrNotFound
 	}
-	now := time.Now().UTC()
+	now = time.Now().UTC()
 	err = repository.WithTx(ctx, a.DB, func(txCtx context.Context) error {
+		var txErr error
+
 		u.AccountStatus = entity.AccountStatusActive
 		u.SellerStatus = entity.SellerStatusActive
 		u.UpdatedAt = now
-		if err := a.Users.Update(txCtx, u); err != nil {
-			return err
+		if txErr = a.Users.Update(txCtx, u); txErr != nil {
+			return txErr
 		}
 		reg.Status = entity.RegApproved
 		reg.ReviewedAt = &now
@@ -136,24 +167,30 @@ func (a *AdminUseCase) ApproveSellerReg(ctx context.Context, adminID, regID uuid
 }
 
 func (a *AdminUseCase) RejectSellerReg(ctx context.Context, adminID, regID uuid.UUID, reason string) (*entity.SellerReg, error) {
+	var (
+		reg *entity.SellerReg
+		err error
+		now time.Time
+	)
+
 	reason = strings.TrimSpace(reason)
 	if reason == "" {
 		return nil, ErrBadRequest
 	}
-	reg, err := a.SellerRegs.FindByID(ctx, regID)
+	reg, err = a.SellerRegs.FindByID(ctx, regID)
 	if err != nil || reg == nil {
 		return nil, ErrNotFound
 	}
 	if reg.Status != entity.RegPending {
 		return nil, ErrInvalidState
 	}
-	now := time.Now().UTC()
+	now = time.Now().UTC()
 	reg.Status = entity.RegRejected
 	reg.RejectReason = &reason
 	reg.ReviewedAt = &now
 	reg.ReviewedBy = &adminID
 	reg.UpdatedAt = now
-	if err := a.SellerRegs.Update(ctx, reg); err != nil {
+	if err = a.SellerRegs.Update(ctx, reg); err != nil {
 		return nil, err
 	}
 	a.writeAudit(ctx, adminID, "seller_registration.reject", "seller_registration", reg.ID.String(), &reason, nil)
