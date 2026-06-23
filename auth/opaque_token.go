@@ -7,14 +7,20 @@ import (
 )
 
 func OpaqueHex() (string, error) {
-	b := make([]byte, 32)
-	if _, err := rand.Read(b); err != nil {
+	var (
+		b   []byte
+		err error
+	)
+	b = make([]byte, 32)
+	_, err = rand.Read(b)
+	if err != nil {
 		return "", err
 	}
 	return hex.EncodeToString(b), nil
 }
 
 func OpaqueHash(plain string) string {
-	sum := sha256.Sum256([]byte(plain))
+	var sum [32]byte
+	sum = sha256.Sum256([]byte(plain))
 	return hex.EncodeToString(sum[:])
 }

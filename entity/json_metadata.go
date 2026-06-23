@@ -9,7 +9,11 @@ import (
 type JSONMetadata json.RawMessage
 
 func StepMeta(step string) JSONMetadata {
-	b, err := json.Marshal(struct {
+	var (
+		b   []byte
+		err error
+	)
+	b, err = json.Marshal(struct {
 		Step string `json:"step"`
 	}{Step: step})
 	if err != nil {
@@ -19,7 +23,11 @@ func StepMeta(step string) JSONMetadata {
 }
 
 func ProviderMeta(provider string) JSONMetadata {
-	b, err := json.Marshal(struct {
+	var (
+		b   []byte
+		err error
+	)
+	b, err = json.Marshal(struct {
 		Provider string `json:"provider"`
 	}{Provider: provider})
 	if err != nil {
@@ -36,16 +44,19 @@ func (m JSONMetadata) Value() (driver.Value, error) {
 }
 
 func (m *JSONMetadata) Scan(value interface{}) error {
+	var (
+		raw []byte
+		cp  []byte
+	)
 	if value == nil {
 		*m = nil
 		return nil
 	}
-	var raw []byte
-	switch v := value.(type) {
+	switch value.(type) {
 	case []byte:
-		raw = v
+		raw = value.([]byte)
 	case string:
-		raw = []byte(v)
+		raw = []byte(value.(string))
 	default:
 		return fmt.Errorf("entity.JSONMetadata: unsupported type %T", value)
 	}
@@ -53,7 +64,7 @@ func (m *JSONMetadata) Scan(value interface{}) error {
 		*m = nil
 		return nil
 	}
-	cp := make([]byte, len(raw))
+	cp = make([]byte, len(raw))
 	copy(cp, raw)
 	*m = JSONMetadata(cp)
 	return nil

@@ -5,25 +5,35 @@ import (
 	"os"
 
 	"github.com/joho/godotenv"
+	"github.com/labstack/echo/v4"
 )
 
 func main() {
+	var (
+		e    *echo.Echo
+		addr string
+		err  error
+	)
 	loadDotEnv()
-	e, addr, err := buildApp()
+	e, addr, err = buildApp()
 	if err != nil {
 		log.Fatal(err)
 	}
-	if err := e.Start(addr); err != nil {
+	err = e.Start(addr)
+	if err != nil {
 		log.Fatal(err)
 	}
 }
 
 func loadDotEnv() {
 	const envFile = ".env"
-	if _, err := os.Stat(envFile); err != nil {
+	var err error
+	_, err = os.Stat(envFile)
+	if err != nil {
 		return
 	}
-	if err := godotenv.Load(envFile); err != nil {
+	err = godotenv.Load(envFile)
+	if err != nil {
 		log.Printf("warning: load .env: %v", err)
 	}
 }

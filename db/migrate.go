@@ -6,6 +6,7 @@ import (
 
 	"github.com/golang-migrate/migrate/v4"
 	_ "github.com/golang-migrate/migrate/v4/database/postgres"
+	"github.com/golang-migrate/migrate/v4/source"
 	"github.com/golang-migrate/migrate/v4/source/iofs"
 )
 
@@ -13,11 +14,16 @@ import (
 var migrationsFS embed.FS
 
 func Up(databaseURL string) error {
-	src, err := iofs.New(migrationsFS, "migrations")
+	var (
+		src source.Driver
+		m   *migrate.Migrate
+		err error
+	)
+	src, err = iofs.New(migrationsFS, "migrations")
 	if err != nil {
 		return fmt.Errorf("migrations source: %w", err)
 	}
-	m, err := migrate.NewWithSourceInstance("iofs", src, databaseURL)
+	m, err = migrate.NewWithSourceInstance("iofs", src, databaseURL)
 	if err != nil {
 		return fmt.Errorf(
 			"migrate new: %w (if the DB was migrated with a newer schema, run: docker compose down -v)",
@@ -25,7 +31,8 @@ func Up(databaseURL string) error {
 		)
 	}
 	defer m.Close()
-	if err := m.Up(); err != nil && err != migrate.ErrNoChange {
+	err = m.Up()
+	if err != nil && err != migrate.ErrNoChange {
 		return err
 	}
 	return nil

@@ -6,15 +6,21 @@ import (
 	"crowdfund-app/auth"
 	"crowdfund-app/usecase"
 
+	"github.com/google/uuid"
 	"github.com/labstack/echo/v4"
 )
 
 func (h *AuthController) Setup2FA(c echo.Context) error {
-	uid, err := CurrentUserID(c)
+	var (
+		uid uuid.UUID
+		res *usecase.TOTPSetupResult
+		err error
+	)
+	uid, err = CurrentUserID(c)
 	if err != nil {
 		return err
 	}
-	res, err := h.Auth.Setup2FA(c.Request().Context(), uid)
+	res, err = h.Auth.Setup2FA(c.Request().Context(), uid)
 	if err != nil {
 		return mapAuthError(err)
 	}
@@ -25,17 +31,22 @@ func (h *AuthController) Setup2FA(c echo.Context) error {
 }
 
 func (h *AuthController) Verify2FA(c echo.Context) error {
-	uid, err := CurrentUserID(c)
+	var (
+		uid  uuid.UUID
+		body struct {
+			Code string `json:"code"`
+		}
+		res *usecase.TOTPVerifyResult
+		err error
+	)
+	uid, err = CurrentUserID(c)
 	if err != nil {
 		return err
 	}
-	var body struct {
-		Code string `json:"code"`
-	}
-	if err := c.Bind(&body); err != nil || body.Code == "" {
+	if err = c.Bind(&body); err != nil || body.Code == "" {
 		return echo.NewHTTPError(http.StatusBadRequest, apiError("code required", "BAD_REQUEST"))
 	}
-	res, err := h.Auth.Verify2FASetup(c.Request().Context(), uid, body.Code)
+	res, err = h.Auth.Verify2FASetup(c.Request().Context(), uid, body.Code)
 	if err != nil {
 		return mapAuthError(err)
 	}
@@ -46,17 +57,22 @@ func (h *AuthController) Verify2FA(c echo.Context) error {
 }
 
 func (h *AuthController) Challenge2FA(c echo.Context) error {
-	pending := auth.Pending2FAFrom(c)
+	var (
+		pending string
+		body    struct {
+			Code string `json:"code"`
+		}
+		res *usecase.LoginResult
+		err error
+	)
+	pending = auth.Pending2FAFrom(c)
 	if pending == "" {
 		return echo.NewHTTPError(http.StatusUnauthorized, apiError("2fa session expired", "UNAUTHORIZED"))
 	}
-	var body struct {
-		Code string `json:"code"`
-	}
-	if err := c.Bind(&body); err != nil || body.Code == "" {
+	if err = c.Bind(&body); err != nil || body.Code == "" {
 		return echo.NewHTTPError(http.StatusBadRequest, apiError("code required", "BAD_REQUEST"))
 	}
-	res, err := h.Auth.Challenge2FA(c.Request().Context(), pending, body.Code, authMeta(c))
+	res, err = h.Auth.Challenge2FA(c.Request().Context(), pending, body.Code, authMeta(c))
 	if err != nil {
 		return mapAuthError(err)
 	}
@@ -69,8 +85,13 @@ func (h *AuthController) Challenge2FA(c echo.Context) error {
 }
 
 func (h *AuthController) GoogleStart(c echo.Context) error {
-	from := c.QueryParam("from")
-	authURL, err := h.Auth.GoogleAuthURL(from)
+	var (
+		from    string
+		authURL string
+		err     error
+	)
+	from = c.QueryParam("from")
+	authURL, err = h.Auth.GoogleAuthURL(from)
 	if err != nil {
 		return mapAuthError(err)
 	}
@@ -78,12 +99,20 @@ func (h *AuthController) GoogleStart(c echo.Context) error {
 }
 
 func (h *AuthController) GoogleCallback(c echo.Context) error {
-	if errMsg := c.QueryParam("error"); errMsg != "" {
+	var (
+		errMsg string
+		code   string
+		state  string
+		res    *usecase.OAuthCBOut
+		err    error
+	)
+	errMsg = c.QueryParam("error")
+	if errMsg != "" {
 		return c.Redirect(http.StatusFound, h.Auth.OAuthErrorRedirect(errMsg))
 	}
-	code := c.QueryParam("code")
-	state := c.QueryParam("state")
-	res, err := h.Auth.GoogleCallback(c.Request().Context(), code, state, authMeta(c))
+	code = c.QueryParam("code")
+	state = c.QueryParam("state")
+	res, err = h.Auth.GoogleCallback(c.Request().Context(), code, state, authMeta(c))
 	if err != nil {
 		return c.Redirect(http.StatusFound, h.Auth.OAuthErrorRedirect(oauthErrCode(err)))
 	}
@@ -92,13 +121,17 @@ func (h *AuthController) GoogleCallback(c echo.Context) error {
 }
 
 func (h *AuthController) OAuthExchange(c echo.Context) error {
-	var body struct {
-		Code string `json:"code"`
-	}
-	if err := c.Bind(&body); err != nil || body.Code == "" {
+	var (
+		body struct {
+			Code string `json:"code"`
+		}
+		res *usecase.LoginResult
+		err error
+	)
+	if err = c.Bind(&body); err != nil || body.Code == "" {
 		return echo.NewHTTPError(http.StatusBadRequest, apiError("code required", "BAD_REQUEST"))
 	}
-	res, err := h.Auth.ExchangeOAuthCode(c.Request().Context(), body.Code, authMeta(c))
+	res, err = h.Auth.ExchangeOAuthCode(c.Request().Context(), body.Code, authMeta(c))
 	if err != nil {
 		return mapAuthError(err)
 	}
