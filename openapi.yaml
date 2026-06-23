@@ -2229,6 +2229,9 @@ components:
         new_password:
           type: string
           minLength: 8
+        totp_code:
+          type: string
+          description: SELLER / ADMIN は必須（§5.1.5）。6桁 TOTP またはバックアップコード。
 
     CheckEmailResponse:
       type: object

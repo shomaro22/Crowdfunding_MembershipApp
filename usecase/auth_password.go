@@ -99,7 +99,7 @@ func (a *AuthUseCase) ResetPassword(ctx context.Context, plainToken, newPassword
 	return a.invalidateSessions(ctx, u.ID)
 }
 
-func (a *AuthUseCase) ChangePassword(ctx context.Context, userID uuid.UUID, current, newPassword string) error {
+func (a *AuthUseCase) ChangePassword(ctx context.Context, userID uuid.UUID, current, newPassword, totpCode string) error {
 	var (
 		err  error
 		u    *entity.User
@@ -113,6 +113,17 @@ func (a *AuthUseCase) ChangePassword(ctx context.Context, userID uuid.UUID, curr
 	u, err = a.Users.FindByID(ctx, userID)
 	if err != nil || u == nil {
 		return ErrNotFound
+	}
+	if u.MustSetup2FA() {
+		if strings.TrimSpace(totpCode) == "" {
+			return ErrRequires2FA
+		}
+		if !u.TOTPEnabled {
+			return Err2FANotConfigured
+		}
+		if !a.verifyTOTPOrBackup(ctx, u, totpCode) {
+			return ErrInvalid2FACode
+		}
 	}
 	if auth.ComparePassword(u.PasswordHash, current) != nil {
 		return ErrInvalidCredentials
