@@ -10,42 +10,61 @@ import (
 )
 
 func EncryptSecret(key []byte, plain string) (string, error) {
-	k := deriveAESKey(key)
-	block, err := aes.NewCipher(k)
+	var (
+		k     []byte
+		block cipher.Block
+		gcm   cipher.AEAD
+		nonce []byte
+		out   []byte
+		err   error
+	)
+	k = deriveAESKey(key)
+	block, err = aes.NewCipher(k)
 	if err != nil {
 		return "", err
 	}
-	gcm, err := cipher.NewGCM(block)
+	gcm, err = cipher.NewGCM(block)
 	if err != nil {
 		return "", err
 	}
-	nonce := make([]byte, gcm.NonceSize())
-	if _, err := io.ReadFull(rand.Reader, nonce); err != nil {
+	nonce = make([]byte, gcm.NonceSize())
+	_, err = io.ReadFull(rand.Reader, nonce)
+	if err != nil {
 		return "", err
 	}
-	out := gcm.Seal(nonce, nonce, []byte(plain), nil)
+	out = gcm.Seal(nonce, nonce, []byte(plain), nil)
 	return base64.StdEncoding.EncodeToString(out), nil
 }
 
 func DecryptSecret(key []byte, enc string) (string, error) {
-	raw, err := base64.StdEncoding.DecodeString(enc)
+	var (
+		raw   []byte
+		k     []byte
+		block cipher.Block
+		gcm   cipher.AEAD
+		nonce []byte
+		ct    []byte
+		plain []byte
+		err   error
+	)
+	raw, err = base64.StdEncoding.DecodeString(enc)
 	if err != nil {
 		return "", ErrInvalidToken
 	}
-	k := deriveAESKey(key)
-	block, err := aes.NewCipher(k)
+	k = deriveAESKey(key)
+	block, err = aes.NewCipher(k)
 	if err != nil {
 		return "", err
 	}
-	gcm, err := cipher.NewGCM(block)
+	gcm, err = cipher.NewGCM(block)
 	if err != nil {
 		return "", err
 	}
 	if len(raw) < gcm.NonceSize() {
 		return "", ErrInvalidToken
 	}
-	nonce, ct := raw[:gcm.NonceSize()], raw[gcm.NonceSize():]
-	plain, err := gcm.Open(nil, nonce, ct, nil)
+	nonce, ct = raw[:gcm.NonceSize()], raw[gcm.NonceSize():]
+	plain, err = gcm.Open(nil, nonce, ct, nil)
 	if err != nil {
 		return "", ErrInvalidToken
 	}
@@ -53,19 +72,27 @@ func DecryptSecret(key []byte, enc string) (string, error) {
 }
 
 func deriveAESKey(key []byte) []byte {
-	out := make([]byte, 32)
+	var (
+		out []byte
+		i   int
+	)
+	out = make([]byte, 32)
 	copy(out, key)
 	if len(key) >= 32 {
 		return key[:32]
 	}
-	for i := 32; i < len(key); i++ {
+	for i = 32; i < len(key); i++ {
 		out[i%32] ^= key[i]
 	}
 	return out
 }
 
 func MustEncryptSecret(key []byte, plain string) string {
-	s, err := EncryptSecret(key, plain)
+	var (
+		s   string
+		err error
+	)
+	s, err = EncryptSecret(key, plain)
 	if err != nil {
 		panic(fmt.Sprintf("encrypt secret: %v", err))
 	}

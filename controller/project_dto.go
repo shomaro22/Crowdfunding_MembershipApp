@@ -37,20 +37,29 @@ type planInJSON struct {
 }
 
 func (b createProjectJSON) toInput() (usecase.CreateProjectIn, error) {
-	start, err := time.Parse(time.RFC3339, b.StartDate)
+	var (
+		start time.Time
+		err   error
+		end   *time.Time
+		t     time.Time
+		plans []usecase.PlanIn
+		i     int
+		p     planInJSON
+	)
+	start, err = time.Parse(time.RFC3339, b.StartDate)
 	if err != nil {
 		return usecase.CreateProjectIn{}, err
 	}
-	var end *time.Time
 	if b.EndDate != nil && *b.EndDate != "" {
-		t, err := time.Parse(time.RFC3339, *b.EndDate)
+		t, err = time.Parse(time.RFC3339, *b.EndDate)
 		if err != nil {
 			return usecase.CreateProjectIn{}, err
 		}
 		end = &t
 	}
-	plans := make([]usecase.PlanIn, 0, len(b.Plans))
-	for _, p := range b.Plans {
+	plans = make([]usecase.PlanIn, 0, len(b.Plans))
+	for i = range b.Plans {
+		p = b.Plans[i]
 		plans = append(plans, usecase.PlanIn{
 			MembershipType: entity.MembershipType(p.MembershipType),
 			Price:          p.Price,
@@ -71,7 +80,14 @@ func (b createProjectJSON) toInput() (usecase.CreateProjectIn, error) {
 }
 
 func (b updateProjectJSON) toInput() usecase.UpdateProjectIn {
-	in := usecase.UpdateProjectIn{
+	var (
+		in     usecase.UpdateProjectIn
+		d      entity.DurationType
+		tStart time.Time
+		tEnd   time.Time
+		err    error
+	)
+	in = usecase.UpdateProjectIn{
 		Title:        b.Title,
 		Description:  b.Description,
 		TargetAmount: b.TargetAmount,
@@ -79,19 +95,23 @@ func (b updateProjectJSON) toInput() usecase.UpdateProjectIn {
 		IsReapply:    b.IsReapply,
 	}
 	if b.DurationType != nil {
-		d := entity.DurationType(*b.DurationType)
+		d = entity.DurationType(*b.DurationType)
 		in.DurationType = &d
 	}
 	if b.StartDate != nil {
-		if t, err := time.Parse(time.RFC3339, *b.StartDate); err == nil {
-			in.StartDate = &t
+		tStart, err = time.Parse(time.RFC3339, *b.StartDate)
+		if err == nil {
+			in.StartDate = &tStart
 		}
 	}
 	if b.EndDate != nil {
 		if *b.EndDate == "" {
 			in.EndDate = nil
-		} else if t, err := time.Parse(time.RFC3339, *b.EndDate); err == nil {
-			in.EndDate = &t
+		} else {
+			tEnd, err = time.Parse(time.RFC3339, *b.EndDate)
+			if err == nil {
+				in.EndDate = &tEnd
+			}
 		}
 	}
 	return in

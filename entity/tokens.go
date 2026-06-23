@@ -6,7 +6,7 @@ import (
 	"github.com/google/uuid"
 )
 
-// ReToken は仕様上の Refresh Token（8.1）。DB テーブル名は refresh_tokens。
+// ReToken は仕様上の Refresh Token。DB テーブル名は refresh_tokens。
 type ReToken struct {
 	ID        uuid.UUID  `gorm:"type:uuid;primaryKey;default:gen_random_uuid()"`
 	UserID    uuid.UUID  `gorm:"type:uuid;not null;index"`
