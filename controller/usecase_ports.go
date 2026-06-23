@@ -18,7 +18,7 @@ type AuthUseCase interface {
 	Logout(ctx context.Context, reTokenPlain string, meta usecase.AuthMeta) error
 	ForgotPassword(ctx context.Context, email string) error
 	ResetPassword(ctx context.Context, plainToken, newPassword string) error
-	ChangePassword(ctx context.Context, userID uuid.UUID, current, newPassword string) error
+	ChangePassword(ctx context.Context, userID uuid.UUID, current, newPassword, totpCode string) error
 	GetUser(ctx context.Context, userID uuid.UUID) (*entity.User, error)
 	EmailFree(ctx context.Context, email string) (bool, error)
 	ParseToken(raw string) (auth.AuthClaims, error)

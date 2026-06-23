@@ -25,6 +25,18 @@ func CurrentUserID(c echo.Context) (uuid.UUID, error) {
 	return uid, nil
 }
 
+func CurrentAdminRole(c echo.Context) (entity.AdminRole, error) {
+	var (
+		ar entity.AdminRole
+		ok bool
+	)
+	ar, ok = middleware.AuthAdminRole(c)
+	if !ok {
+		return "", echo.NewHTTPError(http.StatusForbidden, apiError("forbidden", "FORBIDDEN"))
+	}
+	return ar, nil
+}
+
 func authMeta(c echo.Context) usecase.AuthMeta {
 	var reqID string
 	reqID, _ = c.Get(middleware.CtxRequestID).(string)
@@ -133,6 +145,10 @@ func mapAuthError(err error) *echo.HTTPError {
 		return echo.NewHTTPError(http.StatusUnauthorized, apiError("invalid token", "INVALID_TOKEN"))
 	case errors.Is(err, usecase.ErrNotFound):
 		return echo.NewHTTPError(http.StatusNotFound, apiError("not found", "NOT_FOUND"))
+	case errors.Is(err, usecase.ErrRequires2FA):
+		return echo.NewHTTPError(http.StatusForbidden, apiError("2fa required", "2FA_REQUIRED"))
+	case errors.Is(err, usecase.Err2FANotConfigured):
+		return echo.NewHTTPError(http.StatusForbidden, apiError("2fa not configured", "2FA_NOT_CONFIGURED"))
 	case errors.Is(err, usecase.ErrInvalid2FACode):
 		return echo.NewHTTPError(http.StatusUnauthorized, apiError("invalid 2fa code", "INVALID_2FA_CODE"))
 	case errors.Is(err, usecase.Err2FAAlreadyEnabled):

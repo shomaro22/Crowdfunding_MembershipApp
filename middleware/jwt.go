@@ -84,6 +84,7 @@ func JWTAuth(parse TokenParser, validate SessionValidator) echo.MiddlewareFunc {
 			c.Set(CtxUserID, claims.UserID)
 			c.Set(CtxUserRole, string(claims.Role))
 			c.Set(CtxTwoFAVerified, claims.TwoFAVerified)
+			setAdminRoleCtx(c, claims.AdminRole)
 			if validate != nil {
 				if err = validate(c, claims); err != nil {
 					return err
@@ -114,6 +115,7 @@ func OptionalJWTAuth(parse TokenParser, validate SessionValidator) echo.Middlewa
 			c.Set(CtxUserID, claims.UserID)
 			c.Set(CtxUserRole, string(claims.Role))
 			c.Set(CtxTwoFAVerified, claims.TwoFAVerified)
+			setAdminRoleCtx(c, claims.AdminRole)
 			if validate != nil {
 				if err = validate(c, claims); err != nil {
 					return next(c)
