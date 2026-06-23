@@ -4,6 +4,7 @@ import (
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/base64"
+	"hash"
 	"net/http"
 	"strconv"
 	"strings"
@@ -19,32 +20,50 @@ const (
 )
 
 func SignPending2FA(secret []byte, userID uuid.UUID, now time.Time) string {
-	exp := now.Add(pending2FATTL).Unix()
-	payload := userID.String() + "|" + strconv.FormatInt(exp, 10)
-	mac := hmac.New(sha256.New, secret)
+	var (
+		exp     int64
+		payload string
+		mac     hash.Hash
+		sig     string
+	)
+	exp = now.Add(pending2FATTL).Unix()
+	payload = userID.String() + "|" + strconv.FormatInt(exp, 10)
+	mac = hmac.New(sha256.New, secret)
 	_, _ = mac.Write([]byte(payload))
-	sig := base64.RawURLEncoding.EncodeToString(mac.Sum(nil))
+	sig = base64.RawURLEncoding.EncodeToString(mac.Sum(nil))
 	return base64.RawURLEncoding.EncodeToString([]byte(payload + "|" + sig))
 }
 
 func VerifyPending2FA(secret []byte, token string, now time.Time) (uuid.UUID, error) {
-	raw, err := base64.RawURLEncoding.DecodeString(token)
+	var (
+		raw      []byte
+		parts    []string
+		uidStr   string
+		expStr   string
+		sig      string
+		exp      int64
+		payload  string
+		mac      hash.Hash
+		expected string
+		err      error
+	)
+	raw, err = base64.RawURLEncoding.DecodeString(token)
 	if err != nil {
 		return uuid.Nil, ErrInvalidToken
 	}
-	parts := strings.Split(string(raw), "|")
+	parts = strings.Split(string(raw), "|")
 	if len(parts) != 3 {
 		return uuid.Nil, ErrInvalidToken
 	}
-	uidStr, expStr, sig := parts[0], parts[1], parts[2]
-	exp, err := strconv.ParseInt(expStr, 10, 64)
+	uidStr, expStr, sig = parts[0], parts[1], parts[2]
+	exp, err = strconv.ParseInt(expStr, 10, 64)
 	if err != nil || now.Unix() > exp {
 		return uuid.Nil, ErrInvalidToken
 	}
-	payload := uidStr + "|" + expStr
-	mac := hmac.New(sha256.New, secret)
+	payload = uidStr + "|" + expStr
+	mac = hmac.New(sha256.New, secret)
 	_, _ = mac.Write([]byte(payload))
-	expected := base64.RawURLEncoding.EncodeToString(mac.Sum(nil))
+	expected = base64.RawURLEncoding.EncodeToString(mac.Sum(nil))
 	if !hmac.Equal([]byte(sig), []byte(expected)) {
 		return uuid.Nil, ErrInvalidToken
 	}
@@ -52,7 +71,8 @@ func VerifyPending2FA(secret []byte, token string, now time.Time) (uuid.UUID, er
 }
 
 func SetPending2FA(c echo.Context, cfg CookieCfg, secret []byte, userID uuid.UUID) {
-	val := SignPending2FA(secret, userID, time.Now().UTC())
+	var val string
+	val = SignPending2FA(secret, userID, time.Now().UTC())
 	c.SetCookie(&http.Cookie{
 		Name:     Pending2FACookie,
 		Value:    val,
@@ -78,7 +98,11 @@ func ClearPending2FA(c echo.Context, cfg CookieCfg) {
 }
 
 func Pending2FAFrom(c echo.Context) string {
-	ck, err := c.Cookie(Pending2FACookie)
+	var (
+		ck  *http.Cookie
+		err error
+	)
+	ck, err = c.Cookie(Pending2FACookie)
 	if err != nil || ck == nil {
 		return ""
 	}
