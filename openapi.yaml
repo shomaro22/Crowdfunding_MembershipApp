@@ -1274,6 +1274,43 @@ paths:
         "404":
           $ref: "#/components/responses/NotFound"
 
+  /admin/users/{userId}/reset-2fa:
+    post:
+      tags: [Admin]
+      summary: Reset user TOTP 2FA (SUPPORT_ADMIN / SUPER_ADMIN)
+      description: |
+        対象ユーザーの 2FA を無効化し、バックアップコード削除・全セッション失効を行う（§5.1.6）。
+        audit_log に記録する。
+      parameters:
+        - $ref: "#/components/parameters/UserId"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                reason:
+                  type: string
+                  description: 監査ログ用（任意）
+      responses:
+        "200":
+          description: 2FA reset completed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  user:
+                    $ref: "#/components/schemas/User"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
   /admin/projects:
     get:
       tags: [Admin]

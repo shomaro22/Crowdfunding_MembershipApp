@@ -18,6 +18,8 @@ type AdminUseCase struct {
 	SellerRegs repository.SellerRegRepo
 	Projects   repository.ProjectRepo
 	Audit      repository.AuditRepo
+	ReTokens   repository.ReTokenRepo
+	TOTPBackup repository.TOTPBackupRepo
 	KYC        storage.KYCStore
 	DB         *gorm.DB
 	APIBase    string
