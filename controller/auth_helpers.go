@@ -25,6 +25,18 @@ func CurrentUserID(c echo.Context) (uuid.UUID, error) {
 	return uid, nil
 }
 
+func CurrentAdminRole(c echo.Context) (entity.AdminRole, error) {
+	var (
+		ar entity.AdminRole
+		ok bool
+	)
+	ar, ok = middleware.AuthAdminRole(c)
+	if !ok {
+		return "", echo.NewHTTPError(http.StatusForbidden, apiError("forbidden", "FORBIDDEN"))
+	}
+	return ar, nil
+}
+
 func authMeta(c echo.Context) usecase.AuthMeta {
 	var reqID string
 	reqID, _ = c.Get(middleware.CtxRequestID).(string)
