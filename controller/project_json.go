@@ -55,8 +55,12 @@ type projectDetailResponse struct {
 }
 
 func listProjectsJSON(rows []usecase.ProjectView, total int64, limit, offset int) listProjectsResponse {
-	items := make([]projectSummaryJSON, 0, len(rows))
-	for i := range rows {
+	var (
+		items []projectSummaryJSON
+		i     int
+	)
+	items = make([]projectSummaryJSON, 0, len(rows))
+	for i = 0; i < len(rows); i++ {
 		items = append(items, projectSummaryToJSON(&rows[i]))
 	}
 	if limit <= 0 {
@@ -79,8 +83,14 @@ func projectDetailJSON(v *usecase.ProjectView) projectDetailResponse {
 }
 
 func projectSummaryToJSON(v *usecase.ProjectView) projectSummaryJSON {
-	p := v.Project
-	out := projectSummaryJSON{
+	var (
+		p      *entity.Project
+		out    projectSummaryJSON
+		s      string
+		seller userJSON
+	)
+	p = v.Project
+	out = projectSummaryJSON{
 		ID:             p.ID.String(),
 		Title:          p.Title,
 		Description:    p.Description,
@@ -94,20 +104,25 @@ func projectSummaryToJSON(v *usecase.ProjectView) projectSummaryJSON {
 		Plans:          projectPlansToJSON(v.Plans),
 	}
 	if p.EndDate != nil {
-		s := p.EndDate.UTC().Format(time.RFC3339)
+		s = p.EndDate.UTC().Format(time.RFC3339)
 		out.EndDate = &s
 	}
 	if v.Seller != nil {
-		seller := userToJSON(v.Seller)
+		seller = userToJSON(v.Seller)
 		out.Seller = &seller
 	}
 	return out
 }
 
 func projectPlansToJSON(plans []entity.ProjectPlan) []projectPlanJSON {
-	out := make([]projectPlanJSON, 0, len(plans))
-	for i := range plans {
-		pl := &plans[i]
+	var (
+		out []projectPlanJSON
+		i   int
+		pl  *entity.ProjectPlan
+	)
+	out = make([]projectPlanJSON, 0, len(plans))
+	for i = 0; i < len(plans); i++ {
+		pl = &plans[i]
 		out = append(out, projectPlanJSON{
 			ID:             pl.ID.String(),
 			ProjectID:      pl.ProjectID.String(),
@@ -123,9 +138,14 @@ func projectPlansToJSON(plans []entity.ProjectPlan) []projectPlanJSON {
 }
 
 func projectImagesToJSON(images []entity.ProjectImage) []projectImageJSON {
-	out := make([]projectImageJSON, 0, len(images))
-	for i := range images {
-		img := &images[i]
+	var (
+		out []projectImageJSON
+		i   int
+		img *entity.ProjectImage
+	)
+	out = make([]projectImageJSON, 0, len(images))
+	for i = 0; i < len(images); i++ {
+		img = &images[i]
 		out = append(out, projectImageJSON{
 			ID:       img.ID.String(),
 			ImageURL: img.ImageURL,

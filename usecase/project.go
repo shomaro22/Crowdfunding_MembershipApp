@@ -53,15 +53,28 @@ type ProjectUseCase struct {
 }
 
 func (p *ProjectUseCase) Create(ctx context.Context, sellerID uuid.UUID, in CreateProjectIn) (*ProjectView, error) {
-	u, err := p.Users.FindByID(ctx, sellerID)
+	var (
+		u          *entity.User
+		err        error
+		planInputs []entity.PlanInput
+		now        time.Time
+		proj       *entity.Project
+		plans      []entity.ProjectPlan
+		images     []entity.ProjectImage
+		i          int
+		pl         PlanIn
+		url        string
+	)
+
+	u, err = p.Users.FindByID(ctx, sellerID)
 	if err != nil || u == nil {
 		return nil, ErrNotFound
 	}
 	if u.Role != entity.UserRoleSeller || u.SellerStatus != entity.SellerStatusActive {
 		return nil, ErrForbidden
 	}
-	planInputs := make([]entity.PlanInput, len(in.Plans))
-	for i, pl := range in.Plans {
+	planInputs = make([]entity.PlanInput, len(in.Plans))
+	for i, pl = range in.Plans {
 		planInputs[i] = entity.PlanInput{
 			MembershipType: pl.MembershipType,
 			Price:          pl.Price,
@@ -69,11 +82,11 @@ func (p *ProjectUseCase) Create(ctx context.Context, sellerID uuid.UUID, in Crea
 			Benefits:       pl.Benefits,
 		}
 	}
-	if err := entity.ValidateProject(in.Title, in.Description, in.TargetAmount, in.DurationType, in.StartDate, in.EndDate, planInputs); err != nil {
+	if err = entity.ValidateProject(in.Title, in.Description, in.TargetAmount, in.DurationType, in.StartDate, in.EndDate, planInputs); err != nil {
 		return nil, mapEntityErr(err)
 	}
-	now := time.Now().UTC()
-	proj := &entity.Project{
+	now = time.Now().UTC()
+	proj = &entity.Project{
 		ID:             uuid.New(),
 		SellerID:       sellerID,
 		Title:          strings.TrimSpace(in.Title),
@@ -87,8 +100,8 @@ func (p *ProjectUseCase) Create(ctx context.Context, sellerID uuid.UUID, in Crea
 		CreatedAt:      now,
 		UpdatedAt:      now,
 	}
-	plans := make([]entity.ProjectPlan, 0, len(in.Plans))
-	for _, pl := range in.Plans {
+	plans = make([]entity.ProjectPlan, 0, len(in.Plans))
+	for _, pl = range in.Plans {
 		plans = append(plans, entity.ProjectPlan{
 			ID:             uuid.New(),
 			MembershipType: pl.MembershipType,
@@ -100,9 +113,8 @@ func (p *ProjectUseCase) Create(ctx context.Context, sellerID uuid.UUID, in Crea
 			UpdatedAt:      now,
 		})
 	}
-	var images []entity.ProjectImage
 	if in.ImageURL != nil && strings.TrimSpace(*in.ImageURL) != "" {
-		url := strings.TrimSpace(*in.ImageURL)
+		url = strings.TrimSpace(*in.ImageURL)
 		proj.MainImageURL = &url
 		images = append(images, entity.ProjectImage{
 			ID:        uuid.New(),
@@ -112,15 +124,25 @@ func (p *ProjectUseCase) Create(ctx context.Context, sellerID uuid.UUID, in Crea
 			CreatedAt: now,
 		})
 	}
-	if err := p.Projects.Create(ctx, proj, plans, images); err != nil {
+	if err = p.Projects.Create(ctx, proj, plans, images); err != nil {
 		return nil, err
 	}
 	return &ProjectView{Project: proj, Plans: plans, Images: images, Seller: u}, nil
 }
 
 func (p *ProjectUseCase) ListPublic(ctx context.Context, search, sort string, limit, offset int) ([]ProjectView, int64, error) {
-	rows, total, err := p.Projects.ListPublic(ctx, repository.ProjectListFilter{
-		Search: search, Sort: sort, Limit: limit, Offset: offset, Now: time.Now().UTC(),
+	var (
+		rows  []entity.Project
+		total int64
+		err   error
+	)
+
+	rows, total, err = p.Projects.ListPublic(ctx, repository.ProjectListFilter{
+		Search: search,
+		Sort:   sort,
+		Limit:  limit,
+		Offset: offset,
+		AsOf:   time.Now().UTC(),
 	})
 	if err != nil {
 		return nil, 0, err
@@ -129,26 +151,42 @@ func (p *ProjectUseCase) ListPublic(ctx context.Context, search, sort string, li
 }
 
 func (p *ProjectUseCase) ListMine(ctx context.Context, sellerID uuid.UUID, limit, offset int) ([]ProjectView, int64, error) {
-	u, err := p.Users.FindByID(ctx, sellerID)
+	var (
+		u     *entity.User
+		err   error
+		rows  []entity.Project
+		total int64
+	)
+
+	u, err = p.Users.FindByID(ctx, sellerID)
 	if err != nil || u == nil || u.Role != entity.UserRoleSeller {
 		return nil, 0, ErrForbidden
 	}
-	rows, total, err := p.Projects.ListBySeller(ctx, sellerID, limit, offset)
+	rows, total, err = p.Projects.ListBySeller(ctx, sellerID, limit, offset)
 	if err != nil {
 		return nil, 0, err
 	}
 	return p.enrichList(ctx, rows, total)
 }
 
-func (p *ProjectUseCase) Get(ctx context.Context, id uuid.UUID, viewerID *uuid.UUID, viewerRole entity.UserRole) (*ProjectView, error) {
-	proj, plans, images, err := p.Projects.FindByID(ctx, id)
+func (p *ProjectUseCase) FindView(ctx context.Context, id uuid.UUID, viewerID *uuid.UUID, viewerRole entity.UserRole) (*ProjectView, error) {
+	var (
+		proj   *entity.Project
+		plans  []entity.ProjectPlan
+		images []entity.ProjectImage
+		seller *entity.User
+		err    error
+		now    = time.Now().UTC()
+	)
+
+	proj, plans, images, err = p.Projects.FindByID(ctx, id)
 	if err != nil || proj == nil {
 		return nil, ErrNotFound
 	}
-	if !canViewProject(proj, viewerID, viewerRole, time.Now().UTC()) {
+	if !canViewProject(proj, viewerID, viewerRole, now) {
 		return nil, ErrNotFound
 	}
-	seller, err := p.Users.FindByID(ctx, proj.SellerID)
+	seller, err = p.Users.FindByID(ctx, proj.SellerID)
 	if err != nil {
 		return nil, err
 	}
@@ -156,16 +194,29 @@ func (p *ProjectUseCase) Get(ctx context.Context, id uuid.UUID, viewerID *uuid.U
 }
 
 func (p *ProjectUseCase) Update(ctx context.Context, sellerID, projectID uuid.UUID, in UpdateProjectIn) (*ProjectView, error) {
-	proj, plans, images, err := p.Projects.FindByID(ctx, projectID)
+	var (
+		proj   *entity.Project
+		plans  []entity.ProjectPlan
+		images []entity.ProjectImage
+		seller *entity.User
+		err    error
+		now    time.Time
+		dur    entity.DurationType
+		start  time.Time
+		end    *time.Time
+		url    string
+	)
+
+	proj, plans, images, err = p.Projects.FindByID(ctx, projectID)
 	if err != nil || proj == nil {
 		return nil, ErrNotFound
 	}
 	if proj.SellerID != sellerID {
 		return nil, ErrForbidden
 	}
-	now := time.Now().UTC()
+	now = time.Now().UTC()
 	if in.Title != nil {
-		if err := entity.ValidateTitle(*in.Title); err != nil {
+		if err = entity.ValidateTitle(*in.Title); err != nil {
 			return nil, mapEntityErr(err)
 		}
 		proj.Title = strings.TrimSpace(*in.Title)
@@ -182,9 +233,9 @@ func (p *ProjectUseCase) Update(ctx context.Context, sellerID, projectID uuid.UU
 		}
 		proj.TargetAmount = *in.TargetAmount
 	}
-	dur := proj.DurationType
-	start := proj.StartDate
-	end := proj.EndDate
+	dur = proj.DurationType
+	start = proj.StartDate
+	end = proj.EndDate
 	if in.DurationType != nil {
 		dur = *in.DurationType
 	}
@@ -195,7 +246,7 @@ func (p *ProjectUseCase) Update(ctx context.Context, sellerID, projectID uuid.UU
 		end = in.EndDate
 	}
 	if in.DurationType != nil || in.StartDate != nil || in.EndDate != nil {
-		if err := entity.ValidateDuration(dur, start, end); err != nil {
+		if err = entity.ValidateDuration(dur, start, end); err != nil {
 			return nil, mapEntityErr(err)
 		}
 		proj.DurationType = dur
@@ -203,7 +254,7 @@ func (p *ProjectUseCase) Update(ctx context.Context, sellerID, projectID uuid.UU
 		proj.EndDate = end
 	}
 	if in.ImageURL != nil {
-		url := strings.TrimSpace(*in.ImageURL)
+		url = strings.TrimSpace(*in.ImageURL)
 		if url == "" {
 			proj.MainImageURL = nil
 		} else {
@@ -214,15 +265,24 @@ func (p *ProjectUseCase) Update(ctx context.Context, sellerID, projectID uuid.UU
 		proj.Status = entity.ProjectStatusPending
 	}
 	proj.UpdatedAt = now
-	if err := p.Projects.Update(ctx, proj); err != nil {
+	if err = p.Projects.Update(ctx, proj); err != nil {
 		return nil, err
 	}
-	seller, _ := p.Users.FindByID(ctx, proj.SellerID)
+	seller, _ = p.Users.FindByID(ctx, proj.SellerID)
 	return &ProjectView{Project: proj, Plans: plans, Images: images, Seller: seller}, nil
 }
 
 func (p *ProjectUseCase) RequestDelete(ctx context.Context, sellerID, projectID uuid.UUID) (*ProjectView, error) {
-	proj, plans, images, err := p.Projects.FindByID(ctx, projectID)
+	var (
+		proj   *entity.Project
+		plans  []entity.ProjectPlan
+		images []entity.ProjectImage
+		seller *entity.User
+		err    error
+		now    time.Time
+	)
+
+	proj, plans, images, err = p.Projects.FindByID(ctx, projectID)
 	if err != nil || proj == nil {
 		return nil, ErrNotFound
 	}
@@ -232,36 +292,50 @@ func (p *ProjectUseCase) RequestDelete(ctx context.Context, sellerID, projectID 
 	if proj.Status != entity.ProjectStatusActive {
 		return nil, ErrInvalidState
 	}
-	now := time.Now().UTC()
+	now = time.Now().UTC()
 	proj.DeleteRequested = true
 	proj.Status = entity.ProjectStatusDeleteRequested
 	proj.UpdatedAt = now
-	if err := p.Projects.Update(ctx, proj); err != nil {
+	if err = p.Projects.Update(ctx, proj); err != nil {
 		return nil, err
 	}
-	seller, _ := p.Users.FindByID(ctx, proj.SellerID)
+	seller, _ = p.Users.FindByID(ctx, proj.SellerID)
 	return &ProjectView{Project: proj, Plans: plans, Images: images, Seller: seller}, nil
 }
 
 func (p *ProjectUseCase) enrichList(ctx context.Context, rows []entity.Project, total int64) ([]ProjectView, int64, error) {
-	out := make([]ProjectView, 0, len(rows))
-	sellerCache := map[uuid.UUID]*entity.User{}
-	for i := range rows {
-		proj := rows[i]
-		seller, ok := sellerCache[proj.SellerID]
+	var (
+		out         []ProjectView
+		sellerCache map[uuid.UUID]*entity.User
+		i           int
+		proj        entity.Project
+		seller      *entity.User
+		ok          bool
+		u           *entity.User
+		plans       []entity.ProjectPlan
+		images      []entity.ProjectImage
+		err         error
+		pcopy       entity.Project
+	)
+
+	out = make([]ProjectView, 0, len(rows))
+	sellerCache = map[uuid.UUID]*entity.User{}
+	for i = range rows {
+		proj = rows[i]
+		seller, ok = sellerCache[proj.SellerID]
 		if !ok {
-			u, err := p.Users.FindByID(ctx, proj.SellerID)
+			u, err = p.Users.FindByID(ctx, proj.SellerID)
 			if err != nil {
 				return nil, 0, err
 			}
 			seller = u
 			sellerCache[proj.SellerID] = u
 		}
-		_, plans, images, err := p.Projects.FindByID(ctx, proj.ID)
+		_, plans, images, err = p.Projects.FindByID(ctx, proj.ID)
 		if err != nil {
 			return nil, 0, err
 		}
-		pcopy := proj
+		pcopy = proj
 		out = append(out, ProjectView{Project: &pcopy, Plans: plans, Images: images, Seller: seller})
 	}
 	return out, total, nil

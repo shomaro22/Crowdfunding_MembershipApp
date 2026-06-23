@@ -1,6 +1,7 @@
 package main
 
 import (
+	"database/sql"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -20,74 +21,129 @@ import (
 
 	"github.com/labstack/echo/v4"
 	labmw "github.com/labstack/echo/v4/middleware"
+	"github.com/redis/go-redis/v9"
+	"gorm.io/gorm"
 )
 
 func buildApp() (*echo.Echo, string, error) {
+	var (
+		databaseURL    string
+		err            error
+		gormDB         *gorm.DB
+		sqlDB          *sql.DB
+		rdb            *redis.Client
+		jwtSecret      string
+		port           string
+		publicRoot     string
+		privateRoot    string
+		userRepo       repository.UserRepo
+		sellerRegRepo  repository.SellerRegRepo
+		reTokenRepo    repository.ReTokenRepo
+		resetRepo      repository.ResetRepo
+		activityRepo   repository.ActivityRepo
+		auditRepo      repository.AuditRepo
+		projectRepo    repository.ProjectRepo
+		oauthRepo      repository.OAuthRepo
+		totpBackupRepo repository.TOTPBackupRepo
+		oauthCache     repository.OAuthCache
+		rateLimitRepo  repository.RateLimitRepo
+		kycStore       *storage.LocalKYCStore
+		tokenSvc       *auth.TokenService
+		authUC         *usecase.AuthUseCase
+		googleOAuth    *auth.GoogleOAuth
+		cookieCfg      auth.CookieCfg
+		authCtl        *controller.AuthController
+		healthCtl      *controller.HealthController
+		apiPublicURL   string
+		adminUC        *usecase.AdminUseCase
+		adminCtl       *controller.AdminController
+		kycFileCtl     *controller.KYCFileController
+		projectUC      *usecase.ProjectUseCase
+		projectCtl     *controller.ProjectController
+		preAuth        []echo.MiddlewareFunc
+		corsRaw        string
+		origins        []string
+		p              string
+		s              string
+		protected      []echo.MiddlewareFunc
+		optionalJWT    []echo.MiddlewareFunc
+		sellerRead     []echo.MiddlewareFunc
+		sellerWrite    []echo.MiddlewareFunc
+		adminOnly      []echo.MiddlewareFunc
+		rateLimiter    *middleware.RateLimiter
+		e              *echo.Echo
+		validateSession func(echo.Context, auth.AuthClaims) error
+	)
+
 	slog.SetDefault(slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo})))
 
-	databaseURL := os.Getenv("DATABASE_URL")
+	databaseURL = os.Getenv("DATABASE_URL")
 	if databaseURL == "" {
 		databaseURL = "postgres://postgres:postgres@localhost:5432/crowdfund?sslmode=disable"
 	}
-	if err := db.Up(databaseURL); err != nil {
-		return nil, "", err
-	}
-	gormDB, err := db.Open(databaseURL)
+	err = db.Up(databaseURL)
 	if err != nil {
 		return nil, "", err
 	}
-	sqlDB, err := gormDB.DB()
+	gormDB, err = db.Open(databaseURL)
 	if err != nil {
 		return nil, "", err
 	}
-	if err := sqlDB.Ping(); err != nil {
+	sqlDB, err = gormDB.DB()
+	if err != nil {
+		return nil, "", err
+	}
+	err = sqlDB.Ping()
+	if err != nil {
 		return nil, "", err
 	}
 
-	rdb := db.OpenRedis()
+	rdb = db.OpenRedis()
 	_ = rdb
 
-	jwtSecret := os.Getenv("JWT_SECRET")
+	jwtSecret = os.Getenv("JWT_SECRET")
 	if len(jwtSecret) < 32 {
 		return nil, "", fmt.Errorf("JWT_SECRET must be at least 32 characters")
 	}
 
-	port := os.Getenv("PORT")
+	port = os.Getenv("PORT")
 	if port == "" {
 		port = "8080"
 	}
 
-	publicRoot := os.Getenv("PUBLIC_ROOT")
+	publicRoot = os.Getenv("PUBLIC_ROOT")
 	if publicRoot == "" {
 		publicRoot = "data/public"
 	}
-	if err := os.MkdirAll(filepath.Join(publicRoot, "uploads"), 0o755); err != nil {
+	err = os.MkdirAll(filepath.Join(publicRoot, "uploads"), 0o755)
+	if err != nil {
 		return nil, "", err
 	}
 
-	privateRoot := os.Getenv("PRIVATE_ROOT")
+	privateRoot = os.Getenv("PRIVATE_ROOT")
 	if privateRoot == "" {
 		privateRoot = "data/private"
 	}
-	if err := os.MkdirAll(filepath.Join(privateRoot, "kyc"), 0o700); err != nil {
+	err = os.MkdirAll(filepath.Join(privateRoot, "kyc"), 0o700)
+	if err != nil {
 		return nil, "", err
 	}
 
-	userRepo := repository.NewUserRepo(gormDB)
-	sellerRegRepo := repository.NewSellerRegRepo(gormDB)
-	reTokenRepo := repository.NewReTokenRepo(gormDB)
-	resetRepo := repository.NewResetRepo(gormDB)
-	activityRepo := repository.NewActivityRepo(gormDB)
-	auditRepo := repository.NewAuditRepo(gormDB)
-	projectRepo := repository.NewProjectRepo(gormDB)
-	oauthRepo := repository.NewOAuthRepo(gormDB)
-	totpBackupRepo := repository.NewTOTPBackupRepo(gormDB)
-	oauthCache := repository.NewOAuthCache(rdb)
-	rateLimitRepo := repository.NewRateLimitRepo(rdb)
-	kycStore := storage.NewLocalKYC(privateRoot)
+	userRepo = repository.NewUserRepo(gormDB)
+	sellerRegRepo = repository.NewSellerRegRepo(gormDB)
+	reTokenRepo = repository.NewReTokenRepo(gormDB)
+	resetRepo = repository.NewResetRepo(gormDB)
+	activityRepo = repository.NewActivityRepo(gormDB)
+	auditRepo = repository.NewAuditRepo(gormDB)
+	projectRepo = repository.NewProjectRepo(gormDB)
+	oauthRepo = repository.NewOAuthRepo(gormDB)
+	totpBackupRepo = repository.NewTOTPBackupRepo(gormDB)
+	oauthCache = repository.NewOAuthCache(rdb)
+	rateLimitRepo = repository.NewRateLimitRepo(rdb)
+	kycStore = storage.NewLocalKYC(privateRoot)
 
-	tokenSvc := auth.NewTokenService([]byte(jwtSecret), auth.DefaultAuthTTL)
-	authUC := &usecase.AuthUseCase{
+	tokenSvc = auth.NewTokenService([]byte(jwtSecret), auth.DefaultAuthTTL)
+	authUC = &usecase.AuthUseCase{
 		Users:        userRepo,
 		SellerRegs:   sellerRegRepo,
 		ReTokens:     reTokenRepo,
@@ -103,21 +159,22 @@ func buildApp() (*echo.Echo, string, error) {
 		DB:           gormDB,
 		AppPublicURL: os.Getenv("PUBLIC_APP_URL"),
 	}
-	if googleOAuth, err := auth.GoogleFromEnv(auth.NewStateBridge(oauthCache)); err == nil {
+	googleOAuth, err = auth.GoogleFromEnv(auth.NewStateBridge(oauthCache))
+	if err == nil {
 		authUC.Google = googleOAuth
 	} else {
 		slog.Info("google oauth disabled", "reason", err.Error())
 	}
 
-	cookieCfg := auth.CookieFromEnv()
-	authCtl := controller.NewAuthController(authUC, cookieCfg)
-	healthCtl := &controller.HealthController{SQL: gormDB, RDB: rdb}
+	cookieCfg = auth.CookieFromEnv()
+	authCtl = controller.NewAuthController(authUC, cookieCfg)
+	healthCtl = &controller.HealthController{SQL: gormDB, RDB: rdb}
 
-	apiPublicURL := strings.TrimSpace(os.Getenv("API_PUBLIC_URL"))
+	apiPublicURL = strings.TrimSpace(os.Getenv("API_PUBLIC_URL"))
 	if apiPublicURL == "" {
 		apiPublicURL = "http://localhost:" + port
 	}
-	adminUC := &usecase.AdminUseCase{
+	adminUC = &usecase.AdminUseCase{
 		Users:      userRepo,
 		SellerRegs: sellerRegRepo,
 		Projects:   projectRepo,
@@ -127,13 +184,17 @@ func buildApp() (*echo.Echo, string, error) {
 		APIBase:    apiPublicURL,
 		SignSecret: []byte(jwtSecret),
 	}
-	adminCtl := controller.NewAdminController(adminUC)
-	kycFileCtl := controller.NewKYCFileController(kycStore, []byte(jwtSecret))
-	projectUC := &usecase.ProjectUseCase{Projects: projectRepo, Users: userRepo}
-	projectCtl := controller.NewProjectController(projectUC)
+	adminCtl = controller.NewAdminController(adminUC)
+	kycFileCtl = controller.NewKYCFileController(kycStore, []byte(jwtSecret))
+	projectUC = &usecase.ProjectUseCase{Projects: projectRepo, Users: userRepo}
+	projectCtl = controller.NewProjectController(projectUC)
 
-	validateSession := func(c echo.Context, claims auth.AuthClaims) error {
-		u, err := userRepo.FindByID(c.Request().Context(), claims.UserID)
+	validateSession = func(c echo.Context, claims auth.AuthClaims) error {
+		var (
+			u   *entity.User
+			err error
+		)
+		u, err = userRepo.FindByID(c.Request().Context(), claims.UserID)
 		if err != nil {
 			return echo.NewHTTPError(http.StatusInternalServerError, map[string]string{"error": "internal error", "code": "INTERNAL_ERROR"})
 		}
@@ -147,12 +208,11 @@ func buildApp() (*echo.Echo, string, error) {
 		return nil
 	}
 
-	var preAuth []echo.MiddlewareFunc
-	corsRaw := strings.TrimSpace(os.Getenv("CORS_ALLOW_ORIGINS"))
+	corsRaw = strings.TrimSpace(os.Getenv("CORS_ALLOW_ORIGINS"))
 	if corsRaw != "" {
-		var origins []string
-		for _, p := range strings.Split(corsRaw, ",") {
-			if s := strings.TrimSpace(p); s != "" {
+		for _, p = range strings.Split(corsRaw, ",") {
+			s = strings.TrimSpace(p)
+			if s != "" {
 				origins = append(origins, s)
 			}
 		}
@@ -169,22 +229,22 @@ func buildApp() (*echo.Echo, string, error) {
 		}
 	}
 
-	protected := []echo.MiddlewareFunc{
+	protected = []echo.MiddlewareFunc{
 		middleware.JWTAuth(authUC.ParseToken, validateSession),
 	}
-	optionalJWT := []echo.MiddlewareFunc{
+	optionalJWT = []echo.MiddlewareFunc{
 		middleware.OptionalJWTAuth(authUC.ParseToken, validateSession),
 	}
-	sellerRead := append(append([]echo.MiddlewareFunc{}, protected...), middleware.RequireRole(entity.UserRoleSeller))
-	sellerWrite := append(append([]echo.MiddlewareFunc{}, sellerRead...), middleware.Require2FA())
-	adminOnly := append(
+	sellerRead = append(append([]echo.MiddlewareFunc{}, protected...), middleware.RequireRole(entity.UserRoleSeller))
+	sellerWrite = append(append([]echo.MiddlewareFunc{}, sellerRead...), middleware.Require2FA())
+	adminOnly = append(
 		append([]echo.MiddlewareFunc{}, protected...),
 		middleware.RequireRole(entity.UserRoleAdmin),
 		middleware.Require2FA(),
 	)
-	rateLimiter := middleware.NewRateLimiter(rateLimitRepo)
+	rateLimiter = middleware.NewRateLimiter(rateLimitRepo)
 
-	e := router.New(router.Config{
+	e = router.New(router.Config{
 		PreAuthMiddleware: preAuth,
 		Health:            healthCtl,
 		Auth:              authCtl,

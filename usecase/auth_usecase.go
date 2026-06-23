@@ -68,17 +68,23 @@ type AuthUseCase struct {
 }
 
 func (a *AuthUseCase) logActivity(ctx context.Context, userID *uuid.UUID, action entity.ActivityAction, resource, resourceID string, meta AuthMeta, extra entity.JSONMetadata) {
+	var (
+		res   *string
+		rid   *string
+		ip    *string
+		ua    *string
+		reqID *string
+	)
+
 	if a.Activity == nil {
 		return
 	}
-	var res, rid *string
 	if resource != "" {
 		res = &resource
 	}
 	if resourceID != "" {
 		rid = &resourceID
 	}
-	var ip, ua, reqID *string
 	if meta.IPAddress != "" {
 		ip = &meta.IPAddress
 	}
@@ -110,7 +116,15 @@ func twoFAVerified(u *entity.User) bool {
 }
 
 func (a *AuthUseCase) issueSession(ctx context.Context, u *entity.User, verified2FA bool) (*SessionTokens, error) {
-	authToken, err := a.Tokens.Issue(auth.AuthClaims{
+	var (
+		authToken string
+		err       error
+		plain     string
+		now       time.Time
+		row       *entity.ReToken
+	)
+
+	authToken, err = a.Tokens.Issue(auth.AuthClaims{
 		UserID:        u.ID,
 		Role:          u.Role,
 		TwoFAVerified: verified2FA,
@@ -120,26 +134,28 @@ func (a *AuthUseCase) issueSession(ctx context.Context, u *entity.User, verified
 	if err != nil {
 		return nil, err
 	}
-	plain, err := auth.OpaqueHex()
+	plain, err = auth.OpaqueHex()
 	if err != nil {
 		return nil, err
 	}
-	now := time.Now().UTC()
-	row := &entity.ReToken{
+	now = time.Now().UTC()
+	row = &entity.ReToken{
 		ID:        uuid.New(),
 		UserID:    u.ID,
 		TokenHash: auth.OpaqueHash(plain),
 		ExpiresAt: now.Add(reTokenTTL),
 		CreatedAt: now,
 	}
-	if err := a.ReTokens.Create(ctx, row); err != nil {
+	if err = a.ReTokens.Create(ctx, row); err != nil {
 		return nil, err
 	}
 	return &SessionTokens{AuthToken: authToken, ReToken: plain}, nil
 }
 
 func (a *AuthUseCase) invalidateSessions(ctx context.Context, userID uuid.UUID) error {
-	if _, err := a.Users.BumpTokenVer(ctx, userID); err != nil {
+	var err error
+
+	if _, err = a.Users.BumpTokenVer(ctx, userID); err != nil {
 		return err
 	}
 	return a.ReTokens.RevokeAllForUser(ctx, userID, time.Now().UTC())
