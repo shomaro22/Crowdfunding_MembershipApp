@@ -2,6 +2,7 @@ package router
 
 import (
 	"crowdfund-app/controller"
+	"crowdfund-app/entity"
 	"crowdfund-app/middleware"
 
 	"github.com/labstack/echo/v4"
@@ -103,6 +104,8 @@ func New(cfg Config) *echo.Echo {
 		admin.PATCH("/projects/:projectId", cfg.Admin.PatchProject)
 		admin.DELETE("/projects/:projectId", cfg.Admin.DeleteProject)
 		admin.PATCH("/projects/:projectId/delete-request", cfg.Admin.PatchDeleteReq)
+		admin.POST("/users/:userId/reset-2fa", cfg.Admin.ResetUser2FA,
+			middleware.RequireAdminRole(entity.AdminRoleSupportAdmin, entity.AdminRoleSuperAdmin))
 	}
 
 	return e
