@@ -24,6 +24,7 @@ type AdminUseCase interface {
 	GetSellerReg(ctx context.Context, id uuid.UUID) (*usecase.SellerRegView, error)
 	ApproveSellerReg(ctx context.Context, adminID, regID uuid.UUID) (*entity.SellerReg, error)
 	RejectSellerReg(ctx context.Context, adminID, regID uuid.UUID, reason string) (*entity.SellerReg, error)
+	ResetUser2FA(ctx context.Context, adminID, targetUserID uuid.UUID, reason *string) (*entity.User, error)
 	ListProjects(ctx context.Context, status *entity.ProjectStatus, limit, offset int) ([]usecase.ProjectView, int64, error)
 	PatchProject(ctx context.Context, adminID, projectID uuid.UUID, status entity.ProjectStatus, reason *string) (*usecase.ProjectView, error)
 	DeleteProject(ctx context.Context, adminID, projectID uuid.UUID) error
@@ -305,6 +306,32 @@ func (h *AdminController) PatchDeleteReq(c echo.Context) error {
 		return mapAdminError(err)
 	}
 	return c.JSON(http.StatusOK, projectDetailJSON(view))
+}
+
+func (h *AdminController) ResetUser2FA(c echo.Context) error {
+	var (
+		adminID uuid.UUID
+		userID  uuid.UUID
+		body    struct {
+			Reason *string `json:"reason"`
+		}
+		u   *entity.User
+		err error
+	)
+	adminID, err = CurrentUserID(c)
+	if err != nil {
+		return err
+	}
+	userID, err = uuid.Parse(c.Param("userId"))
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, apiError("invalid user id", "BAD_REQUEST"))
+	}
+	_ = c.Bind(&body)
+	u, err = h.Admin.ResetUser2FA(c.Request().Context(), adminID, userID, body.Reason)
+	if err != nil {
+		return mapAdminError(err)
+	}
+	return c.JSON(http.StatusOK, map[string]userJSON{"user": userToJSON(u)})
 }
 
 type KYCFileController struct {
