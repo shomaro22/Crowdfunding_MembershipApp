@@ -179,6 +179,8 @@ func buildApp() (*echo.Echo, string, error) {
 		SellerRegs: sellerRegRepo,
 		Projects:   projectRepo,
 		Audit:      auditRepo,
+		ReTokens:   reTokenRepo,
+		TOTPBackup: totpBackupRepo,
 		KYC:        kycStore,
 		DB:         gormDB,
 		APIBase:    apiPublicURL,
