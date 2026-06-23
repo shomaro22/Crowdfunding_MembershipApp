@@ -205,6 +205,7 @@ func buildApp() (*echo.Echo, string, error) {
 			return echo.NewHTTPError(http.StatusUnauthorized, map[string]string{"error": "token revoked", "code": "TOKEN_REVOKED"})
 		}
 		c.Set(middleware.CtxUserRole, string(u.Role))
+		middleware.SetAdminRoleFromUser(c, u)
 		return nil
 	}
 
