@@ -10,7 +10,12 @@ import (
 )
 
 func (a *AuthUseCase) GetUser(ctx context.Context, userID uuid.UUID) (*entity.User, error) {
-	u, err := a.Users.FindByID(ctx, userID)
+	var (
+		u   *entity.User
+		err error
+	)
+
+	u, err = a.Users.FindByID(ctx, userID)
 	if err != nil {
 		return nil, err
 	}

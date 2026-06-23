@@ -24,16 +24,24 @@ type Config struct {
 }
 
 func New(cfg Config) *echo.Echo {
-	e := echo.New()
+	var (
+		e     *echo.Echo
+		mw    echo.MiddlewareFunc
+		rl    func(policy middleware.RatePolicy) echo.MiddlewareFunc
+		pm    []echo.MiddlewareFunc
+		opt   []echo.MiddlewareFunc
+		admin *echo.Group
+	)
+	e = echo.New()
 	e.HideBanner = true
 
-	for _, mw := range cfg.PreAuthMiddleware {
+	for _, mw = range cfg.PreAuthMiddleware {
 		e.Use(mw)
 	}
 	e.Use(middleware.RequestID())
 	e.Use(middleware.RequestLogger())
 
-	rl := func(policy middleware.RatePolicy) echo.MiddlewareFunc {
+	rl = func(policy middleware.RatePolicy) echo.MiddlewareFunc {
 		if cfg.RateLimit == nil {
 			return func(next echo.HandlerFunc) echo.HandlerFunc { return next }
 		}
@@ -60,7 +68,7 @@ func New(cfg Config) *echo.Echo {
 			e.POST("/auth/oauth/exchange", cfg.Auth.OAuthExchange, rl(middleware.PolicyOAuthExchange))
 		}
 
-		pm := cfg.Protected
+		pm = cfg.Protected
 		e.POST("/auth/logout", cfg.Auth.Logout, pm...)
 		e.GET("/me", cfg.Auth.Me, pm...)
 		e.POST("/me/change-password", cfg.Auth.ChangePassword, pm...)
@@ -72,7 +80,7 @@ func New(cfg Config) *echo.Echo {
 		e.GET("/projects", cfg.Projects.ListPublic)
 		e.GET("/projects/mine", cfg.Projects.ListMine, cfg.SellerRead...)
 		e.POST("/projects", cfg.Projects.Create, cfg.SellerWrite...)
-		opt := cfg.OptionalJWT
+		opt = cfg.OptionalJWT
 		e.GET("/projects/:projectId", cfg.Projects.Get, opt...)
 		e.PUT("/projects/:projectId", cfg.Projects.Update, cfg.SellerWrite...)
 		e.POST("/projects/:projectId/delete-request", cfg.Projects.RequestDelete, cfg.SellerWrite...)
@@ -83,7 +91,7 @@ func New(cfg Config) *echo.Echo {
 	}
 
 	if cfg.Admin != nil && len(cfg.AdminOnly) > 0 {
-		admin := e.Group("/admin", cfg.AdminOnly...)
+		admin = e.Group("/admin", cfg.AdminOnly...)
 		admin.GET("/reviews/users", cfg.Admin.ListBuyerPending)
 		admin.POST("/reviews/users/:userId/approve", cfg.Admin.ApproveBuyer)
 		admin.POST("/reviews/users/:userId/reject", cfg.Admin.RejectBuyer)
