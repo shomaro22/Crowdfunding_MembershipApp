@@ -4,7 +4,10 @@ import (
 	"net/http"
 
 	"crowdfund-app/auth"
+	"crowdfund-app/entity"
+	"crowdfund-app/usecase"
 
+	"github.com/google/uuid"
 	"github.com/labstack/echo/v4"
 )
 
@@ -43,11 +46,15 @@ type resetPasswordRequest struct {
 }
 
 func (h *AuthController) Register(c echo.Context) error {
-	var body registerRequest
-	if err := c.Bind(&body); err != nil {
+	var (
+		body registerRequest
+		u    *entity.User
+		err  error
+	)
+	if err = c.Bind(&body); err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, apiError("invalid request body", "BAD_REQUEST"))
 	}
-	u, err := h.Auth.RegisterBuyer(c.Request().Context(), body.Email, body.Password, body.Name, authMeta(c))
+	u, err = h.Auth.RegisterBuyer(c.Request().Context(), body.Email, body.Password, body.Name, authMeta(c))
 	if err != nil {
 		return mapAuthError(err)
 	}
@@ -58,11 +65,15 @@ func (h *AuthController) Register(c echo.Context) error {
 }
 
 func (h *AuthController) Login(c echo.Context) error {
-	var body loginRequest
-	if err := c.Bind(&body); err != nil {
+	var (
+		body loginRequest
+		res  *usecase.LoginResult
+		err  error
+	)
+	if err = c.Bind(&body); err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, apiError("invalid request body", "BAD_REQUEST"))
 	}
-	res, err := h.Auth.Login(c.Request().Context(), body.Email, body.Password, authMeta(c))
+	res, err = h.Auth.Login(c.Request().Context(), body.Email, body.Password, authMeta(c))
 	if err != nil {
 		return mapAuthError(err)
 	}
@@ -81,8 +92,14 @@ func (h *AuthController) Login(c echo.Context) error {
 }
 
 func (h *AuthController) Re(c echo.Context) error {
-	plain := auth.ReTokenFrom(c, h.CookieCfg)
-	authToken, reToken, err := h.Auth.Reissue(c.Request().Context(), plain, authMeta(c))
+	var (
+		plain     string
+		authToken string
+		reToken   string
+		err       error
+	)
+	plain = auth.ReTokenFrom(c, h.CookieCfg)
+	authToken, reToken, err = h.Auth.Reissue(c.Request().Context(), plain, authMeta(c))
 	if err != nil {
 		return mapAuthError(err)
 	}
@@ -91,8 +108,12 @@ func (h *AuthController) Re(c echo.Context) error {
 }
 
 func (h *AuthController) Logout(c echo.Context) error {
-	plain := auth.ReTokenFrom(c, h.CookieCfg)
-	if err := h.Auth.Logout(c.Request().Context(), plain, authMeta(c)); err != nil {
+	var (
+		plain string
+		err   error
+	)
+	plain = auth.ReTokenFrom(c, h.CookieCfg)
+	if err = h.Auth.Logout(c.Request().Context(), plain, authMeta(c)); err != nil {
 		return mapAuthError(err)
 	}
 	auth.ClearReCookie(c, h.CookieCfg)
@@ -100,8 +121,11 @@ func (h *AuthController) Logout(c echo.Context) error {
 }
 
 func (h *AuthController) ForgotPassword(c echo.Context) error {
-	var body forgotPasswordRequest
-	if err := c.Bind(&body); err != nil {
+	var (
+		body forgotPasswordRequest
+		err  error
+	)
+	if err = c.Bind(&body); err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, apiError("invalid request body", "BAD_REQUEST"))
 	}
 	_ = h.Auth.ForgotPassword(c.Request().Context(), body.Email)
@@ -109,22 +133,30 @@ func (h *AuthController) ForgotPassword(c echo.Context) error {
 }
 
 func (h *AuthController) ResetPassword(c echo.Context) error {
-	var body resetPasswordRequest
-	if err := c.Bind(&body); err != nil {
+	var (
+		body resetPasswordRequest
+		err  error
+	)
+	if err = c.Bind(&body); err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, apiError("invalid request body", "BAD_REQUEST"))
 	}
-	if err := h.Auth.ResetPassword(c.Request().Context(), body.Token, body.Password); err != nil {
+	if err = h.Auth.ResetPassword(c.Request().Context(), body.Token, body.Password); err != nil {
 		return mapAuthError(err)
 	}
 	return c.NoContent(http.StatusOK)
 }
 
 func (h *AuthController) Me(c echo.Context) error {
-	uid, err := CurrentUserID(c)
+	var (
+		uid uuid.UUID
+		u   *entity.User
+		err error
+	)
+	uid, err = CurrentUserID(c)
 	if err != nil {
 		return err
 	}
-	u, err := h.Auth.GetUser(c.Request().Context(), uid)
+	u, err = h.Auth.GetUser(c.Request().Context(), uid)
 	if err != nil {
 		return mapAuthError(err)
 	}
@@ -132,23 +164,32 @@ func (h *AuthController) Me(c echo.Context) error {
 }
 
 func (h *AuthController) ChangePassword(c echo.Context) error {
-	uid, err := CurrentUserID(c)
+	var (
+		uid  uuid.UUID
+		body changePwRequest
+		err  error
+	)
+	uid, err = CurrentUserID(c)
 	if err != nil {
 		return err
 	}
-	var body changePwRequest
-	if err := c.Bind(&body); err != nil {
+	if err = c.Bind(&body); err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, apiError("invalid request body", "BAD_REQUEST"))
 	}
-	if err := h.Auth.ChangePassword(c.Request().Context(), uid, body.CurrentPassword, body.NewPassword); err != nil {
+	if err = h.Auth.ChangePassword(c.Request().Context(), uid, body.CurrentPassword, body.NewPassword); err != nil {
 		return mapAuthError(err)
 	}
 	return c.NoContent(http.StatusOK)
 }
 
 func (h *AuthController) CheckEmail(c echo.Context) error {
-	email := c.QueryParam("email")
-	available, err := h.Auth.EmailFree(c.Request().Context(), email)
+	var (
+		email     string
+		available bool
+		err       error
+	)
+	email = c.QueryParam("email")
+	available, err = h.Auth.EmailFree(c.Request().Context(), email)
 	if err != nil {
 		return mapAuthError(err)
 	}

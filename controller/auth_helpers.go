@@ -14,7 +14,11 @@ import (
 )
 
 func CurrentUserID(c echo.Context) (uuid.UUID, error) {
-	uid, ok := middleware.AuthUserID(c)
+	var (
+		uid uuid.UUID
+		ok  bool
+	)
+	uid, ok = middleware.AuthUserID(c)
 	if !ok {
 		return uuid.Nil, echo.NewHTTPError(http.StatusUnauthorized, apiError("unauthorized", "UNAUTHORIZED"))
 	}
@@ -22,7 +26,8 @@ func CurrentUserID(c echo.Context) (uuid.UUID, error) {
 }
 
 func authMeta(c echo.Context) usecase.AuthMeta {
-	reqID, _ := c.Get(middleware.CtxRequestID).(string)
+	var reqID string
+	reqID, _ = c.Get(middleware.CtxRequestID).(string)
 	return usecase.AuthMeta{
 		IPAddress: c.RealIP(),
 		UserAgent: c.Request().UserAgent(),
