@@ -31,8 +31,11 @@ func (r *reTokenRepo) Create(ctx context.Context, row *entity.ReToken) error {
 }
 
 func (r *reTokenRepo) FindValidByHash(ctx context.Context, hash string, now time.Time) (*entity.ReToken, error) {
-	var m entity.ReToken
-	err := r.db.WithContext(ctx).
+	var (
+		m   entity.ReToken
+		err error
+	)
+	err = r.db.WithContext(ctx).
 		Where("token_hash = ? AND revoked_at IS NULL AND expires_at > ?", hash, now).
 		First(&m).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {

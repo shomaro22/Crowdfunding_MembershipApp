@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"context"
 	"net/http"
 	"strconv"
 	"time"
@@ -32,17 +33,28 @@ func NewRateLimiter(repo repository.RateLimitRepo) *RateLimiter {
 func (l *RateLimiter) Middleware(policy RatePolicy) echo.MiddlewareFunc {
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(c echo.Context) error {
+			var (
+				ctx   context.Context
+				i     int
+				rule  RateRule
+				key   string
+				full  string
+				ok    bool
+				retry int
+				err   error
+			)
 			if l == nil || l.Repo == nil {
 				return next(c)
 			}
-			ctx := c.Request().Context()
-			for _, rule := range policy.Rules {
-				key := rule.Key(c)
+			ctx = c.Request().Context()
+			for i = 0; i < len(policy.Rules); i++ {
+				rule = policy.Rules[i]
+				key = rule.Key(c)
 				if key == "" || rule.Limit <= 0 {
 					continue
 				}
-				full := policy.Name + ":" + key
-				ok, retry, err := l.Repo.Allow(ctx, full, rule.Limit, policy.Window)
+				full = policy.Name + ":" + key
+				ok, retry, err = l.Repo.Allow(ctx, full, rule.Limit, policy.Window)
 				if err != nil {
 					return next(c)
 				}

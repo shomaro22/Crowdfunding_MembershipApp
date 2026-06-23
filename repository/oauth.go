@@ -32,8 +32,11 @@ func (r *oauthRepo) Create(ctx context.Context, row *entity.OAuthAccount) error 
 }
 
 func (r *oauthRepo) FindBySub(ctx context.Context, provider entity.OAuthProvider, sub string) (*entity.OAuthAccount, error) {
-	var m entity.OAuthAccount
-	err := r.db.WithContext(ctx).Where("provider = ? AND provider_sub = ?", provider, sub).First(&m).Error
+	var (
+		m   entity.OAuthAccount
+		err error
+	)
+	err = r.db.WithContext(ctx).Where("provider = ? AND provider_sub = ?", provider, sub).First(&m).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, nil
 	}
@@ -44,8 +47,11 @@ func (r *oauthRepo) FindBySub(ctx context.Context, provider entity.OAuthProvider
 }
 
 func (r *oauthRepo) FindByUserID(ctx context.Context, userID uuid.UUID, provider entity.OAuthProvider) (*entity.OAuthAccount, error) {
-	var m entity.OAuthAccount
-	err := r.db.WithContext(ctx).Where("user_id = ? AND provider = ?", userID, provider).First(&m).Error
+	var (
+		m   entity.OAuthAccount
+		err error
+	)
+	err = r.db.WithContext(ctx).Where("user_id = ? AND provider = ?", userID, provider).First(&m).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, nil
 	}
@@ -53,46 +59,6 @@ func (r *oauthRepo) FindByUserID(ctx context.Context, userID uuid.UUID, provider
 		return nil, err
 	}
 	return &m, nil
-}
-
-type TOTPBackupRepo interface {
-	CreateBatch(ctx context.Context, rows []entity.TOTPBackupCode) error
-	ListUnused(ctx context.Context, userID uuid.UUID) ([]entity.TOTPBackupCode, error)
-	MarkUsed(ctx context.Context, id uuid.UUID, at time.Time) error
-	DeleteByUser(ctx context.Context, userID uuid.UUID) error
-}
-
-type totpBackupRepo struct {
-	db *gorm.DB
-}
-
-func NewTOTPBackupRepo(db *gorm.DB) TOTPBackupRepo {
-	return &totpBackupRepo{db: db}
-}
-
-func (r *totpBackupRepo) CreateBatch(ctx context.Context, rows []entity.TOTPBackupCode) error {
-	if len(rows) == 0 {
-		return nil
-	}
-	return r.db.WithContext(ctx).Create(&rows).Error
-}
-
-func (r *totpBackupRepo) ListUnused(ctx context.Context, userID uuid.UUID) ([]entity.TOTPBackupCode, error) {
-	var rows []entity.TOTPBackupCode
-	err := r.db.WithContext(ctx).
-		Where("user_id = ? AND used_at IS NULL", userID).
-		Find(&rows).Error
-	return rows, err
-}
-
-func (r *totpBackupRepo) MarkUsed(ctx context.Context, id uuid.UUID, at time.Time) error {
-	return r.db.WithContext(ctx).Model(&entity.TOTPBackupCode{}).
-		Where("id = ?", id).
-		Update("used_at", at).Error
-}
-
-func (r *totpBackupRepo) DeleteByUser(ctx context.Context, userID uuid.UUID) error {
-	return r.db.WithContext(ctx).Where("user_id = ?", userID).Delete(&entity.TOTPBackupCode{}).Error
 }
 
 type OAuthCache interface {
@@ -118,11 +84,16 @@ func (c *redisOAuthCache) SetState(ctx context.Context, state, from string, ttl 
 }
 
 func (c *redisOAuthCache) PopState(ctx context.Context, state string) (string, bool, error) {
+	var (
+		key  string
+		from string
+		err  error
+	)
 	if c.rdb == nil {
 		return "", false, fmt.Errorf("redis unavailable")
 	}
-	key := "oauth:state:" + state
-	from, err := c.rdb.GetDel(ctx, key).Result()
+	key = "oauth:state:" + state
+	from, err = c.rdb.GetDel(ctx, key).Result()
 	if errors.Is(err, redis.Nil) {
 		return "", false, nil
 	}
@@ -140,54 +111,24 @@ func (c *redisOAuthCache) SetCallbackCode(ctx context.Context, code string, user
 }
 
 func (c *redisOAuthCache) PopCallback(ctx context.Context, code string) (uuid.UUID, bool, error) {
+	var (
+		raw string
+		id  uuid.UUID
+		err error
+	)
 	if c.rdb == nil {
 		return uuid.Nil, false, fmt.Errorf("redis unavailable")
 	}
-	raw, err := c.rdb.GetDel(ctx, "oauth:cb:"+code).Result()
+	raw, err = c.rdb.GetDel(ctx, "oauth:cb:"+code).Result()
 	if errors.Is(err, redis.Nil) {
 		return uuid.Nil, false, nil
 	}
 	if err != nil {
 		return uuid.Nil, false, err
 	}
-	id, err := uuid.Parse(raw)
+	id, err = uuid.Parse(raw)
 	if err != nil {
 		return uuid.Nil, false, nil
 	}
 	return id, true, nil
-}
-
-type RateLimitRepo interface {
-	Allow(ctx context.Context, key string, limit int, window time.Duration) (allowed bool, retryAfterSec int, err error)
-}
-
-type redisRateLimitRepo struct {
-	rdb *redis.Client
-}
-
-func NewRateLimitRepo(rdb *redis.Client) RateLimitRepo {
-	return &redisRateLimitRepo{rdb: rdb}
-}
-
-func (r *redisRateLimitRepo) Allow(ctx context.Context, key string, limit int, window time.Duration) (bool, int, error) {
-	if r.rdb == nil {
-		return true, 0, nil
-	}
-	fullKey := "rl:" + key
-	n, err := r.rdb.Incr(ctx, fullKey).Result()
-	if err != nil {
-		return true, 0, err
-	}
-	if n == 1 {
-		_ = r.rdb.Expire(ctx, fullKey, window).Err()
-	}
-	if n > int64(limit) {
-		ttl, _ := r.rdb.TTL(ctx, fullKey).Result()
-		sec := int(ttl.Seconds())
-		if sec < 1 {
-			sec = 1
-		}
-		return false, sec, nil
-	}
-	return true, 0, nil
 }

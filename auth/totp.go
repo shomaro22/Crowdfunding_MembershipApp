@@ -13,7 +13,11 @@ type TOTPSetup struct {
 }
 
 func NewTOTPSetup(issuer, account string) (*TOTPSetup, error) {
-	key, err := totp.Generate(totp.GenerateOpts{
+	var (
+		key *otp.Key
+		err error
+	)
+	key, err = totp.Generate(totp.GenerateOpts{
 		Issuer:      issuer,
 		AccountName: account,
 		Period:      30,
@@ -34,8 +38,11 @@ func VerifyTOTP(secret, code string) bool {
 }
 
 func NormalizeTOTPCode(code string) string {
-	var b strings.Builder
-	for _, r := range code {
+	var (
+		b strings.Builder
+		r rune
+	)
+	for _, r = range code {
 		if r >= '0' && r <= '9' {
 			b.WriteRune(r)
 		}

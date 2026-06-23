@@ -17,7 +17,7 @@ type ProjectListFilter struct {
 	Sort   string
 	Limit  int
 	Offset int
-	Now    time.Time
+	AsOf   time.Time // 公開一覧の期限判定基準。zero なら ListPublic 内で UTC 現在時刻を使う。
 }
 
 type ProjectRepo interface {
@@ -39,7 +39,12 @@ func NewProjectRepo(db *gorm.DB) ProjectRepo {
 }
 
 func (r *projectRepo) dbCtx(ctx context.Context) *gorm.DB {
-	if tx, ok := ctx.Value(txKey{}).(*gorm.DB); ok && tx != nil {
+	var (
+		tx *gorm.DB
+		ok bool
+	)
+	tx, ok = ctx.Value(txKey{}).(*gorm.DB)
+	if ok && tx != nil {
 		return tx.WithContext(ctx)
 	}
 	return r.db.WithContext(ctx)
@@ -47,23 +52,31 @@ func (r *projectRepo) dbCtx(ctx context.Context) *gorm.DB {
 
 func (r *projectRepo) Create(ctx context.Context, p *entity.Project, plans []entity.ProjectPlan, images []entity.ProjectImage) error {
 	return r.dbCtx(ctx).Transaction(func(tx *gorm.DB) error {
-		txCtx := context.WithValue(ctx, txKey{}, tx)
-		if err := r.dbCtx(txCtx).Create(p).Error; err != nil {
+		var (
+			txCtx context.Context
+			err   error
+			i     int
+		)
+		txCtx = context.WithValue(ctx, txKey{}, tx)
+		err = r.dbCtx(txCtx).Create(p).Error
+		if err != nil {
 			return err
 		}
-		for i := range plans {
+		for i = range plans {
 			plans[i].ProjectID = p.ID
 		}
 		if len(plans) > 0 {
-			if err := r.dbCtx(txCtx).Create(&plans).Error; err != nil {
+			err = r.dbCtx(txCtx).Create(&plans).Error
+			if err != nil {
 				return err
 			}
 		}
-		for i := range images {
+		for i = range images {
 			images[i].ProjectID = p.ID
 		}
 		if len(images) > 0 {
-			if err := r.dbCtx(txCtx).Create(&images).Error; err != nil {
+			err = r.dbCtx(txCtx).Create(&images).Error
+			if err != nil {
 				return err
 			}
 		}
@@ -72,46 +85,61 @@ func (r *projectRepo) Create(ctx context.Context, p *entity.Project, plans []ent
 }
 
 func (r *projectRepo) FindByID(ctx context.Context, id uuid.UUID) (*entity.Project, []entity.ProjectPlan, []entity.ProjectImage, error) {
-	var p entity.Project
-	err := r.dbCtx(ctx).Where("id = ?", id).First(&p).Error
+	var (
+		p      entity.Project
+		plans  []entity.ProjectPlan
+		images []entity.ProjectImage
+		err    error
+	)
+
+	err = r.dbCtx(ctx).Where("id = ?", id).First(&p).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, nil, nil, nil
 	}
 	if err != nil {
 		return nil, nil, nil, err
 	}
-	var plans []entity.ProjectPlan
-	if err := r.dbCtx(ctx).Where("project_id = ?", id).Order("membership_type ASC").Find(&plans).Error; err != nil {
+	if err = r.dbCtx(ctx).Where("project_id = ?", id).Order("membership_type ASC").Find(&plans).Error; err != nil {
 		return nil, nil, nil, err
 	}
-	var images []entity.ProjectImage
-	if err := r.dbCtx(ctx).Where("project_id = ?", id).Order("sort_order ASC").Find(&images).Error; err != nil {
+	if err = r.dbCtx(ctx).Where("project_id = ?", id).Order("sort_order ASC").Find(&images).Error; err != nil {
 		return nil, nil, nil, err
 	}
 	return &p, plans, images, nil
 }
 
 func (r *projectRepo) ListPublic(ctx context.Context, f ProjectListFilter) ([]entity.Project, int64, error) {
-	now := f.Now
-	if now.IsZero() {
-		now = time.Now().UTC()
+	var (
+		asOf   time.Time
+		q      *gorm.DB
+		total  int64
+		limit  int
+		offset int
+		order  string
+		rows   []entity.Project
+		s      string
+		like   string
+		err    error
+	)
+
+	asOf = f.AsOf
+	if asOf.IsZero() {
+		asOf = time.Now().UTC()
 	}
-	q := r.dbCtx(ctx).Model(&entity.Project{}).
+	q = r.dbCtx(ctx).Model(&entity.Project{}).
 		Where("status = ?", entity.ProjectStatusActive).
 		Where("(duration_type = ? OR (duration_type = ? AND end_date >= ?))",
-			entity.DurationUnlimited, entity.DurationLimited, now)
-	if s := strings.TrimSpace(f.Search); s != "" {
-		like := "%" + s + "%"
+			entity.DurationUnlimited, entity.DurationLimited, asOf)
+	if s = strings.TrimSpace(f.Search); s != "" {
+		like = "%" + s + "%"
 		q = q.Where("(title ILIKE ? OR description ILIKE ?)", like, like)
 	}
-	var total int64
-	if err := q.Count(&total).Error; err != nil {
+	if err = q.Count(&total).Error; err != nil {
 		return nil, 0, err
 	}
-	limit, offset := paginate(f.Limit, f.Offset)
-	order := publicSort(f.Sort)
-	var rows []entity.Project
-	err := q.Order(order).Limit(limit).Offset(offset).Find(&rows).Error
+	limit, offset = paginate(f.Limit, f.Offset)
+	order = publicSort(f.Sort)
+	err = q.Order(order).Limit(limit).Offset(offset).Find(&rows).Error
 	return rows, total, err
 }
 
@@ -127,34 +155,45 @@ func publicSort(sort string) string {
 }
 
 func (r *projectRepo) ListBySeller(ctx context.Context, sellerID uuid.UUID, limit, offset int) ([]entity.Project, int64, error) {
-	q := r.dbCtx(ctx).Model(&entity.Project{}).Where("seller_id = ?", sellerID)
-	var total int64
-	if err := q.Count(&total).Error; err != nil {
+	var (
+		q     *gorm.DB
+		total int64
+		rows  []entity.Project
+		err   error
+	)
+	q = r.dbCtx(ctx).Model(&entity.Project{}).Where("seller_id = ?", sellerID)
+	err = q.Count(&total).Error
+	if err != nil {
 		return nil, 0, err
 	}
 	limit, offset = paginate(limit, offset)
-	var rows []entity.Project
-	err := r.dbCtx(ctx).Where("seller_id = ?", sellerID).
+	err = r.dbCtx(ctx).Where("seller_id = ?", sellerID).
 		Order("created_at DESC").Limit(limit).Offset(offset).Find(&rows).Error
 	return rows, total, err
 }
 
 func (r *projectRepo) ListAll(ctx context.Context, status *entity.ProjectStatus, limit, offset int) ([]entity.Project, int64, error) {
-	q := r.dbCtx(ctx).Model(&entity.Project{})
+	var (
+		q     *gorm.DB
+		total int64
+		rows  []entity.Project
+		db    *gorm.DB
+		err   error
+	)
+	q = r.dbCtx(ctx).Model(&entity.Project{})
 	if status != nil && status.Valid() {
 		q = q.Where("status = ?", *status)
 	}
-	var total int64
-	if err := q.Count(&total).Error; err != nil {
+	err = q.Count(&total).Error
+	if err != nil {
 		return nil, 0, err
 	}
 	limit, offset = paginate(limit, offset)
-	var rows []entity.Project
-	db := r.dbCtx(ctx).Order("created_at DESC").Limit(limit).Offset(offset)
+	db = r.dbCtx(ctx).Order("created_at DESC").Limit(limit).Offset(offset)
 	if status != nil && status.Valid() {
 		db = db.Where("status = ?", *status)
 	}
-	err := db.Find(&rows).Error
+	err = db.Find(&rows).Error
 	return rows, total, err
 }
 
@@ -164,11 +203,17 @@ func (r *projectRepo) Update(ctx context.Context, p *entity.Project) error {
 
 func (r *projectRepo) Delete(ctx context.Context, id uuid.UUID) error {
 	return r.dbCtx(ctx).Transaction(func(tx *gorm.DB) error {
-		txCtx := context.WithValue(ctx, txKey{}, tx)
-		if err := r.dbCtx(txCtx).Where("project_id = ?", id).Delete(&entity.ProjectImage{}).Error; err != nil {
+		var (
+			txCtx context.Context
+			err   error
+		)
+		txCtx = context.WithValue(ctx, txKey{}, tx)
+		err = r.dbCtx(txCtx).Where("project_id = ?", id).Delete(&entity.ProjectImage{}).Error
+		if err != nil {
 			return err
 		}
-		if err := r.dbCtx(txCtx).Where("project_id = ?", id).Delete(&entity.ProjectPlan{}).Error; err != nil {
+		err = r.dbCtx(txCtx).Where("project_id = ?", id).Delete(&entity.ProjectPlan{}).Error
+		if err != nil {
 			return err
 		}
 		return r.dbCtx(txCtx).Where("id = ?", id).Delete(&entity.Project{}).Error

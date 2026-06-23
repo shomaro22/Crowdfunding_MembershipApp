@@ -37,15 +37,23 @@ func (r *userRepo) Update(ctx context.Context, u *entity.User) error {
 }
 
 func (r *userRepo) withDB(ctx context.Context) *gorm.DB {
-	if tx, ok := ctx.Value(txKey{}).(*gorm.DB); ok && tx != nil {
+	var (
+		tx *gorm.DB
+		ok bool
+	)
+	tx, ok = ctx.Value(txKey{}).(*gorm.DB)
+	if ok && tx != nil {
 		return tx.WithContext(ctx)
 	}
 	return r.db.WithContext(ctx)
 }
 
 func (r *userRepo) FindByID(ctx context.Context, id uuid.UUID) (*entity.User, error) {
-	var u entity.User
-	err := r.withDB(ctx).Where("id = ?", id).First(&u).Error
+	var (
+		u   entity.User
+		err error
+	)
+	err = r.withDB(ctx).Where("id = ?", id).First(&u).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, nil
 	}
@@ -56,8 +64,11 @@ func (r *userRepo) FindByID(ctx context.Context, id uuid.UUID) (*entity.User, er
 }
 
 func (r *userRepo) FindByEmail(ctx context.Context, email string) (*entity.User, error) {
-	var u entity.User
-	err := r.withDB(ctx).Where("email = ?", email).First(&u).Error
+	var (
+		u   entity.User
+		err error
+	)
+	err = r.withDB(ctx).Where("email = ?", email).First(&u).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, nil
 	}
@@ -68,15 +79,24 @@ func (r *userRepo) FindByEmail(ctx context.Context, email string) (*entity.User,
 }
 
 func (r *userRepo) EmailExists(ctx context.Context, email string) (bool, error) {
-	var count int64
-	err := r.withDB(ctx).Model(&entity.User{}).Where("email = ?", email).Count(&count).Error
+	var (
+		count int64
+		err   error
+	)
+	err = r.withDB(ctx).Model(&entity.User{}).Where("email = ?", email).Count(&count).Error
 	return count > 0, err
 }
 
 func (r *userRepo) ListByRoleStatus(ctx context.Context, role entity.UserRole, status entity.AccountStatus, limit, offset int) ([]entity.User, int64, error) {
-	q := r.withDB(ctx).Model(&entity.User{}).Where("role = ? AND account_status = ?", role, status)
-	var total int64
-	if err := q.Count(&total).Error; err != nil {
+	var (
+		q     *gorm.DB
+		total int64
+		rows  []entity.User
+		err   error
+	)
+	q = r.withDB(ctx).Model(&entity.User{}).Where("role = ? AND account_status = ?", role, status)
+	err = q.Count(&total).Error
+	if err != nil {
 		return nil, 0, err
 	}
 	if limit <= 0 {
@@ -88,21 +108,25 @@ func (r *userRepo) ListByRoleStatus(ctx context.Context, role entity.UserRole, s
 	if offset < 0 {
 		offset = 0
 	}
-	var rows []entity.User
-	err := r.withDB(ctx).Where("role = ? AND account_status = ?", role, status).
+	err = r.withDB(ctx).Where("role = ? AND account_status = ?", role, status).
 		Order("created_at DESC").Limit(limit).Offset(offset).Find(&rows).Error
 	return rows, total, err
 }
 
 func (r *userRepo) BumpTokenVer(ctx context.Context, userID uuid.UUID) (int64, error) {
-	res := r.withDB(ctx).Model(&entity.User{}).
+	var (
+		res *gorm.DB
+		u   entity.User
+		err error
+	)
+	res = r.withDB(ctx).Model(&entity.User{}).
 		Where("id = ?", userID).
 		UpdateColumn("token_version", gorm.Expr("token_version + 1"))
 	if res.Error != nil {
 		return 0, res.Error
 	}
-	var u entity.User
-	if err := r.withDB(ctx).Select("token_version").Where("id = ?", userID).First(&u).Error; err != nil {
+	err = r.withDB(ctx).Select("token_version").Where("id = ?", userID).First(&u).Error
+	if err != nil {
 		return 0, err
 	}
 	return u.TokenVersion, nil

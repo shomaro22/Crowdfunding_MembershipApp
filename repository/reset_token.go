@@ -30,8 +30,11 @@ func (r *resetRepo) Create(ctx context.Context, row *entity.ResetToken) error {
 }
 
 func (r *resetRepo) FindValidByHash(ctx context.Context, hash string, now time.Time) (*entity.ResetToken, error) {
-	var m entity.ResetToken
-	err := r.db.WithContext(ctx).
+	var (
+		m   entity.ResetToken
+		err error
+	)
+	err = r.db.WithContext(ctx).
 		Where("token_hash = ? AND used_at IS NULL AND expires_at > ?", hash, now).
 		First(&m).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
