@@ -34,6 +34,7 @@ type loginRequest struct {
 type changePwRequest struct {
 	CurrentPassword string `json:"current_password"`
 	NewPassword     string `json:"new_password"`
+	TotpCode        string `json:"totp_code"`
 }
 
 type forgotPasswordRequest struct {
@@ -176,7 +177,7 @@ func (h *AuthController) ChangePassword(c echo.Context) error {
 	if err = c.Bind(&body); err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, apiError("invalid request body", "BAD_REQUEST"))
 	}
-	if err = h.Auth.ChangePassword(c.Request().Context(), uid, body.CurrentPassword, body.NewPassword); err != nil {
+	if err = h.Auth.ChangePassword(c.Request().Context(), uid, body.CurrentPassword, body.NewPassword, body.TotpCode); err != nil {
 		return mapAuthError(err)
 	}
 	return c.NoContent(http.StatusOK)
