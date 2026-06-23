@@ -50,7 +50,7 @@ func (a *AuthUseCase) Login(ctx context.Context, email, password string, meta Au
 	}, nil
 }
 
-func (a *AuthUseCase) Reissue(ctx context.Context, reTokenPlain string, meta AuthMeta) (string, string, error) {
+func (a *AuthUseCase) Refresh(ctx context.Context, reTokenPlain string, meta AuthMeta) (string, string, error) {
 	var (
 		plain  string
 		hash   string

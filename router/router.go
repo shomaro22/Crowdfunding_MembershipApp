@@ -59,7 +59,7 @@ func New(cfg Config) *echo.Echo {
 		e.POST("/auth/forgot-password", cfg.Auth.ForgotPassword, rl(middleware.PolicyForgotPassword))
 		e.POST("/auth/reset-password", cfg.Auth.ResetPassword)
 		e.GET("/auth/check-email", cfg.Auth.CheckEmail)
-		e.POST("/re", cfg.Auth.Re, rl(middleware.PolicyRe))
+		e.POST("/re", cfg.Auth.Refresh, rl(middleware.PolicyRe))
 		e.POST("/auth/2fa/challenge", cfg.Auth.Challenge2FA, rl(middleware.Policy2FAChallenge))
 
 		if cfg.OAuthEnabled {

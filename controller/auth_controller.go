@@ -91,7 +91,7 @@ func (h *AuthController) Login(c echo.Context) error {
 	})
 }
 
-func (h *AuthController) Re(c echo.Context) error {
+func (h *AuthController) Refresh(c echo.Context) error {
 	var (
 		plain     string
 		authToken string
@@ -99,7 +99,7 @@ func (h *AuthController) Re(c echo.Context) error {
 		err       error
 	)
 	plain = auth.ReTokenFrom(c, h.CookieCfg)
-	authToken, reToken, err = h.Auth.Reissue(c.Request().Context(), plain, authMeta(c))
+	authToken, reToken, err = h.Auth.Refresh(c.Request().Context(), plain, authMeta(c))
 	if err != nil {
 		return mapAuthError(err)
 	}

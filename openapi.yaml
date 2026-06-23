@@ -202,7 +202,7 @@ paths:
   /re:
     post:
       tags: [Auth]
-      summary: Reissue AuthToken (ReToken in httpOnly Cookie)
+      summary: Refresh AuthToken (ReToken in httpOnly Cookie)
       description: |
         Cookie 自動送信で ReToken を検証し、新しい AuthToken を返す。
         Rate Limit 対象名は `re`（§9.2）。
