@@ -2,6 +2,7 @@ package controller
 
 import (
 	"context"
+	"database/sql"
 	"net/http"
 
 	"crowdfund-app/db"
@@ -17,8 +18,12 @@ type HealthController struct {
 }
 
 func (h *HealthController) Health(c echo.Context) error {
-	ctx := c.Request().Context()
-	body := map[string]string{
+	var (
+		ctx  context.Context
+		body map[string]string
+	)
+	ctx = c.Request().Context()
+	body = map[string]string{
 		"status": "ok",
 		"db":     pingDB(ctx, h.SQL),
 		"redis":  pingRedis(ctx, h.RDB),
@@ -27,24 +32,29 @@ func (h *HealthController) Health(c echo.Context) error {
 }
 
 func pingDB(ctx context.Context, gormDB *gorm.DB) string {
+	var (
+		sqlDB *sql.DB
+		err   error
+	)
 	if gormDB == nil {
 		return "skipped"
 	}
-	sqlDB, err := gormDB.DB()
+	sqlDB, err = gormDB.DB()
 	if err != nil {
 		return "error"
 	}
-	if err := sqlDB.PingContext(ctx); err != nil {
+	if err = sqlDB.PingContext(ctx); err != nil {
 		return "error"
 	}
 	return "ok"
 }
 
 func pingRedis(ctx context.Context, rdb *redis.Client) string {
+	var err error
 	if rdb == nil {
 		return "skipped"
 	}
-	if err := db.PingRedis(ctx, rdb); err != nil {
+	if err = db.PingRedis(ctx, rdb); err != nil {
 		return "error"
 	}
 	return "ok"

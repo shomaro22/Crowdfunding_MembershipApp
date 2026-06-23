@@ -20,7 +20,10 @@ type TokenParser func(raw string) (auth.AuthClaims, error)
 type SessionValidator func(c echo.Context, claims auth.AuthClaims) error
 
 func BearerToken(c echo.Context) string {
-	h := c.Request().Header.Get("Authorization")
+	var (
+		h string
+	)
+	h = c.Request().Header.Get("Authorization")
 	const p = "Bearer "
 	if len(h) > len(p) && strings.EqualFold(h[:len(p)], p) {
 		return strings.TrimSpace(h[len(p):])
@@ -29,15 +32,24 @@ func BearerToken(c echo.Context) string {
 }
 
 func AuthUserID(c echo.Context) (uuid.UUID, bool) {
-	v := c.Get(CtxUserID)
+	var (
+		v   interface{}
+		x   uuid.UUID
+		s   string
+		u   uuid.UUID
+		err error
+	)
+	v = c.Get(CtxUserID)
 	if v == nil {
 		return uuid.Nil, false
 	}
-	switch x := v.(type) {
+	switch v.(type) {
 	case uuid.UUID:
+		x = v.(uuid.UUID)
 		return x, x != uuid.Nil
 	case string:
-		u, err := uuid.Parse(strings.TrimSpace(x))
+		s = v.(string)
+		u, err = uuid.Parse(strings.TrimSpace(s))
 		return u, err == nil && u != uuid.Nil
 	default:
 		return uuid.Nil, false
@@ -45,7 +57,11 @@ func AuthUserID(c echo.Context) (uuid.UUID, bool) {
 }
 
 func AuthUserRole(c echo.Context) (entity.UserRole, bool) {
-	r, ok := c.Get(CtxUserRole).(string)
+	var (
+		r  string
+		ok bool
+	)
+	r, ok = c.Get(CtxUserRole).(string)
 	if !ok || r == "" {
 		return "", false
 	}
@@ -55,8 +71,13 @@ func AuthUserRole(c echo.Context) (entity.UserRole, bool) {
 func JWTAuth(parse TokenParser, validate SessionValidator) echo.MiddlewareFunc {
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(c echo.Context) error {
-			raw := BearerToken(c)
-			claims, err := parse(raw)
+			var (
+				raw    string
+				claims auth.AuthClaims
+				err    error
+			)
+			raw = BearerToken(c)
+			claims, err = parse(raw)
 			if err != nil {
 				return echo.NewHTTPError(401, map[string]string{"error": "unauthorized", "code": "UNAUTHORIZED"})
 			}
@@ -64,7 +85,7 @@ func JWTAuth(parse TokenParser, validate SessionValidator) echo.MiddlewareFunc {
 			c.Set(CtxUserRole, string(claims.Role))
 			c.Set(CtxTwoFAVerified, claims.TwoFAVerified)
 			if validate != nil {
-				if err := validate(c, claims); err != nil {
+				if err = validate(c, claims); err != nil {
 					return err
 				}
 			}
@@ -77,11 +98,16 @@ func JWTAuth(parse TokenParser, validate SessionValidator) echo.MiddlewareFunc {
 func OptionalJWTAuth(parse TokenParser, validate SessionValidator) echo.MiddlewareFunc {
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(c echo.Context) error {
-			raw := BearerToken(c)
+			var (
+				raw    string
+				claims auth.AuthClaims
+				err    error
+			)
+			raw = BearerToken(c)
 			if raw == "" {
 				return next(c)
 			}
-			claims, err := parse(raw)
+			claims, err = parse(raw)
 			if err != nil {
 				return next(c)
 			}
@@ -89,7 +115,7 @@ func OptionalJWTAuth(parse TokenParser, validate SessionValidator) echo.Middlewa
 			c.Set(CtxUserRole, string(claims.Role))
 			c.Set(CtxTwoFAVerified, claims.TwoFAVerified)
 			if validate != nil {
-				if err := validate(c, claims); err != nil {
+				if err = validate(c, claims); err != nil {
 					return next(c)
 				}
 			}

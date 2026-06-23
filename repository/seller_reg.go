@@ -27,7 +27,12 @@ func NewSellerRegRepo(db *gorm.DB) SellerRegRepo {
 }
 
 func (r *sellerRegRepo) withDB(ctx context.Context) *gorm.DB {
-	if tx, ok := ctx.Value(txKey{}).(*gorm.DB); ok && tx != nil {
+	var (
+		tx *gorm.DB
+		ok bool
+	)
+	tx, ok = ctx.Value(txKey{}).(*gorm.DB)
+	if ok && tx != nil {
 		return tx.WithContext(ctx)
 	}
 	return r.db.WithContext(ctx)
@@ -42,8 +47,11 @@ func (r *sellerRegRepo) Update(ctx context.Context, reg *entity.SellerReg) error
 }
 
 func (r *sellerRegRepo) FindByID(ctx context.Context, id uuid.UUID) (*entity.SellerReg, error) {
-	var m entity.SellerReg
-	err := r.withDB(ctx).Where("id = ?", id).First(&m).Error
+	var (
+		m   entity.SellerReg
+		err error
+	)
+	err = r.withDB(ctx).Where("id = ?", id).First(&m).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, nil
 	}
@@ -54,8 +62,11 @@ func (r *sellerRegRepo) FindByID(ctx context.Context, id uuid.UUID) (*entity.Sel
 }
 
 func (r *sellerRegRepo) FindByUserID(ctx context.Context, userID uuid.UUID) (*entity.SellerReg, error) {
-	var m entity.SellerReg
-	err := r.withDB(ctx).Where("user_id = ?", userID).First(&m).Error
+	var (
+		m   entity.SellerReg
+		err error
+	)
+	err = r.withDB(ctx).Where("user_id = ?", userID).First(&m).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, nil
 	}
@@ -66,9 +77,15 @@ func (r *sellerRegRepo) FindByUserID(ctx context.Context, userID uuid.UUID) (*en
 }
 
 func (r *sellerRegRepo) List(ctx context.Context, status entity.RegStatus, limit, offset int) ([]entity.SellerReg, int64, error) {
-	q := r.withDB(ctx).Model(&entity.SellerReg{}).Where("status = ?", status)
-	var total int64
-	if err := q.Count(&total).Error; err != nil {
+	var (
+		q     *gorm.DB
+		total int64
+		rows  []entity.SellerReg
+		err   error
+	)
+	q = r.withDB(ctx).Model(&entity.SellerReg{}).Where("status = ?", status)
+	err = q.Count(&total).Error
+	if err != nil {
 		return nil, 0, err
 	}
 	if limit <= 0 {
@@ -80,8 +97,7 @@ func (r *sellerRegRepo) List(ctx context.Context, status entity.RegStatus, limit
 	if offset < 0 {
 		offset = 0
 	}
-	var rows []entity.SellerReg
-	err := r.withDB(ctx).Where("status = ?", status).
+	err = r.withDB(ctx).Where("status = ?", status).
 		Order("created_at DESC").Limit(limit).Offset(offset).Find(&rows).Error
 	return rows, total, err
 }

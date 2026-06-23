@@ -22,11 +22,15 @@ type CookieCfg struct {
 }
 
 func CookieFromEnv() CookieCfg {
-	name := strings.TrimSpace(os.Getenv("REFRESH_COOKIE_NAME"))
+	var (
+		name   string
+		secure bool
+	)
+	name = strings.TrimSpace(os.Getenv("REFRESH_COOKIE_NAME"))
 	if name == "" {
 		name = DefaultReCookie
 	}
-	secure := strings.EqualFold(os.Getenv("COOKIE_SECURE"), "true")
+	secure = strings.EqualFold(os.Getenv("COOKIE_SECURE"), "true")
 	return CookieCfg{
 		Name:     name,
 		Secure:   secure,
@@ -61,7 +65,11 @@ func ClearReCookie(c echo.Context, cfg CookieCfg) {
 }
 
 func ReTokenFrom(c echo.Context, cfg CookieCfg) string {
-	ck, err := c.Cookie(cfg.Name)
+	var (
+		ck  *http.Cookie
+		err error
+	)
+	ck, err = c.Cookie(cfg.Name)
 	if err != nil || ck == nil {
 		return ""
 	}

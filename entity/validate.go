@@ -22,11 +22,16 @@ func runeLen(s string) int {
 }
 
 func ValidateEmail(email string) (string, error) {
-	normalized := NormalizeEmail(email)
+	var (
+		normalized string
+		err        error
+	)
+	normalized = NormalizeEmail(email)
 	if normalized == "" {
 		return "", ErrBadEmail
 	}
-	if _, err := mail.ParseAddress(normalized); err != nil {
+	_, err = mail.ParseAddress(normalized)
+	if err != nil {
 		return "", ErrBadEmail
 	}
 	return normalized, nil
@@ -43,18 +48,24 @@ func ValidatePassword(password string) error {
 }
 
 func ValidateBuyerReg(email, password string) (string, error) {
-	normalized, err := ValidateEmail(email)
+	var (
+		normalized string
+		err        error
+	)
+	normalized, err = ValidateEmail(email)
 	if err != nil {
 		return "", err
 	}
-	if err := ValidatePassword(password); err != nil {
+	err = ValidatePassword(password)
+	if err != nil {
 		return "", err
 	}
 	return normalized, nil
 }
 
 func ValidateTitle(title string) error {
-	n := runeLen(strings.TrimSpace(title))
+	var n int
+	n = runeLen(strings.TrimSpace(title))
 	if n < MinProjectTitle || n > MaxProjectTitle {
 		return ErrBadTitle
 	}
@@ -69,7 +80,8 @@ func ValidatePrice(price int) error {
 }
 
 func ValidateMessage(content string) error {
-	trimmed := strings.TrimSpace(content)
+	var trimmed string
+	trimmed = strings.TrimSpace(content)
 	if trimmed == "" {
 		return ErrBadMessage
 	}
@@ -126,7 +138,14 @@ type PlanInput struct {
 }
 
 func ValidateProject(title, description string, targetAmount int64, duration DurationType, start time.Time, end *time.Time, plans []PlanInput) error {
-	if err := ValidateTitle(title); err != nil {
+	var (
+		seen map[MembershipType]bool
+		p    PlanInput
+		mt   MembershipType
+		err  error
+	)
+	err = ValidateTitle(title)
+	if err != nil {
 		return err
 	}
 	if strings.TrimSpace(description) == "" {
@@ -135,14 +154,15 @@ func ValidateProject(title, description string, targetAmount int64, duration Dur
 	if targetAmount < 0 {
 		return ErrBadProject
 	}
-	if err := ValidateDuration(duration, start, end); err != nil {
+	err = ValidateDuration(duration, start, end)
+	if err != nil {
 		return err
 	}
 	if len(plans) != 3 {
 		return ErrBadProject
 	}
-	seen := map[MembershipType]bool{}
-	for _, p := range plans {
+	seen = map[MembershipType]bool{}
+	for _, p = range plans {
 		if !p.MembershipType.Valid() {
 			return ErrBadMembership
 		}
@@ -153,11 +173,12 @@ func ValidateProject(title, description string, targetAmount int64, duration Dur
 		if strings.TrimSpace(p.Benefits) == "" {
 			return ErrBadProject
 		}
-		if err := ValidatePrice(p.Price); err != nil {
+		err = ValidatePrice(p.Price)
+		if err != nil {
 			return err
 		}
 	}
-	for _, mt := range []MembershipType{MembershipBronze, MembershipSilver, MembershipGold} {
+	for _, mt = range []MembershipType{MembershipBronze, MembershipSilver, MembershipGold} {
 		if !seen[mt] {
 			return ErrBadProject
 		}
