@@ -6,6 +6,8 @@ import (
 	"strings"
 	"time"
 
+	"crowdfund-app/auth"
+
 	"github.com/google/uuid"
 	"github.com/labstack/echo/v4"
 )
@@ -45,10 +47,29 @@ func KeyUserID(c echo.Context) string {
 	return uid.String()
 }
 
+func KeyPending2FAUser(secret []byte) func(c echo.Context) string {
+	return func(c echo.Context) string {
+		var (
+			tok string
+			uid uuid.UUID
+			err error
+		)
+		tok = auth.Pending2FAFrom(c)
+		if tok == "" || len(secret) == 0 {
+			return ""
+		}
+		uid, err = auth.VerifyPending2FA(secret, tok, time.Now().UTC())
+		if err != nil {
+			return ""
+		}
+		return uid.String()
+	}
+}
+
 var (
 	PolicyLogin = RatePolicy{
 		Name:   "login",
-		Window: time.Minute,
+		Period: time.Minute,
 		Rules: []RateRule{
 			{Limit: 20, Key: KeyIP},
 			{Limit: 5, Key: KeyJSONEmail("email")},
@@ -56,17 +77,17 @@ var (
 	}
 	PolicyRegisterBuyer = RatePolicy{
 		Name:   "register_buyer",
-		Window: time.Minute,
+		Period: time.Minute,
 		Rules:  []RateRule{{Limit: 10, Key: KeyIP}},
 	}
 	PolicyRegisterSeller = RatePolicy{
 		Name:   "register_seller",
-		Window: time.Minute,
+		Period: time.Minute,
 		Rules:  []RateRule{{Limit: 5, Key: KeyIP}},
 	}
 	PolicyForgotPassword = RatePolicy{
 		Name:   "forgot_password",
-		Window: time.Minute,
+		Period: time.Minute,
 		Rules: []RateRule{
 			{Limit: 5, Key: KeyIP},
 			{Limit: 3, Key: KeyJSONEmail("email")},
@@ -74,7 +95,7 @@ var (
 	}
 	PolicyRe = RatePolicy{
 		Name:   "re",
-		Window: time.Minute,
+		Period: time.Minute,
 		Rules: []RateRule{
 			{Limit: 30, Key: KeyIP},
 			{Limit: 60, Key: KeyUserID},
