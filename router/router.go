@@ -83,6 +83,7 @@ func New(cfg Config) *echo.Echo {
 		e.GET("/projects/mine", cfg.Projects.ListMine, cfg.SellerRead...)
 		e.POST("/projects", cfg.Projects.Create, cfg.SellerWrite...)
 		opt = cfg.OptionalJWT
+		e.GET("/projects/:projectId/plans", cfg.Projects.ListPlans)
 		e.GET("/projects/:projectId", cfg.Projects.Get, opt...)
 		e.PUT("/projects/:projectId", cfg.Projects.Update, cfg.SellerWrite...)
 		e.POST("/projects/:projectId/delete-request", cfg.Projects.RequestDelete, cfg.SellerWrite...)
