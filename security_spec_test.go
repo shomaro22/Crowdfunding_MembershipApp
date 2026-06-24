@@ -208,6 +208,14 @@ func TestSecurityChangePasswordRequiresTOTP(t *testing.T) {
 	}
 }
 
+func TestBodyCodeParsesRateLimitResponse(t *testing.T) {
+	rec := httptest.NewRecorder()
+	rec.Body.WriteString(`{"error":"rate limit exceeded","code":"RATE_LIMITED","retry_after_seconds":12}`)
+	if bodyCode(rec) != "RATE_LIMITED" {
+		t.Fatalf("code=%q want RATE_LIMITED", bodyCode(rec))
+	}
+}
+
 func TestSecurityRateLimitLogin(t *testing.T) {
 	var (
 		e     *echo.Echo
@@ -241,9 +249,10 @@ func TestSecurityRateLimitLogin(t *testing.T) {
 }
 
 type seedOpts struct {
-	Role        entity.UserRole
-	AdminRole   *entity.AdminRole
-	TOTPEnabled bool
+	Role          entity.UserRole
+	AdminRole     *entity.AdminRole
+	TOTPEnabled   bool
+	AccountStatus entity.AccountStatus
 }
 
 func setupSecurityApp(t *testing.T) *echo.Echo {
@@ -314,6 +323,9 @@ func seedSecurityUser(t *testing.T, gdb *gorm.DB, opts seedOpts) *entity.User {
 		TokenVersion:  0,
 		CreatedAt:     now,
 		UpdatedAt:     now,
+	}
+	if opts.AccountStatus != "" {
+		u.AccountStatus = opts.AccountStatus
 	}
 	if opts.Role == entity.UserRoleSeller {
 		u.SellerStatus = entity.SellerStatusActive
@@ -386,7 +398,7 @@ func securityPOST(e *echo.Echo, path, token, body string) *httptest.ResponseReco
 
 func bodyCode(rec *httptest.ResponseRecorder) string {
 	var (
-		m   map[string]string
+		m   map[string]any
 		raw string
 	)
 	raw = strings.TrimSpace(rec.Body.String())
@@ -396,5 +408,6 @@ func bodyCode(rec *httptest.ResponseRecorder) string {
 	if json.Unmarshal([]byte(raw), &m) != nil {
 		return ""
 	}
-	return m["code"]
+	c, _ := m["code"].(string)
+	return c
 }
