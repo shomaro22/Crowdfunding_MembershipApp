@@ -41,7 +41,8 @@ func buildApp() (*echo.Echo, string, error) {
 		reTokenRepo    repository.ReTokenRepo
 		resetRepo      repository.ResetRepo
 		activityRepo   repository.ActivityRepo
-		auditRepo      repository.AuditRepo
+		auditRepo           repository.AuditRepo
+		reviewDecisionRepo  repository.ReviewDecisionRepo
 		projectRepo    repository.ProjectRepo
 		oauthRepo      repository.OAuthRepo
 		totpBackupRepo repository.TOTPBackupRepo
@@ -136,6 +137,7 @@ func buildApp() (*echo.Echo, string, error) {
 	resetRepo = repository.NewResetRepo(gormDB)
 	activityRepo = repository.NewActivityRepo(gormDB)
 	auditRepo = repository.NewAuditRepo(gormDB)
+	reviewDecisionRepo = repository.NewReviewDecisionRepo(gormDB)
 	projectRepo = repository.NewProjectRepo(gormDB)
 	oauthRepo = repository.NewOAuthRepo(gormDB)
 	totpBackupRepo = repository.NewTOTPBackupRepo(gormDB)
@@ -177,10 +179,11 @@ func buildApp() (*echo.Echo, string, error) {
 		apiPublicURL = "http://localhost:" + port
 	}
 	adminUC = &usecase.AdminUseCase{
-		Users:      userRepo,
-		SellerRegs: sellerRegRepo,
-		Projects:   projectRepo,
-		Audit:      auditRepo,
+		Users:           userRepo,
+		SellerRegs:      sellerRegRepo,
+		Projects:        projectRepo,
+		Audit:           auditRepo,
+		ReviewDecisions: reviewDecisionRepo,
 		ReTokens:   reTokenRepo,
 		TOTPBackup: totpBackupRepo,
 		KYC:        kycStore,
