@@ -2,20 +2,26 @@ package middleware
 
 import "time"
 
-var (
-	Policy2FAChallenge = RatePolicy{
+func Policy2FAChallenge(secret []byte) RatePolicy {
+	return RatePolicy{
 		Name:   "2fa/challenge",
-		Window: time.Minute,
-		Rules:  []RateRule{{Limit: 5, Key: KeyIP}},
+		Period: time.Minute,
+		Rules: []RateRule{
+			{Limit: 5, Key: KeyIP},
+			{Limit: 5, Key: KeyPending2FAUser(secret)},
+		},
 	}
+}
+
+var (
 	PolicyGoogleOAuth = RatePolicy{
 		Name:   "google_oauth",
-		Window: time.Minute,
+		Period: time.Minute,
 		Rules:  []RateRule{{Limit: 20, Key: KeyIP}},
 	}
 	PolicyOAuthExchange = RatePolicy{
 		Name:   "oauth_exchange",
-		Window: time.Minute,
+		Period: time.Minute,
 		Rules:  []RateRule{{Limit: 20, Key: KeyIP}},
 	}
 )
