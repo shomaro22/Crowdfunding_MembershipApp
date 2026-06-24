@@ -106,6 +106,8 @@ func New(cfg Config) *echo.Echo {
 		admin.PATCH("/projects/:projectId/delete-request", cfg.Admin.PatchDeleteReq)
 		admin.POST("/users/:userId/reset-2fa", cfg.Admin.ResetUser2FA,
 			middleware.RequireAdminRole(entity.AdminRoleSupportAdmin, entity.AdminRoleSuperAdmin))
+		admin.PATCH("/users/:userId/admin-role", cfg.Admin.ChangeAdminRole,
+			middleware.RequireAdminRole(entity.AdminRoleSuperAdmin))
 	}
 
 	return e
