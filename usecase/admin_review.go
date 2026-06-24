@@ -73,6 +73,10 @@ func (a *AdminUseCase) RejectBuyer(ctx context.Context, adminID, userID uuid.UUI
 		now time.Time
 	)
 
+	if err = requireReviewReason(reason); err != nil {
+		return nil, err
+	}
+	reason = normalizeReviewReason(reason)
 	if err = a.requireReviewAdmin(ctx, adminID); err != nil {
 		return nil, err
 	}
