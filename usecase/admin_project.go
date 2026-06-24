@@ -62,6 +62,10 @@ func (a *AdminUseCase) PatchProject(ctx context.Context, adminID, projectID uuid
 		if proj.Status != entity.ProjectStatusPending {
 			return nil, ErrInvalidState
 		}
+		if err = requireReviewReason(reason); err != nil {
+			return nil, err
+		}
+		reason = normalizeReviewReason(reason)
 	default:
 		return nil, ErrInvalidState
 	}
@@ -100,6 +104,11 @@ func (a *AdminUseCase) DeleteProject(ctx context.Context, adminID, projectID uui
 	proj, _, _, err = a.Projects.FindByID(ctx, projectID)
 	if err != nil || proj == nil {
 		return ErrNotFound
+	}
+	switch proj.Status {
+	case entity.ProjectStatusPending, entity.ProjectStatusCancelled, entity.ProjectStatusDeleted:
+	default:
+		return ErrInvalidState
 	}
 	if err = a.Projects.Delete(ctx, projectID); err != nil {
 		return err
