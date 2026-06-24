@@ -33,5 +33,6 @@ var (
 	ErrBadMessage    = errors.New("message content is required and must be at most 4000 characters")
 	ErrBadTitle      = errors.New("title must be 1 to 200 characters")
 	ErrBadPrice      = errors.New("plan price must be between 1 and 100000 JPY")
-	ErrBadKYC = errors.New("seller KYC metadata is incomplete")
+	ErrBadKYC        = errors.New("seller KYC metadata is incomplete")
+	ErrBadImages     = errors.New("project images are invalid")
 )
