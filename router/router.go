@@ -15,6 +15,7 @@ type Config struct {
 	Admin             *controller.AdminController
 	KYCFiles          *controller.KYCFileController
 	RateLimit         *middleware.RateLimiter
+	Policy2FAChallenge middleware.RatePolicy
 	OAuthEnabled      bool
 	PreAuthMiddleware []echo.MiddlewareFunc
 	Protected         []echo.MiddlewareFunc
@@ -61,7 +62,7 @@ func New(cfg Config) *echo.Echo {
 		e.POST("/auth/reset-password", cfg.Auth.ResetPassword)
 		e.GET("/auth/check-email", cfg.Auth.CheckEmail)
 		e.POST("/re", cfg.Auth.Re, rl(middleware.PolicyRe))
-		e.POST("/auth/2fa/challenge", cfg.Auth.Challenge2FA, rl(middleware.Policy2FAChallenge))
+		e.POST("/auth/2fa/challenge", cfg.Auth.Challenge2FA, rl(cfg.Policy2FAChallenge))
 
 		if cfg.OAuthEnabled {
 			e.GET("/auth/google", cfg.Auth.GoogleStart, rl(middleware.PolicyGoogleOAuth))
