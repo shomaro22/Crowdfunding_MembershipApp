@@ -3,6 +3,7 @@ package controller
 import (
 	"net/http"
 	"strconv"
+	"strings"
 
 	"crowdfund-app/entity"
 	"crowdfund-app/usecase"
@@ -74,7 +75,12 @@ func (h *AdminController) RejectBuyer(c echo.Context) error {
 	if err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, apiError("invalid user id", "BAD_REQUEST"))
 	}
-	_ = c.Bind(&body)
+	if err = c.Bind(&body); err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, apiError("invalid request body", "BAD_REQUEST"))
+	}
+	if body.Reason == nil || strings.TrimSpace(*body.Reason) == "" {
+		return echo.NewHTTPError(http.StatusBadRequest, apiError("reason required", "BAD_REQUEST"))
+	}
 	u, err = h.Admin.RejectBuyer(c.Request().Context(), adminID, userID, body.Reason)
 	if err != nil {
 		return mapAdminError(err)
