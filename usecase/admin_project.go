@@ -76,6 +76,11 @@ func (a *AdminUseCase) PatchProject(ctx context.Context, adminID, projectID uuid
 		action = "project.reject"
 	}
 	a.writeAudit(ctx, adminID, action, "project", proj.ID.String(), reason, nil)
+	if status == entity.ProjectStatusActive {
+		a.writeReviewDecision(ctx, adminID, entity.ReviewProject, projectID, entity.ReviewApproved, reason)
+	} else {
+		a.writeReviewDecision(ctx, adminID, entity.ReviewProject, projectID, entity.ReviewRejected, reason)
+	}
 	seller, _ = a.Users.FindByID(ctx, proj.SellerID)
 	return &ProjectView{Project: proj, Plans: plans, Images: images, Seller: seller}, nil
 }
@@ -136,6 +141,7 @@ func (a *AdminUseCase) PatchDeleteReq(ctx context.Context, adminID, projectID uu
 			return nil, err
 		}
 		a.writeAudit(ctx, adminID, "project.delete_request.approve", "project", proj.ID.String(), reason, nil)
+		a.writeReviewDecision(ctx, adminID, entity.ReviewProjectDelete, projectID, entity.ReviewApproved, reason)
 	case "reject":
 		proj.Status = entity.ProjectStatusActive
 		proj.DeleteRequested = false
@@ -144,6 +150,7 @@ func (a *AdminUseCase) PatchDeleteReq(ctx context.Context, adminID, projectID uu
 			return nil, err
 		}
 		a.writeAudit(ctx, adminID, "project.delete_request.reject", "project", proj.ID.String(), reason, nil)
+		a.writeReviewDecision(ctx, adminID, entity.ReviewProjectDelete, projectID, entity.ReviewRejected, reason)
 	default:
 		return nil, ErrBadRequest
 	}
