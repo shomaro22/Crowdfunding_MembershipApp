@@ -93,18 +93,20 @@ func New(cfg Config) *echo.Echo {
 	}
 
 	if cfg.Admin != nil && len(cfg.AdminOnly) > 0 {
+		var reviewAdmin echo.MiddlewareFunc
 		admin = e.Group("/admin", cfg.AdminOnly...)
-		admin.GET("/reviews/users", cfg.Admin.ListBuyerPending)
-		admin.POST("/reviews/users/:userId/approve", cfg.Admin.ApproveBuyer)
-		admin.POST("/reviews/users/:userId/reject", cfg.Admin.RejectBuyer)
-		admin.GET("/seller-registrations", cfg.Admin.ListSellerRegs)
-		admin.GET("/seller-registrations/:registrationId", cfg.Admin.GetSellerReg)
-		admin.POST("/seller-registrations/:registrationId/approve", cfg.Admin.ApproveSellerReg)
-		admin.POST("/seller-registrations/:registrationId/reject", cfg.Admin.RejectSellerReg)
-		admin.GET("/projects", cfg.Admin.ListProjects)
-		admin.PATCH("/projects/:projectId", cfg.Admin.PatchProject)
-		admin.DELETE("/projects/:projectId", cfg.Admin.DeleteProject)
-		admin.PATCH("/projects/:projectId/delete-request", cfg.Admin.PatchDeleteReq)
+		reviewAdmin = middleware.RequireAdminRole(entity.AdminRoleReviewAdmin, entity.AdminRoleSuperAdmin)
+		admin.GET("/reviews/users", cfg.Admin.ListBuyerPending, reviewAdmin)
+		admin.POST("/reviews/users/:userId/approve", cfg.Admin.ApproveBuyer, reviewAdmin)
+		admin.POST("/reviews/users/:userId/reject", cfg.Admin.RejectBuyer, reviewAdmin)
+		admin.GET("/seller-registrations", cfg.Admin.ListSellerRegs, reviewAdmin)
+		admin.GET("/seller-registrations/:registrationId", cfg.Admin.GetSellerReg, reviewAdmin)
+		admin.POST("/seller-registrations/:registrationId/approve", cfg.Admin.ApproveSellerReg, reviewAdmin)
+		admin.POST("/seller-registrations/:registrationId/reject", cfg.Admin.RejectSellerReg, reviewAdmin)
+		admin.GET("/projects", cfg.Admin.ListProjects, reviewAdmin)
+		admin.PATCH("/projects/:projectId", cfg.Admin.PatchProject, reviewAdmin)
+		admin.DELETE("/projects/:projectId", cfg.Admin.DeleteProject, reviewAdmin)
+		admin.PATCH("/projects/:projectId/delete-request", cfg.Admin.PatchDeleteReq, reviewAdmin)
 		admin.POST("/users/:userId/reset-2fa", cfg.Admin.ResetUser2FA,
 			middleware.RequireAdminRole(entity.AdminRoleSupportAdmin, entity.AdminRoleSuperAdmin))
 		admin.PATCH("/users/:userId/admin-role", cfg.Admin.ChangeAdminRole,

@@ -44,6 +44,9 @@ func (a *AdminUseCase) ApproveBuyer(ctx context.Context, adminID, userID uuid.UU
 		now time.Time
 	)
 
+	if err = a.requireReviewAdmin(ctx, adminID); err != nil {
+		return nil, err
+	}
 	u, err = a.Users.FindByID(ctx, userID)
 	if err != nil || u == nil {
 		return nil, ErrNotFound
@@ -68,6 +71,9 @@ func (a *AdminUseCase) RejectBuyer(ctx context.Context, adminID, userID uuid.UUI
 		now time.Time
 	)
 
+	if err = a.requireReviewAdmin(ctx, adminID); err != nil {
+		return nil, err
+	}
 	u, err = a.Users.FindByID(ctx, userID)
 	if err != nil || u == nil {
 		return nil, ErrNotFound
@@ -134,6 +140,9 @@ func (a *AdminUseCase) ApproveSellerReg(ctx context.Context, adminID, regID uuid
 		now time.Time
 	)
 
+	if err = a.requireReviewAdmin(ctx, adminID); err != nil {
+		return nil, err
+	}
 	reg, err = a.SellerRegs.FindByID(ctx, regID)
 	if err != nil || reg == nil {
 		return nil, ErrNotFound
@@ -178,6 +187,9 @@ func (a *AdminUseCase) RejectSellerReg(ctx context.Context, adminID, regID uuid.
 	reason = strings.TrimSpace(reason)
 	if reason == "" {
 		return nil, ErrBadRequest
+	}
+	if err = a.requireReviewAdmin(ctx, adminID); err != nil {
+		return nil, err
 	}
 	reg, err = a.SellerRegs.FindByID(ctx, regID)
 	if err != nil || reg == nil {
