@@ -18,6 +18,7 @@ type ProjectUseCase interface {
 	ListPublic(ctx context.Context, search, sort string, limit, offset int) ([]usecase.ProjectView, int64, error)
 	ListMine(ctx context.Context, sellerID uuid.UUID, limit, offset int) ([]usecase.ProjectView, int64, error)
 	FindView(ctx context.Context, id uuid.UUID, viewerID *uuid.UUID, viewerRole entity.UserRole) (*usecase.ProjectView, error)
+	ListPlans(ctx context.Context, projectID uuid.UUID) ([]entity.ProjectPlan, error)
 	Update(ctx context.Context, sellerID, projectID uuid.UUID, in usecase.UpdateProjectIn) (*usecase.ProjectView, error)
 	RequestDelete(ctx context.Context, sellerID, projectID uuid.UUID) (*usecase.ProjectView, error)
 }
@@ -123,6 +124,23 @@ func (h *ProjectController) Get(c echo.Context) error {
 		return mapProjectError(err)
 	}
 	return c.JSON(http.StatusOK, projectDetailJSON(view))
+}
+
+func (h *ProjectController) ListPlans(c echo.Context) error {
+	var (
+		id    uuid.UUID
+		plans []entity.ProjectPlan
+		err   error
+	)
+	id, err = uuid.Parse(c.Param("projectId"))
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, apiError("invalid project id", "BAD_REQUEST"))
+	}
+	plans, err = h.Projects.ListPlans(c.Request().Context(), id)
+	if err != nil {
+		return mapProjectError(err)
+	}
+	return c.JSON(http.StatusOK, projectPlansToJSON(plans))
 }
 
 func (h *ProjectController) Update(c echo.Context) error {
