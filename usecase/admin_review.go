@@ -14,16 +14,17 @@ import (
 )
 
 type AdminUseCase struct {
-	Users      repository.UserRepo
-	SellerRegs repository.SellerRegRepo
-	Projects   repository.ProjectRepo
-	Audit      repository.AuditRepo
-	ReTokens   repository.ReTokenRepo
-	TOTPBackup repository.TOTPBackupRepo
-	KYC        storage.KYCStore
-	DB         *gorm.DB
-	APIBase    string
-	SignSecret []byte
+	Users            repository.UserRepo
+	SellerRegs       repository.SellerRegRepo
+	Projects         repository.ProjectRepo
+	Audit            repository.AuditRepo
+	ReviewDecisions  repository.ReviewDecisionRepo
+	ReTokens         repository.ReTokenRepo
+	TOTPBackup       repository.TOTPBackupRepo
+	KYC              storage.KYCStore
+	DB               *gorm.DB
+	APIBase          string
+	SignSecret       []byte
 }
 
 type SellerRegView struct {
@@ -61,6 +62,7 @@ func (a *AdminUseCase) ApproveBuyer(ctx context.Context, adminID, userID uuid.UU
 		return nil, err
 	}
 	a.writeAudit(ctx, adminID, "buyer_registration.approve", "user", u.ID.String(), reason, nil)
+	a.writeReviewDecision(ctx, adminID, entity.ReviewBuyerRegistration, userID, entity.ReviewApproved, reason)
 	return u, nil
 }
 
@@ -88,6 +90,7 @@ func (a *AdminUseCase) RejectBuyer(ctx context.Context, adminID, userID uuid.UUI
 		return nil, err
 	}
 	a.writeAudit(ctx, adminID, "buyer_registration.reject", "user", u.ID.String(), reason, nil)
+	a.writeReviewDecision(ctx, adminID, entity.ReviewBuyerRegistration, userID, entity.ReviewRejected, reason)
 	return u, nil
 }
 
@@ -174,6 +177,7 @@ func (a *AdminUseCase) ApproveSellerReg(ctx context.Context, adminID, regID uuid
 		return nil, err
 	}
 	a.writeAudit(ctx, adminID, "seller_registration.approve", "seller_registration", reg.ID.String(), nil, nil)
+	a.writeReviewDecision(ctx, adminID, entity.ReviewSellerRegistration, regID, entity.ReviewApproved, nil)
 	return reg, nil
 }
 
@@ -208,7 +212,23 @@ func (a *AdminUseCase) RejectSellerReg(ctx context.Context, adminID, regID uuid.
 		return nil, err
 	}
 	a.writeAudit(ctx, adminID, "seller_registration.reject", "seller_registration", reg.ID.String(), &reason, nil)
+	a.writeReviewDecision(ctx, adminID, entity.ReviewSellerRegistration, regID, entity.ReviewRejected, &reason)
 	return reg, nil
+}
+
+func (a *AdminUseCase) writeReviewDecision(ctx context.Context, reviewerID uuid.UUID, resourceType string, resourceID uuid.UUID, decision string, reason *string) {
+	if a.ReviewDecisions == nil {
+		return
+	}
+	_ = a.ReviewDecisions.Create(ctx, &entity.ReviewDecision{
+		ID:           uuid.New(),
+		ReviewerID:   reviewerID,
+		ResourceType: resourceType,
+		ResourceID:   resourceID,
+		Decision:     decision,
+		Reason:       reason,
+		CreatedAt:    time.Now().UTC(),
+	})
 }
 
 func (a *AdminUseCase) writeAudit(ctx context.Context, adminID uuid.UUID, action, resource, resourceID string, reason, details *string) {
