@@ -318,3 +318,26 @@ func TestDurationDates(t *testing.T) {
 		t.Fatal("unlimited with end should fail")
 	}
 }
+
+func TestValidateProjectImages(t *testing.T) {
+	var err error
+
+	if err = ValidateProjectImages(nil); err != nil {
+		t.Fatalf("empty images: %v", err)
+	}
+	if err = ValidateProjectImages([]ImageInput{{ImageURL: "https://example.com/a.jpg", IsMain: true}}); err != nil {
+		t.Fatalf("single main image: %v", err)
+	}
+	if err = ValidateProjectImages([]ImageInput{
+		{ImageURL: "https://example.com/a.jpg", IsMain: true},
+		{ImageURL: "https://example.com/b.jpg", IsMain: false},
+	}); err != nil {
+		t.Fatalf("two images with one main: %v", err)
+	}
+	if err = ValidateProjectImages([]ImageInput{{ImageURL: "https://example.com/a.jpg", IsMain: false}}); err != ErrBadImages {
+		t.Fatalf("missing main image: got %v", err)
+	}
+	if err = ValidateProjectImages(make([]ImageInput, 11)); err != ErrBadImages {
+		t.Fatalf("too many images: got %v", err)
+	}
+}
