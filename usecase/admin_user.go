@@ -2,6 +2,7 @@ package usecase
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"crowdfund-app/entity"
@@ -39,6 +40,52 @@ func (a *AdminUseCase) ResetUser2FA(ctx context.Context, adminID, targetUserID u
 		return nil, err
 	}
 	a.writeAudit(ctx, adminID, "user.reset_2fa", "user", u.ID.String(), reason, nil)
+	return u, nil
+}
+
+func (a *AdminUseCase) ChangeAdminRole(ctx context.Context, actorID, targetUserID uuid.UUID, newRole entity.AdminRole, reason *string) (*entity.User, error) {
+	var (
+		actor   *entity.User
+		u       *entity.User
+		err     error
+		now     time.Time
+		oldRole string
+		details string
+	)
+
+	if !newRole.Valid() {
+		return nil, ErrBadRequest
+	}
+	actor, err = a.Users.FindByID(ctx, actorID)
+	if err != nil || actor == nil || actor.Role != entity.UserRoleAdmin ||
+		actor.AdminRole == nil || *actor.AdminRole != entity.AdminRoleSuperAdmin {
+		return nil, ErrForbidden
+	}
+	u, err = a.Users.FindByID(ctx, targetUserID)
+	if err != nil || u == nil {
+		return nil, ErrNotFound
+	}
+	if u.Role != entity.UserRoleAdmin {
+		return nil, ErrInvalidState
+	}
+	if u.AdminRole != nil && *u.AdminRole == newRole {
+		return u, nil
+	}
+	if u.AdminRole != nil {
+		oldRole = string(*u.AdminRole)
+	}
+	now = time.Now().UTC()
+	role := newRole
+	u.AdminRole = &role
+	u.UpdatedAt = now
+	if err = a.Users.Update(ctx, u); err != nil {
+		return nil, err
+	}
+	if err = a.invalidateSessions(ctx, targetUserID); err != nil {
+		return nil, err
+	}
+	details = fmt.Sprintf("%s -> %s", oldRole, newRole)
+	a.writeAudit(ctx, actorID, "user.change_admin_role", "user", u.ID.String(), reason, &details)
 	return u, nil
 }
 
