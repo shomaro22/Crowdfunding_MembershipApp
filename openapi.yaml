@@ -1311,6 +1311,40 @@ paths:
         "404":
           $ref: "#/components/responses/NotFound"
 
+  /admin/users/{userId}/admin-role:
+    patch:
+      tags: [Admin]
+      summary: Change admin job role (SUPER_ADMIN only)
+      description: |
+        対象 Admin の admin_role を変更する（§4.1.1 / §8.5）。
+        変更時は Refresh Token 全失効・再ログイン + 2FA が必要。audit_log に記録する。
+      parameters:
+        - $ref: "#/components/parameters/UserId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ChangeAdminRoleRequest"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  user:
+                    $ref: "#/components/schemas/User"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
   /admin/projects:
     get:
       tags: [Admin]
@@ -2831,6 +2865,17 @@ components:
           $ref: "#/components/schemas/UserRole"
         is_active:
           type: boolean
+
+    ChangeAdminRoleRequest:
+      type: object
+      required: [admin_role]
+      properties:
+        admin_role:
+          type: string
+          enum: [SUPER_ADMIN, REVIEW_ADMIN, SUPPORT_ADMIN, FINANCE_ADMIN]
+        reason:
+          type: string
+          description: 監査ログ用（任意）
 
     SellerRegistration:
       type: object
