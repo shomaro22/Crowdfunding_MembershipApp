@@ -2,11 +2,12 @@ package middleware
 
 import (
 	"context"
+	"log/slog"
 	"net/http"
 	"strconv"
 	"time"
 
-	"crowdfund-app/repository"
+	"crowdfund-app/usecase"
 
 	"github.com/labstack/echo/v4"
 )
@@ -18,16 +19,16 @@ type RateRule struct {
 
 type RatePolicy struct {
 	Name   string
-	Window time.Duration
+	Period time.Duration
 	Rules  []RateRule
 }
 
 type RateLimiter struct {
-	Repo repository.RateLimitRepo
+	UC *usecase.RateLimitUseCase
 }
 
-func NewRateLimiter(repo repository.RateLimitRepo) *RateLimiter {
-	return &RateLimiter{Repo: repo}
+func NewRateLimiter(uc *usecase.RateLimitUseCase) *RateLimiter {
+	return &RateLimiter{UC: uc}
 }
 
 func (l *RateLimiter) Middleware(policy RatePolicy) echo.MiddlewareFunc {
@@ -43,7 +44,7 @@ func (l *RateLimiter) Middleware(policy RatePolicy) echo.MiddlewareFunc {
 				retry int
 				err   error
 			)
-			if l == nil || l.Repo == nil {
+			if l == nil || l.UC == nil {
 				return next(c)
 			}
 			ctx = c.Request().Context()
@@ -54,8 +55,9 @@ func (l *RateLimiter) Middleware(policy RatePolicy) echo.MiddlewareFunc {
 					continue
 				}
 				full = policy.Name + ":" + key
-				ok, retry, err = l.Repo.Allow(ctx, full, rule.Limit, policy.Window)
+				ok, retry, err = l.UC.Allow(ctx, full, rule.Limit, policy.Period)
 				if err != nil {
+					slog.Warn("rate_limit_fail_open", "policy", policy.Name, "key", full, "error", err.Error())
 					return next(c)
 				}
 				if !ok {

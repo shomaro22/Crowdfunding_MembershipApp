@@ -47,6 +47,7 @@ func buildApp() (*echo.Echo, string, error) {
 		totpBackupRepo repository.TOTPBackupRepo
 		oauthCache     repository.OAuthCache
 		rateLimitRepo  repository.RateLimitRepo
+		rateLimitUC    *usecase.RateLimitUseCase
 		kycStore       *storage.LocalKYCStore
 		tokenSvc       *auth.TokenService
 		authUC         *usecase.AuthUseCase
@@ -140,6 +141,7 @@ func buildApp() (*echo.Echo, string, error) {
 	totpBackupRepo = repository.NewTOTPBackupRepo(gormDB)
 	oauthCache = repository.NewOAuthCache(rdb)
 	rateLimitRepo = repository.NewRateLimitRepo(rdb)
+	rateLimitUC = &usecase.RateLimitUseCase{Repo: rateLimitRepo}
 	kycStore = storage.NewLocalKYC(privateRoot)
 
 	tokenSvc = auth.NewTokenService([]byte(jwtSecret), auth.DefaultAuthTTL)
@@ -245,16 +247,17 @@ func buildApp() (*echo.Echo, string, error) {
 		middleware.RequireRole(entity.UserRoleAdmin),
 		middleware.Require2FA(),
 	)
-	rateLimiter = middleware.NewRateLimiter(rateLimitRepo)
+	rateLimiter = middleware.NewRateLimiter(rateLimitUC)
 
 	e = router.New(router.Config{
-		PreAuthMiddleware: preAuth,
-		Health:            healthCtl,
-		Auth:              authCtl,
-		Projects:          projectCtl,
-		Admin:             adminCtl,
-		KYCFiles:          kycFileCtl,
-		RateLimit:         rateLimiter,
+		PreAuthMiddleware:  preAuth,
+		Health:             healthCtl,
+		Auth:               authCtl,
+		Projects:           projectCtl,
+		Admin:              adminCtl,
+		KYCFiles:           kycFileCtl,
+		RateLimit:          rateLimiter,
+		Policy2FAChallenge: middleware.Policy2FAChallenge([]byte(jwtSecret)),
 		OAuthEnabled:      authUC.Google != nil,
 		Protected:         protected,
 		OptionalJWT:       optionalJWT,
