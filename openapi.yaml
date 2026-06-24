@@ -1394,6 +1394,7 @@ paths:
                   $ref: "#/components/schemas/ProjectStatus"
                 reason:
                   type: string
+                  description: Required when status=CANCELLED (project rejection).
       responses:
         "200":
           description: Updated
@@ -1409,7 +1410,11 @@ paths:
           $ref: "#/components/responses/NotFound"
     delete:
       tags: [Admin]
-      summary: Hard delete project
+      summary: Hard delete project record
+      description: |
+        Physically removes the project and related plans/images.
+        Allowed only when status is PENDING, CANCELLED, or DELETED.
+        ACTIVE projects must use the delete-request flow first.
       parameters:
         - $ref: "#/components/parameters/ProjectId"
       responses:
@@ -1419,6 +1424,10 @@ paths:
           $ref: "#/components/responses/Unauthorized"
         "403":
           $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "400":
+          description: Project status does not allow hard delete
 
   /admin/projects/{projectId}/delete-request:
     patch:
@@ -1640,13 +1649,16 @@ paths:
       parameters:
         - $ref: "#/components/parameters/UserId"
       requestBody:
+        required: true
         content:
           application/json:
             schema:
               type: object
+              required: [reason]
               properties:
                 reason:
                   type: string
+                  description: Rejection reason stored in audit_log and review_decisions
       responses:
         "200":
           description: Rejected
