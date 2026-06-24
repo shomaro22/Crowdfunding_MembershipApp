@@ -193,6 +193,25 @@ func (p *ProjectUseCase) FindView(ctx context.Context, id uuid.UUID, viewerID *u
 	return &ProjectView{Project: proj, Plans: plans, Images: images, Seller: seller}, nil
 }
 
+func (p *ProjectUseCase) ListPlans(ctx context.Context, projectID uuid.UUID) ([]entity.ProjectPlan, error) {
+	var (
+		proj  *entity.Project
+		plans []entity.ProjectPlan
+		err   error
+		now   time.Time
+	)
+
+	proj, plans, _, err = p.Projects.FindByID(ctx, projectID)
+	if err != nil || proj == nil {
+		return nil, ErrNotFound
+	}
+	now = time.Now().UTC()
+	if !proj.IsPublic(now) {
+		return nil, ErrNotFound
+	}
+	return plans, nil
+}
+
 func (p *ProjectUseCase) Update(ctx context.Context, sellerID, projectID uuid.UUID, in UpdateProjectIn) (*ProjectView, error) {
 	var (
 		proj   *entity.Project
