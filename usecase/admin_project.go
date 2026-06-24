@@ -40,6 +40,9 @@ func (a *AdminUseCase) PatchProject(ctx context.Context, adminID, projectID uuid
 		seller *entity.User
 	)
 
+	if err = a.requireReviewAdmin(ctx, adminID); err != nil {
+		return nil, err
+	}
 	if a.Projects == nil {
 		return nil, ErrNotFound
 	}
@@ -83,6 +86,9 @@ func (a *AdminUseCase) DeleteProject(ctx context.Context, adminID, projectID uui
 		err  error
 	)
 
+	if err = a.requireReviewAdmin(ctx, adminID); err != nil {
+		return err
+	}
 	if a.Projects == nil {
 		return ErrNotFound
 	}
@@ -107,6 +113,9 @@ func (a *AdminUseCase) PatchDeleteReq(ctx context.Context, adminID, projectID uu
 		seller *entity.User
 	)
 
+	if err = a.requireReviewAdmin(ctx, adminID); err != nil {
+		return nil, err
+	}
 	if a.Projects == nil {
 		return nil, ErrNotFound
 	}
