@@ -27,6 +27,7 @@ type ProjectRepo interface {
 	ListBySeller(ctx context.Context, sellerID uuid.UUID, limit, offset int) ([]entity.Project, int64, error)
 	ListAll(ctx context.Context, status *entity.ProjectStatus, limit, offset int) ([]entity.Project, int64, error)
 	Update(ctx context.Context, p *entity.Project) error
+	ReplaceImages(ctx context.Context, projectID uuid.UUID, images []entity.ProjectImage) error
 	Delete(ctx context.Context, id uuid.UUID) error
 }
 
@@ -199,6 +200,28 @@ func (r *projectRepo) ListAll(ctx context.Context, status *entity.ProjectStatus,
 
 func (r *projectRepo) Update(ctx context.Context, p *entity.Project) error {
 	return r.dbCtx(ctx).Save(p).Error
+}
+
+func (r *projectRepo) ReplaceImages(ctx context.Context, projectID uuid.UUID, images []entity.ProjectImage) error {
+	return r.dbCtx(ctx).Transaction(func(tx *gorm.DB) error {
+		var (
+			txCtx context.Context
+			err   error
+			i     int
+		)
+		txCtx = context.WithValue(ctx, txKey{}, tx)
+		err = r.dbCtx(txCtx).Where("project_id = ?", projectID).Delete(&entity.ProjectImage{}).Error
+		if err != nil {
+			return err
+		}
+		for i = range images {
+			images[i].ProjectID = projectID
+		}
+		if len(images) > 0 {
+			return r.dbCtx(txCtx).Create(&images).Error
+		}
+		return nil
+	})
 }
 
 func (r *projectRepo) Delete(ctx context.Context, id uuid.UUID) error {

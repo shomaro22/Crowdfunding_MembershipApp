@@ -2441,6 +2441,19 @@ components:
         order:
           type: integer
 
+    ProjectImageInput:
+      type: object
+      required: [image_url]
+      properties:
+        image_url:
+          type: string
+        is_main:
+          type: boolean
+          default: false
+        order:
+          type: integer
+          minimum: 0
+
     CreateProjectRequest:
       type: object
       required: [title, description, target_amount, duration_type, start_date, plans]
@@ -2465,6 +2478,13 @@ components:
           description: Required when duration_type=LIMITED; must be null when UNLIMITED（§5.2.1）
         image_url:
           type: string
+          description: Legacy single image. Ignored when images is non-empty.
+        images:
+          type: array
+          maxItems: 10
+          description: Project images (§5.2.1). Exactly one must have is_main=true when non-empty.
+          items:
+            $ref: "#/components/schemas/ProjectImageInput"
         plans:
           type: array
           minItems: 3
@@ -2504,6 +2524,13 @@ components:
           nullable: true
         image_url:
           type: string
+          description: Legacy single image. Ignored when images is present.
+        images:
+          type: array
+          maxItems: 10
+          description: Replaces all project images when present. Empty array clears images.
+          items:
+            $ref: "#/components/schemas/ProjectImageInput"
         is_reapply:
           type: boolean
           description: If true, status returns to PENDING

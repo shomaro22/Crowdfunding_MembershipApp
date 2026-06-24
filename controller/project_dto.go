@@ -8,25 +8,33 @@ import (
 )
 
 type createProjectJSON struct {
-	Title        string       `json:"title"`
-	Description  string       `json:"description"`
-	TargetAmount int64        `json:"target_amount"`
-	DurationType string       `json:"duration_type"`
-	StartDate    string       `json:"start_date"`
-	EndDate      *string      `json:"end_date"`
-	ImageURL     *string      `json:"image_url"`
-	Plans        []planInJSON `json:"plans"`
+	Title        string            `json:"title"`
+	Description  string            `json:"description"`
+	TargetAmount int64             `json:"target_amount"`
+	DurationType string            `json:"duration_type"`
+	StartDate    string            `json:"start_date"`
+	EndDate      *string           `json:"end_date"`
+	ImageURL     *string           `json:"image_url"`
+	Images       []projectImageInJSON `json:"images"`
+	Plans        []planInJSON      `json:"plans"`
 }
 
 type updateProjectJSON struct {
-	Title        *string `json:"title"`
-	Description  *string `json:"description"`
-	TargetAmount *int64  `json:"target_amount"`
-	DurationType *string `json:"duration_type"`
-	StartDate    *string `json:"start_date"`
-	EndDate      *string `json:"end_date"`
-	ImageURL     *string `json:"image_url"`
-	IsReapply    bool    `json:"is_reapply"`
+	Title        *string              `json:"title"`
+	Description  *string              `json:"description"`
+	TargetAmount *int64               `json:"target_amount"`
+	DurationType *string              `json:"duration_type"`
+	StartDate    *string              `json:"start_date"`
+	EndDate      *string              `json:"end_date"`
+	ImageURL     *string              `json:"image_url"`
+	Images       *[]projectImageInJSON `json:"images"`
+	IsReapply    bool                 `json:"is_reapply"`
+}
+
+type projectImageInJSON struct {
+	ImageURL string `json:"image_url"`
+	IsMain   bool   `json:"is_main"`
+	Order    int    `json:"order"`
 }
 
 type planInJSON struct {
@@ -75,6 +83,7 @@ func (b createProjectJSON) toInput() (usecase.CreateProjectIn, error) {
 		StartDate:    start,
 		EndDate:      end,
 		ImageURL:     b.ImageURL,
+		Images:       projectImagesInToUsecase(b.Images),
 		Plans:        plans,
 	}, nil
 }
@@ -93,6 +102,10 @@ func (b updateProjectJSON) toInput() usecase.UpdateProjectIn {
 		TargetAmount: b.TargetAmount,
 		ImageURL:     b.ImageURL,
 		IsReapply:    b.IsReapply,
+	}
+	if b.Images != nil {
+		imgs := projectImagesInToUsecase(*b.Images)
+		in.Images = &imgs
 	}
 	if b.DurationType != nil {
 		d = entity.DurationType(*b.DurationType)
@@ -115,4 +128,20 @@ func (b updateProjectJSON) toInput() usecase.UpdateProjectIn {
 		}
 	}
 	return in
+}
+
+func projectImagesInToUsecase(rows []projectImageInJSON) []usecase.ImageIn {
+	var (
+		out []usecase.ImageIn
+		i   int
+	)
+	out = make([]usecase.ImageIn, 0, len(rows))
+	for i = range rows {
+		out = append(out, usecase.ImageIn{
+			ImageURL: rows[i].ImageURL,
+			IsMain:   rows[i].IsMain,
+			Order:    rows[i].Order,
+		})
+	}
+	return out
 }
