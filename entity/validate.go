@@ -137,6 +137,34 @@ type PlanInput struct {
 	Benefits       string
 }
 
+type ImageInput struct {
+	ImageURL string
+	IsMain   bool
+	Order    int
+}
+
+func ValidateProjectImages(images []ImageInput) error {
+	var (
+		mainCount int
+		img       ImageInput
+	)
+	if len(images) > MaxProjectImages {
+		return ErrBadImages
+	}
+	for _, img = range images {
+		if strings.TrimSpace(img.ImageURL) == "" {
+			return ErrBadImages
+		}
+		if img.IsMain {
+			mainCount++
+		}
+	}
+	if len(images) > 0 && mainCount != 1 {
+		return ErrBadImages
+	}
+	return nil
+}
+
 func ValidateProject(title, description string, targetAmount int64, duration DurationType, start time.Time, end *time.Time, plans []PlanInput) error {
 	var (
 		seen map[MembershipType]bool
