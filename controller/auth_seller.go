@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"crowdfund-app/entity"
-	"crowdfund-app/storage"
+	"crowdfund-app/repository"
 	"crowdfund-app/usecase"
 
 	"github.com/labstack/echo/v4"
@@ -66,8 +66,8 @@ func (h *AuthController) RegisterSeller(c echo.Context) error {
 		payload   sellerRegPayload
 		frontFile *multipart.FileHeader
 		backFile  *multipart.FileHeader
-		frontImg  storage.KYCImage
-		backImg   storage.KYCImage
+		frontImg  repository.KYCImage
+		backImg   repository.KYCImage
 		birthDate time.Time
 		res       *usecase.SellerRegOut
 		err       error
@@ -118,7 +118,7 @@ func (h *AuthController) RegisterSeller(c echo.Context) error {
 	})
 }
 
-func readKYCFile(fh *multipart.FileHeader) (storage.KYCImage, error) {
+func readKYCFile(fh *multipart.FileHeader) (repository.KYCImage, error) {
 	var (
 		src         multipart.File
 		contentType string
@@ -126,14 +126,14 @@ func readKYCFile(fh *multipart.FileHeader) (storage.KYCImage, error) {
 	)
 	src, err = fh.Open()
 	if err != nil {
-		return storage.KYCImage{}, err
+		return repository.KYCImage{}, err
 	}
 	defer src.Close()
 	contentType = fh.Header.Get("Content-Type")
 	if contentType == "" {
 		contentType = detectImageType(fh.Filename)
 	}
-	return storage.KYCImage{
+	return repository.KYCImage{
 		Reader:      src,
 		ContentType: contentType,
 		Size:        fh.Size,
@@ -157,9 +157,9 @@ func detectImageType(name string) string {
 
 func mapSellerRegError(err error) *echo.HTTPError {
 	switch err {
-	case storage.ErrBadMedia:
+	case repository.ErrBadMedia:
 		return echo.NewHTTPError(http.StatusUnsupportedMediaType, apiError("unsupported image media type", "UNSUPPORTED_MEDIA"))
-	case storage.ErrTooLarge:
+	case repository.ErrTooLarge:
 		return echo.NewHTTPError(http.StatusRequestEntityTooLarge, apiError("identity document image too large", "FILE_TOO_LARGE"))
 	case entity.ErrBadKYC:
 		return echo.NewHTTPError(http.StatusBadRequest, apiError("invalid seller kyc metadata", "BAD_SELLER_KYC"))

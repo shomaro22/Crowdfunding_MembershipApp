@@ -8,7 +8,6 @@ import (
 	"crowdfund-app/auth"
 	"crowdfund-app/entity"
 	"crowdfund-app/repository"
-	"crowdfund-app/storage"
 
 	"github.com/google/uuid"
 	"gorm.io/gorm"
@@ -59,7 +58,7 @@ type AuthUseCase struct {
 	TOTPBackup   repository.TOTPBackupRepo
 	Tokens       *auth.TokenService
 	Mailer       Mailer
-	KYCStore     storage.KYCStore
+	KYCStore     repository.KYCStore
 	Google       *auth.GoogleOAuth
 	TOTPKey      []byte
 	TOTPIssuer   string
