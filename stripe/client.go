@@ -1,10 +1,10 @@
-package stripeclient
+package stripe
 
 import (
 	"context"
 	"strings"
 
-	stripe "github.com/stripe/stripe-go/v82"
+	stripesdk "github.com/stripe/stripe-go/v82"
 	"github.com/stripe/stripe-go/v82/account"
 	"github.com/stripe/stripe-go/v82/accountlink"
 	"github.com/stripe/stripe-go/v82/webhook"
@@ -21,9 +21,12 @@ type Client interface {
 	CreateExpressAccount(ctx context.Context, email string) (string, error)
 	CreateAccountLink(ctx context.Context, accountID, returnURL, refreshURL string) (string, error)
 	GetAccount(ctx context.Context, accountID string) (AccountSnapshot, error)
-	ConstructWebhookEvent(payload []byte, signature string) (stripe.Event, error)
+	ConstructWebhookEvent(payload []byte, signature string) (stripesdk.Event, error)
 	ConnectReturnURL() string
 	ConnectRefreshURL() string
+	AppURL() string
+	CreateCheckoutSession(ctx context.Context, in CheckoutSessionIn) (CheckoutSessionOut, error)
+	CreateSubscriptionIntent(ctx context.Context, in SubscriptionIntentIn) (SubscriptionIntentOut, error)
 }
 
 type client struct {
@@ -31,27 +34,27 @@ type client struct {
 }
 
 func New(cfg Config) Client {
-	stripe.Key = cfg.SecretKey
+	stripesdk.Key = cfg.SecretKey
 	return &client{cfg: cfg}
 }
 
 func (c *client) CreateExpressAccount(ctx context.Context, email string) (string, error) {
 	var (
-		params *stripe.AccountParams
-		acct   *stripe.Account
+		params *stripesdk.AccountParams
+		acct   *stripesdk.Account
 		err    error
 	)
 	_ = ctx
-	params = &stripe.AccountParams{
-		Type:    stripe.String(string(stripe.AccountTypeExpress)),
-		Email:   stripe.String(email),
-		Country: stripe.String("JP"),
-		Capabilities: &stripe.AccountCapabilitiesParams{
-			CardPayments: &stripe.AccountCapabilitiesCardPaymentsParams{
-				Requested: stripe.Bool(true),
+	params = &stripesdk.AccountParams{
+		Type:    stripesdk.String(string(stripesdk.AccountTypeExpress)),
+		Email:   stripesdk.String(email),
+		Country: stripesdk.String("JP"),
+		Capabilities: &stripesdk.AccountCapabilitiesParams{
+			CardPayments: &stripesdk.AccountCapabilitiesCardPaymentsParams{
+				Requested: stripesdk.Bool(true),
 			},
-			Transfers: &stripe.AccountCapabilitiesTransfersParams{
-				Requested: stripe.Bool(true),
+			Transfers: &stripesdk.AccountCapabilitiesTransfersParams{
+				Requested: stripesdk.Bool(true),
 			},
 		},
 	}
@@ -64,16 +67,16 @@ func (c *client) CreateExpressAccount(ctx context.Context, email string) (string
 
 func (c *client) CreateAccountLink(ctx context.Context, accountID, returnURL, refreshURL string) (string, error) {
 	var (
-		params *stripe.AccountLinkParams
-		link   *stripe.AccountLink
+		params *stripesdk.AccountLinkParams
+		link   *stripesdk.AccountLink
 		err    error
 	)
 	_ = ctx
-	params = &stripe.AccountLinkParams{
-		Account:    stripe.String(accountID),
-		ReturnURL:  stripe.String(returnURL),
-		RefreshURL: stripe.String(refreshURL),
-		Type:       stripe.String(string(stripe.AccountLinkTypeAccountOnboarding)),
+	params = &stripesdk.AccountLinkParams{
+		Account:    stripesdk.String(accountID),
+		ReturnURL:  stripesdk.String(returnURL),
+		RefreshURL: stripesdk.String(refreshURL),
+		Type:       stripesdk.String(string(stripesdk.AccountLinkTypeAccountOnboarding)),
 	}
 	link, err = accountlink.New(params)
 	if err != nil {
@@ -84,7 +87,7 @@ func (c *client) CreateAccountLink(ctx context.Context, accountID, returnURL, re
 
 func (c *client) GetAccount(ctx context.Context, accountID string) (AccountSnapshot, error) {
 	var (
-		acct *stripe.Account
+		acct *stripesdk.Account
 		err  error
 		out  AccountSnapshot
 	)
@@ -102,9 +105,9 @@ func (c *client) GetAccount(ctx context.Context, accountID string) (AccountSnaps
 	return out, nil
 }
 
-func (c *client) ConstructWebhookEvent(payload []byte, signature string) (stripe.Event, error) {
+func (c *client) ConstructWebhookEvent(payload []byte, signature string) (stripesdk.Event, error) {
 	if strings.TrimSpace(c.cfg.WebhookSecret) == "" {
-		return stripe.Event{}, ErrWebhookNotConfigured
+		return stripesdk.Event{}, ErrWebhookNotConfigured
 	}
 	return webhook.ConstructEvent(payload, signature, c.cfg.WebhookSecret)
 }
@@ -115,4 +118,8 @@ func (c *client) ConnectReturnURL() string {
 
 func (c *client) ConnectRefreshURL() string {
 	return c.cfg.ConnectRefresh
+}
+
+func (c *client) AppURL() string {
+	return c.cfg.AppURL
 }
