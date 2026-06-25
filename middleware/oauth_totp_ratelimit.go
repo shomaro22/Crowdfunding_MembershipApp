@@ -24,4 +24,9 @@ var (
 		Period: time.Minute,
 		Rules:  []RateRule{{Limit: 20, Key: KeyIP}},
 	}
+	PolicyPayment = RatePolicy{
+		Name:   "payment",
+		Period: time.Minute,
+		Rules:  []RateRule{{Limit: 10, Key: KeyIP}},
+	}
 )
