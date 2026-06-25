@@ -14,8 +14,8 @@ type PurchaseRepo interface {
 	Create(ctx context.Context, row *entity.Purchase) error
 	Update(ctx context.Context, row *entity.Purchase) error
 	FindByID(ctx context.Context, id uuid.UUID) (*entity.Purchase, error)
-	FindByCheckoutSessionID(ctx context.Context, sessionID string) (*entity.Purchase, error)
-	FindByPaymentIntentID(ctx context.Context, intentID string) (*entity.Purchase, error)
+	FindBySessionID(ctx context.Context, sessionID string) (*entity.Purchase, error)
+	FindByIntentID(ctx context.Context, intentID string) (*entity.Purchase, error)
 	RecordEvent(ctx context.Context, ev *entity.PurchaseEvent) error
 }
 
@@ -62,7 +62,7 @@ func (r *purchaseRepo) FindByID(ctx context.Context, id uuid.UUID) (*entity.Purc
 	return &row, nil
 }
 
-func (r *purchaseRepo) FindByCheckoutSessionID(ctx context.Context, sessionID string) (*entity.Purchase, error) {
+func (r *purchaseRepo) FindBySessionID(ctx context.Context, sessionID string) (*entity.Purchase, error) {
 	var (
 		row entity.Purchase
 		err error
@@ -77,7 +77,7 @@ func (r *purchaseRepo) FindByCheckoutSessionID(ctx context.Context, sessionID st
 	return &row, nil
 }
 
-func (r *purchaseRepo) FindByPaymentIntentID(ctx context.Context, intentID string) (*entity.Purchase, error) {
+func (r *purchaseRepo) FindByIntentID(ctx context.Context, intentID string) (*entity.Purchase, error) {
 	var (
 		row entity.Purchase
 		err error

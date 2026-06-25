@@ -11,7 +11,7 @@ import (
 )
 
 type SupporterRepo interface {
-	FindActiveByProjectUser(ctx context.Context, projectID, userID uuid.UUID) (*entity.ProjectSupporter, error)
+	FindActive(ctx context.Context, projectID, userID uuid.UUID) (*entity.ProjectSupporter, error)
 	Create(ctx context.Context, row *entity.ProjectSupporter) error
 	Update(ctx context.Context, row *entity.ProjectSupporter) error
 }
@@ -36,7 +36,7 @@ func (r *supporterRepo) dbCtx(ctx context.Context) *gorm.DB {
 	return r.db.WithContext(ctx)
 }
 
-func (r *supporterRepo) FindActiveByProjectUser(ctx context.Context, projectID, userID uuid.UUID) (*entity.ProjectSupporter, error) {
+func (r *supporterRepo) FindActive(ctx context.Context, projectID, userID uuid.UUID) (*entity.ProjectSupporter, error) {
 	var (
 		row entity.ProjectSupporter
 		err error
