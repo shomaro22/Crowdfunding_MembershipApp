@@ -19,4 +19,5 @@ var (
 	ErrOAuthUnavailable   = errors.New("oauth unavailable")
 	ErrOAuthForbidden     = errors.New("oauth forbidden")
 	ErrForbidden          = errors.New("forbidden")
+	ErrStripeUnavailable  = errors.New("stripe unavailable")
 )

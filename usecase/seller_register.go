@@ -8,7 +8,6 @@ import (
 	"crowdfund-app/auth"
 	"crowdfund-app/entity"
 	"crowdfund-app/repository"
-	"crowdfund-app/storage"
 
 	"github.com/google/uuid"
 )
@@ -20,8 +19,8 @@ type SellerRegIn struct {
 	BirthDate    time.Time
 	Address      string
 	PhotoPresent bool
-	Front        storage.KYCImage
-	Back         storage.KYCImage
+	Front        repository.KYCImage
+	Back         repository.KYCImage
 }
 
 type SellerRegOut struct {
