@@ -16,7 +16,7 @@ import (
 	"crowdfund-app/middleware"
 	"crowdfund-app/repository"
 	"crowdfund-app/router"
-	"crowdfund-app/storage"
+	"crowdfund-app/stripeclient"
 	"crowdfund-app/usecase"
 
 	"github.com/labstack/echo/v4"
@@ -44,15 +44,18 @@ func buildApp() (*echo.Echo, string, error) {
 		auditRepo           repository.AuditRepo
 		reviewDecisionRepo  repository.ReviewDecisionRepo
 		projectRepo    repository.ProjectRepo
+		connectRepo    repository.ConnectRepo
+		webhookRepo    repository.WebhookEventRepo
 		oauthRepo      repository.OAuthRepo
 		totpBackupRepo repository.TOTPBackupRepo
 		oauthCache     repository.OAuthCache
 		rateLimitRepo  repository.RateLimitRepo
 		rateLimitUC    *usecase.RateLimitUseCase
-		kycStore       *storage.LocalKYCStore
+		kycStore       *repository.LocalKYCStore
 		tokenSvc       *auth.TokenService
 		authUC         *usecase.AuthUseCase
 		googleOAuth    *auth.GoogleOAuth
+		stripeClient   stripeclient.Client
 		cookieCfg      auth.CookieCfg
 		authCtl        *controller.AuthController
 		healthCtl      *controller.HealthController
@@ -61,6 +64,7 @@ func buildApp() (*echo.Echo, string, error) {
 		adminCtl       *controller.AdminController
 		kycFileCtl     *controller.KYCFileController
 		projectUC      *usecase.ProjectUseCase
+		connectUC      *usecase.ConnectUseCase
 		projectCtl     *controller.ProjectController
 		preAuth        []echo.MiddlewareFunc
 		corsRaw        string
@@ -139,12 +143,14 @@ func buildApp() (*echo.Echo, string, error) {
 	auditRepo = repository.NewAuditRepo(gormDB)
 	reviewDecisionRepo = repository.NewReviewDecisionRepo(gormDB)
 	projectRepo = repository.NewProjectRepo(gormDB)
+	connectRepo = repository.NewConnectRepo(gormDB)
+	webhookRepo = repository.NewWebhookEventRepo(gormDB)
 	oauthRepo = repository.NewOAuthRepo(gormDB)
 	totpBackupRepo = repository.NewTOTPBackupRepo(gormDB)
 	oauthCache = repository.NewOAuthCache(rdb)
 	rateLimitRepo = repository.NewRateLimitRepo(rdb)
 	rateLimitUC = &usecase.RateLimitUseCase{Repo: rateLimitRepo}
-	kycStore = storage.NewLocalKYC(privateRoot)
+	kycStore = repository.NewLocalKYC(privateRoot)
 
 	tokenSvc = auth.NewTokenService([]byte(jwtSecret), auth.DefaultAuthTTL)
 	authUC = &usecase.AuthUseCase{
@@ -170,6 +176,15 @@ func buildApp() (*echo.Echo, string, error) {
 		slog.Info("google oauth disabled", "reason", err.Error())
 	}
 
+	var stripeCfg stripeclient.Config
+	stripeCfg, err = stripeclient.ConfigFromEnv()
+	if err == nil {
+		stripeClient = stripeclient.New(stripeCfg)
+	} else {
+		slog.Info("stripe disabled", "reason", err.Error())
+	}
+	_ = webhookRepo
+
 	cookieCfg = auth.CookieFromEnv()
 	authCtl = controller.NewAuthController(authUC, cookieCfg)
 	healthCtl = &controller.HealthController{SQL: gormDB, RDB: rdb}
@@ -194,6 +209,8 @@ func buildApp() (*echo.Echo, string, error) {
 	adminCtl = controller.NewAdminController(adminUC)
 	kycFileCtl = controller.NewKYCFileController(kycStore, []byte(jwtSecret))
 	projectUC = &usecase.ProjectUseCase{Projects: projectRepo, Users: userRepo}
+	connectUC = &usecase.ConnectUseCase{Users: userRepo, Connect: connectRepo, Stripe: stripeClient}
+	_ = connectUC
 	projectCtl = controller.NewProjectController(projectUC)
 
 	validateSession = func(c echo.Context, claims auth.AuthClaims) error {
