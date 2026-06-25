@@ -1,4 +1,4 @@
-package stripeclient
+package stripe
 
 import (
 	"fmt"
@@ -11,6 +11,7 @@ type Config struct {
 	WebhookSecret  string
 	ConnectReturn  string
 	ConnectRefresh string
+	AppURL         string
 }
 
 func ConfigFromEnv() (Config, error) {
@@ -27,6 +28,7 @@ func ConfigFromEnv() (Config, error) {
 	if app == "" {
 		app = "http://localhost:5173"
 	}
+	cfg.AppURL = app
 	cfg.ConnectReturn = strings.TrimSpace(os.Getenv("STRIPE_CONNECT_RETURN_URL"))
 	if cfg.ConnectReturn == "" {
 		cfg.ConnectReturn = app + "/seller/connect/return"

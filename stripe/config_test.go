@@ -1,15 +1,15 @@
-package stripeclient_test
+package stripe_test
 
 import (
 	"testing"
 
-	"crowdfund-app/stripeclient"
+	"crowdfund-app/stripe"
 )
 
 func TestConfigFromEnv_NotConfigured(t *testing.T) {
 	t.Setenv("STRIPE_SECRET_KEY", "")
-	_, err := stripeclient.ConfigFromEnv()
-	if err != stripeclient.ErrNotConfigured {
+	_, err := stripe.ConfigFromEnv()
+	if err != stripe.ErrNotConfigured {
 		t.Fatalf("got %v, want ErrNotConfigured", err)
 	}
 }
@@ -21,7 +21,7 @@ func TestConfigFromEnv_DefaultConnectURLs(t *testing.T) {
 	t.Setenv("STRIPE_CONNECT_RETURN_URL", "")
 	t.Setenv("STRIPE_CONNECT_REFRESH_URL", "")
 
-	cfg, err := stripeclient.ConfigFromEnv()
+	cfg, err := stripe.ConfigFromEnv()
 	if err != nil {
 		t.Fatal(err)
 	}
