@@ -163,6 +163,8 @@ func mapPaymentError(err error) *echo.HTTPError {
 		return echo.NewHTTPError(http.StatusForbidden, apiError("forbidden", "FORBIDDEN"))
 	case usecase.ErrBadRequest:
 		return echo.NewHTTPError(http.StatusBadRequest, apiError("bad request", "BAD_REQUEST"))
+	case usecase.ErrPendingCheckout:
+		return echo.NewHTTPError(http.StatusConflict, apiError("pending checkout exists", "CONFLICT"))
 	case usecase.ErrAlreadySupporting:
 		return echo.NewHTTPError(http.StatusConflict, apiError("already supporting", "CONFLICT"))
 	case usecase.ErrStripeUnavailable:

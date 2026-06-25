@@ -51,12 +51,21 @@ type IntentOut struct {
 }
 
 type supportContext struct {
-	buyer   *entity.User
-	project *entity.Project
-	plan    *entity.ProjectPlan
-	connect *entity.ConnectAccount
-	now     time.Time
+	buyer      *entity.User
+	project    *entity.Project
+	plan       *entity.ProjectPlan
+	connect    *entity.ConnectAccount
+	membership *entity.ProjectSupporter
+	purpose    checkoutPurpose
+	now        time.Time
 }
+
+type checkoutPurpose string
+
+const (
+	checkoutFirstSupport   checkoutPurpose = stripe.PurposeFirstSupport
+	checkoutKonbiniRenewal checkoutPurpose = stripe.PurposeKonbiniRenewal
+)
 
 type periodRange struct {
 	start time.Time
