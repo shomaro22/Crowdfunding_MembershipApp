@@ -227,7 +227,7 @@ func (p *PaymentUseCase) loadSupportContext(ctx context.Context, buyerID, projec
 	if plan.MaxSupporters != nil && plan.SupporterCount >= *plan.MaxSupporters {
 		return sc, ErrForbidden
 	}
-	active, err = p.Supporters.FindActiveByProjectUser(ctx, projectID, buyerID)
+	active, err = p.Supporters.FindActive(ctx, projectID, buyerID)
 	if err != nil {
 		return sc, err
 	}
@@ -337,7 +337,7 @@ func (p *PaymentUseCase) onCheckoutExpired(ctx context.Context, event stripesdk.
 	if err != nil {
 		return err
 	}
-	purchase, err = p.Purchases.FindByCheckoutSessionID(ctx, sess.ID)
+	purchase, err = p.Purchases.FindBySessionID(ctx, sess.ID)
 	if err != nil || purchase == nil || purchase.Status != entity.PurchaseStatusPending {
 		return err
 	}
@@ -422,7 +422,7 @@ func (p *PaymentUseCase) fulfillByCheckoutSession(ctx context.Context, sess stri
 		planID   uuid.UUID
 		err      error
 	)
-	purchase, err = p.Purchases.FindByCheckoutSessionID(ctx, sess.ID)
+	purchase, err = p.Purchases.FindBySessionID(ctx, sess.ID)
 	if err != nil || purchase == nil {
 		return err
 	}
@@ -456,7 +456,7 @@ func (p *PaymentUseCase) fulfillByPaymentIntentID(
 		purchase *entity.Purchase
 		err      error
 	)
-	purchase, err = p.Purchases.FindByPaymentIntentID(ctx, intentID)
+	purchase, err = p.Purchases.FindByIntentID(ctx, intentID)
 	if err != nil || purchase == nil {
 		return err
 	}
@@ -517,7 +517,7 @@ func (p *PaymentUseCase) fulfillPurchase(
 			err       error
 		)
 		now = time.Now().UTC()
-		active, err = p.Supporters.FindActiveByProjectUser(txCtx, purchase.ProjectID, purchase.BuyerID)
+		active, err = p.Supporters.FindActive(txCtx, purchase.ProjectID, purchase.BuyerID)
 		if err != nil {
 			return err
 		}
