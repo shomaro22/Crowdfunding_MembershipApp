@@ -29,6 +29,8 @@ type ProjectRepo interface {
 	Update(ctx context.Context, p *entity.Project) error
 	ReplaceImages(ctx context.Context, projectID uuid.UUID, images []entity.ProjectImage) error
 	Delete(ctx context.Context, id uuid.UUID) error
+	FindPlan(ctx context.Context, projectID, planID uuid.UUID) (*entity.ProjectPlan, error)
+	IncrementSupportCounts(ctx context.Context, projectID, planID uuid.UUID) error
 }
 
 type projectRepo struct {
@@ -241,6 +243,32 @@ func (r *projectRepo) Delete(ctx context.Context, id uuid.UUID) error {
 		}
 		return r.dbCtx(txCtx).Where("id = ?", id).Delete(&entity.Project{}).Error
 	})
+}
+
+func (r *projectRepo) FindPlan(ctx context.Context, projectID, planID uuid.UUID) (*entity.ProjectPlan, error) {
+	var (
+		plan entity.ProjectPlan
+		err  error
+	)
+	err = r.dbCtx(ctx).Where("id = ? AND project_id = ?", planID, projectID).First(&plan).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &plan, nil
+}
+
+func (r *projectRepo) IncrementSupportCounts(ctx context.Context, projectID, planID uuid.UUID) error {
+	var err error
+	err = r.dbCtx(ctx).Model(&entity.Project{}).Where("id = ?", projectID).
+		UpdateColumn("supporter_count", gorm.Expr("supporter_count + 1")).Error
+	if err != nil {
+		return err
+	}
+	return r.dbCtx(ctx).Model(&entity.ProjectPlan{}).Where("id = ? AND project_id = ?", planID, projectID).
+		UpdateColumn("supporter_count", gorm.Expr("supporter_count + 1")).Error
 }
 
 func paginate(limit, offset int) (int, int) {
