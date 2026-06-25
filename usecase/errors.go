@@ -21,4 +21,5 @@ var (
 	ErrForbidden          = errors.New("forbidden")
 	ErrStripeUnavailable  = errors.New("stripe unavailable")
 	ErrAlreadySupporting  = errors.New("already supporting")
+	ErrPendingCheckout    = errors.New("pending checkout exists")
 )
