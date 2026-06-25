@@ -6,42 +6,11 @@ import (
 
 	"crowdfund-app/entity"
 	"crowdfund-app/repository"
-	"crowdfund-app/stripe"
 
 	"github.com/google/uuid"
-	stripesdk "github.com/stripe/stripe-go/v82"
 )
 
-func (p *PaymentUseCase) fulfillCheckoutSession(ctx context.Context, sess stripesdk.CheckoutSession) error {
-	var (
-		purchase *entity.Purchase
-		planID   uuid.UUID
-		err      error
-	)
-	purchase, err = p.Purchases.FindBySessionID(ctx, sess.ID)
-	if err != nil || purchase == nil {
-		return err
-	}
-	planID, err = uuid.Parse(sess.Metadata[stripe.MetaPlanID])
-	if err != nil {
-		planID = uuid.Nil
-	}
-	return p.fulfillPurchase(ctx, purchase, planID, defaultPeriod(nil, nil), nil, nil, nil)
-}
-
-func (p *PaymentUseCase) fulfillPaymentIntent(ctx context.Context, pi stripesdk.PaymentIntent) error {
-	var (
-		planID uuid.UUID
-		err    error
-	)
-	planID, err = uuid.Parse(pi.Metadata[stripe.MetaPlanID])
-	if err != nil {
-		planID = uuid.Nil
-	}
-	return p.fulfillPaymentIntentID(ctx, pi.ID, time.Time{}, time.Time{}, nil, nil, nil, planID)
-}
-
-func (p *PaymentUseCase) fulfillPaymentIntentID(
+func (p *PaymentUseCase) fulfillByPaymentIntentID(
 	ctx context.Context,
 	intentID string,
 	start, end time.Time,
@@ -60,10 +29,10 @@ func (p *PaymentUseCase) fulfillPaymentIntentID(
 	if !start.IsZero() && !end.IsZero() {
 		period = periodRange{start, end}
 	}
-	return p.fulfillPurchase(ctx, purchase, planID, period, customerID, subscriptionID, invoiceID)
+	return p.fulfillFirstSupport(ctx, purchase, planID, period, customerID, subscriptionID, invoiceID)
 }
 
-func (p *PaymentUseCase) fulfillPurchaseID(ctx context.Context, purchaseID uuid.UUID, start, end time.Time, customerID, subscriptionID, invoiceID *string) error {
+func (p *PaymentUseCase) fulfillByPurchaseID(ctx context.Context, purchaseID uuid.UUID, start, end time.Time, customerID, subscriptionID, invoiceID *string) error {
 	var (
 		purchase *entity.Purchase
 		err      error
@@ -72,7 +41,7 @@ func (p *PaymentUseCase) fulfillPurchaseID(ctx context.Context, purchaseID uuid.
 	if err != nil || purchase == nil {
 		return err
 	}
-	return p.fulfillPurchase(ctx, purchase, uuid.Nil, periodRange{start, end}, customerID, subscriptionID, invoiceID)
+	return p.fulfillFirstSupport(ctx, purchase, uuid.Nil, periodRange{start, end}, customerID, subscriptionID, invoiceID)
 }
 
 func defaultPeriod(start, end *time.Time) periodRange {
@@ -84,7 +53,7 @@ func defaultPeriod(start, end *time.Time) periodRange {
 	return periodRange{now, now.AddDate(0, 0, supportPeriodDays)}
 }
 
-func (p *PaymentUseCase) fulfillPurchase(
+func (p *PaymentUseCase) fulfillFirstSupport(
 	ctx context.Context,
 	purchase *entity.Purchase,
 	planID uuid.UUID,
@@ -204,12 +173,20 @@ func (p *PaymentUseCase) markPurchasePaid(ctx context.Context, purchase *entity.
 }
 
 func (p *PaymentUseCase) markPurchaseFailed(ctx context.Context, purchase *entity.Purchase, reason string) error {
+	return p.markPurchaseTerminal(ctx, purchase, entity.PurchaseStatusFailed, reason)
+}
+
+func (p *PaymentUseCase) markPurchaseCancelled(ctx context.Context, purchase *entity.Purchase, reason string) error {
+	return p.markPurchaseTerminal(ctx, purchase, entity.PurchaseStatusCancelled, reason)
+}
+
+func (p *PaymentUseCase) markPurchaseTerminal(ctx context.Context, purchase *entity.Purchase, to entity.PurchaseStatus, reason string) error {
 	var (
 		from entity.PurchaseStatus
 		err  error
 	)
 	from = purchase.Status
-	purchase.Status = entity.PurchaseStatusFailed
+	purchase.Status = to
 	purchase.UpdatedAt = time.Now().UTC()
 	if err = p.Purchases.Update(ctx, purchase); err != nil {
 		return err
@@ -218,7 +195,7 @@ func (p *PaymentUseCase) markPurchaseFailed(ctx context.Context, purchase *entit
 		ID:         uuid.New(),
 		PurchaseID: purchase.ID,
 		FromStatus: &from,
-		ToStatus:   entity.PurchaseStatusFailed,
+		ToStatus:   to,
 		Reason:     &reason,
 		CreatedAt:  time.Now().UTC(),
 	})

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 
 	"crowdfund-app/entity"
+	"crowdfund-app/stripe"
 
 	stripesdk "github.com/stripe/stripe-go/v82"
 )
@@ -17,6 +18,9 @@ func (p *PaymentUseCase) onCheckoutCompleted(ctx context.Context, event stripesd
 	err = json.Unmarshal(event.Data.Raw, &sess)
 	if err != nil {
 		return err
+	}
+	if isKonbiniSession(sess) {
+		return nil
 	}
 	if sess.PaymentStatus != stripesdk.CheckoutSessionPaymentStatusPaid {
 		return nil
@@ -36,6 +40,23 @@ func (p *PaymentUseCase) onCheckoutAsyncPaid(ctx context.Context, event stripesd
 	return p.fulfillCheckoutSession(ctx, sess)
 }
 
+func (p *PaymentUseCase) onCheckoutAsyncFailed(ctx context.Context, event stripesdk.Event) error {
+	var (
+		sess     stripesdk.CheckoutSession
+		purchase *entity.Purchase
+		err      error
+	)
+	err = json.Unmarshal(event.Data.Raw, &sess)
+	if err != nil {
+		return err
+	}
+	purchase, err = p.Purchases.FindBySessionID(ctx, sess.ID)
+	if err != nil {
+		return err
+	}
+	return p.handleKonbiniCheckoutUnpaid(ctx, purchase, "async payment failed", false)
+}
+
 func (p *PaymentUseCase) onCheckoutExpired(ctx context.Context, event stripesdk.Event) error {
 	var (
 		sess     stripesdk.CheckoutSession
@@ -47,8 +68,19 @@ func (p *PaymentUseCase) onCheckoutExpired(ctx context.Context, event stripesdk.
 		return err
 	}
 	purchase, err = p.Purchases.FindBySessionID(ctx, sess.ID)
-	if err != nil || purchase == nil || purchase.Status != entity.PurchaseStatusPending {
+	if err != nil {
 		return err
 	}
-	return p.markPurchaseFailed(ctx, purchase, "checkout session expired")
+	return p.handleKonbiniCheckoutUnpaid(ctx, purchase, "checkout session expired", true)
+}
+
+func isKonbiniSession(sess stripesdk.CheckoutSession) bool {
+	var i int
+	for i = range sess.PaymentMethodTypes {
+		if sess.PaymentMethodTypes[i] == "konbini" {
+			return true
+		}
+	}
+	return parseCheckoutPurpose(sess.Metadata) == checkoutKonbiniRenewal ||
+		sess.Metadata[stripe.MetaBillingMode] == string(entity.BillingModeKonbini)
 }
