@@ -12,13 +12,110 @@ import (
 
 func (p *PaymentUseCase) loadSupportContext(ctx context.Context, buyerID, projectID, planID uuid.UUID) (supportContext, error) {
 	var (
-		sc     supportContext
-		u      *entity.User
-		proj   *entity.Project
-		plan   *entity.ProjectPlan
-		active *entity.ProjectSupporter
-		conn   *entity.ConnectAccount
-		err    error
+		sc   supportContext
+		pend *entity.Purchase
+		err  error
+	)
+	sc, err = p.loadBuyerProjectPlan(ctx, buyerID, projectID, planID)
+	if err != nil {
+		return sc, err
+	}
+	pend, err = p.Purchases.FindPendingByBuyerProject(ctx, buyerID, projectID)
+	if err != nil {
+		return sc, err
+	}
+	if pend != nil {
+		return sc, ErrPendingCheckout
+	}
+	if sc.membership, err = p.Supporters.FindMembership(ctx, projectID, buyerID); err != nil {
+		return sc, err
+	}
+	if sc.membership != nil {
+		return sc, ErrAlreadySupporting
+	}
+	if sc.plan.MaxSupporters != nil && sc.plan.SupporterCount >= *sc.plan.MaxSupporters {
+		return sc, ErrForbidden
+	}
+	sc.purpose = checkoutFirstSupport
+	return sc, nil
+}
+
+func (p *PaymentUseCase) loadCheckoutContext(ctx context.Context, buyerID, projectID, planID uuid.UUID, pm entity.PaymentMethod) (supportContext, error) {
+	var (
+		sc   supportContext
+		pend *entity.Purchase
+		err  error
+	)
+	if pm == entity.PaymentMethodKonbini {
+		return p.loadKonbiniCheckoutContext(ctx, buyerID, projectID, planID)
+	}
+	sc, err = p.loadBuyerProjectPlan(ctx, buyerID, projectID, planID)
+	if err != nil {
+		return sc, err
+	}
+	pend, err = p.Purchases.FindPendingByBuyerProject(ctx, buyerID, projectID)
+	if err != nil {
+		return sc, err
+	}
+	if pend != nil {
+		return sc, ErrPendingCheckout
+	}
+	if sc.membership, err = p.Supporters.FindMembership(ctx, projectID, buyerID); err != nil {
+		return sc, err
+	}
+	if sc.membership != nil {
+		return sc, ErrAlreadySupporting
+	}
+	if sc.plan.MaxSupporters != nil && sc.plan.SupporterCount >= *sc.plan.MaxSupporters {
+		return sc, ErrForbidden
+	}
+	sc.purpose = checkoutFirstSupport
+	return sc, nil
+}
+
+func (p *PaymentUseCase) loadKonbiniCheckoutContext(ctx context.Context, buyerID, projectID, planID uuid.UUID) (supportContext, error) {
+	var (
+		sc   supportContext
+		pend *entity.Purchase
+		err  error
+	)
+	sc, err = p.loadBuyerProjectPlan(ctx, buyerID, projectID, planID)
+	if err != nil {
+		return sc, err
+	}
+	pend, err = p.Purchases.FindPendingByBuyerProject(ctx, buyerID, projectID)
+	if err != nil {
+		return sc, err
+	}
+	if pend != nil {
+		return sc, ErrPendingCheckout
+	}
+	sc.membership, err = p.Supporters.FindMembership(ctx, projectID, buyerID)
+	if err != nil {
+		return sc, err
+	}
+	if sc.membership == nil {
+		if sc.plan.MaxSupporters != nil && sc.plan.SupporterCount >= *sc.plan.MaxSupporters {
+			return sc, ErrForbidden
+		}
+		sc.purpose = checkoutFirstSupport
+		return sc, nil
+	}
+	if sc.membership.BillingMode != entity.BillingModeKonbini {
+		return sc, ErrBadRequest
+	}
+	sc.purpose = checkoutKonbiniRenewal
+	return sc, nil
+}
+
+func (p *PaymentUseCase) loadBuyerProjectPlan(ctx context.Context, buyerID, projectID, planID uuid.UUID) (supportContext, error) {
+	var (
+		sc   supportContext
+		u    *entity.User
+		proj *entity.Project
+		plan *entity.ProjectPlan
+		conn *entity.ConnectAccount
+		err  error
 	)
 	sc.now = time.Now().UTC()
 	u, err = p.Users.FindByID(ctx, buyerID)
@@ -39,16 +136,6 @@ func (p *PaymentUseCase) loadSupportContext(ctx context.Context, buyerID, projec
 	if err != nil || plan == nil || !plan.IsActive {
 		return sc, ErrNotFound
 	}
-	if plan.MaxSupporters != nil && plan.SupporterCount >= *plan.MaxSupporters {
-		return sc, ErrForbidden
-	}
-	active, err = p.Supporters.FindActive(ctx, projectID, buyerID)
-	if err != nil {
-		return sc, err
-	}
-	if active != nil {
-		return sc, ErrAlreadySupporting
-	}
 	conn, err = p.Connect.FindByUserID(ctx, proj.SellerID)
 	if err != nil {
 		return sc, err
@@ -67,7 +154,6 @@ func (p *PaymentUseCase) createPendingPurchase(
 	ctx context.Context,
 	sc supportContext,
 	pm entity.PaymentMethod,
-	mode entity.BillingMode,
 	checkoutID, intentID *string,
 ) (*entity.Purchase, error) {
 	var (
@@ -90,12 +176,35 @@ func (p *PaymentUseCase) createPendingPurchase(
 		CreatedAt:        sc.now,
 		UpdatedAt:        sc.now,
 	}
-	_ = mode
+	if sc.purpose == checkoutKonbiniRenewal && sc.membership != nil {
+		row.SupporterID = &sc.membership.ID
+	}
 	err = p.Purchases.Create(ctx, &row)
 	if err != nil {
 		return nil, err
 	}
 	return &row, nil
+}
+
+func checkoutMetadata(sc supportContext, purchaseID uuid.UUID, pm entity.PaymentMethod) map[string]string {
+	var mode entity.BillingMode
+	if pm == entity.PaymentMethodKonbini {
+		mode = entity.BillingModeKonbini
+	} else {
+		mode = entity.BillingModeAuto
+	}
+	meta := paymentMetadata(
+		purchaseID,
+		sc.project.ID,
+		sc.plan.ID,
+		sc.buyer.ID,
+		mode,
+	)
+	meta[stripe.MetaCheckoutPurpose] = string(sc.purpose)
+	if sc.membership != nil {
+		meta[stripe.MetaSupporterID] = sc.membership.ID.String()
+	}
+	return meta
 }
 
 func paymentMetadata(purchaseID, projectID, planID, buyerID uuid.UUID, mode entity.BillingMode) map[string]string {
@@ -113,4 +222,20 @@ func checkoutURL(custom *string, fallback string) string {
 		return *custom
 	}
 	return fallback
+}
+
+func parseCheckoutPurpose(meta map[string]string) checkoutPurpose {
+	if meta == nil {
+		return checkoutFirstSupport
+	}
+	switch meta[stripe.MetaCheckoutPurpose] {
+	case stripe.PurposeKonbiniRenewal:
+		return checkoutKonbiniRenewal
+	default:
+		return checkoutFirstSupport
+	}
+}
+
+func isKonbiniPurchase(purchase *entity.Purchase) bool {
+	return purchase.PaymentMethod == entity.PaymentMethodKonbini
 }

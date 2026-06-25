@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"time"
 
-	"crowdfund-app/entity"
 	"crowdfund-app/stripe"
 
 	"github.com/google/uuid"
@@ -20,9 +19,6 @@ func (p *PaymentUseCase) onPaymentIntentSucceeded(ctx context.Context, event str
 	err = json.Unmarshal(event.Data.Raw, &pi)
 	if err != nil {
 		return err
-	}
-	if pi.Metadata[stripe.MetaBillingMode] != string(entity.BillingModeAuto) {
-		return nil
 	}
 	return p.fulfillPaymentIntent(ctx, pi)
 }
@@ -63,5 +59,5 @@ func (p *PaymentUseCase) onInvoicePaid(ctx context.Context, event stripesdk.Even
 		sub = stripeString(subDetails.Subscription.ID)
 	}
 	invID = stripeString(inv.ID)
-	return p.fulfillPurchaseID(ctx, uuid.MustParse(purchaseIDStr), start, end, cust, sub, invID)
+	return p.fulfillByPurchaseID(ctx, uuid.MustParse(purchaseIDStr), start, end, cust, sub, invID)
 }

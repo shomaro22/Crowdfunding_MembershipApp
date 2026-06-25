@@ -36,6 +36,8 @@ func (p *PaymentUseCase) HandleWebhook(ctx context.Context, payload []byte, sign
 		err = p.onCheckoutCompleted(ctx, event)
 	case "checkout.session.async_payment_succeeded":
 		err = p.onCheckoutAsyncPaid(ctx, event)
+	case "checkout.session.async_payment_failed":
+		err = p.onCheckoutAsyncFailed(ctx, event)
 	case "checkout.session.expired":
 		err = p.onCheckoutExpired(ctx, event)
 	case "payment_intent.succeeded":

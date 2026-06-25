@@ -26,15 +26,15 @@ func (p *PaymentUseCase) CreateCheckout(ctx context.Context, in CheckoutIn) (Che
 	if pm != entity.PaymentMethodKonbini && pm != entity.PaymentMethodCard {
 		return CheckoutOut{}, ErrBadRequest
 	}
-	sc, err = p.loadSupportContext(ctx, in.BuyerID, in.ProjectID, in.PlanID)
+	sc, err = p.loadCheckoutContext(ctx, in.BuyerID, in.ProjectID, in.PlanID, pm)
 	if err != nil {
 		return CheckoutOut{}, err
 	}
-	purchase, err = p.createPendingPurchase(ctx, sc, pm, entity.BillingModeKonbini, nil, nil)
+	purchase, err = p.createPendingPurchase(ctx, sc, pm, nil, nil)
 	if err != nil {
 		return CheckoutOut{}, err
 	}
-	meta = paymentMetadata(purchase.ID, in.ProjectID, in.PlanID, in.BuyerID, entity.BillingModeKonbini)
+	meta = checkoutMetadata(sc, purchase.ID, pm)
 	sess, err = p.Stripe.CreateCheckoutSession(ctx, stripe.CheckoutSessionIn{
 		ProductName:      sc.project.Title,
 		Amount:           int64(sc.plan.Price),
@@ -49,6 +49,9 @@ func (p *PaymentUseCase) CreateCheckout(ctx context.Context, in CheckoutIn) (Che
 		return CheckoutOut{}, err
 	}
 	purchase.StripeCheckoutID = &sess.SessionID
+	if sess.PaymentIntentID != "" {
+		purchase.StripeIntentID = &sess.PaymentIntentID
+	}
 	purchase.UpdatedAt = sc.now
 	if err = p.Purchases.Update(ctx, purchase); err != nil {
 		return CheckoutOut{}, err

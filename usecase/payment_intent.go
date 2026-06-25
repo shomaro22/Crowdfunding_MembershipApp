@@ -22,7 +22,7 @@ func (p *PaymentUseCase) CreateIntent(ctx context.Context, in IntentIn) (IntentO
 	if err != nil {
 		return IntentOut{}, err
 	}
-	purchase, err = p.createPendingPurchase(ctx, sc, entity.PaymentMethodCard, entity.BillingModeAuto, nil, nil)
+	purchase, err = p.createPendingPurchase(ctx, sc, entity.PaymentMethodCard, nil, nil)
 	if err != nil {
 		return IntentOut{}, err
 	}
