@@ -1,0 +1,46 @@
+package usecase
+
+import (
+	"context"
+
+	"crowdfund-app/entity"
+	"crowdfund-app/stripe"
+)
+
+func (p *PaymentUseCase) CreateIntent(ctx context.Context, in IntentIn) (IntentOut, error) {
+	var (
+		sc       supportContext
+		purchase *entity.Purchase
+		meta     map[string]string
+		sub      stripe.SubscriptionIntentOut
+		err      error
+	)
+	if p.Stripe == nil {
+		return IntentOut{}, ErrStripeUnavailable
+	}
+	sc, err = p.loadSupportContext(ctx, in.BuyerID, in.ProjectID, in.PlanID)
+	if err != nil {
+		return IntentOut{}, err
+	}
+	purchase, err = p.createPendingPurchase(ctx, sc, entity.PaymentMethodCard, entity.BillingModeAuto, nil, nil)
+	if err != nil {
+		return IntentOut{}, err
+	}
+	meta = paymentMetadata(purchase.ID, in.ProjectID, in.PlanID, in.BuyerID, entity.BillingModeAuto)
+	sub, err = p.Stripe.CreateSubscriptionIntent(ctx, stripe.SubscriptionIntentIn{
+		ProductName:      sc.project.Title,
+		Amount:           int64(sc.plan.Price),
+		ConnectAccountID: sc.connect.StripeAccountID,
+		CustomerEmail:    sc.buyer.Email,
+		Metadata:         meta,
+	})
+	if err != nil {
+		return IntentOut{}, err
+	}
+	purchase.StripeIntentID = &sub.PaymentIntentID
+	purchase.UpdatedAt = sc.now
+	if err = p.Purchases.Update(ctx, purchase); err != nil {
+		return IntentOut{}, err
+	}
+	return IntentOut{ClientSecret: sub.ClientSecret, PaymentIntentID: sub.PaymentIntentID}, nil
+}
