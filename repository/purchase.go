@@ -16,6 +16,7 @@ type PurchaseRepo interface {
 	FindByID(ctx context.Context, id uuid.UUID) (*entity.Purchase, error)
 	FindBySessionID(ctx context.Context, sessionID string) (*entity.Purchase, error)
 	FindByIntentID(ctx context.Context, intentID string) (*entity.Purchase, error)
+	FindPendingByBuyerProject(ctx context.Context, buyerID, projectID uuid.UUID) (*entity.Purchase, error)
 	RecordEvent(ctx context.Context, ev *entity.PurchaseEvent) error
 }
 
@@ -83,6 +84,23 @@ func (r *purchaseRepo) FindByIntentID(ctx context.Context, intentID string) (*en
 		err error
 	)
 	err = r.dbCtx(ctx).Where("stripe_payment_intent_id = ?", intentID).First(&row).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &row, nil
+}
+
+func (r *purchaseRepo) FindPendingByBuyerProject(ctx context.Context, buyerID, projectID uuid.UUID) (*entity.Purchase, error) {
+	var (
+		row entity.Purchase
+		err error
+	)
+	err = r.dbCtx(ctx).
+		Where("buyer_id = ? AND project_id = ? AND status = ?", buyerID, projectID, entity.PurchaseStatusPending).
+		First(&row).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, nil
 	}
