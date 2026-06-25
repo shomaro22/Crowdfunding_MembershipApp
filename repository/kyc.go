@@ -1,7 +1,8 @@
-package storage
+package repository
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -12,6 +13,12 @@ import (
 )
 
 const MaxKYCBytes = 5 << 20 // 5 MiB
+
+var (
+	ErrBadMedia = errors.New("unsupported media type")
+	ErrTooLarge = errors.New("file too large")
+	ErrBadToken = errors.New("invalid kyc access token")
+)
 
 var allowedKYCTypes = map[string]string{
 	"image/jpeg": ".jpg",

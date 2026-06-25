@@ -7,7 +7,6 @@ import (
 
 	"crowdfund-app/entity"
 	"crowdfund-app/repository"
-	"crowdfund-app/storage"
 
 	"github.com/google/uuid"
 	"gorm.io/gorm"
@@ -21,7 +20,7 @@ type AdminUseCase struct {
 	ReviewDecisions  repository.ReviewDecisionRepo
 	ReTokens         repository.ReTokenRepo
 	TOTPBackup       repository.TOTPBackupRepo
-	KYC              storage.KYCStore
+	KYC              repository.KYCStore
 	DB               *gorm.DB
 	APIBase          string
 	SignSecret       []byte
@@ -127,13 +126,13 @@ func (a *AdminUseCase) GetSellerReg(ctx context.Context, id uuid.UUID) (*SellerR
 	now = time.Now().UTC()
 	out = &SellerRegView{Registration: reg, User: u}
 	if reg.HasIDFront() {
-		tok = storage.SignKYCAccess(a.SignSecret, *reg.IDFrontKey, now)
-		url = storage.KYCAccessURL(a.APIBase, tok)
+		tok = repository.SignKYCAccess(a.SignSecret, *reg.IDFrontKey, now)
+		url = repository.KYCAccessURL(a.APIBase, tok)
 		out.FrontURL = &url
 	}
 	if reg.HasIDBack() {
-		tok = storage.SignKYCAccess(a.SignSecret, *reg.IDBackKey, now)
-		url = storage.KYCAccessURL(a.APIBase, tok)
+		tok = repository.SignKYCAccess(a.SignSecret, *reg.IDBackKey, now)
+		url = repository.KYCAccessURL(a.APIBase, tok)
 		out.BackURL = &url
 	}
 	return out, nil
