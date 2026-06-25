@@ -23,8 +23,9 @@ type CheckoutSessionIn struct {
 }
 
 type CheckoutSessionOut struct {
-	SessionID string
-	URL       string
+	SessionID       string
+	URL             string
+	PaymentIntentID string
 }
 
 type SubscriptionIntentIn struct {
@@ -85,6 +86,9 @@ func (c *client) CreateCheckoutSession(ctx context.Context, in CheckoutSessionIn
 		return CheckoutSessionOut{}, err
 	}
 	out = CheckoutSessionOut{SessionID: sess.ID, URL: sess.URL}
+	if sess.PaymentIntent != nil {
+		out.PaymentIntentID = sess.PaymentIntent.ID
+	}
 	return out, nil
 }
 
