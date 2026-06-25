@@ -6,7 +6,7 @@ import (
 
 	"crowdfund-app/entity"
 	"crowdfund-app/repository"
-	"crowdfund-app/stripeclient"
+	"crowdfund-app/stripe"
 
 	"github.com/google/uuid"
 )
@@ -14,7 +14,7 @@ import (
 type ConnectUseCase struct {
 	Users   repository.UserRepo
 	Connect repository.ConnectRepo
-	Stripe  stripeclient.Client
+	Stripe  stripe.Client
 }
 
 func (c *ConnectUseCase) GetBySellerID(ctx context.Context, sellerID uuid.UUID) (*entity.ConnectAccount, error) {
@@ -42,7 +42,7 @@ func (c *ConnectUseCase) CreateOnboardingLink(ctx context.Context, sellerID uuid
 		url  string
 		now  time.Time
 		err  error
-		snap stripeclient.AccountSnapshot
+		snap stripe.AccountSnapshot
 	)
 
 	if c.Stripe == nil {
@@ -95,7 +95,7 @@ func (c *ConnectUseCase) CreateOnboardingLink(ctx context.Context, sellerID uuid
 func (c *ConnectUseCase) SyncFromStripeAccountID(ctx context.Context, stripeAccountID string) (*entity.ConnectAccount, error) {
 	var (
 		row  *entity.ConnectAccount
-		snap stripeclient.AccountSnapshot
+		snap stripe.AccountSnapshot
 		now  time.Time
 		err  error
 	)
