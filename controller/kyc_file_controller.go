@@ -5,17 +5,17 @@ import (
 	"os"
 	"time"
 
-	"crowdfund-app/storage"
+	"crowdfund-app/repository"
 
 	"github.com/labstack/echo/v4"
 )
 
 type KYCFileController struct {
-	KYC        storage.KYCStore
+	KYC        repository.KYCStore
 	SignSecret []byte
 }
 
-func NewKYCFileController(kyc storage.KYCStore, secret []byte) *KYCFileController {
+func NewKYCFileController(kyc repository.KYCStore, secret []byte) *KYCFileController {
 	return &KYCFileController{KYC: kyc, SignSecret: secret}
 }
 
@@ -28,7 +28,7 @@ func (h *KYCFileController) Serve(c echo.Context) error {
 		err   error
 	)
 	token = c.QueryParam("token")
-	key, err = storage.VerifyKYCAccess(h.SignSecret, token, time.Now().UTC())
+	key, err = repository.VerifyKYCAccess(h.SignSecret, token, time.Now().UTC())
 	if err != nil {
 		return echo.NewHTTPError(http.StatusUnauthorized, apiError("invalid or expired token", "INVALID_TOKEN"))
 	}
