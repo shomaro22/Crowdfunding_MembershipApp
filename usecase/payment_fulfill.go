@@ -32,18 +32,6 @@ func (p *PaymentUseCase) fulfillPaymentIntentID(
 	return p.fulfillFirstSupport(ctx, purchase, planID, period, customerID, subscriptionID, invoiceID)
 }
 
-func (p *PaymentUseCase) fulfillPurchaseID(ctx context.Context, purchaseID uuid.UUID, start, end time.Time, customerID, subscriptionID, invoiceID *string) error {
-	var (
-		purchase *entity.Purchase
-		err      error
-	)
-	purchase, err = p.Purchases.FindID(ctx, purchaseID)
-	if err != nil || purchase == nil {
-		return err
-	}
-	return p.fulfillFirstSupport(ctx, purchase, uuid.Nil, periodRange{start, end}, customerID, subscriptionID, invoiceID)
-}
-
 func defaultPeriod(start, end *time.Time) periodRange {
 	var now time.Time
 	now = time.Now().UTC()
@@ -62,9 +50,9 @@ func (p *PaymentUseCase) fulfillFirstSupport(
 ) error {
 	return repository.WithTx(ctx, p.DB, func(txCtx context.Context) error {
 		var (
-			locked    *entity.Purchase
-			active    *entity.ProjectSupporter
-			supporter entity.ProjectSupporter
+			locked     *entity.Purchase
+			membership *entity.ProjectSupporter
+			supporter  entity.ProjectSupporter
 			resolved  uuid.UUID
 			proj      *entity.Project
 			plans     []entity.ProjectPlan
@@ -83,12 +71,12 @@ func (p *PaymentUseCase) fulfillFirstSupport(
 			return nil
 		}
 		now = time.Now().UTC()
-		active, err = p.Supporters.FindActive(txCtx, purchase.ProjectID, purchase.BuyerID)
+		membership, err = p.Supporters.FindMembership(txCtx, purchase.ProjectID, purchase.BuyerID)
 		if err != nil {
 			return err
 		}
-		if active != nil {
-			return p.markPurchasePaid(txCtx, purchase, active.ID, period, invoiceID)
+		if membership != nil {
+			return p.markPurchasePaid(txCtx, purchase, membership.ID, period, invoiceID)
 		}
 		proj, plans, _, err = p.Projects.FindID(txCtx, purchase.ProjectID)
 		if err != nil || proj == nil {
