@@ -16,9 +16,10 @@ type ProjectSupporter struct {
 	BillingMode        BillingMode     `gorm:"column:billing_mode;not null"`
 	CurrentPeriodStart time.Time       `gorm:"column:current_period_start;not null"`
 	CurrentPeriodEnd   time.Time       `gorm:"column:current_period_end;not null"`
-	PendingPlanID      *uuid.UUID      `gorm:"type:uuid;column:pending_plan_id"`
-	PlanChangeDate     *time.Time      `gorm:"column:plan_change_date"`
-	StripeCustomerID   *string         `gorm:"column:stripe_customer_id;type:varchar"`
+	PendingPlanID        *uuid.UUID      `gorm:"type:uuid;column:pending_plan_id"`
+	PlanChangeDate       *time.Time      `gorm:"column:plan_change_date"`
+	PendingBillingMode   *BillingMode    `gorm:"column:pending_billing_mode;type:varchar"`
+	StripeCustomerID     *string         `gorm:"column:stripe_customer_id;type:varchar"`
 	StripeSubscriptionID *string       `gorm:"column:stripe_subscription_id;type:varchar"`
 	CreatedAt          time.Time       `gorm:"not null"`
 	UpdatedAt          time.Time       `gorm:"not null"`
