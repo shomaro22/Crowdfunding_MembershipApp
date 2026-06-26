@@ -28,7 +28,7 @@ func (a *AuthUseCase) ForgotPassword(ctx context.Context, email string) error {
 		return nil
 	}
 	normalized = entity.NormalizeEmail(email)
-	u, err = a.Users.FindByEmail(ctx, normalized)
+	u, err = a.Users.FindEmail(ctx, normalized)
 	if err != nil {
 		return err
 	}
@@ -76,11 +76,11 @@ func (a *AuthUseCase) ResetPassword(ctx context.Context, plainToken, newPassword
 		return ErrInvalidToken
 	}
 	now = time.Now().UTC()
-	row, err = a.ResetToks.FindValidByHash(ctx, auth.OpaqueHash(plainToken), now)
+	row, err = a.ResetToks.FindValidHash(ctx, auth.OpaqueHash(plainToken), now)
 	if err != nil || row == nil {
 		return ErrInvalidToken
 	}
-	u, err = a.Users.FindByID(ctx, row.UserID)
+	u, err = a.Users.FindID(ctx, row.UserID)
 	if err != nil || u == nil {
 		return ErrInvalidToken
 	}
@@ -110,7 +110,7 @@ func (a *AuthUseCase) ChangePassword(ctx context.Context, userID uuid.UUID, curr
 	if err = entity.ValidatePassword(newPassword); err != nil {
 		return ErrWeakPassword
 	}
-	u, err = a.Users.FindByID(ctx, userID)
+	u, err = a.Users.FindID(ctx, userID)
 	if err != nil || u == nil {
 		return ErrNotFound
 	}

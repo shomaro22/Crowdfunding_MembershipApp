@@ -14,8 +14,8 @@ import (
 )
 
 const (
-	reTokenTTL    = 7 * 24 * time.Hour
-	resetTokenTTL = time.Hour
+	refreshTokenTTL = 7 * 24 * time.Hour
+	resetTokenTTL   = time.Hour
 )
 
 type Mailer interface {
@@ -36,34 +36,34 @@ type AuthMeta struct {
 }
 
 type SessionTokens struct {
-	AuthToken string
-	ReToken   string
+	AuthToken    string
+	RefreshToken string
 }
 
 type LoginResult struct {
-	User        *entity.User
-	AuthToken   string
-	ReToken     string
-	Requires2FA bool
+	User         *entity.User
+	AuthToken    string
+	RefreshToken string
+	Requires2FA  bool
 }
 
 type AuthUseCase struct {
-	Users        repository.UserRepo
-	SellerRegs   repository.SellerRegRepo
-	ReTokens     repository.ReTokenRepo
-	ResetToks    repository.ResetRepo
-	Activity     repository.ActivityRepo
-	OAuth        repository.OAuthRepo
-	OAuthCache   repository.OAuthCache
-	TOTPBackup   repository.TOTPBackupRepo
-	Tokens       *auth.TokenService
-	Mailer       Mailer
-	KYCStore     repository.KYCStore
-	Google       *auth.GoogleOAuth
-	TOTPKey      []byte
-	TOTPIssuer   string
-	DB           *gorm.DB
-	AppPublicURL string
+	Users         repository.UserRepo
+	SellerRegs    repository.SellerRegRepo
+	RefreshTokens repository.RefreshTokenRepo
+	ResetToks     repository.ResetRepo
+	Activity      repository.ActivityRepo
+	OAuth         repository.OAuthRepo
+	OAuthCache    repository.OAuthCache
+	TOTPBackup    repository.TOTPBackupRepo
+	Tokens        *auth.TokenService
+	Mailer        Mailer
+	KYCStore      repository.KYCStore
+	Google        *auth.GoogleOAuth
+	TOTPKey       []byte
+	TOTPIssuer    string
+	DB            *gorm.DB
+	AppPublicURL  string
 }
 
 func (a *AuthUseCase) logActivity(ctx context.Context, userID *uuid.UUID, action entity.ActivityAction, resource, resourceID string, meta AuthMeta, extra entity.JSONMetadata) {
@@ -120,7 +120,7 @@ func (a *AuthUseCase) issueSession(ctx context.Context, u *entity.User, verified
 		err       error
 		plain     string
 		now       time.Time
-		row       *entity.ReToken
+		row       *entity.RefreshToken
 	)
 
 	authToken, err = a.Tokens.Issue(auth.AuthClaims{
@@ -138,24 +138,26 @@ func (a *AuthUseCase) issueSession(ctx context.Context, u *entity.User, verified
 		return nil, err
 	}
 	now = time.Now().UTC()
-	row = &entity.ReToken{
+	row = &entity.RefreshToken{
 		ID:        uuid.New(),
 		UserID:    u.ID,
 		TokenHash: auth.OpaqueHash(plain),
-		ExpiresAt: now.Add(reTokenTTL),
+		ExpiresAt: now.Add(refreshTokenTTL),
 		CreatedAt: now,
 	}
-	if err = a.ReTokens.Create(ctx, row); err != nil {
+	if err = a.RefreshTokens.Create(ctx, row); err != nil {
 		return nil, err
 	}
-	return &SessionTokens{AuthToken: authToken, ReToken: plain}, nil
+	return &SessionTokens{AuthToken: authToken, RefreshToken: plain}, nil
 }
 
 func (a *AuthUseCase) invalidateSessions(ctx context.Context, userID uuid.UUID) error {
 	var err error
 
-	if _, err = a.Users.BumpTokenVer(ctx, userID); err != nil {
-		return err
-	}
-	return a.ReTokens.RevokeAllForUser(ctx, userID, time.Now().UTC())
+	return repository.WithTx(ctx, a.DB, func(txCtx context.Context) error {
+		if _, err = a.Users.BumpTokenVer(txCtx, userID); err != nil {
+			return err
+		}
+		return a.RefreshTokens.RevokeUser(txCtx, userID, time.Now().UTC())
+	})
 }
