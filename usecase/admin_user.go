@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"crowdfund-app/entity"
+	"crowdfund-app/repository"
 
 	"github.com/google/uuid"
 )
@@ -92,11 +93,13 @@ func (a *AdminUseCase) ChangeAdminRole(ctx context.Context, actorID, targetUserI
 func (a *AdminUseCase) invalidateSessions(ctx context.Context, userID uuid.UUID) error {
 	var err error
 
-	if _, err = a.Users.BumpTokenVer(ctx, userID); err != nil {
-		return err
-	}
-	if a.RefreshTokens == nil {
-		return nil
-	}
-	return a.RefreshTokens.RevokeUser(ctx, userID, time.Now().UTC())
+	return repository.WithTx(ctx, a.DB, func(txCtx context.Context) error {
+		if _, err = a.Users.BumpTokenVer(txCtx, userID); err != nil {
+			return err
+		}
+		if a.RefreshTokens == nil {
+			return nil
+		}
+		return a.RefreshTokens.RevokeUser(txCtx, userID, time.Now().UTC())
+	})
 }

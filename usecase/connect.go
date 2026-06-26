@@ -120,19 +120,3 @@ func (c *ConnectUseCase) SyncFromStripeAccountID(ctx context.Context, stripeAcco
 	}
 	return row, nil
 }
-
-// RequireSellerChargesEnabled は §5.3.8: charges_enabled=false なら応援不可。
-func (c *ConnectUseCase) RequireSellerChargesEnabled(ctx context.Context, sellerID uuid.UUID) error {
-	var (
-		row *entity.ConnectAccount
-		err error
-	)
-	row, err = c.Connect.FindUserID(ctx, sellerID)
-	if err != nil {
-		return err
-	}
-	if row == nil || !row.CanCharge() {
-		return ErrForbidden
-	}
-	return nil
-}

@@ -214,7 +214,7 @@ func buildApp() (*echo.Echo, string, error) {
 	}
 	adminCtl = controller.NewAdminController(adminUC)
 	kycFileCtl = controller.NewKYCFileController(kycStore, []byte(jwtSecret))
-	projectUC = &usecase.ProjectUseCase{Projects: projectRepo, Users: userRepo}
+	projectUC = &usecase.ProjectUseCase{Projects: projectRepo, Users: userRepo, DB: gormDB}
 	connectUC = &usecase.ConnectUseCase{Users: userRepo, Connect: connectRepo, Stripe: stripeClient}
 	paymentUC = &usecase.PaymentUseCase{
 		DB:         gormDB,
