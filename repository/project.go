@@ -22,9 +22,9 @@ type ProjectListFilter struct {
 
 type ProjectRepo interface {
 	Create(ctx context.Context, p *entity.Project, plans []entity.ProjectPlan, images []entity.ProjectImage) error
-	FindByID(ctx context.Context, id uuid.UUID) (*entity.Project, []entity.ProjectPlan, []entity.ProjectImage, error)
+	FindID(ctx context.Context, id uuid.UUID) (*entity.Project, []entity.ProjectPlan, []entity.ProjectImage, error)
 	ListPublic(ctx context.Context, f ProjectListFilter) ([]entity.Project, int64, error)
-	ListBySeller(ctx context.Context, sellerID uuid.UUID, limit, offset int) ([]entity.Project, int64, error)
+	ListSeller(ctx context.Context, sellerID uuid.UUID, limit, offset int) ([]entity.Project, int64, error)
 	ListAll(ctx context.Context, status *entity.ProjectStatus, limit, offset int) ([]entity.Project, int64, error)
 	Update(ctx context.Context, p *entity.Project) error
 	ReplaceImages(ctx context.Context, projectID uuid.UUID, images []entity.ProjectImage) error
@@ -42,15 +42,7 @@ func NewProjectRepo(db *gorm.DB) ProjectRepo {
 }
 
 func (r *projectRepo) dbCtx(ctx context.Context) *gorm.DB {
-	var (
-		tx *gorm.DB
-		ok bool
-	)
-	tx, ok = ctx.Value(txKey{}).(*gorm.DB)
-	if ok && tx != nil {
-		return tx.WithContext(ctx)
-	}
-	return r.db.WithContext(ctx)
+	return dbFromCtx(ctx, r.db)
 }
 
 func (r *projectRepo) Create(ctx context.Context, p *entity.Project, plans []entity.ProjectPlan, images []entity.ProjectImage) error {
@@ -87,7 +79,7 @@ func (r *projectRepo) Create(ctx context.Context, p *entity.Project, plans []ent
 	})
 }
 
-func (r *projectRepo) FindByID(ctx context.Context, id uuid.UUID) (*entity.Project, []entity.ProjectPlan, []entity.ProjectImage, error) {
+func (r *projectRepo) FindID(ctx context.Context, id uuid.UUID) (*entity.Project, []entity.ProjectPlan, []entity.ProjectImage, error) {
 	var (
 		p      entity.Project
 		plans  []entity.ProjectPlan
@@ -157,7 +149,7 @@ func publicSort(sort string) string {
 	}
 }
 
-func (r *projectRepo) ListBySeller(ctx context.Context, sellerID uuid.UUID, limit, offset int) ([]entity.Project, int64, error) {
+func (r *projectRepo) ListSeller(ctx context.Context, sellerID uuid.UUID, limit, offset int) ([]entity.Project, int64, error) {
 	var (
 		q     *gorm.DB
 		total int64

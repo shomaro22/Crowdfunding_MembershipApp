@@ -3,6 +3,7 @@ package middleware
 import (
 	"encoding/json"
 	"io"
+	"os"
 	"strings"
 	"time"
 
@@ -45,6 +46,30 @@ func KeyUserID(c echo.Context) string {
 		return ""
 	}
 	return uid.String()
+}
+
+func KeyRefreshCookie(c echo.Context) string {
+	var (
+		name string
+		v    string
+	)
+	name = strings.TrimSpace(os.Getenv("REFRESH_COOKIE_NAME"))
+	if name == "" {
+		name = auth.DefaultRefreshCookie
+	}
+	ck, err := c.Cookie(name)
+	if err != nil || ck == nil {
+		return ""
+	}
+	v = strings.TrimSpace(ck.Value)
+	if v == "" {
+		return ""
+	}
+	return auth.OpaqueHash(v)
+}
+
+func KeyQueryEmail(c echo.Context) string {
+	return strings.ToLower(strings.TrimSpace(c.QueryParam("email")))
 }
 
 func KeyPending2FAUser(secret []byte) func(c echo.Context) string {
@@ -93,12 +118,27 @@ var (
 			{Limit: 3, Key: KeyJSONEmail("email")},
 		},
 	}
-	PolicyRe = RatePolicy{
-		Name:   "re",
+	PolicyResetPassword = RatePolicy{
+		Name:   "reset_password",
+		Period: time.Minute,
+		Rules: []RateRule{
+			{Limit: 10, Key: KeyIP},
+		},
+	}
+	PolicyCheckEmail = RatePolicy{
+		Name:   "check_email",
 		Period: time.Minute,
 		Rules: []RateRule{
 			{Limit: 30, Key: KeyIP},
-			{Limit: 60, Key: KeyUserID},
+			{Limit: 10, Key: KeyQueryEmail},
+		},
+	}
+	PolicyRefresh = RatePolicy{
+		Name:   "auth_refresh",
+		Period: time.Minute,
+		Rules: []RateRule{
+			{Limit: 30, Key: KeyIP},
+			{Limit: 60, Key: KeyRefreshCookie},
 		},
 	}
 )

@@ -15,7 +15,7 @@ func (a *AuthUseCase) GetUser(ctx context.Context, userID uuid.UUID) (*entity.Us
 		err error
 	)
 
-	u, err = a.Users.FindByID(ctx, userID)
+	u, err = a.Users.FindID(ctx, userID)
 	if err != nil {
 		return nil, err
 	}

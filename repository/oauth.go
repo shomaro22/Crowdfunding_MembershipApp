@@ -15,8 +15,8 @@ import (
 
 type OAuthRepo interface {
 	Create(ctx context.Context, row *entity.OAuthAccount) error
-	FindBySub(ctx context.Context, provider entity.OAuthProvider, sub string) (*entity.OAuthAccount, error)
-	FindByUserID(ctx context.Context, userID uuid.UUID, provider entity.OAuthProvider) (*entity.OAuthAccount, error)
+	FindSub(ctx context.Context, provider entity.OAuthProvider, sub string) (*entity.OAuthAccount, error)
+	FindUserID(ctx context.Context, userID uuid.UUID, provider entity.OAuthProvider) (*entity.OAuthAccount, error)
 }
 
 type oauthRepo struct {
@@ -28,15 +28,15 @@ func NewOAuthRepo(db *gorm.DB) OAuthRepo {
 }
 
 func (r *oauthRepo) Create(ctx context.Context, row *entity.OAuthAccount) error {
-	return r.db.WithContext(ctx).Create(row).Error
+	return dbFromCtx(ctx, r.db).Create(row).Error
 }
 
-func (r *oauthRepo) FindBySub(ctx context.Context, provider entity.OAuthProvider, sub string) (*entity.OAuthAccount, error) {
+func (r *oauthRepo) FindSub(ctx context.Context, provider entity.OAuthProvider, sub string) (*entity.OAuthAccount, error) {
 	var (
 		m   entity.OAuthAccount
 		err error
 	)
-	err = r.db.WithContext(ctx).Where("provider = ? AND provider_sub = ?", provider, sub).First(&m).Error
+	err = dbFromCtx(ctx, r.db).Where("provider = ? AND provider_sub = ?", provider, sub).First(&m).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, nil
 	}
@@ -46,12 +46,12 @@ func (r *oauthRepo) FindBySub(ctx context.Context, provider entity.OAuthProvider
 	return &m, nil
 }
 
-func (r *oauthRepo) FindByUserID(ctx context.Context, userID uuid.UUID, provider entity.OAuthProvider) (*entity.OAuthAccount, error) {
+func (r *oauthRepo) FindUserID(ctx context.Context, userID uuid.UUID, provider entity.OAuthProvider) (*entity.OAuthAccount, error) {
 	var (
 		m   entity.OAuthAccount
 		err error
 	)
-	err = r.db.WithContext(ctx).Where("user_id = ? AND provider = ?", userID, provider).First(&m).Error
+	err = dbFromCtx(ctx, r.db).Where("user_id = ? AND provider = ?", userID, provider).First(&m).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, nil
 	}
