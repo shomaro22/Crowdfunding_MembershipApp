@@ -12,6 +12,7 @@ type Config struct {
 	Health            *controller.HealthController
 	Auth              *controller.AuthController
 	Projects          *controller.ProjectController
+	Connect           *controller.ConnectController
 	Payments          *controller.PaymentController
 	Admin             *controller.AdminController
 	KYCFiles          *controller.KYCFileController
@@ -88,6 +89,11 @@ func New(cfg Config) *echo.Echo {
 		e.GET("/projects/:projectId", cfg.Projects.Get, opt...)
 		e.PUT("/projects/:projectId", cfg.Projects.Update, cfg.SellerWrite...)
 		e.POST("/projects/:projectId/delete-request", cfg.Projects.RequestDelete, cfg.SellerWrite...)
+	}
+
+	if cfg.Connect != nil {
+		e.GET("/seller/connect", cfg.Connect.GetAccount, cfg.SellerRead...)
+		e.POST("/seller/connect/onboarding", cfg.Connect.CreateOnboarding, cfg.SellerWrite...)
 	}
 
 	if cfg.Payments != nil {
