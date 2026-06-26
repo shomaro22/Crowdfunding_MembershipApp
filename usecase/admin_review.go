@@ -9,29 +9,7 @@ import (
 	"crowdfund-app/repository"
 
 	"github.com/google/uuid"
-	"gorm.io/gorm"
 )
-
-type AdminUseCase struct {
-	Users           repository.UserRepo
-	SellerRegs      repository.SellerRegRepo
-	Projects        repository.ProjectRepo
-	Audit           repository.AuditRepo
-	ReviewDecisions repository.ReviewDecisionRepo
-	RefreshTokens   repository.RefreshTokenRepo
-	TOTPBackup      repository.TOTPBackupRepo
-	KYC             repository.KYCStore
-	DB              *gorm.DB
-	APIBase         string
-	SignSecret      []byte
-}
-
-type SellerRegView struct {
-	Registration *entity.SellerReg
-	User         *entity.User
-	FrontURL     *string
-	BackURL      *string
-}
 
 func (a *AdminUseCase) ListBuyerPending(ctx context.Context, limit, offset int) ([]entity.User, int64, error) {
 	return a.Users.ListRoleStatus(ctx, entity.UserRoleBuyer, entity.AccountStatusPending, limit, offset)
@@ -217,35 +195,4 @@ func (a *AdminUseCase) RejectSellerReg(ctx context.Context, adminID, regID uuid.
 	a.writeAudit(ctx, adminID, "seller_registration.reject", "seller_registration", reg.ID.String(), &reason, nil)
 	a.writeReviewDecision(ctx, adminID, entity.ReviewSellerRegistration, regID, entity.ReviewRejected, &reason)
 	return reg, nil
-}
-
-func (a *AdminUseCase) writeReviewDecision(ctx context.Context, reviewerID uuid.UUID, resourceType string, resourceID uuid.UUID, decision string, reason *string) {
-	if a.ReviewDecisions == nil {
-		return
-	}
-	_ = a.ReviewDecisions.Create(ctx, &entity.ReviewDecision{
-		ID:           uuid.New(),
-		ReviewerID:   reviewerID,
-		ResourceType: resourceType,
-		ResourceID:   resourceID,
-		Decision:     decision,
-		Reason:       reason,
-		CreatedAt:    time.Now().UTC(),
-	})
-}
-
-func (a *AdminUseCase) writeAudit(ctx context.Context, adminID uuid.UUID, action, resource, resourceID string, reason, details *string) {
-	if a.Audit == nil {
-		return
-	}
-	_ = a.Audit.Create(ctx, &entity.AuditLog{
-		ID:         uuid.New(),
-		AdminID:    adminID,
-		Action:     action,
-		Resource:   resource,
-		ResourceID: resourceID,
-		Reason:     reason,
-		Details:    details,
-		CreatedAt:  time.Now().UTC(),
-	})
 }
