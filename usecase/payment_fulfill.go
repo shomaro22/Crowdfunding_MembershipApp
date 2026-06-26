@@ -188,12 +188,18 @@ func (p *PaymentUseCase) markPurchaseTerminal(ctx context.Context, purchase *ent
 	if err = p.Purchases.Update(ctx, purchase); err != nil {
 		return err
 	}
-	return p.Purchases.RecordEvent(ctx, &entity.PurchaseEvent{
+	if err = p.Purchases.RecordEvent(ctx, &entity.PurchaseEvent{
 		ID:         uuid.New(),
 		PurchaseID: purchase.ID,
 		FromStatus: &from,
 		ToStatus:   to,
 		Reason:     &reason,
 		CreatedAt:  time.Now().UTC(),
-	})
+	}); err != nil {
+		return err
+	}
+	if to == entity.PurchaseStatusCancelled || to == entity.PurchaseStatusFailed {
+		p.logPurchaseCancelled(ctx, purchase, reason, to)
+	}
+	return nil
 }

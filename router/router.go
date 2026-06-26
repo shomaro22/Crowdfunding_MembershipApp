@@ -102,6 +102,8 @@ func New(cfg Config) *echo.Echo {
 		pm = cfg.Protected
 		e.POST("/payments/checkout", cfg.Payments.Checkout, append(pm, rl(middleware.PolicyPayment))...)
 		e.POST("/payments/intent", cfg.Payments.Intent, append(pm, rl(middleware.PolicyPayment))...)
+		e.POST("/payments/verify/checkout", cfg.Payments.VerifyCheckout, append(pm, rl(middleware.PolicyPayment))...)
+		e.POST("/payments/verify/intent", cfg.Payments.VerifyIntent, append(pm, rl(middleware.PolicyPayment))...)
 		e.POST("/stripe/webhook", cfg.Payments.Webhook)
 	}
 
