@@ -31,6 +31,7 @@ type ProjectRepo interface {
 	Delete(ctx context.Context, id uuid.UUID) error
 	FindPlan(ctx context.Context, projectID, planID uuid.UUID) (*entity.ProjectPlan, error)
 	IncrementSupportCounts(ctx context.Context, projectID, planID uuid.UUID) error
+	AddCurrentAmount(ctx context.Context, projectID uuid.UUID, amount int64) error
 }
 
 type projectRepo struct {
@@ -261,6 +262,14 @@ func (r *projectRepo) IncrementSupportCounts(ctx context.Context, projectID, pla
 	}
 	return r.dbCtx(ctx).Model(&entity.ProjectPlan{}).Where("id = ? AND project_id = ?", planID, projectID).
 		UpdateColumn("supporter_count", gorm.Expr("supporter_count + 1")).Error
+}
+
+func (r *projectRepo) AddCurrentAmount(ctx context.Context, projectID uuid.UUID, amount int64) error {
+	if amount <= 0 {
+		return nil
+	}
+	return r.dbCtx(ctx).Model(&entity.Project{}).Where("id = ?", projectID).
+		UpdateColumn("current_amount", gorm.Expr("current_amount + ?", amount)).Error
 }
 
 func paginate(limit, offset int) (int, int) {
