@@ -68,9 +68,13 @@ func buildApp() (*echo.Echo, string, error) {
 		projectUC          *usecase.ProjectUseCase
 		connectUC          *usecase.ConnectUseCase
 		paymentUC          *usecase.PaymentUseCase
+		supporterUC        *usecase.SupporterUseCase
+		purchaseUC         *usecase.PurchaseUseCase
 		projectCtl         *controller.ProjectController
 		connectCtl         *controller.ConnectController
 		paymentCtl         *controller.PaymentController
+		supporterCtl       *controller.SupporterController
+		purchaseCtl        *controller.PurchaseController
 		preAuth            []echo.MiddlewareFunc
 		corsRaw            string
 		origins            []string
@@ -227,9 +231,25 @@ func buildApp() (*echo.Echo, string, error) {
 		Stripe:     stripeClient,
 		ConnectUC:  connectUC,
 	}
+	supporterUC = &usecase.SupporterUseCase{
+		DB:         gormDB,
+		Users:      userRepo,
+		Projects:   projectRepo,
+		Supporters: supporterRepo,
+		Purchases:  purchaseRepo,
+		Connect:    connectRepo,
+		Stripe:     stripeClient,
+	}
+	purchaseUC = &usecase.PurchaseUseCase{
+		Users:     userRepo,
+		Projects:  projectRepo,
+		Purchases: purchaseRepo,
+	}
 	projectCtl = controller.NewProjectController(projectUC)
 	connectCtl = controller.NewConnectController(connectUC)
 	paymentCtl = controller.NewPaymentController(paymentUC)
+	supporterCtl = controller.NewSupporterController(supporterUC)
+	purchaseCtl = controller.NewPurchaseController(purchaseUC)
 
 	validateSession = func(c echo.Context, claims auth.AuthClaims) error {
 		var (
@@ -294,6 +314,8 @@ func buildApp() (*echo.Echo, string, error) {
 		Projects:           projectCtl,
 		Connect:            connectCtl,
 		Payments:           paymentCtl,
+		Supporters:         supporterCtl,
+		Purchases:          purchaseCtl,
 		Admin:              adminCtl,
 		KYCFiles:           kycFileCtl,
 		RateLimit:          rateLimiter,
