@@ -14,6 +14,8 @@ type Config struct {
 	Projects          *controller.ProjectController
 	Connect           *controller.ConnectController
 	Payments          *controller.PaymentController
+	Supporters        *controller.SupporterController
+	Purchases         *controller.PurchaseController
 	Admin             *controller.AdminController
 	KYCFiles          *controller.KYCFileController
 	RateLimit         *middleware.RateLimiter
@@ -100,7 +102,24 @@ func New(cfg Config) *echo.Echo {
 		pm = cfg.Protected
 		e.POST("/payments/checkout", cfg.Payments.Checkout, append(pm, rl(middleware.PolicyPayment))...)
 		e.POST("/payments/intent", cfg.Payments.Intent, append(pm, rl(middleware.PolicyPayment))...)
+		e.POST("/payments/verify/checkout", cfg.Payments.VerifyCheckout, append(pm, rl(middleware.PolicyPayment))...)
+		e.POST("/payments/verify/intent", cfg.Payments.VerifyIntent, append(pm, rl(middleware.PolicyPayment))...)
 		e.POST("/stripe/webhook", cfg.Payments.Webhook)
+	}
+
+	if cfg.Supporters != nil {
+		pm = cfg.Protected
+		e.GET("/supporters", cfg.Supporters.List, pm...)
+		e.POST("/supporters/apply-plans", cfg.Supporters.ApplyPlans)
+		e.POST("/supporters/:supporterId/upgrade", cfg.Supporters.Upgrade, pm...)
+		e.POST("/supporters/:supporterId/upgrade-confirm", cfg.Supporters.UpgradeConfirm, pm...)
+		e.POST("/supporters/:supporterId/cancel", cfg.Supporters.Cancel, pm...)
+		e.POST("/supporters/:supporterId/rejoin", cfg.Supporters.Rejoin, pm...)
+		e.POST("/supporters/:supporterId/billing/change", cfg.Supporters.ChangeBilling, pm...)
+	}
+
+	if cfg.Purchases != nil {
+		e.GET("/purchases", cfg.Purchases.List, cfg.Protected...)
 	}
 
 	if cfg.KYCFiles != nil {
