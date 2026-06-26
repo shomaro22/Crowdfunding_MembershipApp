@@ -13,17 +13,17 @@ import (
 )
 
 type AdminUseCase struct {
-	Users            repository.UserRepo
-	SellerRegs       repository.SellerRegRepo
-	Projects         repository.ProjectRepo
-	Audit            repository.AuditRepo
-	ReviewDecisions  repository.ReviewDecisionRepo
-	RefreshTokens    repository.RefreshTokenRepo
-	TOTPBackup       repository.TOTPBackupRepo
-	KYC              repository.KYCStore
-	DB               *gorm.DB
-	APIBase          string
-	SignSecret       []byte
+	Users           repository.UserRepo
+	SellerRegs      repository.SellerRegRepo
+	Projects        repository.ProjectRepo
+	Audit           repository.AuditRepo
+	ReviewDecisions repository.ReviewDecisionRepo
+	RefreshTokens   repository.RefreshTokenRepo
+	TOTPBackup      repository.TOTPBackupRepo
+	KYC             repository.KYCStore
+	DB              *gorm.DB
+	APIBase         string
+	SignSecret      []byte
 }
 
 type SellerRegView struct {
@@ -106,13 +106,13 @@ func (a *AdminUseCase) ListSellerRegs(ctx context.Context, status entity.RegStat
 
 func (a *AdminUseCase) GetSellerReg(ctx context.Context, id uuid.UUID) (*SellerRegView, error) {
 	var (
-		reg  *entity.SellerReg
-		err  error
-		u    *entity.User
-		now  time.Time
-		out  *SellerRegView
-		tok  string
-		url  string
+		reg *entity.SellerReg
+		err error
+		u   *entity.User
+		now time.Time
+		out *SellerRegView
+		tok string
+		url string
 	)
 
 	reg, err = a.SellerRegs.FindID(ctx, id)
