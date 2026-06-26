@@ -15,7 +15,7 @@ import (
 
 const (
 	refreshTokenTTL = 7 * 24 * time.Hour
-	resetTokenTTL = time.Hour
+	resetTokenTTL   = time.Hour
 )
 
 type Mailer interface {
@@ -36,7 +36,7 @@ type AuthMeta struct {
 }
 
 type SessionTokens struct {
-	AuthToken string
+	AuthToken    string
 	RefreshToken string
 }
 
@@ -44,26 +44,26 @@ type LoginResult struct {
 	User         *entity.User
 	AuthToken    string
 	RefreshToken string
-	Requires2FA bool
+	Requires2FA  bool
 }
 
 type AuthUseCase struct {
-	Users        repository.UserRepo
-	SellerRegs   repository.SellerRegRepo
+	Users         repository.UserRepo
+	SellerRegs    repository.SellerRegRepo
 	RefreshTokens repository.RefreshTokenRepo
-	ResetToks    repository.ResetRepo
-	Activity     repository.ActivityRepo
-	OAuth        repository.OAuthRepo
-	OAuthCache   repository.OAuthCache
-	TOTPBackup   repository.TOTPBackupRepo
-	Tokens       *auth.TokenService
-	Mailer       Mailer
-	KYCStore     repository.KYCStore
-	Google       *auth.GoogleOAuth
-	TOTPKey      []byte
-	TOTPIssuer   string
-	DB           *gorm.DB
-	AppPublicURL string
+	ResetToks     repository.ResetRepo
+	Activity      repository.ActivityRepo
+	OAuth         repository.OAuthRepo
+	OAuthCache    repository.OAuthCache
+	TOTPBackup    repository.TOTPBackupRepo
+	Tokens        *auth.TokenService
+	Mailer        Mailer
+	KYCStore      repository.KYCStore
+	Google        *auth.GoogleOAuth
+	TOTPKey       []byte
+	TOTPIssuer    string
+	DB            *gorm.DB
+	AppPublicURL  string
 }
 
 func (a *AuthUseCase) logActivity(ctx context.Context, userID *uuid.UUID, action entity.ActivityAction, resource, resourceID string, meta AuthMeta, extra entity.JSONMetadata) {

@@ -44,9 +44,9 @@ func (a *AuthUseCase) Login(ctx context.Context, email, password string, meta Au
 	}
 	a.logActivity(ctx, &u.ID, entity.UserLogin, "user", u.ID.String(), meta, nil)
 	return &LoginResult{
-		User:      u,
-		AuthToken: tokens.AuthToken,
-		RefreshToken:   tokens.RefreshToken,
+		User:         u,
+		AuthToken:    tokens.AuthToken,
+		RefreshToken: tokens.RefreshToken,
 	}, nil
 }
 
