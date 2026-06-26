@@ -19,21 +19,21 @@ func (p *ProjectUseCase) FindView(ctx context.Context, id uuid.UUID, viewerID *u
 		now    = time.Now().UTC()
 	)
 
-	proj, plans, images, err = p.Projects.FindByID(ctx, id)
+	proj, plans, images, err = p.Projects.FindID(ctx, id)
 	if err != nil || proj == nil {
 		return nil, ErrNotFound
 	}
 	if !canViewProject(proj, viewerID, viewerRole, now) {
 		return nil, ErrNotFound
 	}
-	seller, err = p.Users.FindByID(ctx, proj.SellerID)
+	seller, err = p.Users.FindID(ctx, proj.SellerID)
 	if err != nil {
 		return nil, err
 	}
 	return &ProjectView{Project: proj, Plans: plans, Images: images, Seller: seller}, nil
 }
 
-func (p *ProjectUseCase) ListPlans(ctx context.Context, projectID uuid.UUID) ([]entity.ProjectPlan, error) {
+func (p *ProjectUseCase) ListPlans(ctx context.Context, projectID uuid.UUID, viewerID *uuid.UUID, viewerRole entity.UserRole) ([]entity.ProjectPlan, error) {
 	var (
 		proj  *entity.Project
 		plans []entity.ProjectPlan
@@ -41,12 +41,12 @@ func (p *ProjectUseCase) ListPlans(ctx context.Context, projectID uuid.UUID) ([]
 		now   time.Time
 	)
 
-	proj, plans, _, err = p.Projects.FindByID(ctx, projectID)
+	proj, plans, _, err = p.Projects.FindID(ctx, projectID)
 	if err != nil || proj == nil {
 		return nil, ErrNotFound
 	}
 	now = time.Now().UTC()
-	if !proj.IsPublic(now) {
+	if !canViewProject(proj, viewerID, viewerRole, now) {
 		return nil, ErrNotFound
 	}
 	return plans, nil

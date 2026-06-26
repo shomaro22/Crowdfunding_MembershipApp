@@ -19,7 +19,7 @@ func (p *PaymentUseCase) fulfillCheckoutSession(ctx context.Context, sess stripe
 		purpose  checkoutPurpose
 		err      error
 	)
-	purchase, err = p.Purchases.FindBySessionID(ctx, sess.ID)
+	purchase, err = p.Purchases.FindSessionID(ctx, sess.ID)
 	if err != nil || purchase == nil {
 		return err
 	}
@@ -62,7 +62,7 @@ func (p *PaymentUseCase) fulfillKonbiniRenewal(ctx context.Context, purchase *en
 	if purchase.SupporterID == nil {
 		return ErrNotFound
 	}
-	supporter, err = p.Supporters.FindByID(ctx, *purchase.SupporterID)
+	supporter, err = p.Supporters.FindID(ctx, *purchase.SupporterID)
 	if err != nil || supporter == nil {
 		return ErrNotFound
 	}
@@ -116,7 +116,7 @@ func (p *PaymentUseCase) failKonbiniRenewal(ctx context.Context, purchase *entit
 	if err != nil {
 		return err
 	}
-	supporter, err = p.Supporters.FindByID(ctx, *purchase.SupporterID)
+	supporter, err = p.Supporters.FindID(ctx, *purchase.SupporterID)
 	if err != nil || supporter == nil {
 		return err
 	}
@@ -150,7 +150,7 @@ func (p *PaymentUseCase) fulfillPaymentIntent(ctx context.Context, pi stripesdk.
 		if err != nil {
 			planID = uuid.Nil
 		}
-		return p.fulfillByPaymentIntentID(ctx, pi.ID, time.Time{}, time.Time{}, nil, nil, nil, planID)
+		return p.fulfillPaymentIntentID(ctx, pi.ID, time.Time{}, time.Time{}, nil, nil, nil, planID)
 	}
 	if pi.Metadata[stripe.MetaBillingMode] != string(entity.BillingModeKonbini) {
 		return nil
@@ -165,7 +165,7 @@ func (p *PaymentUseCase) fulfillKonbiniPaymentIntent(ctx context.Context, pi str
 		purpose  checkoutPurpose
 		err      error
 	)
-	purchase, err = p.Purchases.FindByIntentID(ctx, pi.ID)
+	purchase, err = p.Purchases.FindIntentID(ctx, pi.ID)
 	if err != nil || purchase == nil {
 		return err
 	}

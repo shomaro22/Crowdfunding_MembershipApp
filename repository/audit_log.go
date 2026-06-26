@@ -21,5 +21,5 @@ func NewAuditRepo(db *gorm.DB) AuditRepo {
 }
 
 func (r *auditRepo) Create(ctx context.Context, row *entity.AuditLog) error {
-	return r.db.WithContext(ctx).Create(row).Error
+	return dbFromCtx(ctx, r.db).Create(row).Error
 }

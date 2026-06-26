@@ -21,5 +21,5 @@ func NewActivityRepo(db *gorm.DB) ActivityRepo {
 }
 
 func (r *activityRepo) Create(ctx context.Context, row *entity.ActivityLog) error {
-	return r.db.WithContext(ctx).Create(row).Error
+	return dbFromCtx(ctx, r.db).Create(row).Error
 }

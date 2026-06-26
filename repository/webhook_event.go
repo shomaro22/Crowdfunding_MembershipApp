@@ -23,7 +23,7 @@ func NewWebhookEventRepo(db *gorm.DB) WebhookEventRepo {
 }
 
 func (r *webhookEventRepo) dbCtx(ctx context.Context) *gorm.DB {
-	return r.db.WithContext(ctx)
+	return dbFromCtx(ctx, r.db)
 }
 
 func (r *webhookEventRepo) Exists(ctx context.Context, stripeEventID string) (bool, error) {
