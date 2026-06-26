@@ -17,7 +17,7 @@ type ConnectUseCase struct {
 	Stripe  stripe.Client
 }
 
-func (c *ConnectUseCase) GetSellerID(ctx context.Context, sellerID uuid.UUID) (*entity.ConnectAccount, error) {
+func (c *ConnectUseCase) GetAccount(ctx context.Context, sellerID uuid.UUID) (*entity.ConnectAccount, error) {
 	var (
 		u   *entity.User
 		err error
