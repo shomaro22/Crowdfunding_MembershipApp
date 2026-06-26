@@ -153,16 +153,14 @@ func (p *PaymentUseCase) loadBuyerProjectPlan(ctx context.Context, buyerID, proj
 	return sc, nil
 }
 
-func (p *PaymentUseCase) createPendingPurchase(
-	ctx context.Context,
+func (p *PaymentUseCase) newPendingPurchase(
 	sc supportContext,
 	pm entity.PaymentMethod,
 	checkoutID, intentID *string,
-) (*entity.Purchase, error) {
+) *entity.Purchase {
 	var (
 		row entity.Purchase
 		key string
-		err error
 	)
 	key = uuid.New().String()
 	row = entity.Purchase{
@@ -182,11 +180,25 @@ func (p *PaymentUseCase) createPendingPurchase(
 	if sc.purpose == checkoutKonbiniRenewal && sc.membership != nil {
 		row.SupporterID = &sc.membership.ID
 	}
-	err = p.Purchases.Create(ctx, &row)
+	return &row
+}
+
+func (p *PaymentUseCase) createPendingPurchase(
+	ctx context.Context,
+	sc supportContext,
+	pm entity.PaymentMethod,
+	checkoutID, intentID *string,
+) (*entity.Purchase, error) {
+	var (
+		row *entity.Purchase
+		err error
+	)
+	row = p.newPendingPurchase(sc, pm, checkoutID, intentID)
+	err = p.Purchases.Create(ctx, row)
 	if err != nil {
 		return nil, err
 	}
-	return &row, nil
+	return row, nil
 }
 
 func checkoutMetadata(sc supportContext, purchaseID uuid.UUID, pm entity.PaymentMethod) map[string]string {

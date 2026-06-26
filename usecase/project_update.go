@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"crowdfund-app/entity"
+	"crowdfund-app/repository"
 
 	"github.com/google/uuid"
 )
@@ -84,13 +85,17 @@ func (p *ProjectUseCase) Update(ctx context.Context, sellerID, projectID uuid.UU
 		proj.Status = entity.ProjectStatusPending
 	}
 	proj.UpdatedAt = now
-	if err = p.Projects.Update(ctx, proj); err != nil {
-		return nil, err
-	}
-	if in.Images != nil || in.ImageURL != nil {
-		if err = p.Projects.ReplaceImages(ctx, projectID, images); err != nil {
-			return nil, err
+	err = repository.WithTx(ctx, p.DB, func(txCtx context.Context) error {
+		if err = p.Projects.Update(txCtx, proj); err != nil {
+			return err
 		}
+		if in.Images != nil || in.ImageURL != nil {
+			return p.Projects.ReplaceImages(txCtx, projectID, images)
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, err
 	}
 	seller, _ = p.Users.FindID(ctx, proj.SellerID)
 	return &ProjectView{Project: proj, Plans: plans, Images: images, Seller: seller}, nil
