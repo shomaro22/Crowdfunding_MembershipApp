@@ -1,0 +1,89 @@
+package controller
+
+import (
+	"context"
+	"net/http"
+
+	"crowdfund-app/entity"
+	"crowdfund-app/usecase"
+
+	"github.com/google/uuid"
+	"github.com/labstack/echo/v4"
+)
+
+type ConnectUseCase interface {
+	GetAccount(ctx context.Context, sellerID uuid.UUID) (*entity.ConnectAccount, error)
+	CreateOnboardingLink(ctx context.Context, sellerID uuid.UUID) (string, error)
+}
+
+type ConnectController struct {
+	Connect ConnectUseCase
+}
+
+func NewConnectController(uc ConnectUseCase) *ConnectController {
+	return &ConnectController{Connect: uc}
+}
+
+func (h *ConnectController) GetAccount(c echo.Context) error {
+	var (
+		sellerID uuid.UUID
+		row      *entity.ConnectAccount
+		err      error
+	)
+	sellerID, err = CurrentUserID(c)
+	if err != nil {
+		return err
+	}
+	row, err = h.Connect.GetAccount(c.Request().Context(), sellerID)
+	if err != nil {
+		return mapConnectError(err)
+	}
+	if row == nil {
+		return c.JSON(http.StatusOK, map[string]any{"account": nil})
+	}
+	return c.JSON(http.StatusOK, map[string]any{"account": toConnectAccountJSON(row)})
+}
+
+func (h *ConnectController) CreateOnboarding(c echo.Context) error {
+	var (
+		sellerID uuid.UUID
+		url      string
+		err      error
+	)
+	sellerID, err = CurrentUserID(c)
+	if err != nil {
+		return err
+	}
+	url, err = h.Connect.CreateOnboardingLink(c.Request().Context(), sellerID)
+	if err != nil {
+		return mapConnectError(err)
+	}
+	return c.JSON(http.StatusOK, map[string]string{"url": url})
+}
+
+type connectAccountResp struct {
+	StripeAccountID  string `json:"stripe_account_id"`
+	ChargesEnabled   bool   `json:"charges_enabled"`
+	PayoutsEnabled   bool   `json:"payouts_enabled"`
+	DetailsSubmitted bool   `json:"details_submitted"`
+}
+
+func toConnectAccountJSON(row *entity.ConnectAccount) connectAccountResp {
+	return connectAccountResp{
+		StripeAccountID:  row.StripeAccountID,
+		ChargesEnabled:   row.ChargesEnabled,
+		PayoutsEnabled:   row.PayoutsEnabled,
+		DetailsSubmitted: row.DetailsSubmitted,
+	}
+}
+
+func mapConnectError(err error) *echo.HTTPError {
+	switch err {
+	case usecase.ErrForbidden:
+		return echo.NewHTTPError(http.StatusForbidden, apiError("forbidden", "FORBIDDEN"))
+	case usecase.ErrStripeUnavailable:
+		return echo.NewHTTPError(http.StatusServiceUnavailable, apiError("stripe unavailable", "STRIPE_UNAVAILABLE"))
+	default:
+		return mapAuthError(err)
+	}
+}
