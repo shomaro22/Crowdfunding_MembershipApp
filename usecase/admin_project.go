@@ -46,7 +46,7 @@ func (a *AdminUseCase) PatchProject(ctx context.Context, adminID, projectID uuid
 	if a.Projects == nil {
 		return nil, ErrNotFound
 	}
-	proj, plans, images, err = a.Projects.FindByID(ctx, projectID)
+	proj, plans, images, err = a.Projects.FindID(ctx, projectID)
 	if err != nil || proj == nil {
 		return nil, ErrNotFound
 	}
@@ -85,7 +85,7 @@ func (a *AdminUseCase) PatchProject(ctx context.Context, adminID, projectID uuid
 	} else {
 		a.writeReviewDecision(ctx, adminID, entity.ReviewProject, projectID, entity.ReviewRejected, reason)
 	}
-	seller, _ = a.Users.FindByID(ctx, proj.SellerID)
+	seller, _ = a.Users.FindID(ctx, proj.SellerID)
 	return &ProjectView{Project: proj, Plans: plans, Images: images, Seller: seller}, nil
 }
 
@@ -101,7 +101,7 @@ func (a *AdminUseCase) DeleteProject(ctx context.Context, adminID, projectID uui
 	if a.Projects == nil {
 		return ErrNotFound
 	}
-	proj, _, _, err = a.Projects.FindByID(ctx, projectID)
+	proj, _, _, err = a.Projects.FindID(ctx, projectID)
 	if err != nil || proj == nil {
 		return ErrNotFound
 	}
@@ -133,7 +133,7 @@ func (a *AdminUseCase) PatchDeleteReq(ctx context.Context, adminID, projectID uu
 	if a.Projects == nil {
 		return nil, ErrNotFound
 	}
-	proj, plans, images, err = a.Projects.FindByID(ctx, projectID)
+	proj, plans, images, err = a.Projects.FindID(ctx, projectID)
 	if err != nil || proj == nil {
 		return nil, ErrNotFound
 	}
@@ -163,6 +163,6 @@ func (a *AdminUseCase) PatchDeleteReq(ctx context.Context, adminID, projectID uu
 	default:
 		return nil, ErrBadRequest
 	}
-	seller, _ = a.Users.FindByID(ctx, proj.SellerID)
+	seller, _ = a.Users.FindID(ctx, proj.SellerID)
 	return &ProjectView{Project: proj, Plans: plans, Images: images, Seller: seller}, nil
 }

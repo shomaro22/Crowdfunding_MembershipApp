@@ -2,16 +2,18 @@ package repository
 
 import (
 	"context"
-	"errors"
+	"time"
 
 	"crowdfund-app/entity"
 
+	"github.com/google/uuid"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 type WebhookEventRepo interface {
-	Exists(ctx context.Context, stripeEventID string) (bool, error)
-	Create(ctx context.Context, row *entity.WebhookEvent) error
+	Claim(ctx context.Context, stripeEventID, eventType string) (bool, error)
+	Release(ctx context.Context, stripeEventID string) error
 }
 
 type webhookEventRepo struct {
@@ -23,27 +25,32 @@ func NewWebhookEventRepo(db *gorm.DB) WebhookEventRepo {
 }
 
 func (r *webhookEventRepo) dbCtx(ctx context.Context) *gorm.DB {
-	return r.db.WithContext(ctx)
+	return dbFromCtx(ctx, r.db)
 }
 
-func (r *webhookEventRepo) Exists(ctx context.Context, stripeEventID string) (bool, error) {
+// Claim inserts a webhook event row. Returns true when this caller won deduplication.
+func (r *webhookEventRepo) Claim(ctx context.Context, stripeEventID, eventType string) (bool, error) {
 	var (
-		err   error
-		count int64
+		row entity.WebhookEvent
+		res *gorm.DB
 	)
-	err = r.dbCtx(ctx).Model(&entity.WebhookEvent{}).
-		Where("stripe_event_id = ?", stripeEventID).
-		Count(&count).Error
-	if err != nil {
-		return false, err
+	row = entity.WebhookEvent{
+		ID:            uuid.New(),
+		StripeEventID: stripeEventID,
+		EventType:     eventType,
+		ProcessedAt:   time.Now().UTC(),
 	}
-	return count > 0, nil
+	res = r.dbCtx(ctx).Clauses(clause.OnConflict{
+		Columns:   []clause.Column{{Name: "stripe_event_id"}},
+		DoNothing: true,
+	}).Create(&row)
+	if res.Error != nil {
+		return false, res.Error
+	}
+	return res.RowsAffected > 0, nil
 }
 
-func (r *webhookEventRepo) Create(ctx context.Context, row *entity.WebhookEvent) error {
-	err := r.dbCtx(ctx).Create(row).Error
-	if err != nil && errors.Is(err, gorm.ErrDuplicatedKey) {
-		return nil
-	}
-	return err
+// Release removes a claimed row so Stripe can retry after handler failure.
+func (r *webhookEventRepo) Release(ctx context.Context, stripeEventID string) error {
+	return r.dbCtx(ctx).Where("stripe_event_id = ?", stripeEventID).Delete(&entity.WebhookEvent{}).Error
 }

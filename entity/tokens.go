@@ -6,8 +6,7 @@ import (
 	"github.com/google/uuid"
 )
 
-// ReToken は仕様上の Refresh Token。DB テーブル名は refresh_tokens。
-type ReToken struct {
+type RefreshToken struct {
 	ID        uuid.UUID  `gorm:"type:uuid;primaryKey;default:gen_random_uuid()"`
 	UserID    uuid.UUID  `gorm:"type:uuid;not null;index"`
 	TokenHash string     `gorm:"column:token_hash;not null;uniqueIndex"`
@@ -16,13 +15,13 @@ type ReToken struct {
 	RevokedAt *time.Time `gorm:"column:revoked_at"`
 }
 
-func (ReToken) TableName() string { return "refresh_tokens" }
+func (RefreshToken) TableName() string { return "refresh_tokens" }
 
-func (t ReToken) IsRevoked() bool {
+func (t RefreshToken) IsRevoked() bool {
 	return t.RevokedAt != nil
 }
 
-func (t ReToken) IsExpired(now time.Time) bool {
+func (t RefreshToken) IsExpired(now time.Time) bool {
 	return !t.ExpiresAt.After(now)
 }
 

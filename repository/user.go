@@ -13,10 +13,10 @@ import (
 type UserRepo interface {
 	Create(ctx context.Context, u *entity.User) error
 	Update(ctx context.Context, u *entity.User) error
-	FindByID(ctx context.Context, id uuid.UUID) (*entity.User, error)
-	FindByEmail(ctx context.Context, email string) (*entity.User, error)
+	FindID(ctx context.Context, id uuid.UUID) (*entity.User, error)
+	FindEmail(ctx context.Context, email string) (*entity.User, error)
 	EmailExists(ctx context.Context, email string) (bool, error)
-	ListByRoleStatus(ctx context.Context, role entity.UserRole, status entity.AccountStatus, limit, offset int) ([]entity.User, int64, error)
+	ListRoleStatus(ctx context.Context, role entity.UserRole, status entity.AccountStatus, limit, offset int) ([]entity.User, int64, error)
 	BumpTokenVer(ctx context.Context, userID uuid.UUID) (int64, error)
 }
 
@@ -29,31 +29,19 @@ func NewUserRepo(db *gorm.DB) UserRepo {
 }
 
 func (r *userRepo) Create(ctx context.Context, u *entity.User) error {
-	return r.withDB(ctx).Create(u).Error
+	return dbFromCtx(ctx, r.db).Create(u).Error
 }
 
 func (r *userRepo) Update(ctx context.Context, u *entity.User) error {
-	return r.withDB(ctx).Save(u).Error
+	return dbFromCtx(ctx, r.db).Save(u).Error
 }
 
-func (r *userRepo) withDB(ctx context.Context) *gorm.DB {
-	var (
-		tx *gorm.DB
-		ok bool
-	)
-	tx, ok = ctx.Value(txKey{}).(*gorm.DB)
-	if ok && tx != nil {
-		return tx.WithContext(ctx)
-	}
-	return r.db.WithContext(ctx)
-}
-
-func (r *userRepo) FindByID(ctx context.Context, id uuid.UUID) (*entity.User, error) {
+func (r *userRepo) FindID(ctx context.Context, id uuid.UUID) (*entity.User, error) {
 	var (
 		u   entity.User
 		err error
 	)
-	err = r.withDB(ctx).Where("id = ?", id).First(&u).Error
+	err = dbFromCtx(ctx, r.db).Where("id = ?", id).First(&u).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, nil
 	}
@@ -63,12 +51,12 @@ func (r *userRepo) FindByID(ctx context.Context, id uuid.UUID) (*entity.User, er
 	return &u, nil
 }
 
-func (r *userRepo) FindByEmail(ctx context.Context, email string) (*entity.User, error) {
+func (r *userRepo) FindEmail(ctx context.Context, email string) (*entity.User, error) {
 	var (
 		u   entity.User
 		err error
 	)
-	err = r.withDB(ctx).Where("email = ?", email).First(&u).Error
+	err = dbFromCtx(ctx, r.db).Where("email = ?", email).First(&u).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, nil
 	}
@@ -83,18 +71,18 @@ func (r *userRepo) EmailExists(ctx context.Context, email string) (bool, error) 
 		count int64
 		err   error
 	)
-	err = r.withDB(ctx).Model(&entity.User{}).Where("email = ?", email).Count(&count).Error
+	err = dbFromCtx(ctx, r.db).Model(&entity.User{}).Where("email = ?", email).Count(&count).Error
 	return count > 0, err
 }
 
-func (r *userRepo) ListByRoleStatus(ctx context.Context, role entity.UserRole, status entity.AccountStatus, limit, offset int) ([]entity.User, int64, error) {
+func (r *userRepo) ListRoleStatus(ctx context.Context, role entity.UserRole, status entity.AccountStatus, limit, offset int) ([]entity.User, int64, error) {
 	var (
 		q     *gorm.DB
 		total int64
 		rows  []entity.User
 		err   error
 	)
-	q = r.withDB(ctx).Model(&entity.User{}).Where("role = ? AND account_status = ?", role, status)
+	q = dbFromCtx(ctx, r.db).Model(&entity.User{}).Where("role = ? AND account_status = ?", role, status)
 	err = q.Count(&total).Error
 	if err != nil {
 		return nil, 0, err
@@ -108,7 +96,7 @@ func (r *userRepo) ListByRoleStatus(ctx context.Context, role entity.UserRole, s
 	if offset < 0 {
 		offset = 0
 	}
-	err = r.withDB(ctx).Where("role = ? AND account_status = ?", role, status).
+	err = dbFromCtx(ctx, r.db).Where("role = ? AND account_status = ?", role, status).
 		Order("created_at DESC").Limit(limit).Offset(offset).Find(&rows).Error
 	return rows, total, err
 }
@@ -119,13 +107,13 @@ func (r *userRepo) BumpTokenVer(ctx context.Context, userID uuid.UUID) (int64, e
 		u   entity.User
 		err error
 	)
-	res = r.withDB(ctx).Model(&entity.User{}).
+	res = dbFromCtx(ctx, r.db).Model(&entity.User{}).
 		Where("id = ?", userID).
 		UpdateColumn("token_version", gorm.Expr("token_version + 1"))
 	if res.Error != nil {
 		return 0, res.Error
 	}
-	err = r.withDB(ctx).Select("token_version").Where("id = ?", userID).First(&u).Error
+	err = dbFromCtx(ctx, r.db).Select("token_version").Where("id = ?", userID).First(&u).Error
 	if err != nil {
 		return 0, err
 	}

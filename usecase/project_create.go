@@ -23,7 +23,7 @@ func (p *ProjectUseCase) Create(ctx context.Context, sellerID uuid.UUID, in Crea
 		pl         PlanIn
 	)
 
-	u, err = p.Users.FindByID(ctx, sellerID)
+	u, err = p.Users.FindID(ctx, sellerID)
 	if err != nil || u == nil {
 		return nil, ErrNotFound
 	}

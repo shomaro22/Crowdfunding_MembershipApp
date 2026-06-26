@@ -77,7 +77,7 @@ func (h *AuthController) Challenge2FA(c echo.Context) error {
 		return mapAuthError(err)
 	}
 	auth.ClearPending2FA(c, h.CookieCfg)
-	auth.SetReCookie(c, h.CookieCfg, res.ReToken)
+	auth.SetRefreshCookie(c, h.CookieCfg, res.RefreshToken)
 	return c.JSON(http.StatusOK, authTokenResponse{
 		AuthToken: res.AuthToken,
 		User:      userToJSON(res.User),
@@ -116,7 +116,7 @@ func (h *AuthController) GoogleCallback(c echo.Context) error {
 	if err != nil {
 		return c.Redirect(http.StatusFound, h.Auth.OAuthErrorRedirect(oauthErrCode(err)))
 	}
-	auth.SetReCookie(c, h.CookieCfg, res.ReToken)
+	auth.SetRefreshCookie(c, h.CookieCfg, res.RefreshToken)
 	return c.Redirect(http.StatusFound, h.Auth.OAuthSuccessRedirect(res.From, res.CallbackCode))
 }
 

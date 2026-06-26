@@ -10,7 +10,7 @@ import (
 	"github.com/google/uuid"
 )
 
-func (p *PaymentUseCase) fulfillByPaymentIntentID(
+func (p *PaymentUseCase) fulfillPaymentIntentID(
 	ctx context.Context,
 	intentID string,
 	start, end time.Time,
@@ -21,7 +21,7 @@ func (p *PaymentUseCase) fulfillByPaymentIntentID(
 		purchase *entity.Purchase
 		err      error
 	)
-	purchase, err = p.Purchases.FindByIntentID(ctx, intentID)
+	purchase, err = p.Purchases.FindIntentID(ctx, intentID)
 	if err != nil || purchase == nil {
 		return err
 	}
@@ -30,18 +30,6 @@ func (p *PaymentUseCase) fulfillByPaymentIntentID(
 		period = periodRange{start, end}
 	}
 	return p.fulfillFirstSupport(ctx, purchase, planID, period, customerID, subscriptionID, invoiceID)
-}
-
-func (p *PaymentUseCase) fulfillByPurchaseID(ctx context.Context, purchaseID uuid.UUID, start, end time.Time, customerID, subscriptionID, invoiceID *string) error {
-	var (
-		purchase *entity.Purchase
-		err      error
-	)
-	purchase, err = p.Purchases.FindByID(ctx, purchaseID)
-	if err != nil || purchase == nil {
-		return err
-	}
-	return p.fulfillFirstSupport(ctx, purchase, uuid.Nil, periodRange{start, end}, customerID, subscriptionID, invoiceID)
 }
 
 func defaultPeriod(start, end *time.Time) periodRange {
@@ -60,31 +48,37 @@ func (p *PaymentUseCase) fulfillFirstSupport(
 	period periodRange,
 	customerID, subscriptionID, invoiceID *string,
 ) error {
-	if purchase.Status == entity.PurchaseStatusPaid {
-		return nil
-	}
-	if purchase.Status != entity.PurchaseStatusPending {
-		return nil
-	}
 	return repository.WithTx(ctx, p.DB, func(txCtx context.Context) error {
 		var (
-			active    *entity.ProjectSupporter
-			supporter entity.ProjectSupporter
+			locked     *entity.Purchase
+			membership *entity.ProjectSupporter
+			supporter  entity.ProjectSupporter
 			resolved  uuid.UUID
 			proj      *entity.Project
 			plans     []entity.ProjectPlan
 			now       time.Time
 			err       error
 		)
+		locked, err = p.Purchases.FindIDLock(txCtx, purchase.ID)
+		if err != nil || locked == nil {
+			return ErrNotFound
+		}
+		purchase = locked
+		if purchase.Status == entity.PurchaseStatusPaid {
+			return nil
+		}
+		if purchase.Status != entity.PurchaseStatusPending {
+			return nil
+		}
 		now = time.Now().UTC()
-		active, err = p.Supporters.FindActive(txCtx, purchase.ProjectID, purchase.BuyerID)
+		membership, err = p.Supporters.FindMembership(txCtx, purchase.ProjectID, purchase.BuyerID)
 		if err != nil {
 			return err
 		}
-		if active != nil {
-			return p.markPurchasePaid(txCtx, purchase, active.ID, period, invoiceID)
+		if membership != nil {
+			return p.markPurchasePaid(txCtx, purchase, membership.ID, period, invoiceID)
 		}
-		proj, plans, _, err = p.Projects.FindByID(txCtx, purchase.ProjectID)
+		proj, plans, _, err = p.Projects.FindID(txCtx, purchase.ProjectID)
 		if err != nil || proj == nil {
 			return ErrNotFound
 		}
@@ -161,6 +155,9 @@ func (p *PaymentUseCase) markPurchasePaid(ctx context.Context, purchase *entity.
 	purchase.StripeInvoiceID = invoiceID
 	purchase.UpdatedAt = time.Now().UTC()
 	if err = p.Purchases.Update(ctx, purchase); err != nil {
+		return err
+	}
+	if err = p.Projects.AddCurrentAmount(ctx, purchase.ProjectID, int64(purchase.TotalPrice)); err != nil {
 		return err
 	}
 	return p.Purchases.RecordEvent(ctx, &entity.PurchaseEvent{

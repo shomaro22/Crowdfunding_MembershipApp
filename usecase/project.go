@@ -8,6 +8,7 @@ import (
 	"crowdfund-app/repository"
 
 	"github.com/google/uuid"
+	"gorm.io/gorm"
 )
 
 type PlanIn struct {
@@ -57,6 +58,7 @@ type ProjectView struct {
 type ProjectUseCase struct {
 	Projects repository.ProjectRepo
 	Users    repository.UserRepo
+	DB       *gorm.DB
 }
 
 func (p *ProjectUseCase) enrichList(ctx context.Context, rows []entity.Project, total int64) ([]ProjectView, int64, error) {
@@ -80,14 +82,14 @@ func (p *ProjectUseCase) enrichList(ctx context.Context, rows []entity.Project, 
 		proj = rows[i]
 		seller, ok = sellerCache[proj.SellerID]
 		if !ok {
-			u, err = p.Users.FindByID(ctx, proj.SellerID)
+			u, err = p.Users.FindID(ctx, proj.SellerID)
 			if err != nil {
 				return nil, 0, err
 			}
 			seller = u
 			sellerCache[proj.SellerID] = u
 		}
-		_, plans, images, err = p.Projects.FindByID(ctx, proj.ID)
+		_, plans, images, err = p.Projects.FindID(ctx, proj.ID)
 		if err != nil {
 			return nil, 0, err
 		}

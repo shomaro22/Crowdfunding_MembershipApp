@@ -16,7 +16,7 @@ import (
 const oauthCallbackCodeTTL = 2 * time.Minute
 
 type OAuthCBOut struct {
-	ReToken      string
+	RefreshToken string
 	CallbackCode string
 	From         string
 	User         *entity.User
@@ -83,7 +83,7 @@ func (a *AuthUseCase) GoogleCallback(ctx context.Context, code, state string, me
 	}
 	a.logActivity(ctx, &u.ID, entity.UserLogin, "user", u.ID.String(), meta, entity.ProviderMeta("google"))
 	return &OAuthCBOut{
-		ReToken:      tokens.ReToken,
+		RefreshToken: tokens.RefreshToken,
 		CallbackCode: cbCode,
 		From:         from,
 		User:         u,
@@ -113,7 +113,7 @@ func (a *AuthUseCase) ExchangeOAuthCode(ctx context.Context, code string, meta A
 	if !ok {
 		return nil, ErrInvalidToken
 	}
-	u, err = a.Users.FindByID(ctx, userID)
+	u, err = a.Users.FindID(ctx, userID)
 	if err != nil || u == nil || !u.CanLogin() {
 		return nil, ErrInvalidToken
 	}
@@ -163,14 +163,14 @@ func (a *AuthUseCase) resolveGoogleUser(ctx context.Context, profile *auth.Googl
 		u        *entity.User
 	)
 
-	acc, err = a.OAuth.FindBySub(ctx, entity.OAuthProviderGoogle, profile.Sub)
+	acc, err = a.OAuth.FindSub(ctx, entity.OAuthProviderGoogle, profile.Sub)
 	if err != nil {
 		return nil, err
 	}
 	if acc != nil {
-		return a.Users.FindByID(ctx, acc.UserID)
+		return a.Users.FindID(ctx, acc.UserID)
 	}
-	existing, err = a.Users.FindByEmail(ctx, profile.Email)
+	existing, err = a.Users.FindEmail(ctx, profile.Email)
 	if err != nil {
 		return nil, err
 	}
@@ -210,7 +210,7 @@ func (a *AuthUseCase) resolveGoogleUser(ctx context.Context, profile *auth.Googl
 		Name:          name,
 		PasswordHash:  pwHash,
 		Role:          entity.UserRoleBuyer,
-		AccountStatus: entity.AccountStatusActive,
+		AccountStatus: entity.AccountStatusPending,
 		SellerStatus:  entity.SellerStatusNotApplicable,
 		CreatedAt:     now,
 		UpdatedAt:     now,

@@ -3,11 +3,7 @@ package usecase
 import (
 	"context"
 	"encoding/json"
-	"time"
 
-	"crowdfund-app/entity"
-
-	"github.com/google/uuid"
 	stripesdk "github.com/stripe/stripe-go/v82"
 )
 
@@ -23,12 +19,12 @@ func (p *PaymentUseCase) HandleWebhook(ctx context.Context, payload []byte, sign
 	if err != nil {
 		return err
 	}
-	var exists bool
-	exists, err = p.Webhooks.Exists(ctx, event.ID)
+	var claimed bool
+	claimed, err = p.Webhooks.Claim(ctx, event.ID, string(event.Type))
 	if err != nil {
 		return err
 	}
-	if exists {
+	if !claimed {
 		return nil
 	}
 	switch string(event.Type) {
@@ -50,14 +46,10 @@ func (p *PaymentUseCase) HandleWebhook(ctx context.Context, payload []byte, sign
 		err = nil
 	}
 	if err != nil {
+		_ = p.Webhooks.Release(ctx, event.ID)
 		return err
 	}
-	return p.Webhooks.Create(ctx, &entity.WebhookEvent{
-		ID:            uuid.New(),
-		StripeEventID: event.ID,
-		EventType:     string(event.Type),
-		ProcessedAt:   time.Now().UTC(),
-	})
+	return nil
 }
 
 func (p *PaymentUseCase) onAccountUpdated(ctx context.Context, event stripesdk.Event) error {
