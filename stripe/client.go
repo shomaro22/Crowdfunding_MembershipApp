@@ -27,6 +27,11 @@ type Client interface {
 	AppURL() string
 	CreateCheckoutSession(ctx context.Context, in CheckoutSessionIn) (CheckoutSessionOut, error)
 	CreateSubscriptionIntent(ctx context.Context, in SubscriptionIntentIn) (SubscriptionIntentOut, error)
+	CancelSubscriptionAtPeriodEnd(ctx context.Context, subID string) error
+	ResumeSubscription(ctx context.Context, subID string) error
+	UpdateSubscriptionAmount(ctx context.Context, subID string, amount int64) error
+	CreateUpgradePaymentIntent(ctx context.Context, in UpgradePaymentIn) (UpgradePaymentOut, error)
+	GetPaymentIntent(ctx context.Context, intentID string) (PaymentIntentSnapshot, error)
 }
 
 type client struct {
