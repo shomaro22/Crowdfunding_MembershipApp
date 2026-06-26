@@ -169,6 +169,9 @@ func (p *PaymentUseCase) markPurchasePaid(ctx context.Context, purchase *entity.
 	if err = p.Purchases.Update(ctx, purchase); err != nil {
 		return err
 	}
+	if err = p.Projects.AddCurrentAmount(ctx, purchase.ProjectID, int64(purchase.TotalPrice)); err != nil {
+		return err
+	}
 	return p.Purchases.RecordEvent(ctx, &entity.PurchaseEvent{
 		ID:         uuid.New(),
 		PurchaseID: purchase.ID,
