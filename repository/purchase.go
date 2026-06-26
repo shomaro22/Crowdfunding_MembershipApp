@@ -20,6 +20,7 @@ type PurchaseRepo interface {
 	FindIntentID(ctx context.Context, intentID string) (*entity.Purchase, error)
 	FindPendingBuyerProject(ctx context.Context, buyerID, projectID uuid.UUID) (*entity.Purchase, error)
 	FindStripeInvoiceID(ctx context.Context, invoiceID string) (*entity.Purchase, error)
+	ListByBuyerID(ctx context.Context, buyerID uuid.UUID, limit, offset int) ([]entity.Purchase, int64, error)
 	RecordEvent(ctx context.Context, ev *entity.PurchaseEvent) error
 }
 
@@ -134,6 +135,27 @@ func (r *purchaseRepo) FindStripeInvoiceID(ctx context.Context, invoiceID string
 		return nil, err
 	}
 	return &row, nil
+}
+
+func (r *purchaseRepo) ListByBuyerID(ctx context.Context, buyerID uuid.UUID, limit, offset int) ([]entity.Purchase, int64, error) {
+	var (
+		rows  []entity.Purchase
+		total int64
+		err   error
+	)
+	limit, offset = paginate(limit, offset)
+	err = r.dbCtx(ctx).Model(&entity.Purchase{}).Where("buyer_id = ?", buyerID).Count(&total).Error
+	if err != nil {
+		return nil, 0, err
+	}
+	err = r.dbCtx(ctx).Where("buyer_id = ?", buyerID).
+		Order("created_at DESC").
+		Limit(limit).Offset(offset).
+		Find(&rows).Error
+	if err != nil {
+		return nil, 0, err
+	}
+	return rows, total, nil
 }
 
 func (r *purchaseRepo) RecordEvent(ctx context.Context, ev *entity.PurchaseEvent) error {

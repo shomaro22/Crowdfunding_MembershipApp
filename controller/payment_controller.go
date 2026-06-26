@@ -6,6 +6,7 @@ import (
 	"net/http"
 
 	"crowdfund-app/entity"
+	"crowdfund-app/middleware"
 	"crowdfund-app/usecase"
 
 	"github.com/google/uuid"
@@ -15,6 +16,8 @@ import (
 type PaymentUseCase interface {
 	CreateCheckout(ctx context.Context, in usecase.CheckoutIn) (usecase.CheckoutOut, error)
 	CreateIntent(ctx context.Context, in usecase.IntentIn) (usecase.IntentOut, error)
+	VerifyCheckout(ctx context.Context, buyerID uuid.UUID, sessionID string) (usecase.SupporterView, error)
+	VerifyIntent(ctx context.Context, buyerID uuid.UUID, intentID string) (usecase.SupporterView, error)
 	HandleWebhook(ctx context.Context, payload []byte, signature string) error
 }
 
@@ -58,6 +61,7 @@ func (h *PaymentController) Checkout(c echo.Context) error {
 	if err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, apiError("invalid request body", "BAD_REQUEST"))
 	}
+	in.Meta = requestMeta(c)
 	out, err = h.Payments.CreateCheckout(c.Request().Context(), in)
 	if err != nil {
 		return mapPaymentError(err)
@@ -87,6 +91,7 @@ func (h *PaymentController) Intent(c echo.Context) error {
 	if err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, apiError("invalid request body", "BAD_REQUEST"))
 	}
+	in.Meta = requestMeta(c)
 	out, err = h.Payments.CreateIntent(c.Request().Context(), in)
 	if err != nil {
 		return mapPaymentError(err)
@@ -111,6 +116,66 @@ func (h *PaymentController) Webhook(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusBadRequest, apiError("webhook rejected", "BAD_REQUEST"))
 	}
 	return c.NoContent(http.StatusOK)
+}
+
+type verifyCheckoutJSON struct {
+	SessionID string `json:"session_id"`
+}
+
+type verifyIntentJSON struct {
+	PaymentIntentID string `json:"payment_intent_id"`
+}
+
+func (h *PaymentController) VerifyCheckout(c echo.Context) error {
+	var (
+		buyerID uuid.UUID
+		body    verifyCheckoutJSON
+		view    usecase.SupporterView
+		err     error
+	)
+	buyerID, err = CurrentUserID(c)
+	if err != nil {
+		return err
+	}
+	if err = c.Bind(&body); err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, apiError("invalid request body", "BAD_REQUEST"))
+	}
+	view, err = h.Payments.VerifyCheckout(c.Request().Context(), buyerID, body.SessionID)
+	if err != nil {
+		return mapPaymentError(err)
+	}
+	return c.JSON(http.StatusOK, supporterToJSON(view))
+}
+
+func (h *PaymentController) VerifyIntent(c echo.Context) error {
+	var (
+		buyerID uuid.UUID
+		body    verifyIntentJSON
+		view    usecase.SupporterView
+		err     error
+	)
+	buyerID, err = CurrentUserID(c)
+	if err != nil {
+		return err
+	}
+	if err = c.Bind(&body); err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, apiError("invalid request body", "BAD_REQUEST"))
+	}
+	view, err = h.Payments.VerifyIntent(c.Request().Context(), buyerID, body.PaymentIntentID)
+	if err != nil {
+		return mapPaymentError(err)
+	}
+	return c.JSON(http.StatusOK, supporterToJSON(view))
+}
+
+func requestMeta(c echo.Context) usecase.RequestMeta {
+	var reqID string
+	reqID, _ = c.Get(middleware.CtxRequestID).(string)
+	return usecase.RequestMeta{
+		IPAddress: c.RealIP(),
+		UserAgent: c.Request().UserAgent(),
+		RequestID: reqID,
+	}
 }
 
 func (body checkoutRequestJSON) toInput(buyerID uuid.UUID) (usecase.CheckoutIn, error) {
@@ -167,6 +232,8 @@ func mapPaymentError(err error) *echo.HTTPError {
 		return echo.NewHTTPError(http.StatusConflict, apiError("pending checkout exists", "CONFLICT"))
 	case usecase.ErrAlreadySupporting:
 		return echo.NewHTTPError(http.StatusConflict, apiError("already supporting", "CONFLICT"))
+	case usecase.ErrNotFound:
+		return echo.NewHTTPError(http.StatusNotFound, apiError("not found", "NOT_FOUND"))
 	case usecase.ErrStripeUnavailable:
 		return echo.NewHTTPError(http.StatusServiceUnavailable, apiError("stripe unavailable", "STRIPE_UNAVAILABLE"))
 	default:

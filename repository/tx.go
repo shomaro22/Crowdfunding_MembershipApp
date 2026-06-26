@@ -8,8 +8,7 @@ import (
 
 type txKey struct{}
 
-// WithTx runs fn inside a database transaction. Repositories resolve the active
-// transaction via dbFromCtx when the context carries txKey.
+
 func WithTx(ctx context.Context, db *gorm.DB, fn func(ctx context.Context) error) error {
 	return db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		return fn(context.WithValue(ctx, txKey{}, tx))
