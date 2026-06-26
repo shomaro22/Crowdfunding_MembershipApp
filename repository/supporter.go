@@ -19,6 +19,7 @@ type SupporterRepo interface {
 	FindOwned(ctx context.Context, id, userID uuid.UUID) (*entity.ProjectSupporter, error)
 	ListByUserID(ctx context.Context, userID uuid.UUID) ([]entity.ProjectSupporter, error)
 	ListDuePlanChanges(ctx context.Context, asOf time.Time) ([]entity.ProjectSupporter, error)
+	ListExpirable(ctx context.Context, asOf time.Time) ([]entity.ProjectSupporter, error)
 	Create(ctx context.Context, row *entity.ProjectSupporter) error
 	Update(ctx context.Context, row *entity.ProjectSupporter) error
 }
@@ -132,6 +133,22 @@ func (r *supporterRepo) ListDuePlanChanges(ctx context.Context, asOf time.Time) 
 	err = r.dbCtx(ctx).
 		Where("plan_change_date IS NOT NULL AND plan_change_date <= ?", asOf).
 		Where("pending_plan_id IS NOT NULL OR pending_billing_mode IS NOT NULL").
+		Find(&rows).Error
+	return rows, err
+}
+
+func (r *supporterRepo) ListExpirable(ctx context.Context, asOf time.Time) ([]entity.ProjectSupporter, error) {
+	var (
+		rows []entity.ProjectSupporter
+		err  error
+	)
+	err = r.dbCtx(ctx).
+		Where("current_period_end < ?", asOf).
+		Where("status IN ?", []entity.SupporterStatus{
+			entity.SupporterStatusActive,
+			entity.SupporterStatusPendingRenewal,
+			entity.SupporterStatusCancelled,
+		}).
 		Find(&rows).Error
 	return rows, err
 }

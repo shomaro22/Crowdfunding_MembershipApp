@@ -33,33 +33,47 @@ func (s *SupporterUseCase) ListMine(ctx context.Context, userID uuid.UUID) ([]Su
 
 func (s *SupporterUseCase) ApplyPlans(ctx context.Context) (int, error) {
 	var (
-		rows    []entity.ProjectSupporter
-		applied int
-		err     error
-		i       int
-		ok      bool
+		processed int
+		err       error
 	)
-	rows, err = s.Supporters.ListDuePlanChanges(ctx, time.Now().UTC())
+	processed, _, err = s.RunApplyPlans(ctx, false)
+	return processed, err
+}
+
+func (s *SupporterUseCase) RunApplyPlans(ctx context.Context, dryRun bool) (processed, failed int, err error) {
+	var (
+		rows []entity.ProjectSupporter
+		now  time.Time
+		i    int
+		ok   bool
+	)
+	now = time.Now().UTC()
+	rows, err = s.Supporters.ListDuePlanChanges(ctx, now)
 	if err != nil {
-		return 0, err
+		return 0, 0, err
+	}
+	if dryRun {
+		return len(rows), 0, nil
 	}
 	for i = range rows {
 		ok, err = s.applyPendingChanges(ctx, &rows[i])
 		if err != nil {
-			return applied, err
+			failed++
+			err = nil
+			continue
 		}
 		if ok {
-			applied++
+			processed++
 		}
 	}
-	return applied, nil
+	return processed, failed, nil
 }
 
 func (s *SupporterUseCase) applyPendingChanges(ctx context.Context, supporter *entity.ProjectSupporter) (bool, error) {
 	var (
-		now   time.Time
-		due   bool
-		err   error
+		now time.Time
+		due bool
+		err error
 	)
 	if supporter == nil {
 		return false, nil
@@ -158,9 +172,9 @@ func (s *SupporterUseCase) enrichViews(ctx context.Context, rows []entity.Projec
 
 func (s *SupporterUseCase) enrichView(ctx context.Context, supporter *entity.ProjectSupporter) (SupporterView, error) {
 	var (
-		v   SupporterView
+		v    SupporterView
 		proj *entity.Project
-		err error
+		err  error
 	)
 	if supporter == nil {
 		return SupporterView{}, ErrNotFound
@@ -194,16 +208,4 @@ func (s *SupporterUseCase) loadOwned(ctx context.Context, userID, supporterID uu
 		return nil, ErrNotFound
 	}
 	return row, nil
-}
-
-func supporterCanManage(s *entity.ProjectSupporter, now time.Time) bool {
-	if s == nil {
-		return false
-	}
-	switch s.Status {
-	case entity.SupporterStatusActive, entity.SupporterStatusPendingRenewal, entity.SupporterStatusCancelled:
-		return s.HasBenefits(now)
-	default:
-		return false
-	}
 }
