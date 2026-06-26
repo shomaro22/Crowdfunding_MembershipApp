@@ -187,12 +187,16 @@ func buildApp() (*echo.Echo, string, error) {
 		slog.Info("google oauth disabled", "reason", err.Error())
 	}
 
-	var stripeCfg stripe.Config
-	stripeCfg, err = stripe.ConfigFromEnv()
-	if err == nil {
-		stripeClient = stripe.New(stripeCfg)
+	if testStripeClient != nil {
+		stripeClient = testStripeClient
 	} else {
-		slog.Info("stripe disabled", "reason", err.Error())
+		var stripeCfg stripe.Config
+		stripeCfg, err = stripe.ConfigFromEnv()
+		if err == nil {
+			stripeClient = stripe.New(stripeCfg)
+		} else {
+			slog.Info("stripe disabled", "reason", err.Error())
+		}
 	}
 
 	cookieCfg = auth.CookieFromEnv()
