@@ -126,8 +126,8 @@ func (a *AuthUseCase) Challenge2FA(ctx context.Context, pendingToken, code strin
 	}
 	a.logActivity(ctx, &u.ID, entity.UserLogin, "user", u.ID.String(), meta, entity.StepMeta("2fa_ok"))
 	return &LoginResult{
-		User:      u,
-		AuthToken: tokens.AuthToken,
+		User:         u,
+		AuthToken:    tokens.AuthToken,
 		RefreshToken: tokens.RefreshToken,
 	}, nil
 }
