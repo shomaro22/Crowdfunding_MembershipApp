@@ -7,6 +7,7 @@ import (
 
 	"crowdfund-app/auth"
 	"crowdfund-app/entity"
+	"crowdfund-app/repository"
 )
 
 func (a *AuthUseCase) Login(ctx context.Context, email, password string, meta AuthMeta) (*LoginResult, error) {
@@ -75,10 +76,13 @@ func (a *AuthUseCase) Refresh(ctx context.Context, refreshTokenPlain string, met
 	if err != nil || u == nil || !u.CanLogin() {
 		return "", "", ErrInvalidToken
 	}
-	if err = a.RefreshTokens.Revoke(ctx, row.ID, now); err != nil {
-		return "", "", err
-	}
-	tokens, err = a.issueSession(ctx, u, twoFAVerified(u))
+	err = repository.WithTx(ctx, a.DB, func(txCtx context.Context) error {
+		if err = a.RefreshTokens.Revoke(txCtx, row.ID, now); err != nil {
+			return err
+		}
+		tokens, err = a.issueSession(txCtx, u, twoFAVerified(u))
+		return err
+	})
 	if err != nil {
 		return "", "", err
 	}

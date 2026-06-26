@@ -154,8 +154,10 @@ func (a *AuthUseCase) issueSession(ctx context.Context, u *entity.User, verified
 func (a *AuthUseCase) invalidateSessions(ctx context.Context, userID uuid.UUID) error {
 	var err error
 
-	if _, err = a.Users.BumpTokenVer(ctx, userID); err != nil {
-		return err
-	}
-	return a.RefreshTokens.RevokeUser(ctx, userID, time.Now().UTC())
+	return repository.WithTx(ctx, a.DB, func(txCtx context.Context) error {
+		if _, err = a.Users.BumpTokenVer(txCtx, userID); err != nil {
+			return err
+		}
+		return a.RefreshTokens.RevokeUser(txCtx, userID, time.Now().UTC())
+	})
 }

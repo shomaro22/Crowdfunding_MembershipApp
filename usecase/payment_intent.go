@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"crowdfund-app/entity"
+	"crowdfund-app/repository"
 	"crowdfund-app/stripe"
 )
 
@@ -22,10 +23,7 @@ func (p *PaymentUseCase) CreateIntent(ctx context.Context, in IntentIn) (IntentO
 	if err != nil {
 		return IntentOut{}, err
 	}
-	purchase, err = p.createPendingPurchase(ctx, sc, entity.PaymentMethodCard, nil, nil)
-	if err != nil {
-		return IntentOut{}, err
-	}
+	purchase = p.newPendingPurchase(sc, entity.PaymentMethodCard, nil, nil)
 	meta = paymentMetadata(purchase.ID, in.ProjectID, in.PlanID, in.BuyerID, entity.BillingModeAuto)
 	sub, err = p.Stripe.CreateSubscriptionIntent(ctx, stripe.SubscriptionIntentIn{
 		ProductName:      sc.project.Title,
@@ -39,7 +37,10 @@ func (p *PaymentUseCase) CreateIntent(ctx context.Context, in IntentIn) (IntentO
 	}
 	purchase.StripeIntentID = &sub.PaymentIntentID
 	purchase.UpdatedAt = sc.now
-	if err = p.Purchases.Update(ctx, purchase); err != nil {
+	err = repository.WithTx(ctx, p.DB, func(txCtx context.Context) error {
+		return p.Purchases.Create(txCtx, purchase)
+	})
+	if err != nil {
 		return IntentOut{}, err
 	}
 	return IntentOut{ClientSecret: sub.ClientSecret, PaymentIntentID: sub.PaymentIntentID}, nil
