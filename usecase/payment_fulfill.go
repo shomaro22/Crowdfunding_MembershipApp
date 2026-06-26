@@ -10,7 +10,7 @@ import (
 	"github.com/google/uuid"
 )
 
-func (p *PaymentUseCase) fulfillByPaymentIntentID(
+func (p *PaymentUseCase) fulfillPaymentIntentID(
 	ctx context.Context,
 	intentID string,
 	start, end time.Time,
@@ -21,7 +21,7 @@ func (p *PaymentUseCase) fulfillByPaymentIntentID(
 		purchase *entity.Purchase
 		err      error
 	)
-	purchase, err = p.Purchases.FindByIntentID(ctx, intentID)
+	purchase, err = p.Purchases.FindIntentID(ctx, intentID)
 	if err != nil || purchase == nil {
 		return err
 	}
@@ -32,12 +32,12 @@ func (p *PaymentUseCase) fulfillByPaymentIntentID(
 	return p.fulfillFirstSupport(ctx, purchase, planID, period, customerID, subscriptionID, invoiceID)
 }
 
-func (p *PaymentUseCase) fulfillByPurchaseID(ctx context.Context, purchaseID uuid.UUID, start, end time.Time, customerID, subscriptionID, invoiceID *string) error {
+func (p *PaymentUseCase) fulfillPurchaseID(ctx context.Context, purchaseID uuid.UUID, start, end time.Time, customerID, subscriptionID, invoiceID *string) error {
 	var (
 		purchase *entity.Purchase
 		err      error
 	)
-	purchase, err = p.Purchases.FindByID(ctx, purchaseID)
+	purchase, err = p.Purchases.FindID(ctx, purchaseID)
 	if err != nil || purchase == nil {
 		return err
 	}
@@ -84,7 +84,7 @@ func (p *PaymentUseCase) fulfillFirstSupport(
 		if active != nil {
 			return p.markPurchasePaid(txCtx, purchase, active.ID, period, invoiceID)
 		}
-		proj, plans, _, err = p.Projects.FindByID(txCtx, purchase.ProjectID)
+		proj, plans, _, err = p.Projects.FindID(txCtx, purchase.ProjectID)
 		if err != nil || proj == nil {
 			return ErrNotFound
 		}

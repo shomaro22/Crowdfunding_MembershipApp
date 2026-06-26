@@ -10,8 +10,8 @@ import (
 )
 
 const (
-	DefaultReCookie = "re_token"
-	reTokenMaxAge   = 7 * 24 * 3600
+	DefaultRefreshCookie = "refresh_token"
+	refreshTokenMaxAge   = 7 * 24 * 3600
 )
 
 type CookieCfg struct {
@@ -28,7 +28,7 @@ func CookieFromEnv() CookieCfg {
 	)
 	name = strings.TrimSpace(os.Getenv("REFRESH_COOKIE_NAME"))
 	if name == "" {
-		name = DefaultReCookie
+		name = DefaultRefreshCookie
 	}
 	secure = strings.EqualFold(os.Getenv("COOKIE_SECURE"), "true")
 	return CookieCfg{
@@ -39,19 +39,19 @@ func CookieFromEnv() CookieCfg {
 	}
 }
 
-func SetReCookie(c echo.Context, cfg CookieCfg, value string) {
+func SetRefreshCookie(c echo.Context, cfg CookieCfg, value string) {
 	c.SetCookie(&http.Cookie{
 		Name:     cfg.Name,
 		Value:    value,
 		Path:     cfg.Path,
-		MaxAge:   reTokenMaxAge,
+		MaxAge:   refreshTokenMaxAge,
 		HttpOnly: true,
 		Secure:   cfg.Secure,
 		SameSite: cfg.SameSite,
 	})
 }
 
-func ClearReCookie(c echo.Context, cfg CookieCfg) {
+func ClearRefreshCookie(c echo.Context, cfg CookieCfg) {
 	c.SetCookie(&http.Cookie{
 		Name:     cfg.Name,
 		Value:    "",
@@ -64,7 +64,7 @@ func ClearReCookie(c echo.Context, cfg CookieCfg) {
 	})
 }
 
-func ReTokenFrom(c echo.Context, cfg CookieCfg) string {
+func RefreshTokenFrom(c echo.Context, cfg CookieCfg) string {
 	var (
 		ck  *http.Cookie
 		err error

@@ -85,26 +85,26 @@ func (h *AuthController) Login(c echo.Context) error {
 			User:        userToJSON(res.User),
 		})
 	}
-	auth.SetReCookie(c, h.CookieCfg, res.ReToken)
+	auth.SetRefreshCookie(c, h.CookieCfg, res.RefreshToken)
 	return c.JSON(http.StatusOK, authTokenResponse{
 		AuthToken: res.AuthToken,
 		User:      userToJSON(res.User),
 	})
 }
 
-func (h *AuthController) Re(c echo.Context) error {
+func (h *AuthController) Refresh(c echo.Context) error {
 	var (
-		plain     string
-		authToken string
-		reToken   string
-		err       error
+		plain        string
+		authToken    string
+		refreshToken string
+		err          error
 	)
-	plain = auth.ReTokenFrom(c, h.CookieCfg)
-	authToken, reToken, err = h.Auth.Reissue(c.Request().Context(), plain, authMeta(c))
+	plain = auth.RefreshTokenFrom(c, h.CookieCfg)
+	authToken, refreshToken, err = h.Auth.Refresh(c.Request().Context(), plain, authMeta(c))
 	if err != nil {
 		return mapAuthError(err)
 	}
-	auth.SetReCookie(c, h.CookieCfg, reToken)
+	auth.SetRefreshCookie(c, h.CookieCfg, refreshToken)
 	return c.JSON(http.StatusOK, map[string]string{"auth_token": authToken})
 }
 
@@ -113,11 +113,11 @@ func (h *AuthController) Logout(c echo.Context) error {
 		plain string
 		err   error
 	)
-	plain = auth.ReTokenFrom(c, h.CookieCfg)
+	plain = auth.RefreshTokenFrom(c, h.CookieCfg)
 	if err = h.Auth.Logout(c.Request().Context(), plain, authMeta(c)); err != nil {
 		return mapAuthError(err)
 	}
-	auth.ClearReCookie(c, h.CookieCfg)
+	auth.ClearRefreshCookie(c, h.CookieCfg)
 	return c.NoContent(http.StatusOK)
 }
 

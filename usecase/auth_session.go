@@ -22,7 +22,7 @@ func (a *AuthUseCase) Login(ctx context.Context, email, password string, meta Au
 		a.logActivity(ctx, nil, entity.UserLoginFail, "user", normalized, meta, nil)
 		return nil, ErrInvalidCredentials
 	}
-	u, err = a.Users.FindByEmail(ctx, normalized)
+	u, err = a.Users.FindEmail(ctx, normalized)
 	if err != nil {
 		return nil, err
 	}
@@ -46,68 +46,68 @@ func (a *AuthUseCase) Login(ctx context.Context, email, password string, meta Au
 	return &LoginResult{
 		User:      u,
 		AuthToken: tokens.AuthToken,
-		ReToken:   tokens.ReToken,
+		RefreshToken:   tokens.RefreshToken,
 	}, nil
 }
 
-func (a *AuthUseCase) Reissue(ctx context.Context, reTokenPlain string, meta AuthMeta) (string, string, error) {
+func (a *AuthUseCase) Refresh(ctx context.Context, refreshTokenPlain string, meta AuthMeta) (string, string, error) {
 	var (
 		plain  string
 		hash   string
 		now    time.Time
-		row    *entity.ReToken
+		row    *entity.RefreshToken
 		err    error
 		u      *entity.User
 		tokens *SessionTokens
 	)
 
-	plain = strings.TrimSpace(reTokenPlain)
+	plain = strings.TrimSpace(refreshTokenPlain)
 	if plain == "" {
 		return "", "", ErrInvalidToken
 	}
 	hash = auth.OpaqueHash(plain)
 	now = time.Now().UTC()
-	row, err = a.ReTokens.FindValidByHash(ctx, hash, now)
+	row, err = a.RefreshTokens.FindValidHash(ctx, hash, now)
 	if err != nil || row == nil {
 		return "", "", ErrInvalidToken
 	}
-	u, err = a.Users.FindByID(ctx, row.UserID)
+	u, err = a.Users.FindID(ctx, row.UserID)
 	if err != nil || u == nil || !u.CanLogin() {
 		return "", "", ErrInvalidToken
 	}
-	if err = a.ReTokens.Revoke(ctx, row.ID, now); err != nil {
+	if err = a.RefreshTokens.Revoke(ctx, row.ID, now); err != nil {
 		return "", "", err
 	}
 	tokens, err = a.issueSession(ctx, u, twoFAVerified(u))
 	if err != nil {
 		return "", "", err
 	}
-	return tokens.AuthToken, tokens.ReToken, nil
+	return tokens.AuthToken, tokens.RefreshToken, nil
 }
 
-func (a *AuthUseCase) Logout(ctx context.Context, reTokenPlain string, meta AuthMeta) error {
+func (a *AuthUseCase) Logout(ctx context.Context, refreshTokenPlain string, meta AuthMeta) error {
 	var (
 		plain string
 		hash  string
 		now   time.Time
-		row   *entity.ReToken
+		row   *entity.RefreshToken
 		err   error
 	)
 
-	plain = strings.TrimSpace(reTokenPlain)
+	plain = strings.TrimSpace(refreshTokenPlain)
 	if plain == "" {
 		return ErrInvalidToken
 	}
 	hash = auth.OpaqueHash(plain)
 	now = time.Now().UTC()
-	row, err = a.ReTokens.FindValidByHash(ctx, hash, now)
+	row, err = a.RefreshTokens.FindValidHash(ctx, hash, now)
 	if err != nil {
 		return err
 	}
 	if row == nil {
 		return ErrInvalidToken
 	}
-	if err = a.ReTokens.Revoke(ctx, row.ID, now); err != nil {
+	if err = a.RefreshTokens.Revoke(ctx, row.ID, now); err != nil {
 		return err
 	}
 	a.logActivity(ctx, &row.UserID, entity.UserLogout, "user", row.UserID.String(), meta, nil)
