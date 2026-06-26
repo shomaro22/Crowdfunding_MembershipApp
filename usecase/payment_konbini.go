@@ -48,27 +48,33 @@ func (p *PaymentUseCase) fulfillKonbiniFirstSupport(ctx context.Context, purchas
 }
 
 func (p *PaymentUseCase) fulfillKonbiniRenewal(ctx context.Context, purchase *entity.Purchase, planID uuid.UUID, paidAt time.Time) error {
-	var (
-		supporter *entity.ProjectSupporter
-		period    periodRange
-		err       error
-	)
-	if purchase.Status == entity.PurchaseStatusPaid {
-		return nil
-	}
-	if purchase.Status != entity.PurchaseStatusPending {
-		return nil
-	}
-	if purchase.SupporterID == nil {
-		return ErrNotFound
-	}
-	supporter, err = p.Supporters.FindID(ctx, *purchase.SupporterID)
-	if err != nil || supporter == nil {
-		return ErrNotFound
-	}
-	period = konbiniRenewalPeriod(supporter, paidAt)
 	return repository.WithTx(ctx, p.DB, func(txCtx context.Context) error {
-		var now time.Time
+		var (
+			locked    *entity.Purchase
+			supporter *entity.ProjectSupporter
+			period    periodRange
+			now       time.Time
+			err       error
+		)
+		locked, err = p.Purchases.FindIDLock(txCtx, purchase.ID)
+		if err != nil || locked == nil {
+			return ErrNotFound
+		}
+		purchase = locked
+		if purchase.Status == entity.PurchaseStatusPaid {
+			return nil
+		}
+		if purchase.Status != entity.PurchaseStatusPending {
+			return nil
+		}
+		if purchase.SupporterID == nil {
+			return ErrNotFound
+		}
+		supporter, err = p.Supporters.FindID(txCtx, *purchase.SupporterID)
+		if err != nil || supporter == nil {
+			return ErrNotFound
+		}
+		period = konbiniRenewalPeriod(supporter, paidAt)
 		now = time.Now().UTC()
 		supporter.Status = entity.SupporterStatusActive
 		supporter.CurrentPeriodStart = period.start
@@ -104,28 +110,33 @@ func (p *PaymentUseCase) handleKonbiniCheckoutUnpaid(ctx context.Context, purcha
 }
 
 func (p *PaymentUseCase) failKonbiniRenewal(ctx context.Context, purchase *entity.Purchase, reason string, cancelled bool) error {
-	var (
-		supporter *entity.ProjectSupporter
-		err       error
-	)
-	if cancelled {
-		err = p.markPurchaseCancelled(ctx, purchase, reason)
-	} else {
-		err = p.markPurchaseFailed(ctx, purchase, reason)
-	}
-	if err != nil {
-		return err
-	}
-	supporter, err = p.Supporters.FindID(ctx, *purchase.SupporterID)
-	if err != nil || supporter == nil {
-		return err
-	}
-	if supporter.Status == entity.SupporterStatusPendingRenewal {
-		return nil
-	}
-	supporter.Status = entity.SupporterStatusPendingRenewal
-	supporter.UpdatedAt = time.Now().UTC()
-	return p.Supporters.Update(ctx, supporter)
+	return repository.WithTx(ctx, p.DB, func(txCtx context.Context) error {
+		var (
+			supporter *entity.ProjectSupporter
+			err       error
+		)
+		if cancelled {
+			err = p.markPurchaseCancelled(txCtx, purchase, reason)
+		} else {
+			err = p.markPurchaseFailed(txCtx, purchase, reason)
+		}
+		if err != nil {
+			return err
+		}
+		if purchase.SupporterID == nil {
+			return nil
+		}
+		supporter, err = p.Supporters.FindID(txCtx, *purchase.SupporterID)
+		if err != nil || supporter == nil {
+			return err
+		}
+		if supporter.Status == entity.SupporterStatusPendingRenewal {
+			return nil
+		}
+		supporter.Status = entity.SupporterStatusPendingRenewal
+		supporter.UpdatedAt = time.Now().UTC()
+		return p.Supporters.Update(txCtx, supporter)
+	})
 }
 func konbiniFirstPeriod(paidAt time.Time) periodRange {
 	return periodRange{start: paidAt, end: paidAt.AddDate(0, 0, supportPeriodDays)}

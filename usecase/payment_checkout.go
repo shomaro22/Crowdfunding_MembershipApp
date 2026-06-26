@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"crowdfund-app/entity"
+	"crowdfund-app/repository"
 	"crowdfund-app/stripe"
 )
 
@@ -30,10 +31,7 @@ func (p *PaymentUseCase) CreateCheckout(ctx context.Context, in CheckoutIn) (Che
 	if err != nil {
 		return CheckoutOut{}, err
 	}
-	purchase, err = p.createPendingPurchase(ctx, sc, pm, nil, nil)
-	if err != nil {
-		return CheckoutOut{}, err
-	}
+	purchase = p.newPendingPurchase(sc, pm, nil, nil)
 	meta = checkoutMetadata(sc, purchase.ID, pm)
 	sess, err = p.Stripe.CreateCheckoutSession(ctx, stripe.CheckoutSessionIn{
 		ProductName:      sc.project.Title,
@@ -53,7 +51,10 @@ func (p *PaymentUseCase) CreateCheckout(ctx context.Context, in CheckoutIn) (Che
 		purchase.StripeIntentID = &sess.PaymentIntentID
 	}
 	purchase.UpdatedAt = sc.now
-	if err = p.Purchases.Update(ctx, purchase); err != nil {
+	err = repository.WithTx(ctx, p.DB, func(txCtx context.Context) error {
+		return p.Purchases.Create(txCtx, purchase)
+	})
+	if err != nil {
 		return CheckoutOut{}, err
 	}
 	return CheckoutOut{SessionID: sess.SessionID, URL: sess.URL}, nil
