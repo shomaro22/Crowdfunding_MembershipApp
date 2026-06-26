@@ -8,15 +8,18 @@ import (
 
 	"github.com/google/uuid"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 type PurchaseRepo interface {
 	Create(ctx context.Context, row *entity.Purchase) error
 	Update(ctx context.Context, row *entity.Purchase) error
-	FindByID(ctx context.Context, id uuid.UUID) (*entity.Purchase, error)
-	FindBySessionID(ctx context.Context, sessionID string) (*entity.Purchase, error)
-	FindByIntentID(ctx context.Context, intentID string) (*entity.Purchase, error)
-	FindPendingByBuyerProject(ctx context.Context, buyerID, projectID uuid.UUID) (*entity.Purchase, error)
+	FindID(ctx context.Context, id uuid.UUID) (*entity.Purchase, error)
+	FindIDLock(ctx context.Context, id uuid.UUID) (*entity.Purchase, error)
+	FindSessionID(ctx context.Context, sessionID string) (*entity.Purchase, error)
+	FindIntentID(ctx context.Context, intentID string) (*entity.Purchase, error)
+	FindPendingBuyerProject(ctx context.Context, buyerID, projectID uuid.UUID) (*entity.Purchase, error)
+	FindStripeInvoiceID(ctx context.Context, invoiceID string) (*entity.Purchase, error)
 	RecordEvent(ctx context.Context, ev *entity.PurchaseEvent) error
 }
 
@@ -29,15 +32,7 @@ func NewPurchaseRepo(db *gorm.DB) PurchaseRepo {
 }
 
 func (r *purchaseRepo) dbCtx(ctx context.Context) *gorm.DB {
-	var (
-		tx *gorm.DB
-		ok bool
-	)
-	tx, ok = ctx.Value(txKey{}).(*gorm.DB)
-	if ok && tx != nil {
-		return tx.WithContext(ctx)
-	}
-	return r.db.WithContext(ctx)
+	return dbFromCtx(ctx, r.db)
 }
 
 func (r *purchaseRepo) Create(ctx context.Context, row *entity.Purchase) error {
@@ -48,7 +43,7 @@ func (r *purchaseRepo) Update(ctx context.Context, row *entity.Purchase) error {
 	return r.dbCtx(ctx).Save(row).Error
 }
 
-func (r *purchaseRepo) FindByID(ctx context.Context, id uuid.UUID) (*entity.Purchase, error) {
+func (r *purchaseRepo) FindID(ctx context.Context, id uuid.UUID) (*entity.Purchase, error) {
 	var (
 		row entity.Purchase
 		err error
@@ -63,7 +58,23 @@ func (r *purchaseRepo) FindByID(ctx context.Context, id uuid.UUID) (*entity.Purc
 	return &row, nil
 }
 
-func (r *purchaseRepo) FindBySessionID(ctx context.Context, sessionID string) (*entity.Purchase, error) {
+func (r *purchaseRepo) FindIDLock(ctx context.Context, id uuid.UUID) (*entity.Purchase, error) {
+	var (
+		row entity.Purchase
+		err error
+	)
+	err = r.dbCtx(ctx).Clauses(clause.Locking{Strength: "UPDATE"}).
+		Where("id = ?", id).First(&row).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &row, nil
+}
+
+func (r *purchaseRepo) FindSessionID(ctx context.Context, sessionID string) (*entity.Purchase, error) {
 	var (
 		row entity.Purchase
 		err error
@@ -78,7 +89,7 @@ func (r *purchaseRepo) FindBySessionID(ctx context.Context, sessionID string) (*
 	return &row, nil
 }
 
-func (r *purchaseRepo) FindByIntentID(ctx context.Context, intentID string) (*entity.Purchase, error) {
+func (r *purchaseRepo) FindIntentID(ctx context.Context, intentID string) (*entity.Purchase, error) {
 	var (
 		row entity.Purchase
 		err error
@@ -93,7 +104,7 @@ func (r *purchaseRepo) FindByIntentID(ctx context.Context, intentID string) (*en
 	return &row, nil
 }
 
-func (r *purchaseRepo) FindPendingByBuyerProject(ctx context.Context, buyerID, projectID uuid.UUID) (*entity.Purchase, error) {
+func (r *purchaseRepo) FindPendingBuyerProject(ctx context.Context, buyerID, projectID uuid.UUID) (*entity.Purchase, error) {
 	var (
 		row entity.Purchase
 		err error
@@ -101,6 +112,21 @@ func (r *purchaseRepo) FindPendingByBuyerProject(ctx context.Context, buyerID, p
 	err = r.dbCtx(ctx).
 		Where("buyer_id = ? AND project_id = ? AND status = ?", buyerID, projectID, entity.PurchaseStatusPending).
 		First(&row).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &row, nil
+}
+
+func (r *purchaseRepo) FindStripeInvoiceID(ctx context.Context, invoiceID string) (*entity.Purchase, error) {
+	var (
+		row entity.Purchase
+		err error
+	)
+	err = r.dbCtx(ctx).Where("stripe_invoice_id = ?", invoiceID).First(&row).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, nil
 	}

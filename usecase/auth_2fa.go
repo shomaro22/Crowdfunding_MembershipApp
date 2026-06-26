@@ -33,7 +33,7 @@ func (a *AuthUseCase) Setup2FA(ctx context.Context, userID uuid.UUID) (*TOTPSetu
 		enc    string
 	)
 
-	u, err = a.Users.FindByID(ctx, userID)
+	u, err = a.Users.FindID(ctx, userID)
 	if err != nil || u == nil {
 		return nil, ErrNotFound
 	}
@@ -69,7 +69,7 @@ func (a *AuthUseCase) Verify2FASetup(ctx context.Context, userID uuid.UUID, code
 		codes  []string
 	)
 
-	u, err = a.Users.FindByID(ctx, userID)
+	u, err = a.Users.FindID(ctx, userID)
 	if err != nil || u == nil {
 		return nil, ErrNotFound
 	}
@@ -93,7 +93,9 @@ func (a *AuthUseCase) Verify2FASetup(ctx context.Context, userID uuid.UUID, code
 	if err != nil {
 		return nil, err
 	}
-	a.invalidateSessions(ctx, u.ID)
+	if err = a.invalidateSessions(ctx, u.ID); err != nil {
+		return nil, err
+	}
 	return &TOTPVerifyResult{BackupCodes: codes}, nil
 }
 
@@ -109,7 +111,7 @@ func (a *AuthUseCase) Challenge2FA(ctx context.Context, pendingToken, code strin
 	if err != nil {
 		return nil, ErrInvalidToken
 	}
-	u, err = a.Users.FindByID(ctx, uid)
+	u, err = a.Users.FindID(ctx, uid)
 	if err != nil || u == nil || !u.CanLogin() {
 		return nil, ErrInvalidToken
 	}
@@ -126,9 +128,9 @@ func (a *AuthUseCase) Challenge2FA(ctx context.Context, pendingToken, code strin
 	}
 	a.logActivity(ctx, &u.ID, entity.UserLogin, "user", u.ID.String(), meta, entity.StepMeta("2fa_ok"))
 	return &LoginResult{
-		User:      u,
-		AuthToken: tokens.AuthToken,
-		ReToken:   tokens.ReToken,
+		User:         u,
+		AuthToken:    tokens.AuthToken,
+		RefreshToken: tokens.RefreshToken,
 	}, nil
 }
 
@@ -191,7 +193,7 @@ func (a *AuthUseCase) genBackupCodes(ctx context.Context, userID uuid.UUID) ([]s
 	if a.TOTPBackup == nil {
 		return nil, nil
 	}
-	_ = a.TOTPBackup.DeleteByUser(ctx, userID)
+	_ = a.TOTPBackup.DeleteUser(ctx, userID)
 	now = time.Now().UTC()
 	plain = make([]string, 0, backupCodeCount)
 	rows = make([]entity.TOTPBackupCode, 0, backupCodeCount)

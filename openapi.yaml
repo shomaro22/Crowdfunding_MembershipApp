@@ -5,8 +5,8 @@ info:
   description: |
     NewFF_App を React + Go で再構築するための OpenAPI Specification。
     状態更新は HTTP API、メッセージのリアルタイム配信は WebSocket を利用する。
-    認証は **ReToken**（httpOnly Cookie）+ **AuthToken**（クライアントメモリのみ）。
-    Google OAuth で得る Google 側トークンと、Credentials / OAuth ログイン後に発行する AuthToken / ReToken は別物とする。
+    認証は **RefreshToken**（httpOnly Cookie）+ **AuthToken**（クライアントメモリのみ）。
+    Google OAuth で得る Google 側トークンと、Credentials / OAuth ログイン後に発行する AuthToken / RefreshToken は別物とする。
 
 servers:
   - url: http://localhost:8080
@@ -130,7 +130,7 @@ paths:
       tags: [Auth]
       summary: Login (Credentials)
       description: |
-        成功時は AuthToken（Body）+ ReToken（httpOnly Cookie）を返す（§5.1.3）。
+        成功時は AuthToken（Body）+ RefreshToken（httpOnly Cookie）を返す（§5.1.3）。
         ADMIN/SELLER で TOTP 有効時は `requires_2fa: true` のみ返し、POST /auth/2fa/challenge で AuthToken を取得する。
       security: []
       requestBody:
@@ -199,13 +199,13 @@ paths:
         "500":
           $ref: "#/components/responses/InternalError"
 
-  /re:
+  /auth/refresh:
     post:
       tags: [Auth]
-      summary: Reissue AuthToken (ReToken in httpOnly Cookie)
+      summary: Refresh AuthToken (RefreshToken in httpOnly Cookie)
       description: |
-        Cookie 自動送信で ReToken を検証し、新しい AuthToken を返す。
-        Rate Limit 対象名は `re`（§9.2）。
+        Cookie 自動送信で RefreshToken を検証し、新しい AuthToken を返す。
+        Rate Limit 対象名は `auth_refresh`（§9.2）。
       security: []
       responses:
         "200":
@@ -213,7 +213,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ReResponse"
+                $ref: "#/components/schemas/RefreshResponse"
         "401":
           $ref: "#/components/responses/Unauthorized"
         "429":
@@ -222,7 +222,7 @@ paths:
   /auth/logout:
     post:
       tags: [Auth]
-      summary: Logout and revoke ReToken
+      summary: Logout and revoke RefreshToken
       responses:
         "200":
           description: Logged out
@@ -283,7 +283,7 @@ paths:
                   description: 6-digit TOTP code (backup codes also accepted per §5.1.6)
       responses:
         "200":
-          description: AuthToken issued; ReToken in httpOnly Cookie
+          description: AuthToken issued; RefreshToken in httpOnly Cookie
           content:
             application/json:
               schema:
@@ -340,7 +340,7 @@ paths:
   /auth/google/callback:
     get:
       tags: [Auth]
-      summary: Google OAuth callback. Sets ReToken Cookie and redirects with OAuth Callback Code.
+      summary: Google OAuth callback. Sets RefreshToken Cookie and redirects with OAuth Callback Code.
       security: []
       parameters:
         - in: query
@@ -385,7 +385,7 @@ paths:
                   description: One-time code from /auth/callback redirect
       responses:
         "200":
-          description: AuthToken issued; ReToken in httpOnly Cookie
+          description: AuthToken issued; RefreshToken in httpOnly Cookie
           content:
             application/json:
               schema:
@@ -2278,7 +2278,7 @@ components:
           description: |
             true のとき AuthToken は未発行。POST /auth/2fa/challenge で TOTP 検証後に AuthToken を取得する（§5.1.6）。
 
-    ReResponse:
+    RefreshResponse:
       type: object
       properties:
         auth_token:

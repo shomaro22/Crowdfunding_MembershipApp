@@ -11,8 +11,8 @@ import (
 )
 
 type ConnectRepo interface {
-	FindByUserID(ctx context.Context, userID uuid.UUID) (*entity.ConnectAccount, error)
-	FindByStripeAccountID(ctx context.Context, stripeAccountID string) (*entity.ConnectAccount, error)
+	FindUserID(ctx context.Context, userID uuid.UUID) (*entity.ConnectAccount, error)
+	FindStripeAccountID(ctx context.Context, stripeAccountID string) (*entity.ConnectAccount, error)
 	Create(ctx context.Context, row *entity.ConnectAccount) error
 	Update(ctx context.Context, row *entity.ConnectAccount) error
 }
@@ -26,18 +26,10 @@ func NewConnectRepo(db *gorm.DB) ConnectRepo {
 }
 
 func (r *connectRepo) dbCtx(ctx context.Context) *gorm.DB {
-	var (
-		tx *gorm.DB
-		ok bool
-	)
-	tx, ok = ctx.Value(txKey{}).(*gorm.DB)
-	if ok && tx != nil {
-		return tx.WithContext(ctx)
-	}
-	return r.db.WithContext(ctx)
+	return dbFromCtx(ctx, r.db)
 }
 
-func (r *connectRepo) FindByUserID(ctx context.Context, userID uuid.UUID) (*entity.ConnectAccount, error) {
+func (r *connectRepo) FindUserID(ctx context.Context, userID uuid.UUID) (*entity.ConnectAccount, error) {
 	var (
 		row entity.ConnectAccount
 		err error
@@ -52,7 +44,7 @@ func (r *connectRepo) FindByUserID(ctx context.Context, userID uuid.UUID) (*enti
 	return &row, nil
 }
 
-func (r *connectRepo) FindByStripeAccountID(ctx context.Context, stripeAccountID string) (*entity.ConnectAccount, error) {
+func (r *connectRepo) FindStripeAccountID(ctx context.Context, stripeAccountID string) (*entity.ConnectAccount, error) {
 	var (
 		row entity.ConnectAccount
 		err error

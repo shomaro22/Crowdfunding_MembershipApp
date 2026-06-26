@@ -17,7 +17,7 @@ type ConnectUseCase struct {
 	Stripe  stripe.Client
 }
 
-func (c *ConnectUseCase) GetBySellerID(ctx context.Context, sellerID uuid.UUID) (*entity.ConnectAccount, error) {
+func (c *ConnectUseCase) GetAccount(ctx context.Context, sellerID uuid.UUID) (*entity.ConnectAccount, error) {
 	var (
 		u   *entity.User
 		err error
@@ -25,14 +25,14 @@ func (c *ConnectUseCase) GetBySellerID(ctx context.Context, sellerID uuid.UUID) 
 	if c.Stripe == nil {
 		return nil, ErrStripeUnavailable
 	}
-	u, err = c.Users.FindByID(ctx, sellerID)
+	u, err = c.Users.FindID(ctx, sellerID)
 	if err != nil || u == nil {
 		return nil, ErrNotFound
 	}
 	if u.Role != entity.UserRoleSeller {
 		return nil, ErrForbidden
 	}
-	return c.Connect.FindByUserID(ctx, sellerID)
+	return c.Connect.FindUserID(ctx, sellerID)
 }
 
 func (c *ConnectUseCase) CreateOnboardingLink(ctx context.Context, sellerID uuid.UUID) (string, error) {
@@ -48,14 +48,14 @@ func (c *ConnectUseCase) CreateOnboardingLink(ctx context.Context, sellerID uuid
 	if c.Stripe == nil {
 		return "", ErrStripeUnavailable
 	}
-	u, err = c.Users.FindByID(ctx, sellerID)
+	u, err = c.Users.FindID(ctx, sellerID)
 	if err != nil || u == nil {
 		return "", ErrNotFound
 	}
 	if u.Role != entity.UserRoleSeller || u.SellerStatus != entity.SellerStatusActive {
 		return "", ErrForbidden
 	}
-	row, err = c.Connect.FindByUserID(ctx, sellerID)
+	row, err = c.Connect.FindUserID(ctx, sellerID)
 	if err != nil {
 		return "", err
 	}
@@ -102,7 +102,7 @@ func (c *ConnectUseCase) SyncFromStripeAccountID(ctx context.Context, stripeAcco
 	if c.Stripe == nil {
 		return nil, ErrStripeUnavailable
 	}
-	row, err = c.Connect.FindByStripeAccountID(ctx, stripeAccountID)
+	row, err = c.Connect.FindStripeAccountID(ctx, stripeAccountID)
 	if err != nil || row == nil {
 		return nil, ErrNotFound
 	}
@@ -119,20 +119,4 @@ func (c *ConnectUseCase) SyncFromStripeAccountID(ctx context.Context, stripeAcco
 		return nil, err
 	}
 	return row, nil
-}
-
-// RequireSellerChargesEnabled は §5.3.8: charges_enabled=false なら応援不可。
-func (c *ConnectUseCase) RequireSellerChargesEnabled(ctx context.Context, sellerID uuid.UUID) error {
-	var (
-		row *entity.ConnectAccount
-		err error
-	)
-	row, err = c.Connect.FindByUserID(ctx, sellerID)
-	if err != nil {
-		return err
-	}
-	if row == nil || !row.CanCharge() {
-		return ErrForbidden
-	}
-	return nil
 }
