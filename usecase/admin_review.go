@@ -18,7 +18,7 @@ type AdminUseCase struct {
 	Projects         repository.ProjectRepo
 	Audit            repository.AuditRepo
 	ReviewDecisions  repository.ReviewDecisionRepo
-	ReTokens         repository.ReTokenRepo
+	RefreshTokens    repository.RefreshTokenRepo
 	TOTPBackup       repository.TOTPBackupRepo
 	KYC              repository.KYCStore
 	DB               *gorm.DB
@@ -34,7 +34,7 @@ type SellerRegView struct {
 }
 
 func (a *AdminUseCase) ListBuyerPending(ctx context.Context, limit, offset int) ([]entity.User, int64, error) {
-	return a.Users.ListByRoleStatus(ctx, entity.UserRoleBuyer, entity.AccountStatusPending, limit, offset)
+	return a.Users.ListRoleStatus(ctx, entity.UserRoleBuyer, entity.AccountStatusPending, limit, offset)
 }
 
 func (a *AdminUseCase) ApproveBuyer(ctx context.Context, adminID, userID uuid.UUID, reason *string) (*entity.User, error) {
@@ -47,7 +47,7 @@ func (a *AdminUseCase) ApproveBuyer(ctx context.Context, adminID, userID uuid.UU
 	if err = a.requireReviewAdmin(ctx, adminID); err != nil {
 		return nil, err
 	}
-	u, err = a.Users.FindByID(ctx, userID)
+	u, err = a.Users.FindID(ctx, userID)
 	if err != nil || u == nil {
 		return nil, ErrNotFound
 	}
@@ -79,7 +79,7 @@ func (a *AdminUseCase) RejectBuyer(ctx context.Context, adminID, userID uuid.UUI
 	if err = a.requireReviewAdmin(ctx, adminID); err != nil {
 		return nil, err
 	}
-	u, err = a.Users.FindByID(ctx, userID)
+	u, err = a.Users.FindID(ctx, userID)
 	if err != nil || u == nil {
 		return nil, ErrNotFound
 	}
@@ -115,11 +115,11 @@ func (a *AdminUseCase) GetSellerReg(ctx context.Context, id uuid.UUID) (*SellerR
 		url  string
 	)
 
-	reg, err = a.SellerRegs.FindByID(ctx, id)
+	reg, err = a.SellerRegs.FindID(ctx, id)
 	if err != nil || reg == nil {
 		return nil, ErrNotFound
 	}
-	u, err = a.Users.FindByID(ctx, reg.UserID)
+	u, err = a.Users.FindID(ctx, reg.UserID)
 	if err != nil || u == nil {
 		return nil, ErrNotFound
 	}
@@ -149,14 +149,14 @@ func (a *AdminUseCase) ApproveSellerReg(ctx context.Context, adminID, regID uuid
 	if err = a.requireReviewAdmin(ctx, adminID); err != nil {
 		return nil, err
 	}
-	reg, err = a.SellerRegs.FindByID(ctx, regID)
+	reg, err = a.SellerRegs.FindID(ctx, regID)
 	if err != nil || reg == nil {
 		return nil, ErrNotFound
 	}
 	if !reg.CanApprove() {
 		return nil, ErrInvalidState
 	}
-	u, err = a.Users.FindByID(ctx, reg.UserID)
+	u, err = a.Users.FindID(ctx, reg.UserID)
 	if err != nil || u == nil {
 		return nil, ErrNotFound
 	}
@@ -198,7 +198,7 @@ func (a *AdminUseCase) RejectSellerReg(ctx context.Context, adminID, regID uuid.
 	if err = a.requireReviewAdmin(ctx, adminID); err != nil {
 		return nil, err
 	}
-	reg, err = a.SellerRegs.FindByID(ctx, regID)
+	reg, err = a.SellerRegs.FindID(ctx, regID)
 	if err != nil || reg == nil {
 		return nil, ErrNotFound
 	}

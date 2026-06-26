@@ -14,7 +14,7 @@ import (
 )
 
 const (
-	reTokenTTL    = 7 * 24 * time.Hour
+	refreshTokenTTL = 7 * 24 * time.Hour
 	resetTokenTTL = time.Hour
 )
 
@@ -37,20 +37,20 @@ type AuthMeta struct {
 
 type SessionTokens struct {
 	AuthToken string
-	ReToken   string
+	RefreshToken string
 }
 
 type LoginResult struct {
-	User        *entity.User
-	AuthToken   string
-	ReToken     string
+	User         *entity.User
+	AuthToken    string
+	RefreshToken string
 	Requires2FA bool
 }
 
 type AuthUseCase struct {
 	Users        repository.UserRepo
 	SellerRegs   repository.SellerRegRepo
-	ReTokens     repository.ReTokenRepo
+	RefreshTokens repository.RefreshTokenRepo
 	ResetToks    repository.ResetRepo
 	Activity     repository.ActivityRepo
 	OAuth        repository.OAuthRepo
@@ -120,7 +120,7 @@ func (a *AuthUseCase) issueSession(ctx context.Context, u *entity.User, verified
 		err       error
 		plain     string
 		now       time.Time
-		row       *entity.ReToken
+		row       *entity.RefreshToken
 	)
 
 	authToken, err = a.Tokens.Issue(auth.AuthClaims{
@@ -138,17 +138,17 @@ func (a *AuthUseCase) issueSession(ctx context.Context, u *entity.User, verified
 		return nil, err
 	}
 	now = time.Now().UTC()
-	row = &entity.ReToken{
+	row = &entity.RefreshToken{
 		ID:        uuid.New(),
 		UserID:    u.ID,
 		TokenHash: auth.OpaqueHash(plain),
-		ExpiresAt: now.Add(reTokenTTL),
+		ExpiresAt: now.Add(refreshTokenTTL),
 		CreatedAt: now,
 	}
-	if err = a.ReTokens.Create(ctx, row); err != nil {
+	if err = a.RefreshTokens.Create(ctx, row); err != nil {
 		return nil, err
 	}
-	return &SessionTokens{AuthToken: authToken, ReToken: plain}, nil
+	return &SessionTokens{AuthToken: authToken, RefreshToken: plain}, nil
 }
 
 func (a *AuthUseCase) invalidateSessions(ctx context.Context, userID uuid.UUID) error {
@@ -157,5 +157,5 @@ func (a *AuthUseCase) invalidateSessions(ctx context.Context, userID uuid.UUID) 
 	if _, err = a.Users.BumpTokenVer(ctx, userID); err != nil {
 		return err
 	}
-	return a.ReTokens.RevokeAllForUser(ctx, userID, time.Now().UTC())
+	return a.RefreshTokens.RevokeUser(ctx, userID, time.Now().UTC())
 }

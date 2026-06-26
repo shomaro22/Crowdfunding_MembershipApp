@@ -20,7 +20,7 @@ func (p *PaymentUseCase) loadSupportContext(ctx context.Context, buyerID, projec
 	if err != nil {
 		return sc, err
 	}
-	pend, err = p.Purchases.FindPendingByBuyerProject(ctx, buyerID, projectID)
+	pend, err = p.Purchases.FindPendingBuyerProject(ctx, buyerID, projectID)
 	if err != nil {
 		return sc, err
 	}
@@ -53,7 +53,7 @@ func (p *PaymentUseCase) loadCheckoutContext(ctx context.Context, buyerID, proje
 	if err != nil {
 		return sc, err
 	}
-	pend, err = p.Purchases.FindPendingByBuyerProject(ctx, buyerID, projectID)
+	pend, err = p.Purchases.FindPendingBuyerProject(ctx, buyerID, projectID)
 	if err != nil {
 		return sc, err
 	}
@@ -83,7 +83,7 @@ func (p *PaymentUseCase) loadKonbiniCheckoutContext(ctx context.Context, buyerID
 	if err != nil {
 		return sc, err
 	}
-	pend, err = p.Purchases.FindPendingByBuyerProject(ctx, buyerID, projectID)
+	pend, err = p.Purchases.FindPendingBuyerProject(ctx, buyerID, projectID)
 	if err != nil {
 		return sc, err
 	}
@@ -104,6 +104,9 @@ func (p *PaymentUseCase) loadKonbiniCheckoutContext(ctx context.Context, buyerID
 	if sc.membership.BillingMode != entity.BillingModeKonbini {
 		return sc, ErrBadRequest
 	}
+	if !canIssueKonbiniRenewal(sc.membership, sc.now) {
+		return sc, ErrBadRequest
+	}
 	sc.purpose = checkoutKonbiniRenewal
 	return sc, nil
 }
@@ -118,14 +121,14 @@ func (p *PaymentUseCase) loadBuyerProjectPlan(ctx context.Context, buyerID, proj
 		err  error
 	)
 	sc.now = time.Now().UTC()
-	u, err = p.Users.FindByID(ctx, buyerID)
+	u, err = p.Users.FindID(ctx, buyerID)
 	if err != nil || u == nil {
 		return sc, ErrNotFound
 	}
 	if !u.IsActive() || u.Role != entity.UserRoleBuyer {
 		return sc, ErrForbidden
 	}
-	proj, _, _, err = p.Projects.FindByID(ctx, projectID)
+	proj, _, _, err = p.Projects.FindID(ctx, projectID)
 	if err != nil || proj == nil {
 		return sc, ErrNotFound
 	}
@@ -136,7 +139,7 @@ func (p *PaymentUseCase) loadBuyerProjectPlan(ctx context.Context, buyerID, proj
 	if err != nil || plan == nil || !plan.IsActive {
 		return sc, ErrNotFound
 	}
-	conn, err = p.Connect.FindByUserID(ctx, proj.SellerID)
+	conn, err = p.Connect.FindUserID(ctx, proj.SellerID)
 	if err != nil {
 		return sc, err
 	}

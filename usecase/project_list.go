@@ -38,11 +38,11 @@ func (p *ProjectUseCase) ListMine(ctx context.Context, sellerID uuid.UUID, limit
 		total int64
 	)
 
-	u, err = p.Users.FindByID(ctx, sellerID)
+	u, err = p.Users.FindID(ctx, sellerID)
 	if err != nil || u == nil || u.Role != entity.UserRoleSeller {
 		return nil, 0, ErrForbidden
 	}
-	rows, total, err = p.Projects.ListBySeller(ctx, sellerID, limit, offset)
+	rows, total, err = p.Projects.ListSeller(ctx, sellerID, limit, offset)
 	if err != nil {
 		return nil, 0, err
 	}

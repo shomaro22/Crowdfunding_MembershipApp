@@ -17,7 +17,7 @@ func (a *AdminUseCase) ResetUser2FA(ctx context.Context, adminID, targetUserID u
 		now time.Time
 	)
 
-	u, err = a.Users.FindByID(ctx, targetUserID)
+	u, err = a.Users.FindID(ctx, targetUserID)
 	if err != nil || u == nil {
 		return nil, ErrNotFound
 	}
@@ -32,7 +32,7 @@ func (a *AdminUseCase) ResetUser2FA(ctx context.Context, adminID, targetUserID u
 		return nil, err
 	}
 	if a.TOTPBackup != nil {
-		if err = a.TOTPBackup.DeleteByUser(ctx, targetUserID); err != nil {
+		if err = a.TOTPBackup.DeleteUser(ctx, targetUserID); err != nil {
 			return nil, err
 		}
 	}
@@ -56,12 +56,12 @@ func (a *AdminUseCase) ChangeAdminRole(ctx context.Context, actorID, targetUserI
 	if !newRole.Valid() {
 		return nil, ErrBadRequest
 	}
-	actor, err = a.Users.FindByID(ctx, actorID)
+	actor, err = a.Users.FindID(ctx, actorID)
 	if err != nil || actor == nil || actor.Role != entity.UserRoleAdmin ||
 		actor.AdminRole == nil || *actor.AdminRole != entity.AdminRoleSuperAdmin {
 		return nil, ErrForbidden
 	}
-	u, err = a.Users.FindByID(ctx, targetUserID)
+	u, err = a.Users.FindID(ctx, targetUserID)
 	if err != nil || u == nil {
 		return nil, ErrNotFound
 	}
@@ -95,8 +95,8 @@ func (a *AdminUseCase) invalidateSessions(ctx context.Context, userID uuid.UUID)
 	if _, err = a.Users.BumpTokenVer(ctx, userID); err != nil {
 		return err
 	}
-	if a.ReTokens == nil {
+	if a.RefreshTokens == nil {
 		return nil
 	}
-	return a.ReTokens.RevokeAllForUser(ctx, userID, time.Now().UTC())
+	return a.RefreshTokens.RevokeUser(ctx, userID, time.Now().UTC())
 }
