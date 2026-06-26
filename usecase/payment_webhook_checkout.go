@@ -50,7 +50,7 @@ func (p *PaymentUseCase) onCheckoutAsyncFailed(ctx context.Context, event stripe
 	if err != nil {
 		return err
 	}
-	purchase, err = p.Purchases.FindBySessionID(ctx, sess.ID)
+	purchase, err = p.Purchases.FindSessionID(ctx, sess.ID)
 	if err != nil {
 		return err
 	}
@@ -67,7 +67,7 @@ func (p *PaymentUseCase) onCheckoutExpired(ctx context.Context, event stripesdk.
 	if err != nil {
 		return err
 	}
-	purchase, err = p.Purchases.FindBySessionID(ctx, sess.ID)
+	purchase, err = p.Purchases.FindSessionID(ctx, sess.ID)
 	if err != nil {
 		return err
 	}

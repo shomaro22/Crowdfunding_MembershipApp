@@ -21,5 +21,5 @@ func NewReviewDecisionRepo(db *gorm.DB) ReviewDecisionRepo {
 }
 
 func (r *reviewDecisionRepo) Create(ctx context.Context, row *entity.ReviewDecision) error {
-	return r.db.WithContext(ctx).Create(row).Error
+	return dbFromCtx(ctx, r.db).Create(row).Error
 }

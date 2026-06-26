@@ -15,7 +15,7 @@ func (a *AdminUseCase) requireReviewAdmin(ctx context.Context, adminID uuid.UUID
 		err   error
 	)
 
-	admin, err = a.Users.FindByID(ctx, adminID)
+	admin, err = a.Users.FindID(ctx, adminID)
 	if err != nil || admin == nil || admin.Role != entity.UserRoleAdmin {
 		return ErrForbidden
 	}
