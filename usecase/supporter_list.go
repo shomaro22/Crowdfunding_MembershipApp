@@ -94,6 +94,8 @@ func (s *SupporterUseCase) applyPendingChanges(ctx context.Context, supporter *e
 			return ErrNotFound
 		}
 		if locked.PendingPlanID != nil {
+			var oldPlanID uuid.UUID
+			oldPlanID = locked.PlanID
 			newPlan, err = s.Projects.FindPlan(txCtx, locked.ProjectID, *locked.PendingPlanID)
 			if err != nil || newPlan == nil || !newPlan.IsActive {
 				return ErrBadRequest
@@ -108,6 +110,12 @@ func (s *SupporterUseCase) applyPendingChanges(ctx context.Context, supporter *e
 			}
 			locked.PlanID = newPlan.ID
 			locked.PendingPlanID = nil
+			if newPlan.ID != oldPlanID {
+				LogActivity(txCtx, s.Activity, &locked.UserID, entity.PurchasePlanChange, "supporter", locked.ID.String(), RequestMeta{}, activityMeta(map[string]string{
+					"from_plan_id": oldPlanID.String(),
+					"to_plan_id":   newPlan.ID.String(),
+				}))
+			}
 		}
 		if locked.PendingBillingMode != nil {
 			if err = s.applyBillingModeSwitch(txCtx, locked, *locked.PendingBillingMode); err != nil {
