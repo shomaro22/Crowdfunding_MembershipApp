@@ -3,13 +3,76 @@ package usecase
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"crowdfund-app/entity"
 	"crowdfund-app/repository"
 
 	"github.com/google/uuid"
+	"gorm.io/gorm"
 )
+
+type AdminUseCase struct {
+	Users           repository.UserRepo
+	SellerRegs      repository.SellerRegRepo
+	Projects        repository.ProjectRepo
+	Audit           repository.AuditRepo
+	ReviewDecisions repository.ReviewDecisionRepo
+	RefreshTokens   repository.RefreshTokenRepo
+	TOTPBackup      repository.TOTPBackupRepo
+	KYC             repository.KYCStore
+	DB              *gorm.DB
+	APIBase         string
+	SignSecret      []byte
+}
+
+type SellerRegView struct {
+	Registration *entity.SellerReg
+	User         *entity.User
+	FrontURL     *string
+	BackURL      *string
+}
+
+func (a *AdminUseCase) requireReviewAdmin(ctx context.Context, adminID uuid.UUID) error {
+	var (
+		admin *entity.User
+		err   error
+	)
+
+	admin, err = a.Users.FindID(ctx, adminID)
+	if err != nil || admin == nil || admin.Role != entity.UserRoleAdmin {
+		return ErrForbidden
+	}
+	if admin.AdminRole == nil {
+		return ErrForbidden
+	}
+	switch *admin.AdminRole {
+	case entity.AdminRoleSuperAdmin, entity.AdminRoleReviewAdmin:
+		return nil
+	default:
+		return ErrForbidden
+	}
+}
+
+func requireReviewReason(reason *string) error {
+	if reason == nil || strings.TrimSpace(*reason) == "" {
+		return ErrBadRequest
+	}
+	return nil
+}
+
+func normalizeReviewReason(reason *string) *string {
+	var s string
+	if reason == nil {
+		return nil
+	}
+	s = strings.TrimSpace(*reason)
+	if s == "" {
+		return nil
+	}
+	return &s
+}
 
 func (a *AdminUseCase) ResetUser2FA(ctx context.Context, adminID, targetUserID uuid.UUID, reason *string) (*entity.User, error) {
 	var (
@@ -101,5 +164,36 @@ func (a *AdminUseCase) invalidateSessions(ctx context.Context, userID uuid.UUID)
 			return nil
 		}
 		return a.RefreshTokens.RevokeUser(txCtx, userID, time.Now().UTC())
+	})
+}
+
+func (a *AdminUseCase) writeReviewDecision(ctx context.Context, reviewerID uuid.UUID, resourceType string, resourceID uuid.UUID, decision string, reason *string) {
+	if a.ReviewDecisions == nil {
+		return
+	}
+	_ = a.ReviewDecisions.Create(ctx, &entity.ReviewDecision{
+		ID:           uuid.New(),
+		ReviewerID:   reviewerID,
+		ResourceType: resourceType,
+		ResourceID:   resourceID,
+		Decision:     decision,
+		Reason:       reason,
+		CreatedAt:    time.Now().UTC(),
+	})
+}
+
+func (a *AdminUseCase) writeAudit(ctx context.Context, adminID uuid.UUID, action, resource, resourceID string, reason, details *string) {
+	if a.Audit == nil {
+		return
+	}
+	_ = a.Audit.Create(ctx, &entity.AuditLog{
+		ID:         uuid.New(),
+		AdminID:    adminID,
+		Action:     action,
+		Resource:   resource,
+		ResourceID: resourceID,
+		Reason:     reason,
+		Details:    details,
+		CreatedAt:  time.Now().UTC(),
 	})
 }

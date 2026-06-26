@@ -1,6 +1,7 @@
 package usecase
 
 import (
+	"context"
 	"time"
 
 	"crowdfund-app/entity"
@@ -21,6 +22,7 @@ type PaymentUseCase struct {
 	Supporters repository.SupporterRepo
 	Connect    repository.ConnectRepo
 	Webhooks   repository.WebhookEventRepo
+	Activity   repository.ActivityRepo
 	Stripe     stripe.Client
 	ConnectUC  *ConnectUseCase
 }
@@ -32,6 +34,7 @@ type CheckoutIn struct {
 	PaymentMethod entity.PaymentMethod
 	SuccessURL    *string
 	CancelURL     *string
+	Meta          RequestMeta
 }
 
 type CheckoutOut struct {
@@ -43,6 +46,7 @@ type IntentIn struct {
 	BuyerID   uuid.UUID
 	ProjectID uuid.UUID
 	PlanID    uuid.UUID
+	Meta      RequestMeta
 }
 
 type IntentOut struct {
@@ -70,4 +74,41 @@ const (
 type periodRange struct {
 	start time.Time
 	end   time.Time
+}
+
+func (p *PaymentUseCase) logPurchaseCreated(ctx context.Context, purchase *entity.Purchase, meta RequestMeta) {
+	var uid *uuid.UUID
+	if purchase != nil {
+		uid = &purchase.BuyerID
+	}
+	LogActivity(ctx, p.Activity, uid, entity.PurchaseCreated, "purchase", purchase.ID.String(), meta, purchaseActivityMeta(purchase))
+}
+
+func (p *PaymentUseCase) logPaymentCheckoutStarted(ctx context.Context, purchase *entity.Purchase, meta RequestMeta, flow string) {
+	var uid *uuid.UUID
+	if purchase != nil {
+		uid = &purchase.BuyerID
+	}
+	fields := map[string]string{"flow": flow}
+	if purchase != nil {
+		fields["project_id"] = purchase.ProjectID.String()
+	}
+	LogActivity(ctx, p.Activity, uid, entity.PaymentCheckout, "purchase", purchase.ID.String(), meta, activityMeta(fields))
+}
+
+func (p *PaymentUseCase) logPurchaseCancelled(ctx context.Context, purchase *entity.Purchase, reason string, to entity.PurchaseStatus) {
+	var uid *uuid.UUID
+	if purchase != nil {
+		uid = &purchase.BuyerID
+	}
+	LogActivity(ctx, p.Activity, uid, entity.PurchaseCancelled, "purchase", purchase.ID.String(), RequestMeta{}, activityMeta(map[string]string{
+		"reason":    reason,
+		"to_status": string(to),
+	}))
+}
+
+func (p *PaymentUseCase) logPaymentWebhook(ctx context.Context, eventType, eventID string) {
+	LogActivity(ctx, p.Activity, nil, entity.PaymentWebhook, "stripe_event", eventID, RequestMeta{}, activityMeta(map[string]string{
+		"event_type": eventType,
+	}))
 }
