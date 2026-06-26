@@ -38,7 +38,7 @@ func buildApp() (*echo.Echo, string, error) {
 		privateRoot    string
 		userRepo       repository.UserRepo
 		sellerRegRepo  repository.SellerRegRepo
-		reTokenRepo    repository.ReTokenRepo
+		refreshTokenRepo repository.RefreshTokenRepo
 		resetRepo      repository.ResetRepo
 		activityRepo   repository.ActivityRepo
 		auditRepo           repository.AuditRepo
@@ -141,7 +141,7 @@ func buildApp() (*echo.Echo, string, error) {
 
 	userRepo = repository.NewUserRepo(gormDB)
 	sellerRegRepo = repository.NewSellerRegRepo(gormDB)
-	reTokenRepo = repository.NewReTokenRepo(gormDB)
+	refreshTokenRepo = repository.NewRefreshTokenRepo(gormDB)
 	resetRepo = repository.NewResetRepo(gormDB)
 	activityRepo = repository.NewActivityRepo(gormDB)
 	auditRepo = repository.NewAuditRepo(gormDB)
@@ -162,7 +162,7 @@ func buildApp() (*echo.Echo, string, error) {
 	authUC = &usecase.AuthUseCase{
 		Users:        userRepo,
 		SellerRegs:   sellerRegRepo,
-		ReTokens:     reTokenRepo,
+		RefreshTokens:     refreshTokenRepo,
 		ResetToks:    resetRepo,
 		Activity:     activityRepo,
 		OAuth:        oauthRepo,
@@ -204,7 +204,7 @@ func buildApp() (*echo.Echo, string, error) {
 		Projects:        projectRepo,
 		Audit:           auditRepo,
 		ReviewDecisions: reviewDecisionRepo,
-		ReTokens:   reTokenRepo,
+		RefreshTokens:   refreshTokenRepo,
 		TOTPBackup: totpBackupRepo,
 		KYC:        kycStore,
 		DB:         gormDB,
@@ -234,7 +234,7 @@ func buildApp() (*echo.Echo, string, error) {
 			u   *entity.User
 			err error
 		)
-		u, err = userRepo.FindByID(c.Request().Context(), claims.UserID)
+		u, err = userRepo.FindID(c.Request().Context(), claims.UserID)
 		if err != nil {
 			return echo.NewHTTPError(http.StatusInternalServerError, map[string]string{"error": "internal error", "code": "INTERNAL_ERROR"})
 		}

@@ -60,9 +60,9 @@ func New(cfg Config) *echo.Echo {
 		e.POST("/auth/register/seller", cfg.Auth.RegisterSeller, rl(middleware.PolicyRegisterSeller))
 		e.POST("/auth/login", cfg.Auth.Login, rl(middleware.PolicyLogin))
 		e.POST("/auth/forgot-password", cfg.Auth.ForgotPassword, rl(middleware.PolicyForgotPassword))
-		e.POST("/auth/reset-password", cfg.Auth.ResetPassword)
-		e.GET("/auth/check-email", cfg.Auth.CheckEmail)
-		e.POST("/re", cfg.Auth.Re, rl(middleware.PolicyRe))
+		e.POST("/auth/reset-password", cfg.Auth.ResetPassword, rl(middleware.PolicyResetPassword))
+		e.GET("/auth/check-email", cfg.Auth.CheckEmail, rl(middleware.PolicyCheckEmail))
+		e.POST("/auth/refresh", cfg.Auth.Refresh, rl(middleware.PolicyRefresh))
 		e.POST("/auth/2fa/challenge", cfg.Auth.Challenge2FA, rl(cfg.Policy2FAChallenge))
 
 		if cfg.OAuthEnabled {
@@ -71,8 +71,8 @@ func New(cfg Config) *echo.Echo {
 			e.POST("/auth/oauth/exchange", cfg.Auth.OAuthExchange, rl(middleware.PolicyOAuthExchange))
 		}
 
+		e.POST("/auth/logout", cfg.Auth.Logout)
 		pm = cfg.Protected
-		e.POST("/auth/logout", cfg.Auth.Logout, pm...)
 		e.GET("/me", cfg.Auth.Me, pm...)
 		e.POST("/me/change-password", cfg.Auth.ChangePassword, pm...)
 		e.POST("/auth/2fa/setup", cfg.Auth.Setup2FA, pm...)
@@ -84,7 +84,7 @@ func New(cfg Config) *echo.Echo {
 		e.GET("/projects/mine", cfg.Projects.ListMine, cfg.SellerRead...)
 		e.POST("/projects", cfg.Projects.Create, cfg.SellerWrite...)
 		opt = cfg.OptionalJWT
-		e.GET("/projects/:projectId/plans", cfg.Projects.ListPlans)
+		e.GET("/projects/:projectId/plans", cfg.Projects.ListPlans, opt...)
 		e.GET("/projects/:projectId", cfg.Projects.Get, opt...)
 		e.PUT("/projects/:projectId", cfg.Projects.Update, cfg.SellerWrite...)
 		e.POST("/projects/:projectId/delete-request", cfg.Projects.RequestDelete, cfg.SellerWrite...)
@@ -101,7 +101,7 @@ func New(cfg Config) *echo.Echo {
 		e.GET("/admin/kyc-documents", cfg.KYCFiles.Serve)
 	}
 
-	if cfg.Admin != nil && len(cfg.AdminOnly) > 0 {
+	if cfg.Admin != nil {
 		var reviewAdmin echo.MiddlewareFunc
 		admin = e.Group("/admin", cfg.AdminOnly...)
 		reviewAdmin = middleware.RequireAdminRole(entity.AdminRoleReviewAdmin, entity.AdminRoleSuperAdmin)

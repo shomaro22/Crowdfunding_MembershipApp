@@ -23,7 +23,7 @@ func (p *ProjectUseCase) Update(ctx context.Context, sellerID, projectID uuid.UU
 		end    *time.Time
 	)
 
-	proj, plans, images, err = p.Projects.FindByID(ctx, projectID)
+	proj, plans, images, err = p.Projects.FindID(ctx, projectID)
 	if err != nil || proj == nil {
 		return nil, ErrNotFound
 	}
@@ -92,7 +92,7 @@ func (p *ProjectUseCase) Update(ctx context.Context, sellerID, projectID uuid.UU
 			return nil, err
 		}
 	}
-	seller, _ = p.Users.FindByID(ctx, proj.SellerID)
+	seller, _ = p.Users.FindID(ctx, proj.SellerID)
 	return &ProjectView{Project: proj, Plans: plans, Images: images, Seller: seller}, nil
 }
 
@@ -106,7 +106,7 @@ func (p *ProjectUseCase) RequestDelete(ctx context.Context, sellerID, projectID 
 		now    time.Time
 	)
 
-	proj, plans, images, err = p.Projects.FindByID(ctx, projectID)
+	proj, plans, images, err = p.Projects.FindID(ctx, projectID)
 	if err != nil || proj == nil {
 		return nil, ErrNotFound
 	}
@@ -123,6 +123,6 @@ func (p *ProjectUseCase) RequestDelete(ctx context.Context, sellerID, projectID 
 	if err = p.Projects.Update(ctx, proj); err != nil {
 		return nil, err
 	}
-	seller, _ = p.Users.FindByID(ctx, proj.SellerID)
+	seller, _ = p.Users.FindID(ctx, proj.SellerID)
 	return &ProjectView{Project: proj, Plans: plans, Images: images, Seller: seller}, nil
 }
