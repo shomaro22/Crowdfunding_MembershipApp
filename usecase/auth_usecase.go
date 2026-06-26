@@ -67,44 +67,11 @@ type AuthUseCase struct {
 }
 
 func (a *AuthUseCase) logActivity(ctx context.Context, userID *uuid.UUID, action entity.ActivityAction, resource, resourceID string, meta AuthMeta, extra entity.JSONMetadata) {
-	var (
-		res   *string
-		rid   *string
-		ip    *string
-		ua    *string
-		reqID *string
-	)
-
-	if a.Activity == nil {
-		return
-	}
-	if resource != "" {
-		res = &resource
-	}
-	if resourceID != "" {
-		rid = &resourceID
-	}
-	if meta.IPAddress != "" {
-		ip = &meta.IPAddress
-	}
-	if meta.UserAgent != "" {
-		ua = &meta.UserAgent
-	}
-	if meta.RequestID != "" {
-		reqID = &meta.RequestID
-	}
-	_ = a.Activity.Create(ctx, &entity.ActivityLog{
-		ID:         uuid.New(),
-		UserID:     userID,
-		Action:     action,
-		Resource:   res,
-		ResourceID: rid,
-		IPAddress:  ip,
-		UserAgent:  ua,
-		RequestID:  reqID,
-		Metadata:   extra,
-		CreatedAt:  time.Now().UTC(),
-	})
+	LogActivity(ctx, a.Activity, userID, action, resource, resourceID, RequestMeta{
+		IPAddress: meta.IPAddress,
+		UserAgent: meta.UserAgent,
+		RequestID: meta.RequestID,
+	}, extra)
 }
 
 func twoFAVerified(u *entity.User) bool {

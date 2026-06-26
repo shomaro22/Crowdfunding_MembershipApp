@@ -43,5 +43,7 @@ func (p *PaymentUseCase) CreateIntent(ctx context.Context, in IntentIn) (IntentO
 	if err != nil {
 		return IntentOut{}, err
 	}
+	p.logPaymentCheckoutStarted(ctx, purchase, in.Meta, "intent")
+	p.logPurchaseCreated(ctx, purchase, in.Meta)
 	return IntentOut{ClientSecret: sub.ClientSecret, PaymentIntentID: sub.PaymentIntentID}, nil
 }

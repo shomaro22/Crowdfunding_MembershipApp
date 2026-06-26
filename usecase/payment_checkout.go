@@ -57,5 +57,7 @@ func (p *PaymentUseCase) CreateCheckout(ctx context.Context, in CheckoutIn) (Che
 	if err != nil {
 		return CheckoutOut{}, err
 	}
+	p.logPaymentCheckoutStarted(ctx, purchase, in.Meta, "checkout")
+	p.logPurchaseCreated(ctx, purchase, in.Meta)
 	return CheckoutOut{SessionID: sess.SessionID, URL: sess.URL}, nil
 }

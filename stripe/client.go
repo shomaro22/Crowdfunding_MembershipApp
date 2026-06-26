@@ -32,6 +32,8 @@ type Client interface {
 	UpdateSubscriptionAmount(ctx context.Context, subID string, amount int64) error
 	CreateUpgradePaymentIntent(ctx context.Context, in UpgradePaymentIn) (UpgradePaymentOut, error)
 	GetPaymentIntent(ctx context.Context, intentID string) (PaymentIntentSnapshot, error)
+	GetCheckoutSession(ctx context.Context, sessionID string) (*stripesdk.CheckoutSession, error)
+	GetPaymentIntentDetail(ctx context.Context, intentID string) (*stripesdk.PaymentIntent, error)
 }
 
 type client struct {

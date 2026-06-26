@@ -21,6 +21,7 @@ type PaymentUseCase struct {
 	Supporters repository.SupporterRepo
 	Connect    repository.ConnectRepo
 	Webhooks   repository.WebhookEventRepo
+	Activity   repository.ActivityRepo
 	Stripe     stripe.Client
 	ConnectUC  *ConnectUseCase
 }
@@ -32,6 +33,7 @@ type CheckoutIn struct {
 	PaymentMethod entity.PaymentMethod
 	SuccessURL    *string
 	CancelURL     *string
+	Meta          RequestMeta
 }
 
 type CheckoutOut struct {
@@ -43,6 +45,7 @@ type IntentIn struct {
 	BuyerID   uuid.UUID
 	ProjectID uuid.UUID
 	PlanID    uuid.UUID
+	Meta      RequestMeta
 }
 
 type IntentOut struct {
