@@ -60,14 +60,9 @@ func (p *PaymentUseCase) fulfillFirstSupport(
 	period periodRange,
 	customerID, subscriptionID, invoiceID *string,
 ) error {
-	if purchase.Status == entity.PurchaseStatusPaid {
-		return nil
-	}
-	if purchase.Status != entity.PurchaseStatusPending {
-		return nil
-	}
 	return repository.WithTx(ctx, p.DB, func(txCtx context.Context) error {
 		var (
+			locked    *entity.Purchase
 			active    *entity.ProjectSupporter
 			supporter entity.ProjectSupporter
 			resolved  uuid.UUID
@@ -76,6 +71,17 @@ func (p *PaymentUseCase) fulfillFirstSupport(
 			now       time.Time
 			err       error
 		)
+		locked, err = p.Purchases.FindIDLock(txCtx, purchase.ID)
+		if err != nil || locked == nil {
+			return ErrNotFound
+		}
+		purchase = locked
+		if purchase.Status == entity.PurchaseStatusPaid {
+			return nil
+		}
+		if purchase.Status != entity.PurchaseStatusPending {
+			return nil
+		}
 		now = time.Now().UTC()
 		active, err = p.Supporters.FindActive(txCtx, purchase.ProjectID, purchase.BuyerID)
 		if err != nil {

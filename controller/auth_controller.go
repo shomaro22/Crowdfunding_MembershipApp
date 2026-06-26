@@ -12,8 +12,8 @@ import (
 )
 
 type AuthController struct {
-	Auth       AuthUseCase
-	CookieCfg  auth.CookieCfg
+	Auth      AuthUseCase
+	CookieCfg auth.CookieCfg
 }
 
 func NewAuthController(authUC AuthUseCase, cookieCfg auth.CookieCfg) *AuthController {
