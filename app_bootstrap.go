@@ -69,6 +69,7 @@ func buildApp() (*echo.Echo, string, error) {
 		connectUC          *usecase.ConnectUseCase
 		paymentUC          *usecase.PaymentUseCase
 		projectCtl         *controller.ProjectController
+		connectCtl         *controller.ConnectController
 		paymentCtl         *controller.PaymentController
 		preAuth            []echo.MiddlewareFunc
 		corsRaw            string
@@ -227,6 +228,7 @@ func buildApp() (*echo.Echo, string, error) {
 		ConnectUC:  connectUC,
 	}
 	projectCtl = controller.NewProjectController(projectUC)
+	connectCtl = controller.NewConnectController(connectUC)
 	paymentCtl = controller.NewPaymentController(paymentUC)
 
 	validateSession = func(c echo.Context, claims auth.AuthClaims) error {
@@ -290,6 +292,7 @@ func buildApp() (*echo.Echo, string, error) {
 		Health:             healthCtl,
 		Auth:               authCtl,
 		Projects:           projectCtl,
+		Connect:            connectCtl,
 		Payments:           paymentCtl,
 		Admin:              adminCtl,
 		KYCFiles:           kycFileCtl,
