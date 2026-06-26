@@ -31,6 +31,7 @@ type ProjectRepo interface {
 	Delete(ctx context.Context, id uuid.UUID) error
 	FindPlan(ctx context.Context, projectID, planID uuid.UUID) (*entity.ProjectPlan, error)
 	IncrementSupportCounts(ctx context.Context, projectID, planID uuid.UUID) error
+	TransferPlanSupportCount(ctx context.Context, projectID, fromPlanID, toPlanID uuid.UUID) error
 	AddCurrentAmount(ctx context.Context, projectID uuid.UUID, amount int64) error
 }
 
@@ -261,6 +262,21 @@ func (r *projectRepo) IncrementSupportCounts(ctx context.Context, projectID, pla
 		return err
 	}
 	return r.dbCtx(ctx).Model(&entity.ProjectPlan{}).Where("id = ? AND project_id = ?", planID, projectID).
+		UpdateColumn("supporter_count", gorm.Expr("supporter_count + 1")).Error
+}
+
+func (r *projectRepo) TransferPlanSupportCount(ctx context.Context, projectID, fromPlanID, toPlanID uuid.UUID) error {
+	var err error
+	if fromPlanID == toPlanID {
+		return nil
+	}
+	err = r.dbCtx(ctx).Model(&entity.ProjectPlan{}).
+		Where("id = ? AND project_id = ? AND supporter_count > 0", fromPlanID, projectID).
+		UpdateColumn("supporter_count", gorm.Expr("supporter_count - 1")).Error
+	if err != nil {
+		return err
+	}
+	return r.dbCtx(ctx).Model(&entity.ProjectPlan{}).Where("id = ? AND project_id = ?", toPlanID, projectID).
 		UpdateColumn("supporter_count", gorm.Expr("supporter_count + 1")).Error
 }
 
