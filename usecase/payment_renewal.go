@@ -84,6 +84,9 @@ func (p *PaymentUseCase) fulfillAutoRenewal(ctx context.Context, inv stripesdk.I
 		if err = p.Purchases.Create(txCtx, &purchase); err != nil {
 			return err
 		}
+		if err = p.Projects.AddCurrentAmount(txCtx, supporter.ProjectID, inv.AmountPaid); err != nil {
+			return err
+		}
 		if err = p.Purchases.RecordEvent(txCtx, &entity.PurchaseEvent{
 			ID:         uuid.New(),
 			PurchaseID: purchase.ID,
