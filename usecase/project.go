@@ -8,6 +8,7 @@ import (
 	"crowdfund-app/repository"
 
 	"github.com/google/uuid"
+	"gorm.io/gorm"
 )
 
 type PlanIn struct {
@@ -57,6 +58,7 @@ type ProjectView struct {
 type ProjectUseCase struct {
 	Projects repository.ProjectRepo
 	Users    repository.UserRepo
+	DB       *gorm.DB
 }
 
 func (p *ProjectUseCase) enrichList(ctx context.Context, rows []entity.Project, total int64) ([]ProjectView, int64, error) {

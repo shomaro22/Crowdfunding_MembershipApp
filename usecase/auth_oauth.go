@@ -210,7 +210,7 @@ func (a *AuthUseCase) resolveGoogleUser(ctx context.Context, profile *auth.Googl
 		Name:          name,
 		PasswordHash:  pwHash,
 		Role:          entity.UserRoleBuyer,
-		AccountStatus: entity.AccountStatusActive,
+		AccountStatus: entity.AccountStatusPending,
 		SellerStatus:  entity.SellerStatusNotApplicable,
 		CreatedAt:     now,
 		UpdatedAt:     now,

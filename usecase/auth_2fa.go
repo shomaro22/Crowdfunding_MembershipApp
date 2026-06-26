@@ -93,7 +93,9 @@ func (a *AuthUseCase) Verify2FASetup(ctx context.Context, userID uuid.UUID, code
 	if err != nil {
 		return nil, err
 	}
-	a.invalidateSessions(ctx, u.ID)
+	if err = a.invalidateSessions(ctx, u.ID); err != nil {
+		return nil, err
+	}
 	return &TOTPVerifyResult{BackupCodes: codes}, nil
 }
 
