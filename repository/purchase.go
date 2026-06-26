@@ -8,12 +8,14 @@ import (
 
 	"github.com/google/uuid"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 type PurchaseRepo interface {
 	Create(ctx context.Context, row *entity.Purchase) error
 	Update(ctx context.Context, row *entity.Purchase) error
 	FindID(ctx context.Context, id uuid.UUID) (*entity.Purchase, error)
+	FindIDLock(ctx context.Context, id uuid.UUID) (*entity.Purchase, error)
 	FindSessionID(ctx context.Context, sessionID string) (*entity.Purchase, error)
 	FindIntentID(ctx context.Context, intentID string) (*entity.Purchase, error)
 	FindPendingBuyerProject(ctx context.Context, buyerID, projectID uuid.UUID) (*entity.Purchase, error)
@@ -47,6 +49,22 @@ func (r *purchaseRepo) FindID(ctx context.Context, id uuid.UUID) (*entity.Purcha
 		err error
 	)
 	err = r.dbCtx(ctx).Where("id = ?", id).First(&row).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &row, nil
+}
+
+func (r *purchaseRepo) FindIDLock(ctx context.Context, id uuid.UUID) (*entity.Purchase, error) {
+	var (
+		row entity.Purchase
+		err error
+	)
+	err = r.dbCtx(ctx).Clauses(clause.Locking{Strength: "UPDATE"}).
+		Where("id = ?", id).First(&row).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, nil
 	}

@@ -27,62 +27,62 @@ import (
 
 func buildApp() (*echo.Echo, string, error) {
 	var (
-		databaseURL    string
-		err            error
-		gormDB         *gorm.DB
-		sqlDB          *sql.DB
-		rdb            *redis.Client
-		jwtSecret      string
-		port           string
-		publicRoot     string
-		privateRoot    string
-		userRepo       repository.UserRepo
-		sellerRegRepo  repository.SellerRegRepo
-		refreshTokenRepo repository.RefreshTokenRepo
-		resetRepo      repository.ResetRepo
-		activityRepo   repository.ActivityRepo
-		auditRepo           repository.AuditRepo
-		reviewDecisionRepo  repository.ReviewDecisionRepo
-		projectRepo    repository.ProjectRepo
-		connectRepo    repository.ConnectRepo
-		webhookRepo    repository.WebhookEventRepo
-		supporterRepo  repository.SupporterRepo
-		purchaseRepo   repository.PurchaseRepo
-		oauthRepo      repository.OAuthRepo
-		totpBackupRepo repository.TOTPBackupRepo
-		oauthCache     repository.OAuthCache
-		rateLimitRepo  repository.RateLimitRepo
-		rateLimitUC    *usecase.RateLimitUseCase
-		kycStore       *repository.LocalKYCStore
-		tokenSvc       *auth.TokenService
-		authUC         *usecase.AuthUseCase
-		googleOAuth    *auth.GoogleOAuth
-		stripeClient   stripe.Client
-		cookieCfg      auth.CookieCfg
-		authCtl        *controller.AuthController
-		healthCtl      *controller.HealthController
-		apiPublicURL   string
-		adminUC        *usecase.AdminUseCase
-		adminCtl       *controller.AdminController
-		kycFileCtl     *controller.KYCFileController
-		projectUC      *usecase.ProjectUseCase
-		connectUC      *usecase.ConnectUseCase
-		paymentUC      *usecase.PaymentUseCase
-		projectCtl     *controller.ProjectController
-		paymentCtl     *controller.PaymentController
-		preAuth        []echo.MiddlewareFunc
-		corsRaw        string
-		origins        []string
-		p              string
-		s              string
-		protected      []echo.MiddlewareFunc
-		optionalJWT    []echo.MiddlewareFunc
-		sellerRead     []echo.MiddlewareFunc
-		sellerWrite    []echo.MiddlewareFunc
-		adminOnly      []echo.MiddlewareFunc
-		rateLimiter    *middleware.RateLimiter
-		e              *echo.Echo
-		validateSession func(echo.Context, auth.AuthClaims) error
+		databaseURL        string
+		err                error
+		gormDB             *gorm.DB
+		sqlDB              *sql.DB
+		rdb                *redis.Client
+		jwtSecret          string
+		port               string
+		publicRoot         string
+		privateRoot        string
+		userRepo           repository.UserRepo
+		sellerRegRepo      repository.SellerRegRepo
+		refreshTokenRepo   repository.RefreshTokenRepo
+		resetRepo          repository.ResetRepo
+		activityRepo       repository.ActivityRepo
+		auditRepo          repository.AuditRepo
+		reviewDecisionRepo repository.ReviewDecisionRepo
+		projectRepo        repository.ProjectRepo
+		connectRepo        repository.ConnectRepo
+		webhookRepo        repository.WebhookEventRepo
+		supporterRepo      repository.SupporterRepo
+		purchaseRepo       repository.PurchaseRepo
+		oauthRepo          repository.OAuthRepo
+		totpBackupRepo     repository.TOTPBackupRepo
+		oauthCache         repository.OAuthCache
+		rateLimitRepo      repository.RateLimitRepo
+		rateLimitUC        *usecase.RateLimitUseCase
+		kycStore           *repository.LocalKYCStore
+		tokenSvc           *auth.TokenService
+		authUC             *usecase.AuthUseCase
+		googleOAuth        *auth.GoogleOAuth
+		stripeClient       stripe.Client
+		cookieCfg          auth.CookieCfg
+		authCtl            *controller.AuthController
+		healthCtl          *controller.HealthController
+		apiPublicURL       string
+		adminUC            *usecase.AdminUseCase
+		adminCtl           *controller.AdminController
+		kycFileCtl         *controller.KYCFileController
+		projectUC          *usecase.ProjectUseCase
+		connectUC          *usecase.ConnectUseCase
+		paymentUC          *usecase.PaymentUseCase
+		projectCtl         *controller.ProjectController
+		paymentCtl         *controller.PaymentController
+		preAuth            []echo.MiddlewareFunc
+		corsRaw            string
+		origins            []string
+		p                  string
+		s                  string
+		protected          []echo.MiddlewareFunc
+		optionalJWT        []echo.MiddlewareFunc
+		sellerRead         []echo.MiddlewareFunc
+		sellerWrite        []echo.MiddlewareFunc
+		adminOnly          []echo.MiddlewareFunc
+		rateLimiter        *middleware.RateLimiter
+		e                  *echo.Echo
+		validateSession    func(echo.Context, auth.AuthClaims) error
 	)
 
 	slog.SetDefault(slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo})))
@@ -160,20 +160,20 @@ func buildApp() (*echo.Echo, string, error) {
 
 	tokenSvc = auth.NewTokenService([]byte(jwtSecret), auth.DefaultAuthTTL)
 	authUC = &usecase.AuthUseCase{
-		Users:        userRepo,
-		SellerRegs:   sellerRegRepo,
-		RefreshTokens:     refreshTokenRepo,
-		ResetToks:    resetRepo,
-		Activity:     activityRepo,
-		OAuth:        oauthRepo,
-		OAuthCache:   oauthCache,
-		TOTPBackup:   totpBackupRepo,
-		Tokens:       tokenSvc,
-		KYCStore:     kycStore,
-		TOTPKey:      []byte(jwtSecret),
-		TOTPIssuer:   strings.TrimSpace(os.Getenv("TOTP_ISSUER")),
-		DB:           gormDB,
-		AppPublicURL: os.Getenv("PUBLIC_APP_URL"),
+		Users:         userRepo,
+		SellerRegs:    sellerRegRepo,
+		RefreshTokens: refreshTokenRepo,
+		ResetToks:     resetRepo,
+		Activity:      activityRepo,
+		OAuth:         oauthRepo,
+		OAuthCache:    oauthCache,
+		TOTPBackup:    totpBackupRepo,
+		Tokens:        tokenSvc,
+		KYCStore:      kycStore,
+		TOTPKey:       []byte(jwtSecret),
+		TOTPIssuer:    strings.TrimSpace(os.Getenv("TOTP_ISSUER")),
+		DB:            gormDB,
+		AppPublicURL:  os.Getenv("PUBLIC_APP_URL"),
 	}
 	googleOAuth, err = auth.GoogleFromEnv(auth.NewStateBridge(oauthCache))
 	if err == nil {
@@ -205,11 +205,11 @@ func buildApp() (*echo.Echo, string, error) {
 		Audit:           auditRepo,
 		ReviewDecisions: reviewDecisionRepo,
 		RefreshTokens:   refreshTokenRepo,
-		TOTPBackup: totpBackupRepo,
-		KYC:        kycStore,
-		DB:         gormDB,
-		APIBase:    apiPublicURL,
-		SignSecret: []byte(jwtSecret),
+		TOTPBackup:      totpBackupRepo,
+		KYC:             kycStore,
+		DB:              gormDB,
+		APIBase:         apiPublicURL,
+		SignSecret:      []byte(jwtSecret),
 	}
 	adminCtl = controller.NewAdminController(adminUC)
 	kycFileCtl = controller.NewKYCFileController(kycStore, []byte(jwtSecret))
@@ -295,12 +295,12 @@ func buildApp() (*echo.Echo, string, error) {
 		KYCFiles:           kycFileCtl,
 		RateLimit:          rateLimiter,
 		Policy2FAChallenge: middleware.Policy2FAChallenge([]byte(jwtSecret)),
-		OAuthEnabled:      authUC.Google != nil,
-		Protected:         protected,
-		OptionalJWT:       optionalJWT,
-		SellerRead:        sellerRead,
-		SellerWrite:       sellerWrite,
-		AdminOnly:         adminOnly,
+		OAuthEnabled:       authUC.Google != nil,
+		Protected:          protected,
+		OptionalJWT:        optionalJWT,
+		SellerRead:         sellerRead,
+		SellerWrite:        sellerWrite,
+		AdminOnly:          adminOnly,
 	})
 	return e, ":" + port, nil
 }
