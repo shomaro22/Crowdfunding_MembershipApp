@@ -49,6 +49,7 @@ func (p *PaymentUseCase) HandleWebhook(ctx context.Context, payload []byte, sign
 		_ = p.Webhooks.Release(ctx, event.ID)
 		return err
 	}
+	p.logPaymentWebhook(ctx, string(event.Type), event.ID)
 	return nil
 }
 

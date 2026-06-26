@@ -138,6 +138,10 @@ func (s *SupporterUseCase) startPaidUpgrade(
 	if err = s.Purchases.Create(ctx, &purchase); err != nil {
 		return UpgradeOut{}, err
 	}
+	LogActivity(ctx, s.Activity, &supporter.UserID, entity.PurchaseCreated, "purchase", purchase.ID.String(), RequestMeta{}, activityMeta(map[string]string{
+		"project_id": supporter.ProjectID.String(),
+		"purpose":    "plan_upgrade",
+	}))
 	changeAt := now
 	supporter.PendingPlanID = &target.ID
 	supporter.PlanChangeDate = &changeAt
@@ -204,6 +208,7 @@ func (s *SupporterUseCase) finalizePaidUpgrade(ctx context.Context, supporter *e
 		if err = s.Projects.TransferPlanSupportCount(txCtx, locked.ProjectID, locked.PlanID, newPlanID); err != nil {
 			return err
 		}
+		oldPlanID := locked.PlanID
 		if locked.BillingMode == entity.BillingModeAuto && locked.StripeSubscriptionID != nil && s.Stripe != nil {
 			plan, planErr := s.Projects.FindPlan(txCtx, locked.ProjectID, newPlanID)
 			if planErr != nil || plan == nil {
@@ -217,6 +222,12 @@ func (s *SupporterUseCase) finalizePaidUpgrade(ctx context.Context, supporter *e
 		locked.PendingPlanID = nil
 		locked.PlanChangeDate = nil
 		locked.UpdatedAt = now
+		if newPlanID != oldPlanID {
+			LogActivity(txCtx, s.Activity, &locked.UserID, entity.PurchasePlanChange, "supporter", locked.ID.String(), RequestMeta{}, activityMeta(map[string]string{
+				"from_plan_id": oldPlanID.String(),
+				"to_plan_id":   newPlanID.String(),
+			}))
+		}
 		if err = s.Supporters.Update(txCtx, locked); err != nil {
 			return err
 		}

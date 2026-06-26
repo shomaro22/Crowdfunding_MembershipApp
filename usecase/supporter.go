@@ -27,6 +27,7 @@ type SupporterUseCase struct {
 	Supporters repository.SupporterRepo
 	Purchases  repository.PurchaseRepo
 	Connect    repository.ConnectRepo
+	Activity   repository.ActivityRepo
 	Stripe     stripe.Client
 }
 
