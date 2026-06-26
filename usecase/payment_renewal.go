@@ -84,6 +84,10 @@ func (p *PaymentUseCase) fulfillAutoRenewal(ctx context.Context, inv stripesdk.I
 		if err = p.Purchases.Create(txCtx, &purchase); err != nil {
 			return err
 		}
+		LogActivity(txCtx, p.Activity, &supporter.UserID, entity.PurchaseCreated, "purchase", purchase.ID.String(), RequestMeta{}, activityMeta(map[string]string{
+			"project_id": supporter.ProjectID.String(),
+			"renewal":    "true",
+		}))
 		if err = p.Projects.AddCurrentAmount(txCtx, supporter.ProjectID, inv.AmountPaid); err != nil {
 			return err
 		}

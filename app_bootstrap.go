@@ -228,6 +228,7 @@ func buildApp() (*echo.Echo, string, error) {
 		Supporters: supporterRepo,
 		Connect:    connectRepo,
 		Webhooks:   webhookRepo,
+		Activity:   activityRepo,
 		Stripe:     stripeClient,
 		ConnectUC:  connectUC,
 	}
@@ -238,6 +239,7 @@ func buildApp() (*echo.Echo, string, error) {
 		Supporters: supporterRepo,
 		Purchases:  purchaseRepo,
 		Connect:    connectRepo,
+		Activity:   activityRepo,
 		Stripe:     stripeClient,
 	}
 	purchaseUC = &usecase.PurchaseUseCase{
