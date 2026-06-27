@@ -12,10 +12,10 @@ type UserView struct {
 	ID            uuid.UUID
 	Email         string
 	Name          *string
-	Role          entity.UserRole
-	AccountStatus entity.AccountStatus
-	SellerStatus  entity.SellerStatus
-	AdminRole     *entity.AdminRole
+	Role          string
+	AccountStatus string
+	SellerStatus  string
+	AdminRole     *string
 	TOTPEnabled   bool
 	AvatarURL     *string
 	CreatedAt     time.Time
@@ -23,7 +23,15 @@ type UserView struct {
 }
 
 func (v UserView) IsActive() bool {
-	return v.AccountStatus == entity.AccountStatusActive
+	return v.AccountStatus == string(entity.AccountStatusActive)
+}
+
+func adminRoleString(r *entity.AdminRole) *string {
+	if r == nil {
+		return nil
+	}
+	s := string(*r)
+	return &s
 }
 
 func UserViewFrom(u *entity.User) UserView {
@@ -34,10 +42,10 @@ func UserViewFrom(u *entity.User) UserView {
 		ID:            u.ID,
 		Email:         u.Email,
 		Name:          u.Name,
-		Role:          u.Role,
-		AccountStatus: u.AccountStatus,
-		SellerStatus:  u.SellerStatus,
-		AdminRole:     u.AdminRole,
+		Role:          string(u.Role),
+		AccountStatus: string(u.AccountStatus),
+		SellerStatus:  string(u.SellerStatus),
+		AdminRole:     adminRoleString(u.AdminRole),
 		TOTPEnabled:   u.TOTPEnabled,
 		AvatarURL:     u.AvatarURL,
 		CreatedAt:     u.CreatedAt,
@@ -112,7 +120,7 @@ type SellerRegItemView struct {
 	PhotoPresent bool
 	HasIDFront   bool
 	HasIDBack    bool
-	Status       entity.RegStatus
+	Status       string
 	RejectReason *string
 	CreatedAt    time.Time
 	UpdatedAt    time.Time
@@ -131,7 +139,7 @@ func SellerRegItemFrom(r *entity.SellerReg) SellerRegItemView {
 		PhotoPresent: r.PhotoPresent,
 		HasIDFront:   r.HasIDFront(),
 		HasIDBack:    r.HasIDBack(),
-		Status:       r.Status,
+		Status:       string(r.Status),
 		RejectReason: r.RejectReason,
 		CreatedAt:    r.CreatedAt,
 		UpdatedAt:    r.UpdatedAt,
