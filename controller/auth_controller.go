@@ -11,12 +11,13 @@ import (
 )
 
 type AuthController struct {
-	Auth      AuthUseCase
-	CookieCfg auth.CookieCfg
+	Auth         AuthUseCase
+	CookieCfg    auth.CookieCfg
+	AppPublicURL string
 }
 
-func NewAuthController(authUC AuthUseCase, cookieCfg auth.CookieCfg) *AuthController {
-	return &AuthController{Auth: authUC, CookieCfg: cookieCfg}
+func NewAuthController(authUC AuthUseCase, cookieCfg auth.CookieCfg, appPublicURL string) *AuthController {
+	return &AuthController{Auth: authUC, CookieCfg: cookieCfg, AppPublicURL: appPublicURL}
 }
 
 type registerRequest struct {

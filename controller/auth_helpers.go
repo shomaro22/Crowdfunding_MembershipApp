@@ -3,6 +3,8 @@ package controller
 import (
 	"errors"
 	"net/http"
+	"net/url"
+	"strings"
 	"time"
 
 	"crowdfund-app/entity"
@@ -73,6 +75,28 @@ type userJSON struct {
 
 func apiError(msg, code string) map[string]string {
 	return map[string]string{"error": msg, "code": code}
+}
+
+func oauthCallbackURL(appPublicURL string, v usecase.OAuthRedirectView) string {
+	var (
+		base string
+		q    url.Values
+	)
+	base = strings.TrimRight(strings.TrimSpace(appPublicURL), "/") + "/auth/callback"
+	if v.Error != "" {
+		return base + "?error=" + url.QueryEscape(v.Error)
+	}
+	q = url.Values{}
+	if v.From != "" {
+		q.Set("from", v.From)
+	}
+	if v.Code != "" {
+		q.Set("code", v.Code)
+	}
+	if len(q) == 0 {
+		return base
+	}
+	return base + "?" + q.Encode()
 }
 
 type registerResponse struct {
