@@ -30,6 +30,10 @@ func buildApp(opts *bootstrap.Options) (*echo.Echo, string, error) {
 		connectCtl      *controller.ConnectController
 		paymentCtl      *controller.PaymentController
 		supporterCtl    *controller.SupporterController
+		messageCtl      *controller.MessageController
+		wsTokenCtl      *controller.WSTokenController
+		wsCtl           *controller.WSController
+		hubAdapter      bootstrap.WSHubAdapter
 		preAuth         []echo.MiddlewareFunc
 		corsRaw         string
 		origins         []string
@@ -61,6 +65,11 @@ func buildApp(opts *bootstrap.Options) (*echo.Echo, string, error) {
 	connectCtl = controller.NewConnectController(app.UseCases.Connect)
 	paymentCtl = controller.NewPaymentController(app.UseCases.Payment, app.UseCases.Purchase, app.Stripe.AppURL())
 	supporterCtl = controller.NewSupporterController(app.UseCases.Supporter)
+	hubAdapter = bootstrap.NewWSHubAdapter(app.Hub)
+	app.UseCases.Message.SetEventHook(controller.NewMessageWSPublisher(hubAdapter))
+	messageCtl = controller.NewMessageController(app.UseCases.Message)
+	wsTokenCtl = controller.NewWSTokenController(app.UseCases.WSToken)
+	wsCtl = controller.NewWSController(hubAdapter, app.UseCases.Message)
 
 	validateSession = middleware.SessionValidateHTTP(app.UseCases.Auth.ValidateSession)
 
@@ -108,6 +117,10 @@ func buildApp(opts *bootstrap.Options) (*echo.Echo, string, error) {
 		Connect:            connectCtl,
 		Payments:           paymentCtl,
 		Supporters:         supporterCtl,
+		Messages:           messageCtl,
+		WSToken:            wsTokenCtl,
+		WS:                 wsCtl,
+		WSTokenAuth:        middleware.WSTokenAuth(app.UseCases.WSToken.Consume),
 		Admin:              adminCtl,
 		KYCFiles:           kycFileCtl,
 		RateLimit:          rateLimiter,

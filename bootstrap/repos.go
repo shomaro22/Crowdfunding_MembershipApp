@@ -23,6 +23,8 @@ type Repositories struct {
 	OAuth           repository.OAuthRepo
 	TOTPBackup      repository.TOTPBackupRepo
 	Batch           repository.BatchRepo
+	Messages        repository.MessageRepo
+	WSTokens        repository.WSTokenRepo
 }
 
 type RedisRepositories struct {
@@ -47,6 +49,8 @@ func NewRepositories(db *gorm.DB) Repositories {
 		OAuth:           repository.NewOAuthRepo(db),
 		TOTPBackup:      repository.NewTOTPBackupRepo(db),
 		Batch:           repository.NewBatchRepo(db),
+		Messages:        repository.NewMessageRepo(db),
+		WSTokens:        repository.NewWSTokenRepo(db),
 	}
 }
 
