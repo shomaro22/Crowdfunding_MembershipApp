@@ -29,13 +29,15 @@ type PaymentUseCase struct {
 }
 
 type CheckoutIn struct {
-	BuyerID       uuid.UUID
-	ProjectID     uuid.UUID
-	PlanID        uuid.UUID
-	PaymentMethod string
-	SuccessURL    *string
-	CancelURL     *string
-	Meta          RequestMeta
+	BuyerID            uuid.UUID
+	ProjectID          uuid.UUID
+	PlanID             uuid.UUID
+	PaymentMethod      string
+	SuccessURL         *string
+	CancelURL          *string
+	FallbackSuccessURL string
+	FallbackCancelURL  string
+	Meta               RequestMeta
 }
 
 type CheckoutOut struct {

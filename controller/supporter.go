@@ -40,7 +40,7 @@ func (h *SupporterController) List(c echo.Context) error {
 	}
 	rows, err = h.Supporters.ListMine(c.Request().Context(), userID)
 	if err != nil {
-		return mapSupporterError(err)
+		return mapUseCaseError(err)
 	}
 	return c.JSON(http.StatusOK, listSupportersJSON(rows))
 }
@@ -70,7 +70,7 @@ func (h *SupporterController) Upgrade(c echo.Context) error {
 	}
 	out, err = h.Supporters.Upgrade(c.Request().Context(), userID, supporterID, planID)
 	if err != nil {
-		return mapSupporterError(err)
+		return mapUseCaseError(err)
 	}
 	return c.JSON(http.StatusOK, upgradePlanJSONResponse(out))
 }
@@ -96,7 +96,7 @@ func (h *SupporterController) UpgradeConfirm(c echo.Context) error {
 	}
 	view, err = h.Supporters.UpgradeConfirm(c.Request().Context(), userID, supporterID, body.PaymentIntentID)
 	if err != nil {
-		return mapSupporterError(err)
+		return mapUseCaseError(err)
 	}
 	return c.JSON(http.StatusOK, supporterToJSON(view))
 }
@@ -118,7 +118,7 @@ func (h *SupporterController) Cancel(c echo.Context) error {
 	}
 	view, err = h.Supporters.Cancel(c.Request().Context(), userID, supporterID)
 	if err != nil {
-		return mapSupporterError(err)
+		return mapUseCaseError(err)
 	}
 	return c.JSON(http.StatusOK, supporterToJSON(view))
 }
@@ -140,7 +140,7 @@ func (h *SupporterController) Rejoin(c echo.Context) error {
 	}
 	view, err = h.Supporters.Rejoin(c.Request().Context(), userID, supporterID)
 	if err != nil {
-		return mapSupporterError(err)
+		return mapUseCaseError(err)
 	}
 	return c.JSON(http.StatusOK, supporterToJSON(view))
 }
@@ -169,13 +169,9 @@ func (h *SupporterController) ChangeBilling(c echo.Context) error {
 		PaymentMethod: body.PaymentMethod,
 	})
 	if err != nil {
-		return mapSupporterError(err)
+		return mapUseCaseError(err)
 	}
 	return c.JSON(http.StatusOK, supporterToJSON(view))
-}
-
-func mapSupporterError(err error) *echo.HTTPError {
-	return mapUseCaseError(err)
 }
 
 type upgradePlanJSON struct {
