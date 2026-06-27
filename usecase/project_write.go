@@ -34,13 +34,13 @@ func (p *ProjectUseCase) Create(ctx context.Context, sellerID uuid.UUID, in Crea
 	planInputs = make([]entity.PlanInput, len(in.Plans))
 	for i, pl = range in.Plans {
 		planInputs[i] = entity.PlanInput{
-			MembershipType: pl.MembershipType,
+			MembershipType: entity.MembershipType(pl.MembershipType),
 			Price:          pl.Price,
 			MaxSupporters:  pl.MaxSupporters,
 			Benefits:       pl.Benefits,
 		}
 	}
-	if err = entity.ValidateProject(in.Title, in.Description, in.TargetAmount, in.DurationType, in.StartDate, in.EndDate, planInputs); err != nil {
+	if err = entity.ValidateProject(in.Title, in.Description, in.TargetAmount, entity.DurationType(in.DurationType), in.StartDate, in.EndDate, planInputs); err != nil {
 		return nil, mapEntityErr(err)
 	}
 	now = time.Now().UTC()
@@ -50,7 +50,7 @@ func (p *ProjectUseCase) Create(ctx context.Context, sellerID uuid.UUID, in Crea
 		Title:        strings.TrimSpace(in.Title),
 		Description:  strings.TrimSpace(in.Description),
 		TargetAmount: in.TargetAmount,
-		DurationType: in.DurationType,
+		DurationType: entity.DurationType(in.DurationType),
 		StartDate:    in.StartDate.UTC(),
 		EndDate:      in.EndDate,
 		Status:       entity.ProjectStatusPending,
@@ -61,7 +61,7 @@ func (p *ProjectUseCase) Create(ctx context.Context, sellerID uuid.UUID, in Crea
 	for _, pl = range in.Plans {
 		plans = append(plans, entity.ProjectPlan{
 			ID:             uuid.New(),
-			MembershipType: pl.MembershipType,
+			MembershipType: entity.MembershipType(pl.MembershipType),
 			Price:          pl.Price,
 			MaxSupporters:  pl.MaxSupporters,
 			Benefits:       strings.TrimSpace(pl.Benefits),
@@ -77,7 +77,7 @@ func (p *ProjectUseCase) Create(ctx context.Context, sellerID uuid.UUID, in Crea
 	if err = p.Projects.Create(ctx, project, plans, images); err != nil {
 		return nil, err
 	}
-	return &ProjectView{Project: project, Plans: plans, Images: images, Seller: UserViewPtr(u)}, nil
+	return AssembleProjectViewPtr(project, plans, images, UserViewPtr(u)), nil
 }
 
 func (p *ProjectUseCase) Update(ctx context.Context, sellerID, projectID uuid.UUID, in UpdateProjectIn) (*ProjectView, error) {
@@ -123,7 +123,7 @@ func (p *ProjectUseCase) Update(ctx context.Context, sellerID, projectID uuid.UU
 	start = project.StartDate
 	end = project.EndDate
 	if in.DurationType != nil {
-		dur = *in.DurationType
+		dur = entity.DurationType(*in.DurationType)
 	}
 	if in.StartDate != nil {
 		start = in.StartDate.UTC()
@@ -167,7 +167,7 @@ func (p *ProjectUseCase) Update(ctx context.Context, sellerID, projectID uuid.UU
 		return nil, err
 	}
 	seller, _ = p.Users.FindID(ctx, project.SellerID)
-	return &ProjectView{Project: project, Plans: plans, Images: images, Seller: UserViewPtr(seller)}, nil
+	return AssembleProjectViewPtr(project, plans, images, UserViewPtr(seller)), nil
 }
 
 func (p *ProjectUseCase) RequestDelete(ctx context.Context, sellerID, projectID uuid.UUID) (*ProjectView, error) {
@@ -198,5 +198,5 @@ func (p *ProjectUseCase) RequestDelete(ctx context.Context, sellerID, projectID 
 		return nil, err
 	}
 	seller, _ = p.Users.FindID(ctx, project.SellerID)
-	return &ProjectView{Project: project, Plans: plans, Images: images, Seller: UserViewPtr(seller)}, nil
+	return AssembleProjectViewPtr(project, plans, images, UserViewPtr(seller)), nil
 }
