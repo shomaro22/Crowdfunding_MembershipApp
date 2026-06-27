@@ -12,7 +12,7 @@ import (
 	"github.com/google/uuid"
 )
 
-func (a *AuthUseCase) RegisterBuyer(ctx context.Context, email, password string, name *string, meta AuthMeta) (*entity.User, error) {
+func (a *AuthUseCase) RegisterBuyer(ctx context.Context, email, password string, name *string, meta AuthMeta) (UserView, error) {
 	var (
 		normalized  string
 		err         error
@@ -28,23 +28,23 @@ func (a *AuthUseCase) RegisterBuyer(ctx context.Context, email, password string,
 	if err != nil {
 		switch err {
 		case entity.ErrBadEmail:
-			return nil, ErrInvalidEmail
+			return UserView{}, ErrInvalidEmail
 		case entity.ErrWeakPassword:
-			return nil, ErrWeakPassword
+			return UserView{}, ErrWeakPassword
 		default:
-			return nil, err
+			return UserView{}, err
 		}
 	}
 	exists, err = a.Users.EmailExists(ctx, normalized)
 	if err != nil {
-		return nil, err
+		return UserView{}, err
 	}
 	if exists {
-		return nil, ErrEmailInUse
+		return UserView{}, ErrEmailInUse
 	}
 	hash, err = auth.HashPassword(password)
 	if err != nil {
-		return nil, err
+		return UserView{}, err
 	}
 	now = time.Now().UTC()
 	if name != nil {
@@ -65,10 +65,10 @@ func (a *AuthUseCase) RegisterBuyer(ctx context.Context, email, password string,
 		UpdatedAt:     now,
 	}
 	if err = a.Users.Create(ctx, u); err != nil {
-		return nil, err
+		return UserView{}, err
 	}
 	a.logActivity(ctx, &u.ID, entity.UserRegister, "user", u.ID.String(), meta, nil)
-	return u, nil
+	return UserViewFrom(u), nil
 }
 
 func (a *AuthUseCase) EmailFree(ctx context.Context, email string) (bool, error) {
@@ -116,7 +116,7 @@ func (a *AuthUseCase) Login(ctx context.Context, email, password string, meta Au
 	}
 	if u.NeedsTOTP() && u.TOTPEnabled {
 		a.logActivity(ctx, &u.ID, entity.UserLogin, "user", u.ID.String(), meta, entity.StepMeta("2fa_pending"))
-		return &LoginResult{User: u, Requires2FA: true}, nil
+		return &LoginResult{User: UserViewFrom(u), Requires2FA: true}, nil
 	}
 	tokens, err = a.issueSession(ctx, u, twoFAVerified(u))
 	if err != nil {
@@ -124,7 +124,7 @@ func (a *AuthUseCase) Login(ctx context.Context, email, password string, meta Au
 	}
 	a.logActivity(ctx, &u.ID, entity.UserLogin, "user", u.ID.String(), meta, nil)
 	return &LoginResult{
-		User:         u,
+		User:         UserViewFrom(u),
 		AuthToken:    tokens.AuthToken,
 		RefreshToken: tokens.RefreshToken,
 	}, nil
@@ -145,9 +145,10 @@ func (a *AuthUseCase) Refresh(ctx context.Context, refreshTokenPlain string, met
 	if plain == "" {
 		return "", "", ErrInvalidToken
 	}
+	// ── TX の外（読み取り・検証）──
 	hash = auth.OpaqueHash(plain)
 	now = time.Now().UTC()
-	row, err = a.RefreshTokens.FindValidHash(ctx, hash, now)
+	row, err = a.RefreshTokens.FindValidHash(ctx, hash, now) // revoked_at IS NULL
 	if err != nil || row == nil {
 		return "", "", ErrInvalidToken
 	}
@@ -155,11 +156,12 @@ func (a *AuthUseCase) Refresh(ctx context.Context, refreshTokenPlain string, met
 	if err != nil || u == nil || !u.CanLogin() {
 		return "", "", ErrInvalidToken
 	}
+	// ── TX の中（原子的にローテーション）──
 	err = repository.WithTx(ctx, a.DB, func(txCtx context.Context) error {
 		if err = a.RefreshTokens.Revoke(txCtx, row.ID, now); err != nil {
 			return err
-		}
-		tokens, err = a.issueSession(txCtx, u, twoFAVerified(u))
+		} // ① 古い RefreshTokens を失効
+		tokens, err = a.issueSession(txCtx, u, twoFAVerified(u)) // ② 新 JWT + 新 RefreshTokens を INSERT
 		return err
 	})
 	if err != nil {

@@ -14,30 +14,12 @@ func (s *SupporterUseCase) ListMine(ctx context.Context, userID uuid.UUID) ([]Su
 	var (
 		rows []entity.ProjectSupporter
 		err  error
-		i    int
 	)
 	rows, err = s.Supporters.ListByUserID(ctx, userID)
 	if err != nil {
 		return nil, err
 	}
-	for i = range rows {
-		var ok bool
-		ok, err = s.applyPendingChanges(ctx, &rows[i])
-		if err != nil {
-			return nil, err
-		}
-		_ = ok
-	}
 	return s.enrichViews(ctx, rows)
-}
-
-func (s *SupporterUseCase) ApplyPlans(ctx context.Context) (int, error) {
-	var (
-		processed int
-		err       error
-	)
-	processed, _, err = s.RunApplyPlans(ctx, false)
-	return processed, err
 }
 
 func (s *SupporterUseCase) RunApplyPlans(ctx context.Context, dryRun bool) (processed, failed int, err error) {
@@ -92,7 +74,7 @@ func (s *SupporterUseCase) applyPendingChanges(ctx context.Context, supporter *e
 	err = repository.WithTx(ctx, s.DB, func(txCtx context.Context) error {
 		var (
 			locked  *entity.ProjectSupporter
-			proj    *entity.Project
+			project    *entity.Project
 			newPlan *entity.ProjectPlan
 		)
 		locked, err = s.Supporters.FindID(txCtx, supporter.ID)
@@ -103,8 +85,8 @@ func (s *SupporterUseCase) applyPendingChanges(ctx context.Context, supporter *e
 			*supporter = *locked
 			return nil
 		}
-		proj, _, _, err = s.Projects.FindID(txCtx, locked.ProjectID)
-		if err != nil || proj == nil {
+		project, _, _, err = s.Projects.FindID(txCtx, locked.ProjectID)
+		if err != nil || project == nil {
 			return ErrNotFound
 		}
 		if locked.PendingPlanID != nil {
@@ -132,7 +114,7 @@ func (s *SupporterUseCase) applyPendingChanges(ctx context.Context, supporter *e
 			}
 		}
 		if locked.PendingBillingMode != nil {
-			if err = s.applyBillingModeSwitch(txCtx, locked, *locked.PendingBillingMode); err != nil {
+			if err = s.applyBillingMode(txCtx, locked, *locked.PendingBillingMode); err != nil {
 				return err
 			}
 			locked.BillingMode = *locked.PendingBillingMode
@@ -173,18 +155,18 @@ func (s *SupporterUseCase) enrichViews(ctx context.Context, rows []entity.Projec
 func (s *SupporterUseCase) enrichView(ctx context.Context, supporter *entity.ProjectSupporter) (SupporterView, error) {
 	var (
 		v    SupporterView
-		proj *entity.Project
+		project *entity.Project
 		err  error
 	)
 	if supporter == nil {
 		return SupporterView{}, ErrNotFound
 	}
 	v.Supporter = supporter
-	proj, _, _, err = s.Projects.FindID(ctx, supporter.ProjectID)
+	project, _, _, err = s.Projects.FindID(ctx, supporter.ProjectID)
 	if err != nil {
 		return SupporterView{}, err
 	}
-	v.Project = proj
+	v.Project = project
 	v.Plan, err = s.Projects.FindPlan(ctx, supporter.ProjectID, supporter.PlanID)
 	if err != nil {
 		return SupporterView{}, err

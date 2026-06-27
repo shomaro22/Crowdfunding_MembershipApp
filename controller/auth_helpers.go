@@ -47,10 +47,7 @@ func authMeta(c echo.Context) usecase.AuthMeta {
 	}
 }
 
-func userToJSON(u *entity.User) userJSON {
-	if u == nil {
-		return userJSON{}
-	}
+func userToJSON(u usecase.UserView) userJSON {
 	return userJSON{
 		ID:        u.ID.String(),
 		Email:     u.Email,
@@ -157,6 +154,12 @@ func mapAuthError(err error) *echo.HTTPError {
 		return echo.NewHTTPError(http.StatusServiceUnavailable, apiError("oauth unavailable", "OAUTH_UNAVAILABLE"))
 	case errors.Is(err, usecase.ErrOAuthForbidden):
 		return echo.NewHTTPError(http.StatusForbidden, apiError("oauth forbidden", "OAUTH_FORBIDDEN"))
+	case errors.Is(err, usecase.ErrTokenRevoked):
+		return echo.NewHTTPError(http.StatusUnauthorized, apiError("token revoked", "TOKEN_REVOKED"))
+	case errors.Is(err, usecase.ErrUnsupportedMedia):
+		return echo.NewHTTPError(http.StatusBadRequest, apiError("unsupported media type", "BAD_REQUEST"))
+	case errors.Is(err, usecase.ErrFileTooLarge):
+		return echo.NewHTTPError(http.StatusBadRequest, apiError("file too large", "BAD_REQUEST"))
 	default:
 		return echo.NewHTTPError(http.StatusInternalServerError, apiError("internal error", "INTERNAL_ERROR"))
 	}

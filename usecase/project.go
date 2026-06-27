@@ -53,7 +53,7 @@ type ProjectView struct {
 	Project *entity.Project
 	Plans   []entity.ProjectPlan
 	Images  []entity.ProjectImage
-	Seller  *entity.User
+	Seller  *UserView
 }
 
 type ProjectUseCase struct {
@@ -142,37 +142,37 @@ func imageSortOrders(inputs []entity.ImageInput) []int {
 func (p *ProjectUseCase) enrichList(ctx context.Context, rows []entity.Project, total int64) ([]ProjectView, int64, error) {
 	var (
 		out         []ProjectView
-		sellerCache map[uuid.UUID]*entity.User
+		sellerCache map[uuid.UUID]*UserView
 		i           int
-		proj        entity.Project
-		seller      *entity.User
+		project        entity.Project
+		seller      *UserView
 		ok          bool
 		u           *entity.User
 		plans       []entity.ProjectPlan
 		images      []entity.ProjectImage
 		err         error
-		pcopy       entity.Project
+		projectCopy entity.Project
 	)
 
 	out = make([]ProjectView, 0, len(rows))
-	sellerCache = map[uuid.UUID]*entity.User{}
+	sellerCache = map[uuid.UUID]*UserView{}
 	for i = range rows {
-		proj = rows[i]
-		seller, ok = sellerCache[proj.SellerID]
+		project = rows[i]
+		seller, ok = sellerCache[project.SellerID]
 		if !ok {
-			u, err = p.Users.FindID(ctx, proj.SellerID)
+			u, err = p.Users.FindID(ctx, project.SellerID)
 			if err != nil {
 				return nil, 0, err
 			}
-			seller = u
-			sellerCache[proj.SellerID] = u
+			seller = UserViewPtr(u)
+			sellerCache[project.SellerID] = seller
 		}
-		_, plans, images, err = p.Projects.FindID(ctx, proj.ID)
+		_, plans, images, err = p.Projects.FindID(ctx, project.ID)
 		if err != nil {
 			return nil, 0, err
 		}
-		pcopy = proj
-		out = append(out, ProjectView{Project: &pcopy, Plans: plans, Images: images, Seller: seller})
+		projectCopy = project
+		out = append(out, ProjectView{Project: &projectCopy, Plans: plans, Images: images, Seller: seller})
 	}
 	return out, total, nil
 }
@@ -218,52 +218,54 @@ func (p *ProjectUseCase) ListMine(ctx context.Context, sellerID uuid.UUID, limit
 
 func (p *ProjectUseCase) FindView(ctx context.Context, id uuid.UUID, viewerID *uuid.UUID, viewerRole entity.UserRole) (*ProjectView, error) {
 	var (
-		proj   *entity.Project
+		project   *entity.Project
 		plans  []entity.ProjectPlan
 		images []entity.ProjectImage
-		seller *entity.User
+		u      *entity.User
+		seller *UserView
 		err    error
 		now    = time.Now().UTC()
 	)
 
-	proj, plans, images, err = p.Projects.FindID(ctx, id)
-	if err != nil || proj == nil {
+	project, plans, images, err = p.Projects.FindID(ctx, id)
+	if err != nil || project == nil {
 		return nil, ErrNotFound
 	}
-	if !canViewProject(proj, viewerID, viewerRole, now) {
+	if !canViewProject(project, viewerID, viewerRole, now) {
 		return nil, ErrNotFound
 	}
-	seller, err = p.Users.FindID(ctx, proj.SellerID)
+	u, err = p.Users.FindID(ctx, project.SellerID)
 	if err != nil {
 		return nil, err
 	}
-	return &ProjectView{Project: proj, Plans: plans, Images: images, Seller: seller}, nil
+	seller = UserViewPtr(u)
+	return &ProjectView{Project: project, Plans: plans, Images: images, Seller: seller}, nil
 }
 
 func (p *ProjectUseCase) ListPlans(ctx context.Context, projectID uuid.UUID, viewerID *uuid.UUID, viewerRole entity.UserRole) ([]entity.ProjectPlan, error) {
 	var (
-		proj  *entity.Project
+		project  *entity.Project
 		plans []entity.ProjectPlan
 		err   error
 		now   time.Time
 	)
 
-	proj, plans, _, err = p.Projects.FindID(ctx, projectID)
-	if err != nil || proj == nil {
+	project, plans, _, err = p.Projects.FindID(ctx, projectID)
+	if err != nil || project == nil {
 		return nil, ErrNotFound
 	}
 	now = time.Now().UTC()
-	if !canViewProject(proj, viewerID, viewerRole, now) {
+	if !canViewProject(project, viewerID, viewerRole, now) {
 		return nil, ErrNotFound
 	}
 	return plans, nil
 }
 
-func canViewProject(p *entity.Project, viewerID *uuid.UUID, role entity.UserRole, now time.Time) bool {
-	if p.IsPublic(now) {
+func canViewProject(project *entity.Project, viewerID *uuid.UUID, role entity.UserRole, now time.Time) bool {
+	if project.IsPublic(now) {
 		return true
 	}
-	if viewerID != nil && *viewerID == p.SellerID {
+	if viewerID != nil && *viewerID == project.SellerID {
 		return true
 	}
 	if role == entity.UserRoleAdmin {

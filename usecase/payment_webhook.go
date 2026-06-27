@@ -61,14 +61,14 @@ func (p *PaymentUseCase) onAccountUpdated(ctx context.Context, event stripesdk.E
 		acct stripesdk.Account
 		err  error
 	)
-	if p.ConnectUC == nil {
+	if p.ConnectSync == nil {
 		return nil
 	}
 	err = json.Unmarshal(event.Data.Raw, &acct)
 	if err != nil {
 		return err
 	}
-	_, err = p.ConnectUC.SyncFromStripeAccountID(ctx, acct.ID)
+	_, err = p.ConnectSync.SyncFromStripeAccountID(ctx, acct.ID)
 	return err
 }
 

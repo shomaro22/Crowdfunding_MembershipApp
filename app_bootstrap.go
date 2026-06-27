@@ -2,6 +2,7 @@ package main
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -14,6 +15,7 @@ import (
 	"crowdfund-app/db"
 	"crowdfund-app/entity"
 	"crowdfund-app/middleware"
+	"crowdfund-app/bootstrap"
 	"crowdfund-app/repository"
 	"crowdfund-app/router"
 	"crowdfund-app/stripe"
@@ -25,7 +27,7 @@ import (
 	"gorm.io/gorm"
 )
 
-func buildApp() (*echo.Echo, string, error) {
+func buildApp(opts *bootstrap.Options) (*echo.Echo, string, error) {
 	var (
 		databaseURL        string
 		err                error
@@ -87,15 +89,13 @@ func buildApp() (*echo.Echo, string, error) {
 		adminOnly          []echo.MiddlewareFunc
 		rateLimiter        *middleware.RateLimiter
 		e                  *echo.Echo
+		kycAccessUC        *usecase.KYCAccessUseCase
 		validateSession    func(echo.Context, auth.AuthClaims) error
 	)
 
 	slog.SetDefault(slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo})))
 
-	databaseURL = os.Getenv("DATABASE_URL")
-	if databaseURL == "" {
-		databaseURL = "postgres://postgres:postgres@localhost:5432/crowdfund?sslmode=disable"
-	}
+	databaseURL = bootstrap.DatabaseURL()
 	err = db.Up(databaseURL)
 	if err != nil {
 		return nil, "", err
@@ -114,7 +114,6 @@ func buildApp() (*echo.Echo, string, error) {
 	}
 
 	rdb = db.OpenRedis()
-	_ = rdb
 
 	jwtSecret = os.Getenv("JWT_SECRET")
 	if len(jwtSecret) < 32 {
@@ -187,16 +186,10 @@ func buildApp() (*echo.Echo, string, error) {
 		slog.Info("google oauth disabled", "reason", err.Error())
 	}
 
-	if testStripeClient != nil {
-		stripeClient = testStripeClient
+	if opts != nil && opts.Stripe != nil {
+		stripeClient = opts.Stripe
 	} else {
-		var stripeCfg stripe.Config
-		stripeCfg, err = stripe.ConfigFromEnv()
-		if err == nil {
-			stripeClient = stripe.New(stripeCfg)
-		} else {
-			slog.Info("stripe disabled", "reason", err.Error())
-		}
+		stripeClient = bootstrap.StripeFromEnv()
 	}
 
 	cookieCfg = auth.CookieFromEnv()
@@ -221,30 +214,30 @@ func buildApp() (*echo.Echo, string, error) {
 		SignSecret:      []byte(jwtSecret),
 	}
 	adminCtl = controller.NewAdminController(adminUC)
-	kycFileCtl = controller.NewKYCFileController(kycStore, []byte(jwtSecret))
+	kycAccessUC = &usecase.KYCAccessUseCase{KYC: kycStore, SignSecret: []byte(jwtSecret)}
+	kycFileCtl = controller.NewKYCFileController(kycAccessUC)
 	projectUC = &usecase.ProjectUseCase{Projects: projectRepo, Users: userRepo, DB: gormDB}
 	connectUC = &usecase.ConnectUseCase{Users: userRepo, Connect: connectRepo, Stripe: stripeClient}
+	supporterUC = bootstrap.NewSupporterUseCase(gormDB, bootstrap.Repositories{
+		Users:      userRepo,
+		Projects:   projectRepo,
+		Supporters: supporterRepo,
+		Purchases:  purchaseRepo,
+		Connect:    connectRepo,
+		Activity:   activityRepo,
+	}, stripeClient)
 	paymentUC = &usecase.PaymentUseCase{
-		DB:         gormDB,
-		Users:      userRepo,
-		Projects:   projectRepo,
-		Purchases:  purchaseRepo,
-		Supporters: supporterRepo,
-		Connect:    connectRepo,
-		Webhooks:   webhookRepo,
-		Activity:   activityRepo,
-		Stripe:     stripeClient,
-		ConnectUC:  connectUC,
-	}
-	supporterUC = &usecase.SupporterUseCase{
-		DB:         gormDB,
-		Users:      userRepo,
-		Projects:   projectRepo,
-		Supporters: supporterRepo,
-		Purchases:  purchaseRepo,
-		Connect:    connectRepo,
-		Activity:   activityRepo,
-		Stripe:     stripeClient,
+		DB:              gormDB,
+		Users:           userRepo,
+		Projects:        projectRepo,
+		Purchases:       purchaseRepo,
+		Supporters:      supporterRepo,
+		Connect:         connectRepo,
+		Webhooks:        webhookRepo,
+		Activity:        activityRepo,
+		Stripe:          stripeClient,
+		ConnectSync:     connectUC,
+		SupporterViewer: supporterUC,
 	}
 	purchaseUC = &usecase.PurchaseUseCase{
 		Users:     userRepo,
@@ -259,21 +252,22 @@ func buildApp() (*echo.Echo, string, error) {
 
 	validateSession = func(c echo.Context, claims auth.AuthClaims) error {
 		var (
-			u   *entity.User
-			err error
+			info usecase.SessionInfo
+			err  error
 		)
-		u, err = userRepo.FindID(c.Request().Context(), claims.UserID)
+		info, err = authUC.ValidateSession(c.Request().Context(), claims)
 		if err != nil {
-			return echo.NewHTTPError(http.StatusInternalServerError, map[string]string{"error": "internal error", "code": "INTERNAL_ERROR"})
+			switch {
+			case errors.Is(err, usecase.ErrInactiveUser):
+				return echo.NewHTTPError(http.StatusForbidden, map[string]string{"error": "user inactive", "code": "USER_INACTIVE"})
+			case errors.Is(err, usecase.ErrTokenRevoked):
+				return echo.NewHTTPError(http.StatusUnauthorized, map[string]string{"error": "token revoked", "code": "TOKEN_REVOKED"})
+			default:
+				return echo.NewHTTPError(http.StatusInternalServerError, map[string]string{"error": "internal error", "code": "INTERNAL_ERROR"})
+			}
 		}
-		if u == nil || !u.IsActive() {
-			return echo.NewHTTPError(http.StatusForbidden, map[string]string{"error": "user inactive", "code": "USER_INACTIVE"})
-		}
-		if claims.TokenVersion != u.TokenVersion {
-			return echo.NewHTTPError(http.StatusUnauthorized, map[string]string{"error": "token revoked", "code": "TOKEN_REVOKED"})
-		}
-		c.Set(middleware.CtxUserRole, string(u.Role))
-		middleware.SetAdminRoleFromUser(c, u)
+		c.Set(middleware.CtxUserRole, string(info.Role))
+		middleware.SetAdminRoleFromSession(c, info.Role, info.AdminRole)
 		return nil
 	}
 

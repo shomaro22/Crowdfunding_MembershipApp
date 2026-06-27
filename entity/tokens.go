@@ -9,10 +9,10 @@ import (
 type RefreshToken struct {
 	ID        uuid.UUID  `gorm:"type:uuid;primaryKey;default:gen_random_uuid()"`
 	UserID    uuid.UUID  `gorm:"type:uuid;not null;index"`
-	TokenHash string     `gorm:"column:token_hash;not null;uniqueIndex"`
+	TokenHash string     `gorm:"column:token_hash;not null;uniqueIndex"` // 平文は DB に保存しない（SHA-256 ハッシュ）
 	ExpiresAt time.Time  `gorm:"not null;index"`
 	CreatedAt time.Time  `gorm:"not null"`
-	RevokedAt *time.Time `gorm:"column:revoked_at"`
+	RevokedAt *time.Time `gorm:"column:revoked_at"` // NULL = 有効, 値あり = 失効済み
 }
 
 func (RefreshToken) TableName() string { return "refresh_tokens" }

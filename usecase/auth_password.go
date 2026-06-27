@@ -90,12 +90,15 @@ func (a *AuthUseCase) ResetPassword(ctx context.Context, plainToken, newPassword
 	}
 	u.PasswordHash = hash
 	u.UpdatedAt = now
+	// TX 外: パスワード更新
 	if err = a.Users.Update(ctx, u); err != nil {
 		return err
 	}
+	// TX 外: リセットトークン使用済み
 	if err = a.ResetToks.MarkUsed(ctx, row.ID, now); err != nil {
 		return err
 	}
+	// TX 内: BumpTokenVer + RevokeAllByUser
 	return a.invalidateSessions(ctx, u.ID)
 }
 
