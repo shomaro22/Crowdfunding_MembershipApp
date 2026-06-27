@@ -72,17 +72,10 @@ func (a *AuthUseCase) RegisterSeller(ctx context.Context, in SellerRegIn, meta A
 
 	normalized, err = entity.ValidateBuyerReg(in.Email, in.Password)
 	if err != nil {
-		switch err {
-		case entity.ErrBadEmail:
-			return nil, ErrInvalidEmail
-		case entity.ErrWeakPassword:
-			return nil, ErrWeakPassword
-		default:
-			return nil, err
-		}
+		return nil, mapBuyerRegEntityErr(err)
 	}
 	if err = entity.ValidateSellerKYC(in.FullName, in.BirthDate, in.Address, in.PhotoPresent); err != nil {
-		return nil, err
+		return nil, mapSellerKYCEntityErr(err)
 	}
 
 	exists, err = a.Users.EmailExists(ctx, normalized)

@@ -1,6 +1,7 @@
 package usecase
 
 import (
+	"errors"
 	"io"
 
 	"crowdfund-app/repository"
@@ -21,10 +22,10 @@ func (u KYCUpload) toStoreImage() repository.KYCImage {
 }
 
 func mapKYCStoreError(err error) error {
-	switch err {
-	case repository.ErrBadMedia:
+	switch {
+	case errors.Is(err, repository.ErrBadMedia):
 		return ErrUnsupportedMedia
-	case repository.ErrTooLarge:
+	case errors.Is(err, repository.ErrTooLarge):
 		return ErrFileTooLarge
 	default:
 		return err
