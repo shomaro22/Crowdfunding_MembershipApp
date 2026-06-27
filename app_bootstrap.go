@@ -30,7 +30,6 @@ func buildApp(opts *bootstrap.Options) (*echo.Echo, string, error) {
 		connectCtl      *controller.ConnectController
 		paymentCtl      *controller.PaymentController
 		supporterCtl    *controller.SupporterController
-		purchaseCtl     *controller.PurchaseController
 		preAuth         []echo.MiddlewareFunc
 		corsRaw         string
 		origins         []string
@@ -60,9 +59,8 @@ func buildApp(opts *bootstrap.Options) (*echo.Echo, string, error) {
 	kycFileCtl = controller.NewKYCFileController(app.UseCases.KYCAccess)
 	projectCtl = controller.NewProjectController(app.UseCases.Project)
 	connectCtl = controller.NewConnectController(app.UseCases.Connect)
-	paymentCtl = controller.NewPaymentController(app.UseCases.Payment)
+	paymentCtl = controller.NewPaymentController(app.UseCases.Payment, app.UseCases.Purchase)
 	supporterCtl = controller.NewSupporterController(app.UseCases.Supporter)
-	purchaseCtl = controller.NewPurchaseController(app.UseCases.Purchase)
 
 	validateSession = middleware.SessionValidateHTTP(app.UseCases.Auth.ValidateSession)
 
@@ -110,7 +108,6 @@ func buildApp(opts *bootstrap.Options) (*echo.Echo, string, error) {
 		Connect:            connectCtl,
 		Payments:           paymentCtl,
 		Supporters:         supporterCtl,
-		Purchases:          purchaseCtl,
 		Admin:              adminCtl,
 		KYCFiles:           kycFileCtl,
 		RateLimit:          rateLimiter,
