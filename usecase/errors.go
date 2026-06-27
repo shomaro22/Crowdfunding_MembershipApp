@@ -63,3 +63,10 @@ func mapProjectEntityErr(err error) error {
 		return err
 	}
 }
+
+func mapMessageEntityErr(err error) error {
+	if errors.Is(err, entity.ErrBadMessage) {
+		return ErrBadRequest
+	}
+	return err
+}

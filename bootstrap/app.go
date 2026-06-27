@@ -3,6 +3,7 @@ package bootstrap
 import (
 	"crowdfund-app/repository"
 	"crowdfund-app/stripe"
+	"crowdfund-app/wshub"
 
 	"github.com/redis/go-redis/v9"
 	"gorm.io/gorm"
@@ -15,6 +16,7 @@ type App struct {
 	RedisRepos RedisRepositories
 	KYC        *repository.LocalKYCStore
 	Stripe     stripe.Client
+	Hub        *wshub.ConnectionManager
 	UseCases   UseCases
 	Config     Config
 }
@@ -50,6 +52,7 @@ func OpenApp(opts *Options) (*App, error) {
 		RedisRepos: redisRepos,
 		KYC:        kyc,
 		Stripe:     stripeClient,
+		Hub:        wshub.NewConnectionManager(),
 		UseCases:   NewUseCases(gormDB, repos, redisRepos, kyc, stripeClient, cfg),
 		Config:     cfg,
 	}, nil
