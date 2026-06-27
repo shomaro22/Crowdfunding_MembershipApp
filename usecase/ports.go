@@ -7,7 +7,7 @@ import (
 )
 
 type ConnectSyncer interface {
-	SyncFromStripeAccountID(ctx context.Context, stripeAccountID string) (*entity.ConnectAccount, error)
+	SyncFromStripeAccountID(ctx context.Context, stripeAccountID string) (*ConnectAccountView, error)
 }
 
 type SupporterViewer interface {
