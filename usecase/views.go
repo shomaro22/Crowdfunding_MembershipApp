@@ -72,6 +72,37 @@ func ConnectAccountViewFrom(row *entity.ConnectAccount) *ConnectAccountView {
 	}
 }
 
+type BatchRunView struct {
+	ID           uuid.UUID
+	JobName      string
+	Status       string
+	StartedAt    time.Time
+	FinishedAt   *time.Time
+	Processed    int
+	Failed       int
+	ErrorMessage *string
+	TriggeredBy  string
+	DryRun       bool
+}
+
+func BatchRunViewFrom(r *entity.BatchRun) *BatchRunView {
+	if r == nil {
+		return nil
+	}
+	return &BatchRunView{
+		ID:           r.ID,
+		JobName:      r.JobName,
+		Status:       string(r.Status),
+		StartedAt:    r.StartedAt,
+		FinishedAt:   r.FinishedAt,
+		Processed:    r.Processed,
+		Failed:       r.Failed,
+		ErrorMessage: r.ErrorMessage,
+		TriggeredBy:  r.TriggeredBy,
+		DryRun:       r.DryRun,
+	}
+}
+
 type SellerRegItemView struct {
 	ID           uuid.UUID
 	UserID       uuid.UUID
