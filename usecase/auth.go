@@ -47,6 +47,11 @@ type LoginResult struct {
 	Requires2FA  bool
 }
 
+type SessionInfo struct {
+	Role      entity.UserRole
+	AdminRole *entity.AdminRole
+}
+
 type AuthUseCase struct {
 	Users         repository.UserRepo
 	SellerRegs    repository.SellerRegRepo
@@ -121,12 +126,23 @@ func (a *AuthUseCase) issueSession(ctx context.Context, u *entity.User, verified
 }
 
 func (a *AuthUseCase) invalidateSessions(ctx context.Context, userID uuid.UUID) error {
-	var err error
+	return InvalidateUserSessions(ctx, a.DB, a.Users, a.RefreshTokens, userID)
+}
 
-	return repository.WithTx(ctx, a.DB, func(txCtx context.Context) error {
-		if _, err = a.Users.BumpTokenVer(txCtx, userID); err != nil {
-			return err
-		}// ① JWT も無効化
-		return a.RefreshTokens.RevokeAllByUser(txCtx, userID, time.Now().UTC())// ② 全 RefreshTokens 失効
-	})
+func (a *AuthUseCase) ValidateSession(ctx context.Context, claims auth.AuthClaims) (SessionInfo, error) {
+	var (
+		u   *entity.User
+		err error
+	)
+	u, err = a.Users.FindID(ctx, claims.UserID)
+	if err != nil {
+		return SessionInfo{}, err
+	}
+	if u == nil || !u.IsActive() {
+		return SessionInfo{}, ErrInactiveUser
+	}
+	if claims.TokenVersion != u.TokenVersion {
+		return SessionInfo{}, ErrTokenRevoked
+	}
+	return SessionInfo{Role: u.Role, AdminRole: u.AdminRole}, nil
 }

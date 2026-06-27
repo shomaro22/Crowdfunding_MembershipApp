@@ -4,7 +4,6 @@ import (
 	"context"
 
 	"crowdfund-app/entity"
-	"crowdfund-app/repository"
 	"crowdfund-app/stripe"
 
 	"github.com/google/uuid"
@@ -22,7 +21,7 @@ func (p *PaymentUseCase) CreateCheckout(ctx context.Context, in CheckoutIn) (Che
 	if p.Stripe == nil {
 		return CheckoutOut{}, ErrStripeUnavailable
 	}
-	pm = in.PaymentMethod
+	pm = entity.PaymentMethod(in.PaymentMethod)
 	if pm == "" {
 		pm = entity.PaymentMethodKonbini
 	}
@@ -53,10 +52,7 @@ func (p *PaymentUseCase) CreateCheckout(ctx context.Context, in CheckoutIn) (Che
 		purchase.StripeIntentID = &sess.PaymentIntentID
 	}
 	purchase.UpdatedAt = sc.now
-	err = repository.WithTx(ctx, p.DB, func(txCtx context.Context) error {
-		return p.Purchases.Create(txCtx, purchase)
-	})
-	if err != nil {
+	if err = p.savePendingAfterStripe(ctx, purchase); err != nil {
 		return CheckoutOut{}, err
 	}
 	p.logPaymentCheckoutStarted(ctx, purchase, in.Meta, "checkout")
@@ -93,10 +89,7 @@ func (p *PaymentUseCase) CreateIntent(ctx context.Context, in IntentIn) (IntentO
 	}
 	purchase.StripeIntentID = &sub.PaymentIntentID
 	purchase.UpdatedAt = sc.now
-	err = repository.WithTx(ctx, p.DB, func(txCtx context.Context) error {
-		return p.Purchases.Create(txCtx, purchase)
-	})
-	if err != nil {
+	if err = p.savePendingAfterStripe(ctx, purchase); err != nil {
 		return IntentOut{}, err
 	}
 	p.logPaymentCheckoutStarted(ctx, purchase, in.Meta, "intent")

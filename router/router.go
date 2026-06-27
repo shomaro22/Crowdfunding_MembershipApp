@@ -15,7 +15,6 @@ type Config struct {
 	Connect           *controller.ConnectController
 	Payments          *controller.PaymentController
 	Supporters        *controller.SupporterController
-	Purchases         *controller.PurchaseController
 	Admin             *controller.AdminController
 	KYCFiles          *controller.KYCFileController
 	RateLimit         *middleware.RateLimiter
@@ -105,6 +104,7 @@ func New(cfg Config) *echo.Echo {
 		e.POST("/payments/verify/checkout", cfg.Payments.VerifyCheckout, append(pm, rl(middleware.PolicyPayment))...)
 		e.POST("/payments/verify/intent", cfg.Payments.VerifyIntent, append(pm, rl(middleware.PolicyPayment))...)
 		e.POST("/stripe/webhook", cfg.Payments.Webhook)
+		e.GET("/purchases", cfg.Payments.ListPurchases, cfg.Protected...)
 	}
 
 	if cfg.Supporters != nil {
@@ -115,10 +115,6 @@ func New(cfg Config) *echo.Echo {
 		e.POST("/supporters/:supporterId/cancel", cfg.Supporters.Cancel, pm...)
 		e.POST("/supporters/:supporterId/rejoin", cfg.Supporters.Rejoin, pm...)
 		e.POST("/supporters/:supporterId/billing/change", cfg.Supporters.ChangeBilling, pm...)
-	}
-
-	if cfg.Purchases != nil {
-		e.GET("/purchases", cfg.Purchases.List, cfg.Protected...)
 	}
 
 	if cfg.KYCFiles != nil {
