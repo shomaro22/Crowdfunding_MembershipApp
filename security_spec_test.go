@@ -1,3 +1,5 @@
+//go:build integration
+
 package main
 
 import (
@@ -278,7 +280,7 @@ func setupSecurityApp(t *testing.T) *echo.Echo {
 		t.Skip("DB 接続不可のためスキップ: ", err)
 	}
 	_ = os.Setenv("JWT_SECRET", securityTestJWTSecret)
-	e, _, err = buildApp()
+	e, _, err = buildApp(nil)
 	if err != nil {
 		t.Fatalf("buildApp: %v", err)
 	}

@@ -108,7 +108,7 @@ func projectSummaryToJSON(v *usecase.ProjectView) projectSummaryJSON {
 		out.EndDate = &s
 	}
 	if v.Seller != nil {
-		seller = userToJSON(v.Seller)
+		seller = userToJSON(*v.Seller)
 		out.Seller = &seller
 	}
 	return out
@@ -123,18 +123,25 @@ func projectPlansToJSON(plans []entity.ProjectPlan) []projectPlanJSON {
 	out = make([]projectPlanJSON, 0, len(plans))
 	for i = 0; i < len(plans); i++ {
 		pl = &plans[i]
-		out = append(out, projectPlanJSON{
-			ID:             pl.ID.String(),
-			ProjectID:      pl.ProjectID.String(),
-			MembershipType: string(pl.MembershipType),
-			Price:          pl.Price,
-			MaxSupporters:  pl.MaxSupporters,
-			Benefits:       pl.Benefits,
-			IsActive:       pl.IsActive,
-			SupporterCount: pl.SupporterCount,
-		})
+		out = append(out, projectPlanToJSON(pl))
 	}
 	return out
+}
+
+func projectPlanToJSON(pl *entity.ProjectPlan) projectPlanJSON {
+	if pl == nil {
+		return projectPlanJSON{}
+	}
+	return projectPlanJSON{
+		ID:             pl.ID.String(),
+		ProjectID:      pl.ProjectID.String(),
+		MembershipType: string(pl.MembershipType),
+		Price:          pl.Price,
+		MaxSupporters:  pl.MaxSupporters,
+		Benefits:       pl.Benefits,
+		IsActive:       pl.IsActive,
+		SupporterCount: pl.SupporterCount,
+	}
 }
 
 func projectImagesToJSON(images []entity.ProjectImage) []projectImageJSON {

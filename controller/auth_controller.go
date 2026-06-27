@@ -4,7 +4,6 @@ import (
 	"net/http"
 
 	"crowdfund-app/auth"
-	"crowdfund-app/entity"
 	"crowdfund-app/usecase"
 
 	"github.com/google/uuid"
@@ -49,7 +48,7 @@ type resetPasswordRequest struct {
 func (h *AuthController) Register(c echo.Context) error {
 	var (
 		body registerRequest
-		u    *entity.User
+		u    usecase.UserView
 		err  error
 	)
 	if err = c.Bind(&body); err != nil {
@@ -150,7 +149,7 @@ func (h *AuthController) ResetPassword(c echo.Context) error {
 func (h *AuthController) Me(c echo.Context) error {
 	var (
 		uid uuid.UUID
-		u   *entity.User
+		u   usecase.UserView
 		err error
 	)
 	uid, err = CurrentUserID(c)

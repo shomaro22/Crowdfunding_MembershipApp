@@ -32,6 +32,14 @@ func setAdminRoleCtx(c echo.Context, role *entity.AdminRole) {
 	c.Set(CtxAdminRole, string(*role))
 }
 
+// SetAdminRoleFromSession sets admin_role when the validated session belongs to an admin.
+func SetAdminRoleFromSession(c echo.Context, role entity.UserRole, adminRole *entity.AdminRole) {
+	if role != entity.UserRoleAdmin {
+		return
+	}
+	setAdminRoleCtx(c, adminRole)
+}
+
 // SetAdminRoleFromUser refreshes admin_role in context from the DB user (after session validation).
 func SetAdminRoleFromUser(c echo.Context, u *entity.User) {
 	if u == nil || u.Role != entity.UserRoleAdmin {

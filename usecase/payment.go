@@ -15,16 +15,17 @@ import (
 const supportPeriodDays = 30
 
 type PaymentUseCase struct {
-	DB         *gorm.DB
-	Users      repository.UserRepo
-	Projects   repository.ProjectRepo
-	Purchases  repository.PurchaseRepo
-	Supporters repository.SupporterRepo
-	Connect    repository.ConnectRepo
-	Webhooks   repository.WebhookEventRepo
-	Activity   repository.ActivityRepo
-	Stripe     stripe.Client
-	ConnectUC  *ConnectUseCase
+	DB              *gorm.DB
+	Users           repository.UserRepo
+	Projects        repository.ProjectRepo
+	Purchases       repository.PurchaseRepo
+	Supporters      repository.SupporterRepo
+	Connect         repository.ConnectRepo
+	Webhooks        repository.WebhookEventRepo
+	Activity        repository.ActivityRepo
+	Stripe          stripe.Client
+	ConnectSync     ConnectSyncer
+	SupporterViewer SupporterViewer
 }
 
 type CheckoutIn struct {
