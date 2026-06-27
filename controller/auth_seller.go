@@ -2,13 +2,11 @@ package controller
 
 import (
 	"encoding/json"
-	"errors"
 	"mime/multipart"
 	"net/http"
 	"strings"
 	"time"
 
-	"crowdfund-app/entity"
 	"crowdfund-app/usecase"
 
 	"github.com/labstack/echo/v4"
@@ -47,7 +45,7 @@ func sellerRegToJSON(r usecase.SellerRegItemView) sellerRegJSON {
 		BirthDate:    r.BirthDate.Format("2006-01-02"),
 		Address:      r.Address,
 		PhotoPresent: r.PhotoPresent,
-		IDDocType:    string(entity.IDDriversLicense),
+		IDDocType:    "DRIVERS_LICENSE",
 		HasIDFront:   r.HasIDFront,
 		HasIDBack:    r.HasIDBack,
 		Status:       string(r.Status),
@@ -86,11 +84,11 @@ func (h *AuthController) RegisterSeller(c echo.Context) error {
 	}
 	frontImg, err = readKYCFile(frontFile)
 	if err != nil {
-		return mapSellerRegError(err)
+		return mapUseCaseError(err)
 	}
 	backImg, err = readKYCFile(backFile)
 	if err != nil {
-		return mapSellerRegError(err)
+		return mapUseCaseError(err)
 	}
 	birthDate, err = time.Parse("2006-01-02", strings.TrimSpace(payload.BirthDate))
 	if err != nil {
@@ -107,7 +105,7 @@ func (h *AuthController) RegisterSeller(c echo.Context) error {
 		Back:         backImg,
 	}, authMeta(c))
 	if err != nil {
-		return mapSellerRegError(err)
+		return mapUseCaseError(err)
 	}
 	return c.JSON(http.StatusCreated, sellerCreateJSON{
 		User:         userToJSON(res.User),
@@ -150,11 +148,4 @@ func detectImageType(name string) string {
 	default:
 		return ""
 	}
-}
-
-func mapSellerRegError(err error) *echo.HTTPError {
-	if errors.Is(err, entity.ErrBadKYC) {
-		return echo.NewHTTPError(http.StatusBadRequest, apiError("invalid seller kyc metadata", "BAD_SELLER_KYC"))
-	}
-	return mapUseCaseError(err)
 }

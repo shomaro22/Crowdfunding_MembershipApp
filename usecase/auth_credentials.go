@@ -26,14 +26,7 @@ func (a *AuthUseCase) RegisterBuyer(ctx context.Context, email, password string,
 
 	normalized, err = entity.ValidateBuyerReg(email, password)
 	if err != nil {
-		switch err {
-		case entity.ErrBadEmail:
-			return UserView{}, ErrInvalidEmail
-		case entity.ErrWeakPassword:
-			return UserView{}, ErrWeakPassword
-		default:
-			return UserView{}, err
-		}
+		return UserView{}, mapBuyerRegEntityErr(err)
 	}
 	exists, err = a.Users.EmailExists(ctx, normalized)
 	if err != nil {
