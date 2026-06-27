@@ -154,28 +154,31 @@ func (s *SupporterUseCase) enrichViews(ctx context.Context, rows []entity.Projec
 
 func (s *SupporterUseCase) enrichView(ctx context.Context, supporter *entity.ProjectSupporter) (SupporterView, error) {
 	var (
-		v    SupporterView
+		v       SupporterView
 		project *entity.Project
-		err  error
+		plan    *entity.ProjectPlan
+		err     error
 	)
 	if supporter == nil {
 		return SupporterView{}, ErrNotFound
 	}
-	v.Supporter = supporter
+	v.Supporter = SupporterItemFrom(supporter)
 	project, _, _, err = s.Projects.FindID(ctx, supporter.ProjectID)
 	if err != nil {
 		return SupporterView{}, err
 	}
-	v.Project = project
-	v.Plan, err = s.Projects.FindPlan(ctx, supporter.ProjectID, supporter.PlanID)
+	v.Project = ProjectItemPtrFrom(project)
+	plan, err = s.Projects.FindPlan(ctx, supporter.ProjectID, supporter.PlanID)
 	if err != nil {
 		return SupporterView{}, err
 	}
+	v.Plan = ProjectPlanPtrFrom(plan)
 	if supporter.PendingPlanID != nil {
-		v.PendingPlan, err = s.Projects.FindPlan(ctx, supporter.ProjectID, *supporter.PendingPlanID)
+		plan, err = s.Projects.FindPlan(ctx, supporter.ProjectID, *supporter.PendingPlanID)
 		if err != nil {
 			return SupporterView{}, err
 		}
+		v.PendingPlan = ProjectPlanPtrFrom(plan)
 	}
 	return v, nil
 }

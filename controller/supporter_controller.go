@@ -4,7 +4,6 @@ import (
 	"context"
 	"net/http"
 
-	"crowdfund-app/entity"
 	"crowdfund-app/usecase"
 
 	"github.com/google/uuid"
@@ -165,8 +164,8 @@ func (h *SupporterController) ChangeBilling(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusBadRequest, apiError("invalid request body", "BAD_REQUEST"))
 	}
 	view, err = h.Supporters.ChangeBilling(c.Request().Context(), userID, supporterID, usecase.ChangeBillingIn{
-		BillingMode:   entity.BillingMode(body.BillingMode),
-		PaymentMethod: entity.PaymentMethod(body.PaymentMethod),
+		BillingMode:   body.BillingMode,
+		PaymentMethod: body.PaymentMethod,
 	})
 	if err != nil {
 		return mapSupporterError(err)

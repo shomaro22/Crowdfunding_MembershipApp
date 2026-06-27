@@ -161,26 +161,26 @@ type ProjectPlanView struct {
 	UpdatedAt      time.Time
 }
 
-func ProjectPlanFrom(pl entity.ProjectPlan) ProjectPlanView {
+func ProjectPlanFrom(plan entity.ProjectPlan) ProjectPlanView {
 	return ProjectPlanView{
-		ID:             pl.ID,
-		ProjectID:      pl.ProjectID,
-		MembershipType: string(pl.MembershipType),
-		Price:          pl.Price,
-		MaxSupporters:  pl.MaxSupporters,
-		Benefits:       pl.Benefits,
-		IsActive:       pl.IsActive,
-		SupporterCount: pl.SupporterCount,
-		CreatedAt:      pl.CreatedAt,
-		UpdatedAt:      pl.UpdatedAt,
+		ID:             plan.ID,
+		ProjectID:      plan.ProjectID,
+		MembershipType: string(plan.MembershipType),
+		Price:          plan.Price,
+		MaxSupporters:  plan.MaxSupporters,
+		Benefits:       plan.Benefits,
+		IsActive:       plan.IsActive,
+		SupporterCount: plan.SupporterCount,
+		CreatedAt:      plan.CreatedAt,
+		UpdatedAt:      plan.UpdatedAt,
 	}
 }
 
-func ProjectPlanFromPtr(pl *entity.ProjectPlan) ProjectPlanView {
-	if pl == nil {
+func ProjectPlanFromPtr(plan *entity.ProjectPlan) ProjectPlanView {
+	if plan == nil {
 		return ProjectPlanView{}
 	}
-	return ProjectPlanFrom(*pl)
+	return ProjectPlanFrom(*plan)
 }
 
 func ProjectPlansFrom(plans []entity.ProjectPlan) []ProjectPlanView {
@@ -244,4 +244,93 @@ func AssembleProjectView(project *entity.Project, plans []entity.ProjectPlan, im
 func AssembleProjectViewPtr(project *entity.Project, plans []entity.ProjectPlan, images []entity.ProjectImage, seller *UserView) *ProjectView {
 	v := AssembleProjectView(project, plans, images, seller)
 	return &v
+}
+
+type SupporterItemView struct {
+	ID                   uuid.UUID
+	ProjectID            uuid.UUID
+	PlanID               uuid.UUID
+	UserID               uuid.UUID
+	Status               string
+	BillingMode          string
+	CurrentPeriodStart   time.Time
+	CurrentPeriodEnd     time.Time
+	PendingPlanID        *uuid.UUID
+	PlanChangeDate       *time.Time
+}
+
+func SupporterItemFrom(s *entity.ProjectSupporter) SupporterItemView {
+	if s == nil {
+		return SupporterItemView{}
+	}
+	return SupporterItemView{
+		ID:                 s.ID,
+		ProjectID:          s.ProjectID,
+		PlanID:             s.PlanID,
+		UserID:             s.UserID,
+		Status:             string(s.Status),
+		BillingMode:        string(s.BillingMode),
+		CurrentPeriodStart: s.CurrentPeriodStart,
+		CurrentPeriodEnd:   s.CurrentPeriodEnd,
+		PendingPlanID:      s.PendingPlanID,
+		PlanChangeDate:     s.PlanChangeDate,
+	}
+}
+
+type SupporterView struct {
+	Supporter   SupporterItemView
+	Project     *ProjectItemView
+	Plan        *ProjectPlanView
+	PendingPlan *ProjectPlanView
+}
+
+func ProjectItemPtrFrom(p *entity.Project) *ProjectItemView {
+	if p == nil {
+		return nil
+	}
+	v := ProjectItemFrom(p)
+	return &v
+}
+
+func ProjectPlanPtrFrom(plan *entity.ProjectPlan) *ProjectPlanView {
+	if plan == nil {
+		return nil
+	}
+	v := ProjectPlanFrom(*plan)
+	return &v
+}
+
+type PurchaseItemView struct {
+	ID            uuid.UUID
+	ProjectID     uuid.UUID
+	SupporterID   *uuid.UUID
+	BuyerID       uuid.UUID
+	Quantity      int
+	TotalPrice    int
+	Status        string
+	PaymentMethod string
+	CreatedAt     time.Time
+}
+
+func PurchaseItemFrom(p *entity.Purchase) PurchaseItemView {
+	if p == nil {
+		return PurchaseItemView{}
+	}
+	return PurchaseItemView{
+		ID:            p.ID,
+		ProjectID:     p.ProjectID,
+		SupporterID:   p.SupporterID,
+		BuyerID:       p.BuyerID,
+		Quantity:      p.Quantity,
+		TotalPrice:    p.TotalPrice,
+		Status:        string(p.Status),
+		PaymentMethod: string(p.PaymentMethod),
+		CreatedAt:     p.CreatedAt,
+	}
+}
+
+type PurchaseView struct {
+	Purchase PurchaseItemView
+	Project  *ProjectItemView
+	Buyer    *UserView
 }
