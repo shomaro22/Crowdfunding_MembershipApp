@@ -124,9 +124,9 @@ func findPlanForPurchase(plans []entity.ProjectPlan, purchase *entity.Purchase) 
 	if len(plans) == 1 {
 		return plans[0].ID
 	}
-	for _, pl := range plans {
-		if pl.Price == purchase.TotalPrice {
-			return pl.ID
+	for _, plan := range plans {
+		if plan.Price == purchase.TotalPrice {
+			return plan.ID
 		}
 	}
 	if len(plans) > 0 {
