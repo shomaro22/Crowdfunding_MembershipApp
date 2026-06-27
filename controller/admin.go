@@ -29,15 +29,12 @@ type AdminUseCase interface {
 }
 
 type AdminController struct {
-	Admin AdminUseCase
+	Admin        AdminUseCase
+	APIPublicURL string
 }
 
-func NewAdminController(admin AdminUseCase) *AdminController {
-	return &AdminController{Admin: admin}
-}
-
-func mapAdminError(err error) *echo.HTTPError {
-	return mapUseCaseError(err)
+func NewAdminController(admin AdminUseCase, apiPublicURL string) *AdminController {
+	return &AdminController{Admin: admin, APIPublicURL: apiPublicURL}
 }
 
 func (h *AdminController) ResetUser2FA(c echo.Context) error {
@@ -61,7 +58,7 @@ func (h *AdminController) ResetUser2FA(c echo.Context) error {
 	_ = c.Bind(&body)
 	u, err = h.Admin.ResetUser2FA(c.Request().Context(), adminID, userID, body.Reason)
 	if err != nil {
-		return mapAdminError(err)
+		return mapUseCaseError(err)
 	}
 	return c.JSON(http.StatusOK, map[string]userJSON{"user": userToJSON(u)})
 }
@@ -90,7 +87,7 @@ func (h *AdminController) ChangeAdminRole(c echo.Context) error {
 	}
 	u, err = h.Admin.ChangeAdminRole(c.Request().Context(), actorID, userID, body.AdminRole, body.Reason)
 	if err != nil {
-		return mapAdminError(err)
+		return mapUseCaseError(err)
 	}
 	return c.JSON(http.StatusOK, map[string]userJSON{"user": userToJSON(u)})
 }
@@ -113,7 +110,7 @@ func (h *AdminController) ListProjects(c echo.Context) error {
 	offset, _ = strconv.Atoi(c.QueryParam("offset"))
 	rows, total, err = h.Admin.ListProjects(c.Request().Context(), status, limit, offset)
 	if err != nil {
-		return mapAdminError(err)
+		return mapUseCaseError(err)
 	}
 	return c.JSON(http.StatusOK, listProjectsJSON(rows, total, limit, offset))
 }
@@ -142,7 +139,7 @@ func (h *AdminController) PatchProject(c echo.Context) error {
 	}
 	view, err = h.Admin.PatchProject(c.Request().Context(), adminID, id, body.Status, body.Reason)
 	if err != nil {
-		return mapAdminError(err)
+		return mapUseCaseError(err)
 	}
 	return c.JSON(http.StatusOK, projectDetailJSON(view))
 }
@@ -162,7 +159,7 @@ func (h *AdminController) DeleteProject(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusBadRequest, apiError("invalid project id", "BAD_REQUEST"))
 	}
 	if err = h.Admin.DeleteProject(c.Request().Context(), adminID, id); err != nil {
-		return mapAdminError(err)
+		return mapUseCaseError(err)
 	}
 	return c.NoContent(http.StatusNoContent)
 }
@@ -191,7 +188,7 @@ func (h *AdminController) PatchDeleteReq(c echo.Context) error {
 	}
 	view, err = h.Admin.PatchDeleteReq(c.Request().Context(), adminID, id, body.Action, body.Reason)
 	if err != nil {
-		return mapAdminError(err)
+		return mapUseCaseError(err)
 	}
 	return c.JSON(http.StatusOK, projectDetailJSON(view))
 }
@@ -210,7 +207,7 @@ func (h *AdminController) ListBuyerPending(c echo.Context) error {
 	offset, _ = strconv.Atoi(c.QueryParam("offset"))
 	users, total, err = h.Admin.ListBuyerPending(c.Request().Context(), limit, offset)
 	if err != nil {
-		return mapAdminError(err)
+		return mapUseCaseError(err)
 	}
 	items = make([]userJSON, 0, len(users))
 	for i = 0; i < len(users); i++ {
@@ -236,7 +233,7 @@ func (h *AdminController) ApproveBuyer(c echo.Context) error {
 	}
 	u, err = h.Admin.ApproveBuyer(c.Request().Context(), adminID, userID, nil)
 	if err != nil {
-		return mapAdminError(err)
+		return mapUseCaseError(err)
 	}
 	return c.JSON(http.StatusOK, userToJSON(u))
 }
@@ -267,7 +264,7 @@ func (h *AdminController) RejectBuyer(c echo.Context) error {
 	}
 	u, err = h.Admin.RejectBuyer(c.Request().Context(), adminID, userID, body.Reason)
 	if err != nil {
-		return mapAdminError(err)
+		return mapUseCaseError(err)
 	}
 	return c.JSON(http.StatusOK, userToJSON(u))
 }
@@ -288,7 +285,7 @@ func (h *AdminController) ListSellerRegs(c echo.Context) error {
 	offset, _ = strconv.Atoi(c.QueryParam("offset"))
 	regs, total, err = h.Admin.ListSellerRegs(c.Request().Context(), status, limit, offset)
 	if err != nil {
-		return mapAdminError(err)
+		return mapUseCaseError(err)
 	}
 	items = make([]sellerRegJSON, 0, len(regs))
 	for i = 0; i < len(regs); i++ {
@@ -309,9 +306,9 @@ func (h *AdminController) GetSellerReg(c echo.Context) error {
 	}
 	detail, err = h.Admin.GetSellerReg(c.Request().Context(), id)
 	if err != nil {
-		return mapAdminError(err)
+		return mapUseCaseError(err)
 	}
-	return c.JSON(http.StatusOK, sellerRegViewToJSON(detail))
+	return c.JSON(http.StatusOK, sellerRegViewToJSON(h.APIPublicURL, detail))
 }
 
 func (h *AdminController) ApproveSellerReg(c echo.Context) error {
@@ -331,7 +328,7 @@ func (h *AdminController) ApproveSellerReg(c echo.Context) error {
 	}
 	reg, err = h.Admin.ApproveSellerReg(c.Request().Context(), adminID, id)
 	if err != nil {
-		return mapAdminError(err)
+		return mapUseCaseError(err)
 	}
 	return c.JSON(http.StatusOK, sellerRegToJSON(reg))
 }
@@ -359,7 +356,7 @@ func (h *AdminController) RejectSellerReg(c echo.Context) error {
 	}
 	reg, err = h.Admin.RejectSellerReg(c.Request().Context(), adminID, id, body.Reason)
 	if err != nil {
-		return mapAdminError(err)
+		return mapUseCaseError(err)
 	}
 	return c.JSON(http.StatusOK, sellerRegToJSON(reg))
 }

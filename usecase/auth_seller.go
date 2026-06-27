@@ -52,7 +52,7 @@ func (a *AuthUseCase) SigningKey() []byte {
 	return a.TOTPKey
 }
 
-func (a *AuthUseCase) RegisterSeller(ctx context.Context, in SellerRegIn, meta AuthMeta) (*SellerRegOut, error) {
+func (a *AuthUseCase) RegisterSeller(ctx context.Context, in SellerRegIn, meta RequestMeta) (*SellerRegOut, error) {
 	var (
 		normalized string
 		err        error

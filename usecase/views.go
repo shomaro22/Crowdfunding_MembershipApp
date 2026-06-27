@@ -207,13 +207,6 @@ func ProjectPlanFrom(plan entity.ProjectPlan) ProjectPlanView {
 	}
 }
 
-func ProjectPlanFromPtr(plan *entity.ProjectPlan) ProjectPlanView {
-	if plan == nil {
-		return ProjectPlanView{}
-	}
-	return ProjectPlanFrom(*plan)
-}
-
 func ProjectPlansFrom(plans []entity.ProjectPlan) []ProjectPlanView {
 	var (
 		out = make([]ProjectPlanView, len(plans))

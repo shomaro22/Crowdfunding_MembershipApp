@@ -39,8 +39,8 @@ func (p *PaymentUseCase) CreateCheckout(ctx context.Context, in CheckoutIn) (Che
 		Amount:           int64(sc.plan.Price),
 		ConnectAccountID: sc.connect.StripeAccountID,
 		CustomerEmail:    sc.buyer.Email,
-		SuccessURL:       checkoutURL(in.SuccessURL, p.Stripe.AppURL()+"/support/success?session_id={CHECKOUT_SESSION_ID}"),
-		CancelURL:        checkoutURL(in.CancelURL, p.Stripe.AppURL()+"/support/cancel"),
+		SuccessURL:       checkoutURL(in.SuccessURL, in.FallbackSuccessURL),
+		CancelURL:        checkoutURL(in.CancelURL, in.FallbackCancelURL),
 		PaymentMethod:    string(pm),
 		Metadata:         meta,
 	})
@@ -117,23 +117,9 @@ func (p *PaymentUseCase) VerifyCheckout(ctx context.Context, buyerID uuid.UUID, 
 	if err != nil || purchase == nil {
 		return SupporterView{}, ErrNotFound
 	}
-	if err = verifyPurchaseBuyer(purchase, buyerID); err != nil {
-		return SupporterView{}, err
-	}
-	if purchase.Status == entity.PurchaseStatusPaid {
-		return p.supporterViewForPurchase(ctx, purchase)
-	}
-	if sess.PaymentStatus != stripe.CheckoutPaymentStatusPaid {
-		return SupporterView{}, ErrBadRequest
-	}
-	if err = p.fulfillCheckoutSession(ctx, sess); err != nil {
-		return SupporterView{}, err
-	}
-	purchase, err = p.Purchases.FindID(ctx, purchase.ID)
-	if err != nil || purchase == nil {
-		return SupporterView{}, ErrNotFound
-	}
-	return p.supporterViewForPurchase(ctx, purchase)
+	return p.verifyAndFulfill(ctx, buyerID, purchase, sess.PaymentStatus == stripe.CheckoutPaymentStatusPaid, func(ctx context.Context) error {
+		return p.fulfillCheckoutSession(ctx, sess)
+	})
 }
 
 func (p *PaymentUseCase) VerifyIntent(ctx context.Context, buyerID uuid.UUID, intentID string) (SupporterView, error) {
@@ -156,23 +142,39 @@ func (p *PaymentUseCase) VerifyIntent(ctx context.Context, buyerID uuid.UUID, in
 	if err != nil || purchase == nil {
 		return SupporterView{}, ErrNotFound
 	}
+	return p.verifyAndFulfill(ctx, buyerID, purchase, pi.Status == stripe.PaymentIntentStatusSucceeded, func(ctx context.Context) error {
+		return p.fulfillPaymentIntent(ctx, pi)
+	})
+}
+
+func (p *PaymentUseCase) verifyAndFulfill(
+	ctx context.Context,
+	buyerID uuid.UUID,
+	purchase *entity.Purchase,
+	paid bool,
+	fulfill func(context.Context) error,
+) (SupporterView, error) {
+	var (
+		refreshed *entity.Purchase
+		err       error
+	)
 	if err = verifyPurchaseBuyer(purchase, buyerID); err != nil {
 		return SupporterView{}, err
 	}
 	if purchase.Status == entity.PurchaseStatusPaid {
 		return p.supporterViewForPurchase(ctx, purchase)
 	}
-	if pi.Status != stripe.PaymentIntentStatusSucceeded {
+	if !paid {
 		return SupporterView{}, ErrBadRequest
 	}
-	if err = p.fulfillPaymentIntent(ctx, pi); err != nil {
+	if err = fulfill(ctx); err != nil {
 		return SupporterView{}, err
 	}
-	purchase, err = p.Purchases.FindID(ctx, purchase.ID)
-	if err != nil || purchase == nil {
+	refreshed, err = p.Purchases.FindID(ctx, purchase.ID)
+	if err != nil || refreshed == nil {
 		return SupporterView{}, ErrNotFound
 	}
-	return p.supporterViewForPurchase(ctx, purchase)
+	return p.supporterViewForPurchase(ctx, refreshed)
 }
 
 func verifyPurchaseBuyer(purchase *entity.Purchase, buyerID uuid.UUID) error {
