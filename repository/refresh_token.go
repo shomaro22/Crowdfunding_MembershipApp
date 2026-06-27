@@ -15,7 +15,7 @@ type RefreshTokenRepo interface {
 	Create(ctx context.Context, row *entity.RefreshToken) error
 	FindValidHash(ctx context.Context, hash string, now time.Time) (*entity.RefreshToken, error)
 	Revoke(ctx context.Context, id uuid.UUID, at time.Time) error
-	RevokeUser(ctx context.Context, userID uuid.UUID, at time.Time) error
+	RevokeAllByUser(ctx context.Context, userID uuid.UUID, at time.Time) error
 }
 
 type refreshTokenRepo struct {
@@ -53,7 +53,7 @@ func (r *refreshTokenRepo) Revoke(ctx context.Context, id uuid.UUID, at time.Tim
 		Update("revoked_at", at).Error
 }
 
-func (r *refreshTokenRepo) RevokeUser(ctx context.Context, userID uuid.UUID, at time.Time) error {
+func (r *refreshTokenRepo) RevokeAllByUser(ctx context.Context, userID uuid.UUID, at time.Time) error {
 	return dbFromCtx(ctx, r.db).Model(&entity.RefreshToken{}).
 		Where("user_id = ? AND revoked_at IS NULL", userID).
 		Update("revoked_at", at).Error

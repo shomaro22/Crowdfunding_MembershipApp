@@ -14,7 +14,6 @@ import (
 
 type SupporterUseCase interface {
 	ListMine(ctx context.Context, userID uuid.UUID) ([]usecase.SupporterView, error)
-	ApplyPlans(ctx context.Context) (int, error)
 	Upgrade(ctx context.Context, userID, supporterID, planID uuid.UUID) (usecase.UpgradeOut, error)
 	UpgradeConfirm(ctx context.Context, userID, supporterID uuid.UUID, intentID string) (usecase.SupporterView, error)
 	Cancel(ctx context.Context, userID, supporterID uuid.UUID) (usecase.SupporterView, error)
@@ -57,18 +56,6 @@ func (h *SupporterController) List(c echo.Context) error {
 		return mapSupporterError(err)
 	}
 	return c.JSON(http.StatusOK, listSupportersJSON(rows))
-}
-
-func (h *SupporterController) ApplyPlans(c echo.Context) error {
-	var (
-		count int
-		err   error
-	)
-	count, err = h.Supporters.ApplyPlans(c.Request().Context())
-	if err != nil {
-		return mapSupporterError(err)
-	}
-	return c.JSON(http.StatusOK, map[string]int{"applied_count": count})
 }
 
 func (h *SupporterController) Upgrade(c echo.Context) error {

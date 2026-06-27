@@ -8,27 +8,27 @@ import (
 )
 
 type createProjectJSON struct {
-	Title        string            `json:"title"`
-	Description  string            `json:"description"`
-	TargetAmount int64             `json:"target_amount"`
-	DurationType string            `json:"duration_type"`
-	StartDate    string            `json:"start_date"`
-	EndDate      *string           `json:"end_date"`
-	ImageURL     *string           `json:"image_url"`
+	Title        string               `json:"title"`
+	Description  string               `json:"description"`
+	TargetAmount int64                `json:"target_amount"`
+	DurationType string               `json:"duration_type"`
+	StartDate    string               `json:"start_date"`
+	EndDate      *string              `json:"end_date"`
+	ImageURL     *string              `json:"image_url"`
 	Images       []projectImageInJSON `json:"images"`
-	Plans        []planInJSON      `json:"plans"`
+	Plans        []planInJSON         `json:"plans"`
 }
 
 type updateProjectJSON struct {
-	Title        *string              `json:"title"`
-	Description  *string              `json:"description"`
-	TargetAmount *int64               `json:"target_amount"`
-	DurationType *string              `json:"duration_type"`
-	StartDate    *string              `json:"start_date"`
-	EndDate      *string              `json:"end_date"`
-	ImageURL     *string              `json:"image_url"`
+	Title        *string               `json:"title"`
+	Description  *string               `json:"description"`
+	TargetAmount *int64                `json:"target_amount"`
+	DurationType *string               `json:"duration_type"`
+	StartDate    *string               `json:"start_date"`
+	EndDate      *string               `json:"end_date"`
+	ImageURL     *string               `json:"image_url"`
 	Images       *[]projectImageInJSON `json:"images"`
-	IsReapply    bool                 `json:"is_reapply"`
+	IsReapply    bool                  `json:"is_reapply"`
 }
 
 type projectImageInJSON struct {

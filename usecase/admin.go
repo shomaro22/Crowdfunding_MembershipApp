@@ -163,7 +163,7 @@ func (a *AdminUseCase) invalidateSessions(ctx context.Context, userID uuid.UUID)
 		if a.RefreshTokens == nil {
 			return nil
 		}
-		return a.RefreshTokens.RevokeUser(txCtx, userID, time.Now().UTC())
+		return a.RefreshTokens.RevokeAllByUser(txCtx, userID, time.Now().UTC())
 	})
 }
 
