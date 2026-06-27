@@ -1,9 +1,9 @@
 package controller
 
 import (
+	"fmt"
 	"time"
 
-	"crowdfund-app/entity"
 	"crowdfund-app/usecase"
 )
 
@@ -56,12 +56,12 @@ func (b createProjectJSON) toInput() (usecase.CreateProjectIn, error) {
 	)
 	start, err = time.Parse(time.RFC3339, b.StartDate)
 	if err != nil {
-		return usecase.CreateProjectIn{}, err
+		return usecase.CreateProjectIn{}, fmt.Errorf("invalid start_date: %w", err)
 	}
 	if b.EndDate != nil && *b.EndDate != "" {
 		t, err = time.Parse(time.RFC3339, *b.EndDate)
 		if err != nil {
-			return usecase.CreateProjectIn{}, err
+			return usecase.CreateProjectIn{}, fmt.Errorf("invalid end_date: %w", err)
 		}
 		end = &t
 	}
@@ -69,7 +69,7 @@ func (b createProjectJSON) toInput() (usecase.CreateProjectIn, error) {
 	for i = range b.Plans {
 		p = b.Plans[i]
 		plans = append(plans, usecase.PlanIn{
-			MembershipType: entity.MembershipType(p.MembershipType),
+			MembershipType: p.MembershipType,
 			Price:          p.Price,
 			MaxSupporters:  p.MaxSupporters,
 			Benefits:       p.Benefits,
@@ -79,7 +79,7 @@ func (b createProjectJSON) toInput() (usecase.CreateProjectIn, error) {
 		Title:        b.Title,
 		Description:  b.Description,
 		TargetAmount: b.TargetAmount,
-		DurationType: entity.DurationType(b.DurationType),
+		DurationType: b.DurationType,
 		StartDate:    start,
 		EndDate:      end,
 		ImageURL:     b.ImageURL,
@@ -88,10 +88,9 @@ func (b createProjectJSON) toInput() (usecase.CreateProjectIn, error) {
 	}, nil
 }
 
-func (b updateProjectJSON) toInput() usecase.UpdateProjectIn {
+func (b updateProjectJSON) toInput() (usecase.UpdateProjectIn, error) {
 	var (
 		in     usecase.UpdateProjectIn
-		d      entity.DurationType
 		tStart time.Time
 		tEnd   time.Time
 		err    error
@@ -108,26 +107,27 @@ func (b updateProjectJSON) toInput() usecase.UpdateProjectIn {
 		in.Images = &imgs
 	}
 	if b.DurationType != nil {
-		d = entity.DurationType(*b.DurationType)
-		in.DurationType = &d
+		in.DurationType = b.DurationType
 	}
 	if b.StartDate != nil {
 		tStart, err = time.Parse(time.RFC3339, *b.StartDate)
-		if err == nil {
-			in.StartDate = &tStart
+		if err != nil {
+			return usecase.UpdateProjectIn{}, fmt.Errorf("invalid start_date: %w", err)
 		}
+		in.StartDate = &tStart
 	}
 	if b.EndDate != nil {
 		if *b.EndDate == "" {
 			in.EndDate = nil
 		} else {
 			tEnd, err = time.Parse(time.RFC3339, *b.EndDate)
-			if err == nil {
-				in.EndDate = &tEnd
+			if err != nil {
+				return usecase.UpdateProjectIn{}, fmt.Errorf("invalid end_date: %w", err)
 			}
+			in.EndDate = &tEnd
 		}
 	}
-	return in
+	return in, nil
 }
 
 func projectImagesInToUsecase(rows []projectImageInJSON) []usecase.ImageIn {
