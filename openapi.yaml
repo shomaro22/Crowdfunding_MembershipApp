@@ -672,22 +672,6 @@ paths:
         "401":
           $ref: "#/components/responses/Unauthorized"
 
-  /supporters/apply-plans:
-    post:
-      tags: [Supporters]
-      summary: Batch apply pending plan changes (cron or internal)
-      security: []
-      responses:
-        "200":
-          description: Applied
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  applied_count:
-                    type: integer
-
   /supporters/{supporterId}/upgrade:
     post:
       tags: [Supporters]
