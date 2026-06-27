@@ -39,10 +39,7 @@ type sellerRegJSON struct {
 	UpdatedAt    string  `json:"updated_at"`
 }
 
-func sellerRegToJSON(r *entity.SellerReg) sellerRegJSON {
-	if r == nil {
-		return sellerRegJSON{}
-	}
+func sellerRegToJSON(r usecase.SellerRegItemView) sellerRegJSON {
 	return sellerRegJSON{
 		ID:           r.ID.String(),
 		UserID:       r.UserID.String(),
@@ -51,8 +48,8 @@ func sellerRegToJSON(r *entity.SellerReg) sellerRegJSON {
 		Address:      r.Address,
 		PhotoPresent: r.PhotoPresent,
 		IDDocType:    string(entity.IDDriversLicense),
-		HasIDFront:   r.HasIDFront(),
-		HasIDBack:    r.HasIDBack(),
+		HasIDFront:   r.HasIDFront,
+		HasIDBack:    r.HasIDBack,
 		Status:       string(r.Status),
 		RejectReason: r.RejectReason,
 		CreatedAt:    r.CreatedAt.UTC().Format(time.RFC3339),

@@ -93,7 +93,7 @@ func (h *AdminController) ListSellerRegs(c echo.Context) error {
 		status entity.RegStatus
 		limit  int
 		offset int
-		regs   []entity.SellerReg
+		regs   []usecase.SellerRegItemView
 		total  int64
 		items  []sellerRegJSON
 		i      int
@@ -111,7 +111,7 @@ func (h *AdminController) ListSellerRegs(c echo.Context) error {
 	}
 	items = make([]sellerRegJSON, 0, len(regs))
 	for i = 0; i < len(regs); i++ {
-		items = append(items, sellerRegToJSON(&regs[i]))
+		items = append(items, sellerRegToJSON(regs[i]))
 	}
 	return c.JSON(http.StatusOK, sellerRegsPageJSON{Registrations: items, Total: total})
 }
@@ -137,7 +137,7 @@ func (h *AdminController) ApproveSellerReg(c echo.Context) error {
 	var (
 		adminID uuid.UUID
 		id      uuid.UUID
-		reg     *entity.SellerReg
+		reg     usecase.SellerRegItemView
 		err     error
 	)
 	adminID, err = CurrentUserID(c)
@@ -162,7 +162,7 @@ func (h *AdminController) RejectSellerReg(c echo.Context) error {
 		body    struct {
 			Reason string `json:"reason"`
 		}
-		reg *entity.SellerReg
+		reg usecase.SellerRegItemView
 		err error
 	)
 	adminID, err = CurrentUserID(c)
