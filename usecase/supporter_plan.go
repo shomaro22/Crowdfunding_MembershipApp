@@ -200,33 +200,15 @@ func (s *SupporterUseCase) finalizePaidUpgrade(ctx context.Context, supporter *e
 		}
 		newPlanID = *locked.PendingPlanID
 		if purchase.Status != entity.PurchaseStatusPaid {
-			if err = s.markUpgradePurchasePaid(txCtx, purchase); err != nil {
+			if err = markPurchasePaidSimple(txCtx, s.Purchases, purchase); err != nil {
 				return err
 			}
 		}
-		if err = s.Projects.TransferPlanSupportCount(txCtx, locked.ProjectID, locked.PlanID, newPlanID); err != nil {
+		if err = s.commitPendingPlan(txCtx, locked, newPlanID, false); err != nil {
 			return err
 		}
-		oldPlanID := locked.PlanID
-		if locked.BillingMode == entity.BillingModeAuto && locked.StripeSubscriptionID != nil && s.Stripe != nil {
-			plan, planErr := s.Projects.FindPlan(txCtx, locked.ProjectID, newPlanID)
-			if planErr != nil || plan == nil {
-				return ErrNotFound
-			}
-			if err = s.Stripe.UpdateSubscriptionAmount(txCtx, *locked.StripeSubscriptionID, int64(plan.Price)); err != nil {
-				return err
-			}
-		}
-		locked.PlanID = newPlanID
-		locked.PendingPlanID = nil
 		locked.PlanChangeDate = nil
 		locked.UpdatedAt = now
-		if newPlanID != oldPlanID {
-			LogActivity(txCtx, s.Activity, &locked.UserID, entity.PurchasePlanChange, "supporter", locked.ID.String(), RequestMeta{}, activityMeta(map[string]string{
-				"from_plan_id": oldPlanID.String(),
-				"to_plan_id":   newPlanID.String(),
-			}))
-		}
 		if err = s.Supporters.Update(txCtx, locked); err != nil {
 			return err
 		}
@@ -239,22 +221,44 @@ func (s *SupporterUseCase) finalizePaidUpgrade(ctx context.Context, supporter *e
 	return s.enrichView(ctx, supporter)
 }
 
-func (s *SupporterUseCase) markUpgradePurchasePaid(ctx context.Context, purchase *entity.Purchase) error {
+func (s *SupporterUseCase) commitPendingPlan(
+	ctx context.Context,
+	locked *entity.ProjectSupporter,
+	newPlanID uuid.UUID,
+	validatePlan bool,
+) error {
 	var (
-		from entity.PurchaseStatus
-		err  error
+		oldPlanID uuid.UUID
+		newPlan   *entity.ProjectPlan
+		plan      *entity.ProjectPlan
+		err       error
 	)
-	from = purchase.Status
-	purchase.Status = entity.PurchaseStatusPaid
-	purchase.UpdatedAt = time.Now().UTC()
-	if err = s.Purchases.Update(ctx, purchase); err != nil {
+	if validatePlan {
+		newPlan, err = s.Projects.FindPlan(ctx, locked.ProjectID, newPlanID)
+		if err != nil || newPlan == nil || !newPlan.IsActive {
+			return ErrBadRequest
+		}
+	}
+	if err = s.Projects.TransferPlanSupportCount(ctx, locked.ProjectID, locked.PlanID, newPlanID); err != nil {
 		return err
 	}
-	return s.Purchases.RecordEvent(ctx, &entity.PurchaseEvent{
-		ID:         uuid.New(),
-		PurchaseID: purchase.ID,
-		FromStatus: &from,
-		ToStatus:   entity.PurchaseStatusPaid,
-		CreatedAt:  time.Now().UTC(),
-	})
+	oldPlanID = locked.PlanID
+	if locked.BillingMode == entity.BillingModeAuto && locked.StripeSubscriptionID != nil && s.Stripe != nil {
+		plan, err = s.Projects.FindPlan(ctx, locked.ProjectID, newPlanID)
+		if err != nil || plan == nil {
+			return ErrNotFound
+		}
+		if err = s.Stripe.UpdateSubscriptionAmount(ctx, *locked.StripeSubscriptionID, int64(plan.Price)); err != nil {
+			return err
+		}
+	}
+	locked.PlanID = newPlanID
+	locked.PendingPlanID = nil
+	if newPlanID != oldPlanID {
+		LogActivity(ctx, s.Activity, &locked.UserID, entity.PurchasePlanChange, "supporter", locked.ID.String(), RequestMeta{}, activityMeta(map[string]string{
+			"from_plan_id": oldPlanID.String(),
+			"to_plan_id":   newPlanID.String(),
+		}))
+	}
+	return nil
 }

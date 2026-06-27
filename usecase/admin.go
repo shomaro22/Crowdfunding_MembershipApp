@@ -156,17 +156,7 @@ func (a *AdminUseCase) ChangeAdminRole(ctx context.Context, actorID, targetUserI
 }
 
 func (a *AdminUseCase) invalidateSessions(ctx context.Context, userID uuid.UUID) error {
-	var err error
-
-	return repository.WithTx(ctx, a.DB, func(txCtx context.Context) error {
-		if _, err = a.Users.BumpTokenVer(txCtx, userID); err != nil {
-			return err
-		}
-		if a.RefreshTokens == nil {
-			return nil
-		}
-		return a.RefreshTokens.RevokeAllByUser(txCtx, userID, time.Now().UTC())
-	})
+	return InvalidateUserSessions(ctx, a.DB, a.Users, a.RefreshTokens, userID)
 }
 
 func (a *AdminUseCase) writeReviewDecision(ctx context.Context, reviewerID uuid.UUID, resourceType string, resourceID uuid.UUID, decision string, reason *string) {

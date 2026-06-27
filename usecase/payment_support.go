@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"crowdfund-app/entity"
+	"crowdfund-app/repository"
 	"crowdfund-app/stripe"
 
 	"github.com/google/uuid"
@@ -13,19 +14,11 @@ import (
 func (p *PaymentUseCase) loadSupportContext(ctx context.Context, buyerID, projectID, planID uuid.UUID) (supportContext, error) {
 	var (
 		sc   supportContext
-		pend *entity.Purchase
 		err  error
 	)
-	sc, err = p.loadBuyerProjectPlan(ctx, buyerID, projectID, planID)
+	sc, err = p.loadCheckoutBase(ctx, buyerID, projectID, planID)
 	if err != nil {
 		return sc, err
-	}
-	pend, err = p.Purchases.FindPendingBuyerProject(ctx, buyerID, projectID)
-	if err != nil {
-		return sc, err
-	}
-	if pend != nil {
-		return sc, ErrPendingCheckout
 	}
 	if sc.membership, err = p.Supporters.FindMembership(ctx, projectID, buyerID); err != nil {
 		return sc, err
@@ -33,8 +26,8 @@ func (p *PaymentUseCase) loadSupportContext(ctx context.Context, buyerID, projec
 	if sc.membership != nil {
 		return sc, ErrAlreadySupporting
 	}
-	if sc.plan.MaxSupporters != nil && sc.plan.SupporterCount >= *sc.plan.MaxSupporters {
-		return sc, ErrForbidden
+	if err = checkPlanCapacity(sc.plan); err != nil {
+		return sc, err
 	}
 	sc.purpose = checkoutFirstSupport
 	return sc, nil
@@ -49,6 +42,36 @@ func (p *PaymentUseCase) loadCheckoutContext(ctx context.Context, buyerID, proje
 
 func (p *PaymentUseCase) loadKonbiniCheckoutContext(ctx context.Context, buyerID, projectID, planID uuid.UUID) (supportContext, error) {
 	var (
+		sc  supportContext
+		err error
+	)
+	sc, err = p.loadCheckoutBase(ctx, buyerID, projectID, planID)
+	if err != nil {
+		return sc, err
+	}
+	sc.membership, err = p.Supporters.FindMembership(ctx, projectID, buyerID)
+	if err != nil {
+		return sc, err
+	}
+	if sc.membership == nil {
+		if err = checkPlanCapacity(sc.plan); err != nil {
+			return sc, err
+		}
+		sc.purpose = checkoutFirstSupport
+		return sc, nil
+	}
+	if sc.membership.BillingMode != entity.BillingModeKonbini {
+		return sc, ErrBadRequest
+	}
+	if !canIssueKonbiniRenewal(sc.membership, sc.now) {
+		return sc, ErrBadRequest
+	}
+	sc.purpose = checkoutKonbiniRenewal
+	return sc, nil
+}
+
+func (p *PaymentUseCase) loadCheckoutBase(ctx context.Context, buyerID, projectID, planID uuid.UUID) (supportContext, error) {
+	var (
 		sc   supportContext
 		pend *entity.Purchase
 		err  error
@@ -64,35 +87,26 @@ func (p *PaymentUseCase) loadKonbiniCheckoutContext(ctx context.Context, buyerID
 	if pend != nil {
 		return sc, ErrPendingCheckout
 	}
-	sc.membership, err = p.Supporters.FindMembership(ctx, projectID, buyerID)
-	if err != nil {
-		return sc, err
-	}
-	if sc.membership == nil {
-		if sc.plan.MaxSupporters != nil && sc.plan.SupporterCount >= *sc.plan.MaxSupporters {
-			return sc, ErrForbidden
-		}
-		sc.purpose = checkoutFirstSupport
-		return sc, nil
-	}
-	if sc.membership.BillingMode != entity.BillingModeKonbini {
-		return sc, ErrBadRequest
-	}
-	if !canIssueKonbiniRenewal(sc.membership, sc.now) {
-		return sc, ErrBadRequest
-	}
-	sc.purpose = checkoutKonbiniRenewal
 	return sc, nil
+}
+
+func checkPlanCapacity(plan *entity.ProjectPlan) error {
+	if plan.MaxSupporters != nil && plan.SupporterCount >= *plan.MaxSupporters {
+		return ErrForbidden
+	}
+	return nil
 }
 
 func (p *PaymentUseCase) loadBuyerProjectPlan(ctx context.Context, buyerID, projectID, planID uuid.UUID) (supportContext, error) {
 	var (
-		sc   supportContext
-		u    *entity.User
+		sc      supportContext
+		u       *entity.User
 		project *entity.Project
-		plan *entity.ProjectPlan
-		conn *entity.ConnectAccount
-		err  error
+		plans   []entity.ProjectPlan
+		plan    *entity.ProjectPlan
+		conn    *entity.ConnectAccount
+		i       int
+		err     error
 	)
 	sc.now = time.Now().UTC()
 	u, err = p.Users.FindID(ctx, buyerID)
@@ -102,15 +116,23 @@ func (p *PaymentUseCase) loadBuyerProjectPlan(ctx context.Context, buyerID, proj
 	if !u.IsActive() || u.Role != entity.UserRoleBuyer {
 		return sc, ErrForbidden
 	}
-	project, _, _, err = p.Projects.FindID(ctx, projectID)
+	project, plans, _, err = p.Projects.FindID(ctx, projectID)
 	if err != nil || project == nil {
 		return sc, ErrNotFound
 	}
 	if !project.IsPublic(sc.now) {
 		return sc, ErrForbidden
 	}
-	plan, err = p.Projects.FindPlan(ctx, projectID, planID)
-	if err != nil || plan == nil || !plan.IsActive {
+	for i = range plans {
+		if plans[i].ID == planID {
+			if !plans[i].IsActive {
+				return sc, ErrNotFound
+			}
+			plan = &plans[i]
+			break
+		}
+	}
+	if plan == nil {
 		return sc, ErrNotFound
 	}
 	conn, err = p.Connect.FindUserID(ctx, project.SellerID)
@@ -173,6 +195,12 @@ func (p *PaymentUseCase) createPendingPurchase(
 		return nil, err
 	}
 	return row, nil
+}
+
+func (p *PaymentUseCase) savePendingAfterStripe(ctx context.Context, purchase *entity.Purchase) error {
+	return repository.WithTx(ctx, p.DB, func(txCtx context.Context) error {
+		return p.Purchases.Create(txCtx, purchase)
+	})
 }
 
 func checkoutMetadata(sc supportContext, purchaseID uuid.UUID, pm entity.PaymentMethod) map[string]string {

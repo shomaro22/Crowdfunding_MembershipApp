@@ -73,9 +73,8 @@ func (s *SupporterUseCase) applyPendingChanges(ctx context.Context, supporter *e
 	}
 	err = repository.WithTx(ctx, s.DB, func(txCtx context.Context) error {
 		var (
-			locked  *entity.ProjectSupporter
-			project    *entity.Project
-			newPlan *entity.ProjectPlan
+			locked *entity.ProjectSupporter
+			project *entity.Project
 		)
 		locked, err = s.Supporters.FindID(txCtx, supporter.ID)
 		if err != nil || locked == nil {
@@ -90,27 +89,8 @@ func (s *SupporterUseCase) applyPendingChanges(ctx context.Context, supporter *e
 			return ErrNotFound
 		}
 		if locked.PendingPlanID != nil {
-			var oldPlanID uuid.UUID
-			oldPlanID = locked.PlanID
-			newPlan, err = s.Projects.FindPlan(txCtx, locked.ProjectID, *locked.PendingPlanID)
-			if err != nil || newPlan == nil || !newPlan.IsActive {
-				return ErrBadRequest
-			}
-			if err = s.Projects.TransferPlanSupportCount(txCtx, locked.ProjectID, locked.PlanID, newPlan.ID); err != nil {
+			if err = s.commitPendingPlan(txCtx, locked, *locked.PendingPlanID, true); err != nil {
 				return err
-			}
-			if locked.BillingMode == entity.BillingModeAuto && locked.StripeSubscriptionID != nil && s.Stripe != nil {
-				if err = s.Stripe.UpdateSubscriptionAmount(txCtx, *locked.StripeSubscriptionID, int64(newPlan.Price)); err != nil {
-					return err
-				}
-			}
-			locked.PlanID = newPlan.ID
-			locked.PendingPlanID = nil
-			if newPlan.ID != oldPlanID {
-				LogActivity(txCtx, s.Activity, &locked.UserID, entity.PurchasePlanChange, "supporter", locked.ID.String(), RequestMeta{}, activityMeta(map[string]string{
-					"from_plan_id": oldPlanID.String(),
-					"to_plan_id":   newPlan.ID.String(),
-				}))
 			}
 		}
 		if locked.PendingBillingMode != nil {
