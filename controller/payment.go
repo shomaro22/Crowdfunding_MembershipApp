@@ -5,8 +5,8 @@ import (
 	"io"
 	"net/http"
 	"strconv"
+	"strings"
 
-	"crowdfund-app/middleware"
 	"crowdfund-app/usecase"
 
 	"github.com/google/uuid"
@@ -22,12 +22,13 @@ type PaymentUseCase interface {
 }
 
 type PaymentController struct {
-	Payments  PaymentUseCase
-	Purchases PurchaseUseCase
+	Payments     PaymentUseCase
+	Purchases    PurchaseUseCase
+	StripeAppURL string
 }
 
-func NewPaymentController(payments PaymentUseCase, purchases PurchaseUseCase) *PaymentController {
-	return &PaymentController{Payments: payments, Purchases: purchases}
+func NewPaymentController(payments PaymentUseCase, purchases PurchaseUseCase, stripeAppURL string) *PaymentController {
+	return &PaymentController{Payments: payments, Purchases: purchases, StripeAppURL: stripeAppURL}
 }
 
 type PurchaseUseCase interface {
@@ -67,9 +68,11 @@ func (h *PaymentController) Checkout(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusBadRequest, apiError("invalid request body", "BAD_REQUEST"))
 	}
 	in.Meta = requestMeta(c)
+	in.FallbackSuccessURL = strings.TrimRight(h.StripeAppURL, "/") + "/support/success?session_id={CHECKOUT_SESSION_ID}"
+	in.FallbackCancelURL = strings.TrimRight(h.StripeAppURL, "/") + "/support/cancel"
 	out, err = h.Payments.CreateCheckout(c.Request().Context(), in)
 	if err != nil {
-		return mapPaymentError(err)
+		return mapUseCaseError(err)
 	}
 	return c.JSON(http.StatusOK, map[string]string{
 		"session_id": out.SessionID,
@@ -99,7 +102,7 @@ func (h *PaymentController) Intent(c echo.Context) error {
 	in.Meta = requestMeta(c)
 	out, err = h.Payments.CreateIntent(c.Request().Context(), in)
 	if err != nil {
-		return mapPaymentError(err)
+		return mapUseCaseError(err)
 	}
 	return c.JSON(http.StatusOK, map[string]string{
 		"client_secret":     out.ClientSecret,
@@ -147,7 +150,7 @@ func (h *PaymentController) VerifyCheckout(c echo.Context) error {
 	}
 	view, err = h.Payments.VerifyCheckout(c.Request().Context(), buyerID, body.SessionID)
 	if err != nil {
-		return mapPaymentError(err)
+		return mapUseCaseError(err)
 	}
 	return c.JSON(http.StatusOK, supporterToJSON(view))
 }
@@ -168,19 +171,9 @@ func (h *PaymentController) VerifyIntent(c echo.Context) error {
 	}
 	view, err = h.Payments.VerifyIntent(c.Request().Context(), buyerID, body.PaymentIntentID)
 	if err != nil {
-		return mapPaymentError(err)
+		return mapUseCaseError(err)
 	}
 	return c.JSON(http.StatusOK, supporterToJSON(view))
-}
-
-func requestMeta(c echo.Context) usecase.RequestMeta {
-	var reqID string
-	reqID, _ = c.Get(middleware.CtxRequestID).(string)
-	return usecase.RequestMeta{
-		IPAddress: c.RealIP(),
-		UserAgent: c.Request().UserAgent(),
-		RequestID: reqID,
-	}
 }
 
 func (body checkoutRequestJSON) toInput(buyerID uuid.UUID) (usecase.CheckoutIn, error) {
@@ -225,10 +218,6 @@ func (body intentRequestJSON) toInput(buyerID uuid.UUID) (usecase.IntentIn, erro
 		return usecase.IntentIn{}, err
 	}
 	return usecase.IntentIn{BuyerID: buyerID, ProjectID: projectID, PlanID: planID}, nil
-}
-
-func mapPaymentError(err error) *echo.HTTPError {
-	return mapUseCaseError(err)
 }
 
 func (h *PaymentController) ListPurchases(c echo.Context) error {

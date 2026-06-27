@@ -35,7 +35,7 @@ func (h *ConnectController) GetAccount(c echo.Context) error {
 	}
 	row, err = h.Connect.GetAccount(c.Request().Context(), sellerID)
 	if err != nil {
-		return mapConnectError(err)
+		return mapUseCaseError(err)
 	}
 	if row == nil {
 		return c.JSON(http.StatusOK, map[string]any{"account": nil})
@@ -55,7 +55,7 @@ func (h *ConnectController) CreateOnboarding(c echo.Context) error {
 	}
 	url, err = h.Connect.CreateOnboardingLink(c.Request().Context(), sellerID)
 	if err != nil {
-		return mapConnectError(err)
+		return mapUseCaseError(err)
 	}
 	return c.JSON(http.StatusOK, map[string]string{"url": url})
 }
@@ -77,8 +77,4 @@ func toConnectAccountJSON(row *usecase.ConnectAccountView) connectAccountResp {
 		PayoutsEnabled:   row.PayoutsEnabled,
 		DetailsSubmitted: row.DetailsSubmitted,
 	}
-}
-
-func mapConnectError(err error) *echo.HTTPError {
-	return mapUseCaseError(err)
 }

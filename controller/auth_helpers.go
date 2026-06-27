@@ -1,12 +1,12 @@
 package controller
 
 import (
-	"errors"
 	"net/http"
 	"net/url"
 	"strings"
 	"time"
 
+	"crowdfund-app/auth"
 	"crowdfund-app/middleware"
 	"crowdfund-app/usecase"
 
@@ -26,22 +26,10 @@ func CurrentUserID(c echo.Context) (uuid.UUID, error) {
 	return uid, nil
 }
 
-func CurrentAdminRole(c echo.Context) (string, error) {
-	var (
-		r  string
-		ok bool
-	)
-	r, ok = c.Get(middleware.CtxAdminRole).(string)
-	if !ok || r == "" {
-		return "", echo.NewHTTPError(http.StatusForbidden, apiError("forbidden", "FORBIDDEN"))
-	}
-	return r, nil
-}
-
-func authMeta(c echo.Context) usecase.AuthMeta {
+func requestMeta(c echo.Context) usecase.RequestMeta {
 	var reqID string
 	reqID, _ = c.Get(middleware.CtxRequestID).(string)
-	return usecase.AuthMeta{
+	return usecase.RequestMeta{
 		IPAddress: c.RealIP(),
 		UserAgent: c.Request().UserAgent(),
 		RequestID: reqID,
@@ -140,50 +128,22 @@ type sellerRegViewJSON struct {
 	BackURL  *string  `json:"identity_document_back_url,omitempty"`
 }
 
-func sellerRegViewToJSON(d *usecase.SellerRegView) sellerRegViewJSON {
-	return sellerRegViewJSON{
+func sellerRegViewToJSON(apiBase string, d *usecase.SellerRegView) sellerRegViewJSON {
+	var (
+		out sellerRegViewJSON
+		url string
+	)
+	out = sellerRegViewJSON{
 		sellerRegJSON: sellerRegToJSON(d.Registration),
 		User:          userToJSON(d.User),
-		FrontURL:      d.FrontURL,
-		BackURL:       d.BackURL,
 	}
-}
-
-func mapAuthError(err error) *echo.HTTPError {
-	switch {
-	case errors.Is(err, usecase.ErrInvalidCredentials):
-		return echo.NewHTTPError(http.StatusUnauthorized, apiError("invalid credentials", "INVALID_CREDENTIALS"))
-	case errors.Is(err, usecase.ErrInactiveUser):
-		return echo.NewHTTPError(http.StatusForbidden, apiError("user inactive", "USER_INACTIVE"))
-	case errors.Is(err, usecase.ErrEmailInUse):
-		return echo.NewHTTPError(http.StatusConflict, apiError("email already in use", "EMAIL_IN_USE"))
-	case errors.Is(err, usecase.ErrWeakPassword):
-		return echo.NewHTTPError(http.StatusBadRequest, apiError("weak password", "WEAK_PASSWORD"))
-	case errors.Is(err, usecase.ErrInvalidEmail):
-		return echo.NewHTTPError(http.StatusBadRequest, apiError("invalid email", "INVALID_EMAIL"))
-	case errors.Is(err, usecase.ErrInvalidToken):
-		return echo.NewHTTPError(http.StatusUnauthorized, apiError("invalid token", "INVALID_TOKEN"))
-	case errors.Is(err, usecase.ErrNotFound):
-		return echo.NewHTTPError(http.StatusNotFound, apiError("not found", "NOT_FOUND"))
-	case errors.Is(err, usecase.ErrRequires2FA):
-		return echo.NewHTTPError(http.StatusForbidden, apiError("2fa required", "2FA_REQUIRED"))
-	case errors.Is(err, usecase.Err2FANotConfigured):
-		return echo.NewHTTPError(http.StatusForbidden, apiError("2fa not configured", "2FA_NOT_CONFIGURED"))
-	case errors.Is(err, usecase.ErrInvalid2FACode):
-		return echo.NewHTTPError(http.StatusUnauthorized, apiError("invalid 2fa code", "INVALID_2FA_CODE"))
-	case errors.Is(err, usecase.Err2FAAlreadyEnabled):
-		return echo.NewHTTPError(http.StatusConflict, apiError("2fa already enabled", "2FA_ALREADY_ENABLED"))
-	case errors.Is(err, usecase.ErrOAuthUnavailable):
-		return echo.NewHTTPError(http.StatusServiceUnavailable, apiError("oauth unavailable", "OAUTH_UNAVAILABLE"))
-	case errors.Is(err, usecase.ErrOAuthForbidden):
-		return echo.NewHTTPError(http.StatusForbidden, apiError("oauth forbidden", "OAUTH_FORBIDDEN"))
-	case errors.Is(err, usecase.ErrTokenRevoked):
-		return echo.NewHTTPError(http.StatusUnauthorized, apiError("token revoked", "TOKEN_REVOKED"))
-	case errors.Is(err, usecase.ErrUnsupportedMedia):
-		return echo.NewHTTPError(http.StatusBadRequest, apiError("unsupported media type", "BAD_REQUEST"))
-	case errors.Is(err, usecase.ErrFileTooLarge):
-		return echo.NewHTTPError(http.StatusBadRequest, apiError("file too large", "BAD_REQUEST"))
-	default:
-		return echo.NewHTTPError(http.StatusInternalServerError, apiError("internal error", "INTERNAL_ERROR"))
+	if d.FrontAccessToken != nil {
+		url = auth.KYCAccessURL(apiBase, *d.FrontAccessToken)
+		out.FrontURL = &url
 	}
+	if d.BackAccessToken != nil {
+		url = auth.KYCAccessURL(apiBase, *d.BackAccessToken)
+		out.BackURL = &url
+	}
+	return out
 }
