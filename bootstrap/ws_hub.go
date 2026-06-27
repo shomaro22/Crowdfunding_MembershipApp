@@ -43,6 +43,13 @@ func (a WSHubAdapter) Unsubscribe(connID, projectID uuid.UUID) {
 	a.hub.Unsubscribe(connID, projectID)
 }
 
+func (a WSHubAdapter) ProjectIDs(connID uuid.UUID) []uuid.UUID {
+	if a.hub == nil {
+		return nil
+	}
+	return a.hub.ProjectIDs(connID)
+}
+
 func (a WSHubAdapter) WriteText(connID uuid.UUID, payload []byte) bool {
 	if a.hub == nil {
 		return false
@@ -57,16 +64,14 @@ func (a WSHubAdapter) SendPing(connID uuid.UUID) bool {
 	return a.hub.SendPing(connID)
 }
 
-func (a WSHubAdapter) BroadcastToProject(projectID uuid.UUID, payload []byte) {
+func (a WSHubAdapter) BroadcastToProjectExceptUserFiltered(
+	projectID uuid.UUID,
+	payload []byte,
+	excludeUserID uuid.UUID,
+	filter wshub.SubscriberFilter,
+) {
 	if a.hub == nil {
 		return
 	}
-	a.hub.BroadcastToProject(projectID, payload)
-}
-
-func (a WSHubAdapter) BroadcastToProjectExceptUser(projectID uuid.UUID, payload []byte, excludeUserID uuid.UUID) {
-	if a.hub == nil {
-		return
-	}
-	a.hub.BroadcastToProjectExceptUser(projectID, payload, excludeUserID)
+	a.hub.BroadcastToProjectExceptUserFiltered(projectID, payload, excludeUserID, filter)
 }

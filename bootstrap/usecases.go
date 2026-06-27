@@ -122,13 +122,11 @@ func NewUseCases(
 			Supporters: repos.Supporters,
 			Users:      repos.Users,
 			Activity:   repos.Activity,
-			DB:         db,
 		},
 		WSToken: &usecase.WSTokenUseCase{
 			Tokens:   repos.WSTokens,
 			Users:    repos.Users,
 			Activity: repos.Activity,
-			DB:       db,
 		},
 	}
 }

@@ -8,6 +8,8 @@ import (
 	"github.com/gorilla/websocket"
 )
 
+type SubscriberFilter func(userID uuid.UUID) bool
+
 type ConnectionManager struct {
 	mu          sync.RWMutex
 	clients     map[uuid.UUID]*wsClient
@@ -15,11 +17,11 @@ type ConnectionManager struct {
 }
 
 type wsClient struct {
-	connID    uuid.UUID
-	userID    uuid.UUID
-	conn      *websocket.Conn
-	writeMu   sync.Mutex
-	projects  map[uuid.UUID]struct{}
+	connID   uuid.UUID
+	userID   uuid.UUID
+	conn     *websocket.Conn
+	writeMu  sync.Mutex
+	projects map[uuid.UUID]struct{}
 }
 
 func NewConnectionManager() *ConnectionManager {
@@ -98,25 +100,83 @@ func (m *ConnectionManager) Subscribe(connID, projectID uuid.UUID) {
 func (m *ConnectionManager) Unsubscribe(connID, projectID uuid.UUID) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	c, ok := m.clients[connID]
+	m.unsubscribeLocked(connID, projectID)
+}
+
+func (m *ConnectionManager) unsubscribeLocked(connID, projectID uuid.UUID) {
+	var (
+		c   *wsClient
+		ok  bool
+		subs map[uuid.UUID]struct{}
+	)
+	c, ok = m.clients[connID]
 	if !ok {
 		return
 	}
 	delete(c.projects, projectID)
-	if subs, ok := m.projectSubs[projectID]; ok {
-		delete(subs, connID)
-		if len(subs) == 0 {
-			delete(m.projectSubs, projectID)
-		}
+	subs, ok = m.projectSubs[projectID]
+	if !ok {
+		return
+	}
+	delete(subs, connID)
+	if len(subs) == 0 {
+		delete(m.projectSubs, projectID)
 	}
 }
 
-func (m *ConnectionManager) BroadcastToProject(projectID uuid.UUID, payload []byte) {
+func (m *ConnectionManager) ProjectIDs(connID uuid.UUID) []uuid.UUID {
 	var (
-		list []*wsClient
 		c    *wsClient
-		cid  uuid.UUID
 		ok   bool
+		ids  []uuid.UUID
+		pid  uuid.UUID
+	)
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	c, ok = m.clients[connID]
+	if !ok {
+		return nil
+	}
+	ids = make([]uuid.UUID, 0, len(c.projects))
+	for pid = range c.projects {
+		ids = append(ids, pid)
+	}
+	return ids
+}
+
+func (m *ConnectionManager) BroadcastToProject(projectID uuid.UUID, payload []byte) {
+	m.broadcastToProject(projectID, payload, nil, uuid.Nil)
+}
+
+func (m *ConnectionManager) BroadcastToProjectExceptUser(projectID uuid.UUID, payload []byte, excludeUserID uuid.UUID) {
+	m.broadcastToProject(projectID, payload, nil, excludeUserID)
+}
+
+func (m *ConnectionManager) BroadcastToProjectFiltered(projectID uuid.UUID, payload []byte, filter SubscriberFilter) {
+	m.broadcastToProject(projectID, payload, filter, uuid.Nil)
+}
+
+func (m *ConnectionManager) BroadcastToProjectExceptUserFiltered(
+	projectID uuid.UUID,
+	payload []byte,
+	excludeUserID uuid.UUID,
+	filter SubscriberFilter,
+) {
+	m.broadcastToProject(projectID, payload, filter, excludeUserID)
+}
+
+func (m *ConnectionManager) broadcastToProject(
+	projectID uuid.UUID,
+	payload []byte,
+	filter SubscriberFilter,
+	excludeUserID uuid.UUID,
+) {
+	var (
+		list      []*wsClient
+		stale     []uuid.UUID
+		c         *wsClient
+		cid       uuid.UUID
+		ok        bool
 	)
 	m.mu.RLock()
 	subs := m.projectSubs[projectID]
@@ -132,39 +192,32 @@ func (m *ConnectionManager) BroadcastToProject(projectID uuid.UUID, payload []by
 	}
 	m.mu.RUnlock()
 	for _, c = range list {
-		c.writeMu.Lock()
-		c.conn.SetWriteDeadline(time.Now().Add(10 * time.Second))
-		_ = c.conn.WriteMessage(websocket.TextMessage, payload)
-		c.writeMu.Unlock()
+		if excludeUserID != uuid.Nil && c.userID == excludeUserID {
+			continue
+		}
+		if filter != nil && !filter(c.userID) {
+			m.Unsubscribe(c.connID, projectID)
+			continue
+		}
+		if !m.writeClient(c, payload) {
+			stale = append(stale, c.connID)
+		}
+	}
+	for _, cid = range stale {
+		m.RemoveConn(cid)
 	}
 }
 
-func (m *ConnectionManager) BroadcastToProjectExceptUser(projectID uuid.UUID, payload []byte, excludeUserID uuid.UUID) {
-	var (
-		list []*wsClient
-		c    *wsClient
-		cid  uuid.UUID
-		ok   bool
-	)
-	m.mu.RLock()
-	subs := m.projectSubs[projectID]
-	if len(subs) == 0 {
-		m.mu.RUnlock()
-		return
+func (m *ConnectionManager) writeClient(c *wsClient, payload []byte) bool {
+	var err error
+	if c == nil || c.conn == nil {
+		return false
 	}
-	list = make([]*wsClient, 0, len(subs))
-	for cid = range subs {
-		if c, ok = m.clients[cid]; ok && c.userID != excludeUserID {
-			list = append(list, c)
-		}
-	}
-	m.mu.RUnlock()
-	for _, c = range list {
-		c.writeMu.Lock()
-		c.conn.SetWriteDeadline(time.Now().Add(10 * time.Second))
-		_ = c.conn.WriteMessage(websocket.TextMessage, payload)
-		c.writeMu.Unlock()
-	}
+	c.writeMu.Lock()
+	defer c.writeMu.Unlock()
+	c.conn.SetWriteDeadline(time.Now().Add(10 * time.Second))
+	err = c.conn.WriteMessage(websocket.TextMessage, payload)
+	return err == nil
 }
 
 func (m *ConnectionManager) SendPing(connID uuid.UUID) bool {
@@ -183,14 +236,16 @@ func (m *ConnectionManager) SendPing(connID uuid.UUID) bool {
 	defer c.writeMu.Unlock()
 	c.conn.SetWriteDeadline(time.Now().Add(10 * time.Second))
 	err = c.conn.WriteMessage(websocket.PingMessage, nil)
-	return err == nil
+	if err != nil {
+		return false
+	}
+	return true
 }
 
 func (m *ConnectionManager) WriteText(connID uuid.UUID, payload []byte) bool {
 	var (
-		c   *wsClient
-		ok  bool
-		err error
+		c  *wsClient
+		ok bool
 	)
 	m.mu.RLock()
 	c, ok = m.clients[connID]
@@ -198,9 +253,9 @@ func (m *ConnectionManager) WriteText(connID uuid.UUID, payload []byte) bool {
 	if !ok {
 		return false
 	}
-	c.writeMu.Lock()
-	defer c.writeMu.Unlock()
-	c.conn.SetWriteDeadline(time.Now().Add(10 * time.Second))
-	err = c.conn.WriteMessage(websocket.TextMessage, payload)
-	return err == nil
+	if !m.writeClient(c, payload) {
+		m.RemoveConn(connID)
+		return false
+	}
+	return true
 }

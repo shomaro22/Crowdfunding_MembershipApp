@@ -2,9 +2,8 @@ package middleware
 
 import (
 	"context"
-	"errors"
-	"net/http"
 
+	"crowdfund-app/apierr"
 	"crowdfund-app/auth"
 	"crowdfund-app/usecase"
 
@@ -21,14 +20,12 @@ func SessionValidateHTTP(check SessionChecker) SessionValidator {
 		)
 		info, err = check(c.Request().Context(), claims)
 		if err != nil {
-			switch {
-			case errors.Is(err, usecase.ErrInactiveUser):
-				return echo.NewHTTPError(http.StatusForbidden, map[string]string{"error": "user inactive", "code": "USER_INACTIVE"})
-			case errors.Is(err, usecase.ErrTokenRevoked):
-				return echo.NewHTTPError(http.StatusUnauthorized, map[string]string{"error": "token revoked", "code": "TOKEN_REVOKED"})
-			default:
-				return echo.NewHTTPError(http.StatusInternalServerError, map[string]string{"error": "internal error", "code": "INTERNAL_ERROR"})
-			}
+			var (
+				status int
+				body   apierr.Body
+			)
+			status, body = apierr.MapSession(err)
+			return echo.NewHTTPError(status, body)
 		}
 		c.Set(CtxUserRole, string(info.Role))
 		SetAdminRoleFromSession(c, info.Role, info.AdminRole)
