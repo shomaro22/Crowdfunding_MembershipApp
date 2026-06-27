@@ -5,7 +5,6 @@ import (
 	"io"
 	"net/http"
 
-	"crowdfund-app/entity"
 	"crowdfund-app/middleware"
 	"crowdfund-app/usecase"
 
@@ -200,7 +199,7 @@ func (body checkoutRequestJSON) toInput(buyerID uuid.UUID) (usecase.CheckoutIn, 
 		CancelURL:  body.CancelURL,
 	}
 	if body.PaymentMethod != nil {
-		in.PaymentMethod = entity.PaymentMethod(*body.PaymentMethod)
+		in.PaymentMethod = *body.PaymentMethod
 	}
 	return in, nil
 }
