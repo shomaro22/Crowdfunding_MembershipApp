@@ -44,7 +44,7 @@ func (h *ProjectController) ListPublic(c echo.Context) error {
 	offset, _ = strconv.Atoi(c.QueryParam("offset"))
 	rows, total, err = h.Projects.ListPublic(c.Request().Context(), c.QueryParam("search"), c.QueryParam("sort"), limit, offset)
 	if err != nil {
-		return mapProjectError(err)
+		return mapUseCaseError(err)
 	}
 	return c.JSON(http.StatusOK, listProjectsJSON(rows, total, limit, offset))
 }
@@ -70,7 +70,7 @@ func (h *ProjectController) Create(c echo.Context) error {
 	}
 	view, err = h.Projects.Create(c.Request().Context(), sellerID, in)
 	if err != nil {
-		return mapProjectError(err)
+		return mapUseCaseError(err)
 	}
 	return c.JSON(http.StatusCreated, projectDetailJSON(view))
 }
@@ -92,7 +92,7 @@ func (h *ProjectController) ListMine(c echo.Context) error {
 	offset, _ = strconv.Atoi(c.QueryParam("offset"))
 	rows, total, err = h.Projects.ListMine(c.Request().Context(), sellerID, limit, offset)
 	if err != nil {
-		return mapProjectError(err)
+		return mapUseCaseError(err)
 	}
 	return c.JSON(http.StatusOK, listProjectsJSON(rows, total, limit, offset))
 }
@@ -119,7 +119,7 @@ func (h *ProjectController) Get(c echo.Context) error {
 	}
 	view, err = h.Projects.FindView(c.Request().Context(), id, viewerID, viewerRole)
 	if err != nil {
-		return mapProjectError(err)
+		return mapUseCaseError(err)
 	}
 	return c.JSON(http.StatusOK, projectDetailJSON(view))
 }
@@ -146,7 +146,7 @@ func (h *ProjectController) ListPlans(c echo.Context) error {
 	}
 	plans, err = h.Projects.ListPlans(c.Request().Context(), id, viewerID, viewerRole)
 	if err != nil {
-		return mapProjectError(err)
+		return mapUseCaseError(err)
 	}
 	return c.JSON(http.StatusOK, projectPlansToJSON(plans))
 }
@@ -177,7 +177,7 @@ func (h *ProjectController) Update(c echo.Context) error {
 	}
 	view, err = h.Projects.Update(c.Request().Context(), sellerID, id, in)
 	if err != nil {
-		return mapProjectError(err)
+		return mapUseCaseError(err)
 	}
 	return c.JSON(http.StatusOK, projectDetailJSON(view))
 }
@@ -199,13 +199,9 @@ func (h *ProjectController) RequestDelete(c echo.Context) error {
 	}
 	view, err = h.Projects.RequestDelete(c.Request().Context(), sellerID, id)
 	if err != nil {
-		return mapProjectError(err)
+		return mapUseCaseError(err)
 	}
 	return c.JSON(http.StatusOK, projectDetailJSON(view))
-}
-
-func mapProjectError(err error) *echo.HTTPError {
-	return mapUseCaseError(err)
 }
 
 type createProjectJSON struct {

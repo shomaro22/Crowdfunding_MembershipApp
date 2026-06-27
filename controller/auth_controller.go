@@ -60,9 +60,9 @@ func (h *AuthController) Register(c echo.Context) error {
 	if err = c.Bind(&body); err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, apiError("invalid request body", "BAD_REQUEST"))
 	}
-	u, err = h.Auth.RegisterBuyer(c.Request().Context(), body.Email, body.Password, body.Name, authMeta(c))
+	u, err = h.Auth.RegisterBuyer(c.Request().Context(), body.Email, body.Password, body.Name, requestMeta(c))
 	if err != nil {
-		return mapAuthError(err)
+		return mapUseCaseError(err)
 	}
 	return c.JSON(http.StatusCreated, registerResponse{
 		User:    userToJSON(u),
@@ -79,9 +79,9 @@ func (h *AuthController) Login(c echo.Context) error {
 	if err = c.Bind(&body); err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, apiError("invalid request body", "BAD_REQUEST"))
 	}
-	res, err = h.Auth.Login(c.Request().Context(), body.Email, body.Password, authMeta(c))
+	res, err = h.Auth.Login(c.Request().Context(), body.Email, body.Password, requestMeta(c))
 	if err != nil {
-		return mapAuthError(err)
+		return mapUseCaseError(err)
 	}
 	if res.Requires2FA {
 		auth.SetPending2FA(c, h.CookieCfg, h.Auth.SigningKey(), res.User.ID)
@@ -105,9 +105,9 @@ func (h *AuthController) Refresh(c echo.Context) error {
 		err          error
 	)
 	plain = auth.RefreshTokenFrom(c, h.CookieCfg)
-	authToken, refreshToken, err = h.Auth.Refresh(c.Request().Context(), plain, authMeta(c))
+	authToken, refreshToken, err = h.Auth.Refresh(c.Request().Context(), plain, requestMeta(c))
 	if err != nil {
-		return mapAuthError(err)
+		return mapUseCaseError(err)
 	}
 	auth.SetRefreshCookie(c, h.CookieCfg, refreshToken)
 	return c.JSON(http.StatusOK, map[string]string{"auth_token": authToken})
@@ -119,8 +119,8 @@ func (h *AuthController) Logout(c echo.Context) error {
 		err   error
 	)
 	plain = auth.RefreshTokenFrom(c, h.CookieCfg)
-	if err = h.Auth.Logout(c.Request().Context(), plain, authMeta(c)); err != nil {
-		return mapAuthError(err)
+	if err = h.Auth.Logout(c.Request().Context(), plain, requestMeta(c)); err != nil {
+		return mapUseCaseError(err)
 	}
 	auth.ClearRefreshCookie(c, h.CookieCfg)
 	return c.NoContent(http.StatusOK)
@@ -147,7 +147,7 @@ func (h *AuthController) ResetPassword(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusBadRequest, apiError("invalid request body", "BAD_REQUEST"))
 	}
 	if err = h.Auth.ResetPassword(c.Request().Context(), body.Token, body.Password); err != nil {
-		return mapAuthError(err)
+		return mapUseCaseError(err)
 	}
 	return c.NoContent(http.StatusOK)
 }
@@ -164,7 +164,7 @@ func (h *AuthController) Me(c echo.Context) error {
 	}
 	u, err = h.Auth.GetUser(c.Request().Context(), uid)
 	if err != nil {
-		return mapAuthError(err)
+		return mapUseCaseError(err)
 	}
 	return c.JSON(http.StatusOK, map[string]userJSON{"user": userToJSON(u)})
 }
@@ -183,7 +183,7 @@ func (h *AuthController) ChangePassword(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusBadRequest, apiError("invalid request body", "BAD_REQUEST"))
 	}
 	if err = h.Auth.ChangePassword(c.Request().Context(), uid, body.CurrentPassword, body.NewPassword, body.TotpCode); err != nil {
-		return mapAuthError(err)
+		return mapUseCaseError(err)
 	}
 	return c.NoContent(http.StatusOK)
 }
@@ -197,7 +197,7 @@ func (h *AuthController) CheckEmail(c echo.Context) error {
 	email = c.QueryParam("email")
 	available, err = h.Auth.EmailFree(c.Request().Context(), email)
 	if err != nil {
-		return mapAuthError(err)
+		return mapUseCaseError(err)
 	}
 	return c.JSON(http.StatusOK, map[string]bool{"available": available})
 }
@@ -214,7 +214,7 @@ func (h *AuthController) Setup2FA(c echo.Context) error {
 	}
 	res, err = h.Auth.Setup2FA(c.Request().Context(), uid)
 	if err != nil {
-		return mapAuthError(err)
+		return mapUseCaseError(err)
 	}
 	return c.JSON(http.StatusOK, map[string]string{
 		"secret":      res.Secret,
@@ -240,7 +240,7 @@ func (h *AuthController) Verify2FA(c echo.Context) error {
 	}
 	res, err = h.Auth.Verify2FASetup(c.Request().Context(), uid, body.Code)
 	if err != nil {
-		return mapAuthError(err)
+		return mapUseCaseError(err)
 	}
 	return c.JSON(http.StatusOK, verify2FAResponse{
 		Enabled:     true,
@@ -264,9 +264,9 @@ func (h *AuthController) Challenge2FA(c echo.Context) error {
 	if err = c.Bind(&body); err != nil || body.Code == "" {
 		return echo.NewHTTPError(http.StatusBadRequest, apiError("code required", "BAD_REQUEST"))
 	}
-	res, err = h.Auth.Challenge2FA(c.Request().Context(), pending, body.Code, authMeta(c))
+	res, err = h.Auth.Challenge2FA(c.Request().Context(), pending, body.Code, requestMeta(c))
 	if err != nil {
-		return mapAuthError(err)
+		return mapUseCaseError(err)
 	}
 	auth.ClearPending2FA(c, h.CookieCfg)
 	auth.SetRefreshCookie(c, h.CookieCfg, res.RefreshToken)
@@ -285,7 +285,7 @@ func (h *AuthController) GoogleStart(c echo.Context) error {
 	from = c.QueryParam("from")
 	authURL, err = h.Auth.GoogleAuthURL(from)
 	if err != nil {
-		return mapAuthError(err)
+		return mapUseCaseError(err)
 	}
 	return c.Redirect(http.StatusFound, authURL)
 }
@@ -304,7 +304,7 @@ func (h *AuthController) GoogleCallback(c echo.Context) error {
 	}
 	code = c.QueryParam("code")
 	state = c.QueryParam("state")
-	res, err = h.Auth.GoogleCallback(c.Request().Context(), code, state, authMeta(c))
+	res, err = h.Auth.GoogleCallback(c.Request().Context(), code, state, requestMeta(c))
 	if err != nil {
 		return c.Redirect(http.StatusFound, oauthCallbackURL(h.AppPublicURL, usecase.OAuthRedirectView{Error: oauthErrCode(err)}))
 	}
@@ -323,9 +323,9 @@ func (h *AuthController) OAuthExchange(c echo.Context) error {
 	if err = c.Bind(&body); err != nil || body.Code == "" {
 		return echo.NewHTTPError(http.StatusBadRequest, apiError("code required", "BAD_REQUEST"))
 	}
-	res, err = h.Auth.ExchangeOAuthCode(c.Request().Context(), body.Code, authMeta(c))
+	res, err = h.Auth.ExchangeOAuthCode(c.Request().Context(), body.Code, requestMeta(c))
 	if err != nil {
-		return mapAuthError(err)
+		return mapUseCaseError(err)
 	}
 	return c.JSON(http.StatusOK, authTokenResponse{
 		AuthToken: res.AuthToken,
@@ -435,7 +435,7 @@ func (h *AuthController) RegisterSeller(c echo.Context) error {
 		PhotoPresent: payload.PhotoPresent,
 		Front:        frontImg,
 		Back:         backImg,
-	}, authMeta(c))
+	}, requestMeta(c))
 	if err != nil {
 		return mapUseCaseError(err)
 	}

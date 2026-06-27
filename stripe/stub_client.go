@@ -77,7 +77,7 @@ func (c *StubClient) SessionMetadata(sessionID string) map[string]string {
 	if !ok {
 		return nil
 	}
-	return cloneMeta(s.in.Metadata)
+	return cloneStringMap(s.in.Metadata)
 }
 
 func (c *StubClient) IntentMetadata(intentID string) map[string]string {
@@ -87,18 +87,7 @@ func (c *StubClient) IntentMetadata(intentID string) map[string]string {
 	if !ok {
 		return nil
 	}
-	return cloneMeta(pi.metadata)
-}
-
-func cloneMeta(m map[string]string) map[string]string {
-	if m == nil {
-		return nil
-	}
-	out := make(map[string]string, len(m))
-	for k, v := range m {
-		out[k] = v
-	}
-	return out
+	return cloneStringMap(pi.metadata)
 }
 
 func (c *StubClient) nextCheckoutIDs() (string, string) {
@@ -168,7 +157,7 @@ func (c *StubClient) CreateCheckoutSession(ctx context.Context, in CheckoutSessi
 		paymentStatus: CheckoutPaymentStatusUnpaid,
 	}
 	c.intents[pid] = &stubIntent{
-		metadata: cloneMeta(in.Metadata),
+		metadata: cloneStringMap(in.Metadata),
 		status:   "requires_payment_method",
 	}
 	return out, nil
@@ -185,7 +174,7 @@ func (c *StubClient) CreateSubscriptionIntent(ctx context.Context, in Subscripti
 		custID = "cus_test_" + suffix
 	)
 	c.intents[piID] = &stubIntent{
-		metadata: cloneMeta(in.Metadata),
+		metadata: cloneStringMap(in.Metadata),
 		status:   "requires_payment_method",
 		subID:    subID,
 		custID:   custID,
@@ -223,7 +212,7 @@ func (c *StubClient) CreateUpgradePaymentIntent(ctx context.Context, in UpgradeP
 	defer c.mu.Unlock()
 	var piID = "pi_test_" + strings.ReplaceAll(uuid.New().String(), "-", "")
 	c.intents[piID] = &stubIntent{
-		metadata: cloneMeta(in.Metadata),
+		metadata: cloneStringMap(in.Metadata),
 		status:   "requires_payment_method",
 		custID:   in.CustomerID,
 	}
@@ -259,7 +248,7 @@ func (c *StubClient) GetCheckoutSession(ctx context.Context, sessionID string) (
 	return CheckoutSessionSnapshot{
 		ID:                 sessionID,
 		PaymentStatus:      s.paymentStatus,
-		Metadata:           cloneMeta(s.in.Metadata),
+		Metadata:           cloneStringMap(s.in.Metadata),
 		PaymentMethodTypes: pm,
 	}, nil
 }
@@ -275,6 +264,6 @@ func (c *StubClient) GetPaymentIntentDetail(ctx context.Context, intentID string
 	return PaymentIntentDetail{
 		ID:       intentID,
 		Status:   pi.status,
-		Metadata: cloneMeta(pi.metadata),
+		Metadata: cloneStringMap(pi.metadata),
 	}, nil
 }
