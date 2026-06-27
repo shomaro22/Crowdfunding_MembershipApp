@@ -380,7 +380,7 @@ func sellerRegToJSON(r usecase.SellerRegItemView) sellerRegJSON {
 		IDDocType:    "DRIVERS_LICENSE",
 		HasIDFront:   r.HasIDFront,
 		HasIDBack:    r.HasIDBack,
-		Status:       string(r.Status),
+		Status:       r.Status,
 		RejectReason: r.RejectReason,
 		CreatedAt:    r.CreatedAt.UTC().Format(time.RFC3339),
 		UpdatedAt:    r.UpdatedAt.UTC().Format(time.RFC3339),
