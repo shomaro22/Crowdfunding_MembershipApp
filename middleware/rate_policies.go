@@ -141,4 +141,25 @@ var (
 			{Limit: 60, Key: KeyRefreshCookie},
 		},
 	}
+	PolicyMessageSend = RatePolicy{
+		Name:   "message_send",
+		Period: time.Minute,
+		Rules: []RateRule{
+			{Limit: 30, Key: KeyIP},
+			{Limit: 20, Key: KeyUserID},
+		},
+	}
+	PolicyWSToken = RatePolicy{
+		Name:   "ws_token",
+		Period: time.Minute,
+		Rules: []RateRule{
+			{Limit: 20, Key: KeyIP},
+			{Limit: 10, Key: KeyUserID},
+		},
+	}
+	PolicyWSConnect = RatePolicy{
+		Name:   "ws_connect",
+		Period: time.Minute,
+		Rules:  []RateRule{{Limit: 30, Key: KeyIP}},
+	}
 )
