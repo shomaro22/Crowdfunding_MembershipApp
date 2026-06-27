@@ -22,16 +22,16 @@ type AdminUseCase struct {
 	RefreshTokens   repository.RefreshTokenRepo
 	TOTPBackup      repository.TOTPBackupRepo
 	KYC             repository.KYCStore
+	ProjectsUC      *ProjectUseCase
+	KYCAccess       *KYCAccessUseCase
 	DB              *gorm.DB
-	APIBase         string
-	SignSecret      []byte
 }
 
 type SellerRegView struct {
-	Registration SellerRegItemView
-	User         UserView
-	FrontURL     *string
-	BackURL      *string
+	Registration     SellerRegItemView
+	User             UserView
+	FrontAccessToken *string
+	BackAccessToken  *string
 }
 
 func (a *AdminUseCase) requireReviewAdmin(ctx context.Context, adminID uuid.UUID) error {
@@ -100,7 +100,7 @@ func (a *AdminUseCase) ResetUser2FA(ctx context.Context, adminID, targetUserID u
 			return UserView{}, err
 		}
 	}
-	if err = a.invalidateSessions(ctx, targetUserID); err != nil {
+	if err = InvalidateUserSessions(ctx, a.DB, a.Users, a.RefreshTokens, targetUserID); err != nil {
 		return UserView{}, err
 	}
 	a.writeAudit(ctx, adminID, "user.reset_2fa", "user", u.ID.String(), reason, nil)
@@ -147,16 +147,12 @@ func (a *AdminUseCase) ChangeAdminRole(ctx context.Context, actorID, targetUserI
 	if err = a.Users.Update(ctx, u); err != nil {
 		return UserView{}, err
 	}
-	if err = a.invalidateSessions(ctx, targetUserID); err != nil {
+	if err = InvalidateUserSessions(ctx, a.DB, a.Users, a.RefreshTokens, targetUserID); err != nil {
 		return UserView{}, err
 	}
 	details = fmt.Sprintf("%s -> %s", oldRole, role)
 	a.writeAudit(ctx, actorID, "user.change_admin_role", "user", u.ID.String(), reason, &details)
 	return UserViewFrom(u), nil
-}
-
-func (a *AdminUseCase) invalidateSessions(ctx context.Context, userID uuid.UUID) error {
-	return InvalidateUserSessions(ctx, a.DB, a.Users, a.RefreshTokens, userID)
 }
 
 func (a *AdminUseCase) writeReviewDecision(ctx context.Context, reviewerID uuid.UUID, resourceType string, resourceID uuid.UUID, decision string, reason *string) {

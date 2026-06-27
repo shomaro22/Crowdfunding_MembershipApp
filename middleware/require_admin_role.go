@@ -40,14 +40,6 @@ func SetAdminRoleFromSession(c echo.Context, role entity.UserRole, adminRole *en
 	setAdminRoleCtx(c, adminRole)
 }
 
-// SetAdminRoleFromUser refreshes admin_role in context from the DB user (after session validation).
-func SetAdminRoleFromUser(c echo.Context, u *entity.User) {
-	if u == nil || u.Role != entity.UserRoleAdmin {
-		return
-	}
-	setAdminRoleCtx(c, u.AdminRole)
-}
-
 // RequireAdminRole checks JWT admin_role against allowed roles (§8.6).
 // SUPER_ADMIN is always permitted.
 func RequireAdminRole(roles ...entity.AdminRole) echo.MiddlewareFunc {

@@ -123,7 +123,7 @@ func imageSortOrders(inputs []entity.ImageInput) []int {
 	return orders
 }
 
-func (p *ProjectUseCase) enrichList(ctx context.Context, rows []entity.Project, total int64) ([]ProjectView, int64, error) {
+func (p *ProjectUseCase) EnrichList(ctx context.Context, rows []entity.Project, total int64) ([]ProjectView, int64, error) {
 	var (
 		out         []ProjectView
 		sellerCache map[uuid.UUID]*UserView
@@ -178,7 +178,7 @@ func (p *ProjectUseCase) ListPublic(ctx context.Context, search, sort string, li
 	if err != nil {
 		return nil, 0, err
 	}
-	return p.enrichList(ctx, rows, total)
+	return p.EnrichList(ctx, rows, total)
 }
 
 func (p *ProjectUseCase) ListMine(ctx context.Context, sellerID uuid.UUID, limit, offset int) ([]ProjectView, int64, error) {
@@ -197,7 +197,7 @@ func (p *ProjectUseCase) ListMine(ctx context.Context, sellerID uuid.UUID, limit
 	if err != nil {
 		return nil, 0, err
 	}
-	return p.enrichList(ctx, rows, total)
+	return p.EnrichList(ctx, rows, total)
 }
 
 func (p *ProjectUseCase) FindView(ctx context.Context, id uuid.UUID, viewerID *uuid.UUID, viewerRole string) (*ProjectView, error) {

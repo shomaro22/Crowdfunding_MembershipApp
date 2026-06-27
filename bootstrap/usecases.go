@@ -32,13 +32,18 @@ func NewUseCases(
 	cfg Config,
 ) UseCases {
 	var (
-		tokenSvc  = auth.NewTokenService([]byte(cfg.JWTSecret), auth.DefaultAuthTTL)
-		authUC    *usecase.AuthUseCase
-		connectUC *usecase.ConnectUseCase
-		supportUC *usecase.SupporterUseCase
-		google    *auth.GoogleOAuth
-		err       error
+		tokenSvc   = auth.NewTokenService([]byte(cfg.JWTSecret), auth.DefaultAuthTTL)
+		authUC     *usecase.AuthUseCase
+		connectUC  *usecase.ConnectUseCase
+		supportUC  *usecase.SupporterUseCase
+		projectUC  *usecase.ProjectUseCase
+		kycAccess  *usecase.KYCAccessUseCase
+		google     *auth.GoogleOAuth
+		err        error
 	)
+
+	kycAccess = &usecase.KYCAccessUseCase{KYC: kyc, SignSecret: []byte(cfg.JWTSecret)}
+	projectUC = &usecase.ProjectUseCase{Projects: repos.Projects, Users: repos.Users, DB: db}
 
 	authUC = &usecase.AuthUseCase{
 		Users:         repos.Users,
@@ -94,11 +99,11 @@ func NewUseCases(
 			RefreshTokens:   repos.RefreshTokens,
 			TOTPBackup:      repos.TOTPBackup,
 			KYC:             kyc,
+			ProjectsUC:      projectUC,
+			KYCAccess:       kycAccess,
 			DB:              db,
-			APIBase:         cfg.APIPublicURL,
-			SignSecret:      []byte(cfg.JWTSecret),
 		},
-		Project:   &usecase.ProjectUseCase{Projects: repos.Projects, Users: repos.Users, DB: db},
+		Project:   projectUC,
 		Connect:   connectUC,
 		Payment:   paymentUC,
 		Supporter: supportUC,
@@ -108,7 +113,7 @@ func NewUseCases(
 			Purchases: repos.Purchases,
 		},
 		RateLimit: &usecase.RateLimitUseCase{Repo: redisRepos.RateLimit},
-		KYCAccess: &usecase.KYCAccessUseCase{KYC: kyc, SignSecret: []byte(cfg.JWTSecret)},
+		KYCAccess: kycAccess,
 	}
 }
 

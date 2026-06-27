@@ -5,7 +5,6 @@ import (
 	"strings"
 	"time"
 
-	"crowdfund-app/auth"
 	"crowdfund-app/entity"
 	"crowdfund-app/repository"
 
@@ -124,7 +123,6 @@ func (a *AdminUseCase) GetSellerReg(ctx context.Context, id uuid.UUID) (*SellerR
 		now time.Time
 		out *SellerRegView
 		tok string
-		url string
 	)
 
 	reg, err = a.SellerRegs.FindID(ctx, id)
@@ -137,15 +135,16 @@ func (a *AdminUseCase) GetSellerReg(ctx context.Context, id uuid.UUID) (*SellerR
 	}
 	now = time.Now().UTC()
 	out = &SellerRegView{Registration: SellerRegItemFrom(reg), User: UserViewFrom(u)}
+	if a.KYCAccess == nil {
+		return out, nil
+	}
 	if reg.HasIDFront() {
-		tok = auth.SignKYCAccess(a.SignSecret, *reg.IDFrontKey, now)
-		url = auth.KYCAccessURL(a.APIBase, tok)
-		out.FrontURL = &url
+		tok = a.KYCAccess.SignToken(*reg.IDFrontKey, now)
+		out.FrontAccessToken = &tok
 	}
 	if reg.HasIDBack() {
-		tok = auth.SignKYCAccess(a.SignSecret, *reg.IDBackKey, now)
-		url = auth.KYCAccessURL(a.APIBase, tok)
-		out.BackURL = &url
+		tok = a.KYCAccess.SignToken(*reg.IDBackKey, now)
+		out.BackAccessToken = &tok
 	}
 	return out, nil
 }
