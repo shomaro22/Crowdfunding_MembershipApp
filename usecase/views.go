@@ -71,3 +71,38 @@ func ConnectAccountViewFrom(row *entity.ConnectAccount) *ConnectAccountView {
 		DetailsSubmitted: row.DetailsSubmitted,
 	}
 }
+
+type SellerRegItemView struct {
+	ID           uuid.UUID
+	UserID       uuid.UUID
+	FullName     string
+	BirthDate    time.Time
+	Address      string
+	PhotoPresent bool
+	HasIDFront   bool
+	HasIDBack    bool
+	Status       entity.RegStatus
+	RejectReason *string
+	CreatedAt    time.Time
+	UpdatedAt    time.Time
+}
+
+func SellerRegItemFrom(r *entity.SellerReg) SellerRegItemView {
+	if r == nil {
+		return SellerRegItemView{}
+	}
+	return SellerRegItemView{
+		ID:           r.ID,
+		UserID:       r.UserID,
+		FullName:     r.FullName,
+		BirthDate:    r.BirthDate,
+		Address:      r.Address,
+		PhotoPresent: r.PhotoPresent,
+		HasIDFront:   r.HasIDFront(),
+		HasIDBack:    r.HasIDBack(),
+		Status:       r.Status,
+		RejectReason: r.RejectReason,
+		CreatedAt:    r.CreatedAt,
+		UpdatedAt:    r.UpdatedAt,
+	}
+}

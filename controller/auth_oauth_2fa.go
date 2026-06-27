@@ -1,6 +1,7 @@
 package controller
 
 import (
+	"errors"
 	"net/http"
 
 	"crowdfund-app/auth"
@@ -142,10 +143,10 @@ func (h *AuthController) OAuthExchange(c echo.Context) error {
 }
 
 func oauthErrCode(err error) string {
-	switch err {
-	case usecase.ErrInactiveUser:
+	switch {
+	case errors.Is(err, usecase.ErrInactiveUser):
 		return "user_inactive"
-	case usecase.ErrOAuthForbidden:
+	case errors.Is(err, usecase.ErrOAuthForbidden):
 		return "oauth_forbidden"
 	default:
 		return "oauth_failed"
