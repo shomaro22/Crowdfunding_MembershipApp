@@ -55,6 +55,17 @@ func buildApp(opts *bootstrap.Options) (*echo.Echo, string, error) {
 	if err != nil {
 		return nil, "", err
 	}
+	app.WireRealtimeMessaging()
+
+	corsRaw = strings.TrimSpace(os.Getenv("CORS_ALLOW_ORIGINS"))
+	if corsRaw != "" {
+		for _, p = range strings.Split(corsRaw, ",") {
+			s = strings.TrimSpace(p)
+			if s != "" {
+				origins = append(origins, s)
+			}
+		}
+	}
 
 	cookieCfg = auth.CookieFromEnv()
 	authCtl = controller.NewAuthController(app.UseCases.Auth, cookieCfg, app.Config.AppPublicURL)
@@ -66,32 +77,22 @@ func buildApp(opts *bootstrap.Options) (*echo.Echo, string, error) {
 	paymentCtl = controller.NewPaymentController(app.UseCases.Payment, app.UseCases.Purchase, app.Stripe.AppURL())
 	supporterCtl = controller.NewSupporterController(app.UseCases.Supporter)
 	hubAdapter = bootstrap.NewWSHubAdapter(app.Hub)
-	app.UseCases.Message.SetEventHook(controller.NewMessageWSPublisher(hubAdapter))
 	messageCtl = controller.NewMessageController(app.UseCases.Message)
 	wsTokenCtl = controller.NewWSTokenController(app.UseCases.WSToken)
-	wsCtl = controller.NewWSController(hubAdapter, app.UseCases.Message)
+	wsCtl = controller.NewWSController(hubAdapter, app.UseCases.Message, origins)
 
 	validateSession = middleware.SessionValidateHTTP(app.UseCases.Auth.ValidateSession)
 
-	corsRaw = strings.TrimSpace(os.Getenv("CORS_ALLOW_ORIGINS"))
-	if corsRaw != "" {
-		for _, p = range strings.Split(corsRaw, ",") {
-			s = strings.TrimSpace(p)
-			if s != "" {
-				origins = append(origins, s)
-			}
-		}
-		if len(origins) > 0 {
-			preAuth = append(preAuth, labmw.CORSWithConfig(labmw.CORSConfig{
-				AllowOrigins:     origins,
-				AllowCredentials: true,
-				AllowHeaders:     []string{"Origin", "Content-Type", "Accept", "Authorization", "X-Request-ID"},
-				AllowMethods: []string{
-					http.MethodGet, http.MethodHead, http.MethodPut, http.MethodPatch,
-					http.MethodPost, http.MethodDelete, http.MethodOptions,
-				},
-			}))
-		}
+	if len(origins) > 0 {
+		preAuth = append(preAuth, labmw.CORSWithConfig(labmw.CORSConfig{
+			AllowOrigins:     origins,
+			AllowCredentials: true,
+			AllowHeaders:     []string{"Origin", "Content-Type", "Accept", "Authorization", "X-Request-ID"},
+			AllowMethods: []string{
+				http.MethodGet, http.MethodHead, http.MethodPut, http.MethodPatch,
+				http.MethodPost, http.MethodDelete, http.MethodOptions,
+			},
+		}))
 	}
 
 	protected = []echo.MiddlewareFunc{

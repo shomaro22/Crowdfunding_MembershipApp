@@ -41,7 +41,7 @@ func userToJSON(u usecase.UserView) userJSON {
 		ID:        u.ID.String(),
 		Email:     u.Email,
 		Name:      u.Name,
-		Role:      string(u.Role),
+		Role:      u.Role,
 		IsActive:  u.IsActive(),
 		AvatarURL: u.AvatarURL,
 		CreatedAt: u.CreatedAt.UTC().Format(time.RFC3339),

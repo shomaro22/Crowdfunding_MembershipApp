@@ -3,12 +3,12 @@ package controller
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"net/http"
 	"strings"
 	"time"
 
-	"crowdfund-app/usecase"
+	"crowdfund-app/apierr"
+	"crowdfund-app/wshub"
 
 	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
@@ -16,29 +16,32 @@ import (
 )
 
 type WSController struct {
-	Hub      WebSocketHub
-	Messages MessageProjectAccess
+	Hub             WebSocketHub
+	Messages        MessageProjectAccess
+	allowedOrigins  map[string]struct{}
 }
 
-func NewWSController(hub WebSocketHub, messages MessageProjectAccess) *WSController {
-	return &WSController{Hub: hub, Messages: messages}
-}
-
-var wsUpgrader = websocket.Upgrader{
-	ReadBufferSize:  1024,
-	WriteBufferSize: 1024,
-	CheckOrigin: func(r *http.Request) bool {
-		return true
-	},
+func NewWSController(hub WebSocketHub, messages MessageProjectAccess, allowedOrigins []string) *WSController {
+	var allowed map[string]struct{}
+	if len(allowedOrigins) > 0 {
+		allowed = make(map[string]struct{}, len(allowedOrigins))
+		for _, origin := range allowedOrigins {
+			if origin = strings.TrimSpace(origin); origin != "" {
+				allowed[origin] = struct{}{}
+			}
+		}
+	}
+	return &WSController{Hub: hub, Messages: messages, allowedOrigins: allowed}
 }
 
 const wsDBOpTimeout = 5 * time.Second
 
 func (w *WSController) Handle(c echo.Context) error {
 	var (
-		userID uuid.UUID
-		conn   *websocket.Conn
-		err    error
+		userID  uuid.UUID
+		conn    *websocket.Conn
+		upgrader websocket.Upgrader
+		err     error
 	)
 	if w.Hub == nil {
 		return echo.NewHTTPError(http.StatusInternalServerError, apiError("websocket hub not configured", "INTERNAL_ERROR"))
@@ -47,24 +50,29 @@ func (w *WSController) Handle(c echo.Context) error {
 	if err != nil {
 		return err
 	}
-	conn, err = wsUpgrader.Upgrade(c.Response(), c.Request(), nil)
+	upgrader = websocket.Upgrader{
+		ReadBufferSize:  1024,
+		WriteBufferSize: 1024,
+		CheckOrigin:     w.checkOrigin,
+	}
+	conn, err = upgrader.Upgrade(c.Response(), c.Request(), nil)
 	if err != nil {
 		return err
 	}
 	conn.SetPongHandler(func(string) error {
-		return conn.SetReadDeadline(time.Now().Add(WSReadDeadline))
+		return conn.SetReadDeadline(time.Now().Add(wshub.ReadDeadline))
 	})
-	conn.SetReadDeadline(time.Now().Add(WSReadDeadline))
+	conn.SetReadDeadline(time.Now().Add(wshub.ReadDeadline))
 
 	connID := w.Hub.Register(userID, conn)
-	w.writeJSON(connID, wsSessionReadyOutbound{
-		Type:          WSEventSessionReady,
-		SchemaVersion: WSEventSchemaVersion,
+	writeWSFrame(w.Hub, connID, wshub.SessionReadyOutbound{
+		Type:          wshub.EventSessionReady,
+		SchemaVersion: wshub.EventSchemaVersion,
 		UserID:        userID,
 	})
 
 	done := make(chan struct{})
-	go w.pingLoop(connID, done)
+	go w.pingLoop(connID, userID, done)
 
 	defer func() {
 		close(done)
@@ -74,19 +82,19 @@ func (w *WSController) Handle(c echo.Context) error {
 	for {
 		var (
 			data []byte
-			in   wsClientMessage
+			in   wshub.ClientMessage
 		)
 		_, data, err = conn.ReadMessage()
 		if err != nil {
 			break
 		}
-		_ = conn.SetReadDeadline(time.Now().Add(WSReadDeadline))
+		_ = conn.SetReadDeadline(time.Now().Add(wshub.ReadDeadline))
 		if err = json.Unmarshal(data, &in); err != nil {
-			w.writeWSError(connID, WSCodeInvalidJSON, "invalid json", nil)
+			w.writeWSError(connID, wshub.CodeInvalidJSON, "invalid json", nil)
 			continue
 		}
-		if in.SchemaVersion != 0 && in.SchemaVersion != WSClientSchemaVersion {
-			w.writeWSError(connID, WSCodeSchemaVersion, "unsupported schema_version", nil)
+		if in.SchemaVersion != 0 && in.SchemaVersion != wshub.ClientSchemaVersion {
+			w.writeWSError(connID, wshub.CodeSchemaVersion, "unsupported schema_version", nil)
 			continue
 		}
 		w.dispatchClientFrame(c, connID, userID, in)
@@ -94,7 +102,22 @@ func (w *WSController) Handle(c echo.Context) error {
 	return nil
 }
 
-func (w *WSController) dispatchClientFrame(c echo.Context, connID, userID uuid.UUID, in wsClientMessage) {
+func (w *WSController) checkOrigin(r *http.Request) bool {
+	var (
+		origin string
+	)
+	origin = strings.TrimSpace(r.Header.Get("Origin"))
+	if origin == "" {
+		return true
+	}
+	if len(w.allowedOrigins) == 0 {
+		return false
+	}
+	_, ok := w.allowedOrigins[origin]
+	return ok
+}
+
+func (w *WSController) dispatchClientFrame(c echo.Context, connID, userID uuid.UUID, in wshub.ClientMessage) {
 	var (
 		typ        string
 		projectRaw string
@@ -103,38 +126,38 @@ func (w *WSController) dispatchClientFrame(c echo.Context, connID, userID uuid.U
 	)
 	typ = strings.TrimSpace(in.Type)
 	if typ == "" {
-		w.writeWSError(connID, WSCodeMissingType, "type is required", nil)
+		w.writeWSError(connID, wshub.CodeMissingType, "type is required", nil)
 		return
 	}
-	if typ == WSClientPing {
-		w.writeJSON(connID, wsPongOutbound{Type: WSEventPong, SchemaVersion: WSEventSchemaVersion})
+	if typ == wshub.ClientPing {
+		writeWSFrame(w.Hub, connID, wshub.PongOutbound{Type: wshub.EventPong, SchemaVersion: wshub.EventSchemaVersion})
 		return
 	}
 	projectRaw = strings.TrimSpace(in.ProjectID)
 	if projectRaw == "" {
-		w.writeWSError(connID, WSCodeMissingProjectID, "project_id is required", nil)
+		w.writeWSError(connID, wshub.CodeMissingProjectID, "project_id is required", nil)
 		return
 	}
 	projectID, err = uuid.Parse(projectRaw)
 	if err != nil {
-		w.writeWSError(connID, WSCodeInvalidProjectID, "invalid project_id", nil)
+		w.writeWSError(connID, wshub.CodeInvalidProjectID, "invalid project_id", nil)
 		return
 	}
 	projectPtr := projectID.String()
 	switch typ {
-	case WSClientTyping:
+	case wshub.ClientTyping:
 		w.handleTyping(connID, userID, projectID, projectPtr, in.IsTyping)
-	case WSClientSubscribe:
+	case wshub.ClientSubscribe:
 		w.handleSubscribe(c, connID, userID, projectID, projectPtr)
-	case WSClientUnsubscribe:
+	case wshub.ClientUnsubscribe:
 		w.Hub.Unsubscribe(connID, projectID)
-		w.writeJSON(connID, wsProjectAckOutbound{
-			Type:          WSEventUnsubscribed,
-			SchemaVersion: WSEventSchemaVersion,
+		writeWSFrame(w.Hub, connID, wshub.ProjectAckOutbound{
+			Type:          wshub.EventUnsubscribed,
+			SchemaVersion: wshub.EventSchemaVersion,
 			ProjectID:     projectPtr,
 		})
 	default:
-		w.writeWSError(connID, WSCodeUnknownType, "unknown type", &projectPtr)
+		w.writeWSError(connID, wshub.CodeUnknownType, "unknown type", &projectPtr)
 	}
 }
 
@@ -142,37 +165,43 @@ func (w *WSController) handleSubscribe(c echo.Context, connID, userID, projectID
 	var (
 		ctx    context.Context
 		cancel context.CancelFunc
+		code   string
+		internal bool
 		err    error
 	)
 	ctx, cancel = context.WithTimeout(c.Request().Context(), wsDBOpTimeout)
-	err = w.Messages.CanSubscribeProject(ctx, projectID, userID)
+	err = w.Messages.ConfirmWSSubscribe(ctx, userID, projectID, requestMeta(c))
 	cancel()
 	if err != nil {
-		switch {
-		case errors.Is(err, usecase.ErrForbidden):
-			w.writeWSError(connID, WSCodeForbiddenNotMember, "not allowed to subscribe to this project", &projectPtr)
-		case errors.Is(err, usecase.ErrNotFound):
-			w.writeWSError(connID, WSCodeInvalidProjectID, "project not found", &projectPtr)
-		default:
-			w.writeWSError(connID, WSCodeInternal, "internal error", &projectPtr)
+		code, internal = apierr.MapWSSubscribe(err)
+		if internal {
+			w.writeWSError(connID, wshub.CodeInternal, "internal error", &projectPtr)
+			return
 		}
+		msg := "not allowed to subscribe to this project"
+		if code == wshub.CodeInvalidProjectID {
+			msg = "project not found"
+		}
+		w.writeWSError(connID, code, msg, &projectPtr)
 		return
 	}
 	w.Hub.Subscribe(connID, projectID)
-	w.writeJSON(connID, wsProjectAckOutbound{
-		Type:          WSEventSubscribed,
-		SchemaVersion: WSEventSchemaVersion,
+	writeWSFrame(w.Hub, connID, wshub.ProjectAckOutbound{
+		Type:          wshub.EventSubscribed,
+		SchemaVersion: wshub.EventSchemaVersion,
 		ProjectID:     projectPtr,
 	})
 }
 
 func (w *WSController) handleTyping(connID, userID, projectID uuid.UUID, projectPtr string, isTyping *bool) {
 	var (
-		ctx    context.Context
-		cancel context.CancelFunc
-		active bool
+		ctx     context.Context
+		cancel  context.CancelFunc
+		active  bool
 		payload []byte
-		err    error
+		code    string
+		internal bool
+		err     error
 	)
 	active = true
 	if isTyping != nil {
@@ -182,31 +211,75 @@ func (w *WSController) handleTyping(connID, userID, projectID uuid.UUID, project
 	err = w.Messages.CanSubscribeProject(ctx, projectID, userID)
 	cancel()
 	if err != nil {
-		w.writeWSError(connID, WSCodeForbiddenNotMember, "not allowed", &projectPtr)
+		code, internal = apierr.MapWSSubscribe(err)
+		if internal {
+			w.writeWSError(connID, wshub.CodeInternal, "internal error", &projectPtr)
+			return
+		}
+		w.writeWSError(connID, code, "not allowed", &projectPtr)
 		return
 	}
-	payload, err = json.Marshal(typingOutboundPayload{
-		Type:          WSEventTyping,
-		SchemaVersion: WSEventSchemaVersion,
+	payload, err = json.Marshal(wshub.TypingOutbound{
+		Type:          wshub.EventTyping,
+		SchemaVersion: wshub.EventSchemaVersion,
 		ProjectID:     projectID,
 		UserID:        userID,
 		IsTyping:      active,
 	})
-	if err == nil {
-		w.Hub.BroadcastToProjectExceptUser(projectID, payload, userID)
+	if err != nil {
+		return
+	}
+	w.Hub.BroadcastToProjectExceptUserFiltered(
+		projectID,
+		payload,
+		userID,
+		w.accessFilter(projectID),
+	)
+}
+
+func (w *WSController) accessFilter(projectID uuid.UUID) func(uuid.UUID) bool {
+	return func(userID uuid.UUID) bool {
+		var (
+			ctx    context.Context
+			cancel context.CancelFunc
+			err    error
+		)
+		ctx, cancel = context.WithTimeout(context.Background(), wsDBOpTimeout)
+		err = w.Messages.CanSubscribeProject(ctx, projectID, userID)
+		cancel()
+		return err == nil
 	}
 }
 
-func (w *WSController) pingLoop(connID uuid.UUID, done <-chan struct{}) {
+func (w *WSController) revalidateSubscriptions(connID, userID uuid.UUID) {
+	var (
+		projectID uuid.UUID
+		ctx       context.Context
+		cancel    context.CancelFunc
+		err       error
+	)
+	for _, projectID = range w.Hub.ProjectIDs(connID) {
+		ctx, cancel = context.WithTimeout(context.Background(), wsDBOpTimeout)
+		err = w.Messages.CanSubscribeProject(ctx, projectID, userID)
+		cancel()
+		if err != nil {
+			w.Hub.Unsubscribe(connID, projectID)
+		}
+	}
+}
+
+func (w *WSController) pingLoop(connID, userID uuid.UUID, done <-chan struct{}) {
 	var ticker *time.Ticker
-	ticker = time.NewTicker(WSPingInterval)
+	ticker = time.NewTicker(wshub.PingInterval)
 	defer ticker.Stop()
 	for {
 		select {
 		case <-done:
 			return
 		case <-ticker.C:
+			w.revalidateSubscriptions(connID, userID)
 			if !w.Hub.SendPing(connID) {
+				w.Hub.RemoveConn(connID)
 				return
 			}
 		}
@@ -214,16 +287,16 @@ func (w *WSController) pingLoop(connID uuid.UUID, done <-chan struct{}) {
 }
 
 func (w *WSController) writeWSError(connID uuid.UUID, code, msg string, projectID *string) {
-	w.writeJSON(connID, wsErrorOutbound{
-		Type:          WSEventError,
-		SchemaVersion: WSEventSchemaVersion,
+	writeWSFrame(w.Hub, connID, wshub.ErrorOutbound{
+		Type:          wshub.EventError,
+		SchemaVersion: wshub.EventSchemaVersion,
 		Code:          code,
 		Message:       msg,
 		ProjectID:     projectID,
 	})
 }
 
-func (w *WSController) writeJSON(connID uuid.UUID, v any) {
+func writeWSFrame[T any](hub WebSocketHub, connID uuid.UUID, v T) {
 	var (
 		b   []byte
 		err error
@@ -232,5 +305,5 @@ func (w *WSController) writeJSON(connID uuid.UUID, v any) {
 	if err != nil {
 		return
 	}
-	_ = w.Hub.WriteText(connID, b)
+	_ = hub.WriteText(connID, b)
 }
