@@ -7,7 +7,6 @@ import (
 	"strings"
 	"time"
 
-	"crowdfund-app/entity"
 	"crowdfund-app/middleware"
 	"crowdfund-app/usecase"
 
@@ -27,16 +26,16 @@ func CurrentUserID(c echo.Context) (uuid.UUID, error) {
 	return uid, nil
 }
 
-func CurrentAdminRole(c echo.Context) (entity.AdminRole, error) {
+func CurrentAdminRole(c echo.Context) (string, error) {
 	var (
-		ar entity.AdminRole
+		r  string
 		ok bool
 	)
-	ar, ok = middleware.AuthAdminRole(c)
-	if !ok {
+	r, ok = c.Get(middleware.CtxAdminRole).(string)
+	if !ok || r == "" {
 		return "", echo.NewHTTPError(http.StatusForbidden, apiError("forbidden", "FORBIDDEN"))
 	}
-	return ar, nil
+	return r, nil
 }
 
 func authMeta(c echo.Context) usecase.AuthMeta {
