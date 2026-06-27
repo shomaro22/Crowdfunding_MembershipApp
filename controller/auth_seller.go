@@ -2,13 +2,13 @@ package controller
 
 import (
 	"encoding/json"
+	"errors"
 	"mime/multipart"
 	"net/http"
 	"strings"
 	"time"
 
 	"crowdfund-app/entity"
-	"crowdfund-app/repository"
 	"crowdfund-app/usecase"
 
 	"github.com/labstack/echo/v4"
@@ -39,10 +39,7 @@ type sellerRegJSON struct {
 	UpdatedAt    string  `json:"updated_at"`
 }
 
-func sellerRegToJSON(r *entity.SellerReg) sellerRegJSON {
-	if r == nil {
-		return sellerRegJSON{}
-	}
+func sellerRegToJSON(r usecase.SellerRegItemView) sellerRegJSON {
 	return sellerRegJSON{
 		ID:           r.ID.String(),
 		UserID:       r.UserID.String(),
@@ -51,8 +48,8 @@ func sellerRegToJSON(r *entity.SellerReg) sellerRegJSON {
 		Address:      r.Address,
 		PhotoPresent: r.PhotoPresent,
 		IDDocType:    string(entity.IDDriversLicense),
-		HasIDFront:   r.HasIDFront(),
-		HasIDBack:    r.HasIDBack(),
+		HasIDFront:   r.HasIDFront,
+		HasIDBack:    r.HasIDBack,
 		Status:       string(r.Status),
 		RejectReason: r.RejectReason,
 		CreatedAt:    r.CreatedAt.UTC().Format(time.RFC3339),
@@ -66,8 +63,8 @@ func (h *AuthController) RegisterSeller(c echo.Context) error {
 		payload   sellerRegPayload
 		frontFile *multipart.FileHeader
 		backFile  *multipart.FileHeader
-		frontImg  repository.KYCImage
-		backImg   repository.KYCImage
+		frontImg  usecase.KYCUpload
+		backImg   usecase.KYCUpload
 		birthDate time.Time
 		res       *usecase.SellerRegOut
 		err       error
@@ -118,7 +115,7 @@ func (h *AuthController) RegisterSeller(c echo.Context) error {
 	})
 }
 
-func readKYCFile(fh *multipart.FileHeader) (repository.KYCImage, error) {
+func readKYCFile(fh *multipart.FileHeader) (usecase.KYCUpload, error) {
 	var (
 		src         multipart.File
 		contentType string
@@ -126,14 +123,14 @@ func readKYCFile(fh *multipart.FileHeader) (repository.KYCImage, error) {
 	)
 	src, err = fh.Open()
 	if err != nil {
-		return repository.KYCImage{}, err
+		return usecase.KYCUpload{}, err
 	}
 	defer src.Close()
 	contentType = fh.Header.Get("Content-Type")
 	if contentType == "" {
 		contentType = detectImageType(fh.Filename)
 	}
-	return repository.KYCImage{
+	return usecase.KYCUpload{
 		Reader:      src,
 		ContentType: contentType,
 		Size:        fh.Size,
@@ -156,14 +153,8 @@ func detectImageType(name string) string {
 }
 
 func mapSellerRegError(err error) *echo.HTTPError {
-	switch err {
-	case repository.ErrBadMedia:
-		return echo.NewHTTPError(http.StatusUnsupportedMediaType, apiError("unsupported image media type", "UNSUPPORTED_MEDIA"))
-	case repository.ErrTooLarge:
-		return echo.NewHTTPError(http.StatusRequestEntityTooLarge, apiError("identity document image too large", "FILE_TOO_LARGE"))
-	case entity.ErrBadKYC:
+	if errors.Is(err, entity.ErrBadKYC) {
 		return echo.NewHTTPError(http.StatusBadRequest, apiError("invalid seller kyc metadata", "BAD_SELLER_KYC"))
-	default:
-		return mapAuthError(err)
 	}
+	return mapUseCaseError(err)
 }

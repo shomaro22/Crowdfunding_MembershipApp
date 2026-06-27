@@ -205,14 +205,5 @@ func (h *ProjectController) RequestDelete(c echo.Context) error {
 }
 
 func mapProjectError(err error) *echo.HTTPError {
-	switch err {
-	case usecase.ErrForbidden:
-		return echo.NewHTTPError(http.StatusForbidden, apiError("forbidden", "FORBIDDEN"))
-	case usecase.ErrInvalidState:
-		return echo.NewHTTPError(http.StatusBadRequest, apiError("invalid state", "INVALID_STATE"))
-	case usecase.ErrBadRequest:
-		return echo.NewHTTPError(http.StatusBadRequest, apiError("bad request", "BAD_REQUEST"))
-	default:
-		return mapAuthError(err)
-	}
+	return mapUseCaseError(err)
 }

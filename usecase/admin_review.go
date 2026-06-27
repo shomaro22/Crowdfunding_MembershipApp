@@ -5,17 +5,33 @@ import (
 	"strings"
 	"time"
 
+	"crowdfund-app/auth"
 	"crowdfund-app/entity"
 	"crowdfund-app/repository"
 
 	"github.com/google/uuid"
 )
 
-func (a *AdminUseCase) ListBuyerPending(ctx context.Context, limit, offset int) ([]entity.User, int64, error) {
-	return a.Users.ListRoleStatus(ctx, entity.UserRoleBuyer, entity.AccountStatusPending, limit, offset)
+func (a *AdminUseCase) ListBuyerPending(ctx context.Context, limit, offset int) ([]UserView, int64, error) {
+	var (
+		rows  []entity.User
+		total int64
+		out   []UserView
+		err   error
+		i     int
+	)
+	rows, total, err = a.Users.ListRoleStatus(ctx, entity.UserRoleBuyer, entity.AccountStatusPending, limit, offset)
+	if err != nil {
+		return nil, 0, err
+	}
+	out = make([]UserView, len(rows))
+	for i = range rows {
+		out[i] = UserViewFrom(&rows[i])
+	}
+	return out, total, nil
 }
 
-func (a *AdminUseCase) ApproveBuyer(ctx context.Context, adminID, userID uuid.UUID, reason *string) (*entity.User, error) {
+func (a *AdminUseCase) ApproveBuyer(ctx context.Context, adminID, userID uuid.UUID, reason *string) (UserView, error) {
 	var (
 		u   *entity.User
 		err error
@@ -23,27 +39,27 @@ func (a *AdminUseCase) ApproveBuyer(ctx context.Context, adminID, userID uuid.UU
 	)
 
 	if err = a.requireReviewAdmin(ctx, adminID); err != nil {
-		return nil, err
+		return UserView{}, err
 	}
 	u, err = a.Users.FindID(ctx, userID)
 	if err != nil || u == nil {
-		return nil, ErrNotFound
+		return UserView{}, ErrNotFound
 	}
 	if u.Role != entity.UserRoleBuyer || u.AccountStatus != entity.AccountStatusPending {
-		return nil, ErrInvalidState
+		return UserView{}, ErrInvalidState
 	}
 	now = time.Now().UTC()
 	u.AccountStatus = entity.AccountStatusActive
 	u.UpdatedAt = now
 	if err = a.Users.Update(ctx, u); err != nil {
-		return nil, err
+		return UserView{}, err
 	}
 	a.writeAudit(ctx, adminID, "buyer_registration.approve", "user", u.ID.String(), reason, nil)
 	a.writeReviewDecision(ctx, adminID, entity.ReviewBuyerRegistration, userID, entity.ReviewApproved, reason)
-	return u, nil
+	return UserViewFrom(u), nil
 }
 
-func (a *AdminUseCase) RejectBuyer(ctx context.Context, adminID, userID uuid.UUID, reason *string) (*entity.User, error) {
+func (a *AdminUseCase) RejectBuyer(ctx context.Context, adminID, userID uuid.UUID, reason *string) (UserView, error) {
 	var (
 		u   *entity.User
 		err error
@@ -51,35 +67,51 @@ func (a *AdminUseCase) RejectBuyer(ctx context.Context, adminID, userID uuid.UUI
 	)
 
 	if err = requireReviewReason(reason); err != nil {
-		return nil, err
+		return UserView{}, err
 	}
 	reason = normalizeReviewReason(reason)
 	if err = a.requireReviewAdmin(ctx, adminID); err != nil {
-		return nil, err
+		return UserView{}, err
 	}
 	u, err = a.Users.FindID(ctx, userID)
 	if err != nil || u == nil {
-		return nil, ErrNotFound
+		return UserView{}, ErrNotFound
 	}
 	if u.Role != entity.UserRoleBuyer || u.AccountStatus != entity.AccountStatusPending {
-		return nil, ErrInvalidState
+		return UserView{}, ErrInvalidState
 	}
 	now = time.Now().UTC()
 	u.AccountStatus = entity.AccountStatusSuspended
 	u.UpdatedAt = now
 	if err = a.Users.Update(ctx, u); err != nil {
-		return nil, err
+		return UserView{}, err
 	}
 	a.writeAudit(ctx, adminID, "buyer_registration.reject", "user", u.ID.String(), reason, nil)
 	a.writeReviewDecision(ctx, adminID, entity.ReviewBuyerRegistration, userID, entity.ReviewRejected, reason)
-	return u, nil
+	return UserViewFrom(u), nil
 }
 
-func (a *AdminUseCase) ListSellerRegs(ctx context.Context, status entity.RegStatus, limit, offset int) ([]entity.SellerReg, int64, error) {
+func (a *AdminUseCase) ListSellerRegs(ctx context.Context, status entity.RegStatus, limit, offset int) ([]SellerRegItemView, int64, error) {
+	var (
+		rows  []entity.SellerReg
+		total int64
+		out   []SellerRegItemView
+		err   error
+		i     int
+	)
+
 	if !status.Valid() {
 		status = entity.RegPending
 	}
-	return a.SellerRegs.List(ctx, status, limit, offset)
+	rows, total, err = a.SellerRegs.List(ctx, status, limit, offset)
+	if err != nil {
+		return nil, 0, err
+	}
+	out = make([]SellerRegItemView, len(rows))
+	for i = range rows {
+		out[i] = SellerRegItemFrom(&rows[i])
+	}
+	return out, total, nil
 }
 
 func (a *AdminUseCase) GetSellerReg(ctx context.Context, id uuid.UUID) (*SellerRegView, error) {
@@ -102,21 +134,21 @@ func (a *AdminUseCase) GetSellerReg(ctx context.Context, id uuid.UUID) (*SellerR
 		return nil, ErrNotFound
 	}
 	now = time.Now().UTC()
-	out = &SellerRegView{Registration: reg, User: u}
+	out = &SellerRegView{Registration: SellerRegItemFrom(reg), User: UserViewFrom(u)}
 	if reg.HasIDFront() {
-		tok = repository.SignKYCAccess(a.SignSecret, *reg.IDFrontKey, now)
-		url = repository.KYCAccessURL(a.APIBase, tok)
+		tok = auth.SignKYCAccess(a.SignSecret, *reg.IDFrontKey, now)
+		url = auth.KYCAccessURL(a.APIBase, tok)
 		out.FrontURL = &url
 	}
 	if reg.HasIDBack() {
-		tok = repository.SignKYCAccess(a.SignSecret, *reg.IDBackKey, now)
-		url = repository.KYCAccessURL(a.APIBase, tok)
+		tok = auth.SignKYCAccess(a.SignSecret, *reg.IDBackKey, now)
+		url = auth.KYCAccessURL(a.APIBase, tok)
 		out.BackURL = &url
 	}
 	return out, nil
 }
 
-func (a *AdminUseCase) ApproveSellerReg(ctx context.Context, adminID, regID uuid.UUID) (*entity.SellerReg, error) {
+func (a *AdminUseCase) ApproveSellerReg(ctx context.Context, adminID, regID uuid.UUID) (SellerRegItemView, error) {
 	var (
 		reg *entity.SellerReg
 		err error
@@ -125,18 +157,18 @@ func (a *AdminUseCase) ApproveSellerReg(ctx context.Context, adminID, regID uuid
 	)
 
 	if err = a.requireReviewAdmin(ctx, adminID); err != nil {
-		return nil, err
+		return SellerRegItemView{}, err
 	}
 	reg, err = a.SellerRegs.FindID(ctx, regID)
 	if err != nil || reg == nil {
-		return nil, ErrNotFound
+		return SellerRegItemView{}, ErrNotFound
 	}
 	if !reg.CanApprove() {
-		return nil, ErrInvalidState
+		return SellerRegItemView{}, ErrInvalidState
 	}
 	u, err = a.Users.FindID(ctx, reg.UserID)
 	if err != nil || u == nil {
-		return nil, ErrNotFound
+		return SellerRegItemView{}, ErrNotFound
 	}
 	now = time.Now().UTC()
 	err = repository.WithTx(ctx, a.DB, func(txCtx context.Context) error {
@@ -155,14 +187,14 @@ func (a *AdminUseCase) ApproveSellerReg(ctx context.Context, adminID, regID uuid
 		return a.SellerRegs.Update(txCtx, reg)
 	})
 	if err != nil {
-		return nil, err
+		return SellerRegItemView{}, err
 	}
 	a.writeAudit(ctx, adminID, "seller_registration.approve", "seller_registration", reg.ID.String(), nil, nil)
 	a.writeReviewDecision(ctx, adminID, entity.ReviewSellerRegistration, regID, entity.ReviewApproved, nil)
-	return reg, nil
+	return SellerRegItemFrom(reg), nil
 }
 
-func (a *AdminUseCase) RejectSellerReg(ctx context.Context, adminID, regID uuid.UUID, reason string) (*entity.SellerReg, error) {
+func (a *AdminUseCase) RejectSellerReg(ctx context.Context, adminID, regID uuid.UUID, reason string) (SellerRegItemView, error) {
 	var (
 		reg *entity.SellerReg
 		err error
@@ -171,17 +203,17 @@ func (a *AdminUseCase) RejectSellerReg(ctx context.Context, adminID, regID uuid.
 
 	reason = strings.TrimSpace(reason)
 	if reason == "" {
-		return nil, ErrBadRequest
+		return SellerRegItemView{}, ErrBadRequest
 	}
 	if err = a.requireReviewAdmin(ctx, adminID); err != nil {
-		return nil, err
+		return SellerRegItemView{}, err
 	}
 	reg, err = a.SellerRegs.FindID(ctx, regID)
 	if err != nil || reg == nil {
-		return nil, ErrNotFound
+		return SellerRegItemView{}, ErrNotFound
 	}
 	if reg.Status != entity.RegPending {
-		return nil, ErrInvalidState
+		return SellerRegItemView{}, ErrInvalidState
 	}
 	now = time.Now().UTC()
 	reg.Status = entity.RegRejected
@@ -190,9 +222,9 @@ func (a *AdminUseCase) RejectSellerReg(ctx context.Context, adminID, regID uuid.
 	reg.ReviewedBy = &adminID
 	reg.UpdatedAt = now
 	if err = a.SellerRegs.Update(ctx, reg); err != nil {
-		return nil, err
+		return SellerRegItemView{}, err
 	}
 	a.writeAudit(ctx, adminID, "seller_registration.reject", "seller_registration", reg.ID.String(), &reason, nil)
 	a.writeReviewDecision(ctx, adminID, entity.ReviewSellerRegistration, regID, entity.ReviewRejected, &reason)
-	return reg, nil
+	return SellerRegItemFrom(reg), nil
 }

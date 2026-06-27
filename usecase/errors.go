@@ -22,4 +22,7 @@ var (
 	ErrStripeUnavailable  = errors.New("stripe unavailable")
 	ErrAlreadySupporting  = errors.New("already supporting")
 	ErrPendingCheckout    = errors.New("pending checkout exists")
+	ErrTokenRevoked       = errors.New("token revoked")
+	ErrUnsupportedMedia   = errors.New("unsupported media type")
+	ErrFileTooLarge       = errors.New("file too large")
 )

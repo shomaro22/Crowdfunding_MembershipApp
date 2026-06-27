@@ -206,6 +206,8 @@ func (p *PaymentUseCase) supporterViewForPurchase(ctx context.Context, purchase 
 	if err != nil || supporter == nil {
 		return SupporterView{}, ErrNotFound
 	}
-	uc := &SupporterUseCase{Projects: p.Projects, Supporters: p.Supporters}
-	return uc.enrichView(ctx, supporter)
+	if p.SupporterViewer == nil {
+		return SupporterView{}, ErrNotFound
+	}
+	return p.SupporterViewer.ViewForSupporter(ctx, supporter)
 }

@@ -19,16 +19,16 @@ type SellerRegIn struct {
 	BirthDate    time.Time
 	Address      string
 	PhotoPresent bool
-	Front        repository.KYCImage
-	Back         repository.KYCImage
+	Front        KYCUpload
+	Back         KYCUpload
 }
 
 type SellerRegOut struct {
-	User         *entity.User
-	Registration *entity.SellerReg
+	User         UserView
+	Registration SellerRegItemView
 }
 
-func (a *AuthUseCase) GetUser(ctx context.Context, userID uuid.UUID) (*entity.User, error) {
+func (a *AuthUseCase) GetUser(ctx context.Context, userID uuid.UUID) (UserView, error) {
 	var (
 		u   *entity.User
 		err error
@@ -36,12 +36,12 @@ func (a *AuthUseCase) GetUser(ctx context.Context, userID uuid.UUID) (*entity.Us
 
 	u, err = a.Users.FindID(ctx, userID)
 	if err != nil {
-		return nil, err
+		return UserView{}, err
 	}
 	if u == nil {
-		return nil, ErrNotFound
+		return UserView{}, ErrNotFound
 	}
-	return u, nil
+	return UserViewFrom(u), nil
 }
 
 func (a *AuthUseCase) ParseToken(raw string) (auth.AuthClaims, error) {
@@ -94,14 +94,14 @@ func (a *AuthUseCase) RegisterSeller(ctx context.Context, in SellerRegIn, meta A
 	}
 
 	userID = uuid.New()
-	frontKey, err = a.KYCStore.Save(ctx, userID, "front", in.Front)
+	frontKey, err = a.KYCStore.Save(ctx, userID, "front", in.Front.toStoreImage())
 	if err != nil {
-		return nil, err
+		return nil, mapKYCStoreError(err)
 	}
-	backKey, err = a.KYCStore.Save(ctx, userID, "back", in.Back)
+	backKey, err = a.KYCStore.Save(ctx, userID, "back", in.Back.toStoreImage())
 	if err != nil {
 		_ = a.KYCStore.Remove(ctx, frontKey)
-		return nil, err
+		return nil, mapKYCStoreError(err)
 	}
 
 	hash, err = auth.HashPassword(in.Password)
@@ -149,5 +149,5 @@ func (a *AuthUseCase) RegisterSeller(ctx context.Context, in SellerRegIn, meta A
 	}
 
 	a.logActivity(ctx, &u.ID, entity.SellerRegister, "seller_registration", reg.ID.String(), meta, nil)
-	return &SellerRegOut{User: u, Registration: reg}, nil
+	return &SellerRegOut{User: UserViewFrom(u), Registration: SellerRegItemFrom(reg)}, nil
 }

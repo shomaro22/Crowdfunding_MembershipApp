@@ -41,7 +41,7 @@ type SessionTokens struct {
 }
 
 type LoginResult struct {
-	User         *entity.User
+	User         UserView
 	AuthToken    string
 	RefreshToken string
 	Requires2FA  bool

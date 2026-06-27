@@ -16,7 +16,7 @@ func (h *AdminController) ListBuyerPending(c echo.Context) error {
 	var (
 		limit  int
 		offset int
-		users  []entity.User
+		users  []usecase.UserView
 		total  int64
 		items  []userJSON
 		i      int
@@ -30,7 +30,7 @@ func (h *AdminController) ListBuyerPending(c echo.Context) error {
 	}
 	items = make([]userJSON, 0, len(users))
 	for i = 0; i < len(users); i++ {
-		items = append(items, userToJSON(&users[i]))
+		items = append(items, userToJSON(users[i]))
 	}
 	return c.JSON(http.StatusOK, usersPageJSON{Users: items, Total: total})
 }
@@ -39,7 +39,7 @@ func (h *AdminController) ApproveBuyer(c echo.Context) error {
 	var (
 		adminID uuid.UUID
 		userID  uuid.UUID
-		u       *entity.User
+		u       usecase.UserView
 		err     error
 	)
 	adminID, err = CurrentUserID(c)
@@ -64,7 +64,7 @@ func (h *AdminController) RejectBuyer(c echo.Context) error {
 		body    struct {
 			Reason *string `json:"reason"`
 		}
-		u   *entity.User
+		u   usecase.UserView
 		err error
 	)
 	adminID, err = CurrentUserID(c)
@@ -93,7 +93,7 @@ func (h *AdminController) ListSellerRegs(c echo.Context) error {
 		status entity.RegStatus
 		limit  int
 		offset int
-		regs   []entity.SellerReg
+		regs   []usecase.SellerRegItemView
 		total  int64
 		items  []sellerRegJSON
 		i      int
@@ -111,7 +111,7 @@ func (h *AdminController) ListSellerRegs(c echo.Context) error {
 	}
 	items = make([]sellerRegJSON, 0, len(regs))
 	for i = 0; i < len(regs); i++ {
-		items = append(items, sellerRegToJSON(&regs[i]))
+		items = append(items, sellerRegToJSON(regs[i]))
 	}
 	return c.JSON(http.StatusOK, sellerRegsPageJSON{Registrations: items, Total: total})
 }
@@ -137,7 +137,7 @@ func (h *AdminController) ApproveSellerReg(c echo.Context) error {
 	var (
 		adminID uuid.UUID
 		id      uuid.UUID
-		reg     *entity.SellerReg
+		reg     usecase.SellerRegItemView
 		err     error
 	)
 	adminID, err = CurrentUserID(c)
@@ -162,7 +162,7 @@ func (h *AdminController) RejectSellerReg(c echo.Context) error {
 		body    struct {
 			Reason string `json:"reason"`
 		}
-		reg *entity.SellerReg
+		reg usecase.SellerRegItemView
 		err error
 	)
 	adminID, err = CurrentUserID(c)
