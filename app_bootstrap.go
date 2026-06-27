@@ -33,7 +33,6 @@ func buildApp(opts *bootstrap.Options) (*echo.Echo, string, error) {
 		messageCtl      *controller.MessageController
 		wsTokenCtl      *controller.WSTokenController
 		wsCtl           *controller.WSController
-		hubAdapter      bootstrap.WSHubAdapter
 		preAuth         []echo.MiddlewareFunc
 		corsRaw         string
 		origins         []string
@@ -55,7 +54,6 @@ func buildApp(opts *bootstrap.Options) (*echo.Echo, string, error) {
 	if err != nil {
 		return nil, "", err
 	}
-	app.WireRealtimeMessaging()
 
 	corsRaw = strings.TrimSpace(os.Getenv("CORS_ALLOW_ORIGINS"))
 	if corsRaw != "" {
@@ -78,10 +76,9 @@ func buildApp(opts *bootstrap.Options) (*echo.Echo, string, error) {
 		paymentCtl = controller.NewPaymentController(app.UseCases.Payment, app.UseCases.Purchase, app.Stripe.AppURL())
 	}
 	supporterCtl = controller.NewSupporterController(app.UseCases.Supporter)
-	hubAdapter = bootstrap.NewWSHubAdapter(app.Hub)
 	messageCtl = controller.NewMessageController(app.UseCases.Message)
 	wsTokenCtl = controller.NewWSTokenController(app.UseCases.WSToken)
-	wsCtl = controller.NewWSController(hubAdapter, app.UseCases.Message, origins)
+	wsCtl = controller.NewWSController(app.Hub, app.UseCases.Message, origins)
 
 	validateSession = middleware.SessionValidateHTTP(app.UseCases.Auth.ValidateSession)
 

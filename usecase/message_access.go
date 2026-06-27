@@ -9,29 +9,61 @@ import (
 	"github.com/google/uuid"
 )
 
-func (m *MessageUseCase) CanSubscribeProject(ctx context.Context, projectID, userID uuid.UUID) error {
+const messagingAccessTimeout = 3 * time.Second
+
+func (m *MessageUseCase) loadProject(ctx context.Context, projectID uuid.UUID) (*entity.Project, error) {
 	var (
-		project   *entity.Project
-		supporter *entity.ProjectSupporter
-		err       error
-		now       time.Time
+		project *entity.Project
+		err     error
 	)
 	project, _, _, err = m.Projects.FindID(ctx, projectID)
 	if err != nil || project == nil {
-		return ErrNotFound
+		return nil, ErrNotFound
 	}
-	if project.SellerID == userID {
-		return nil
-	}
+	return project, nil
+}
+
+func (m *MessageUseCase) requireActiveMember(ctx context.Context, projectID, userID uuid.UUID) error {
+	var (
+		supporter *entity.ProjectSupporter
+		err       error
+	)
 	supporter, err = m.Supporters.FindMembership(ctx, projectID, userID)
 	if err != nil || supporter == nil {
 		return ErrForbidden
 	}
-	now = time.Now().UTC()
-	if err = entity.CanMessage(*supporter, now); err != nil {
+	if err = entity.CanMessage(*supporter, time.Now().UTC()); err != nil {
 		return ErrForbidden
 	}
 	return nil
+}
+
+func (m *MessageUseCase) CanSubscribeProject(ctx context.Context, projectID, userID uuid.UUID) error {
+	var (
+		project *entity.Project
+		err     error
+	)
+	project, err = m.loadProject(ctx, projectID)
+	if err != nil {
+		return err
+	}
+	if project.SellerID == userID {
+		return nil
+	}
+	return m.requireActiveMember(ctx, projectID, userID)
+}
+
+func (m *MessageUseCase) SubscriberFilter(ctx context.Context, projectID uuid.UUID) func(uuid.UUID) bool {
+	return func(userID uuid.UUID) bool {
+		var (
+			checkCtx context.Context
+			cancel   context.CancelFunc
+		)
+		checkCtx, cancel = context.WithTimeout(ctx, messagingAccessTimeout)
+		err := m.CanSubscribeProject(checkCtx, projectID, userID)
+		cancel()
+		return err == nil
+	}
 }
 
 func (m *MessageUseCase) authorizeSend(
@@ -40,38 +72,26 @@ func (m *MessageUseCase) authorizeSend(
 ) (*entity.Project, error) {
 	var (
 		project   *entity.Project
-		supporter *entity.ProjectSupporter
 		err       error
-		now       time.Time
 	)
-	project, _, _, err = m.Projects.FindID(ctx, projectID)
-	if err != nil || project == nil {
-		return nil, ErrNotFound
+	project, err = m.loadProject(ctx, projectID)
+	if err != nil {
+		return nil, err
 	}
 	if project.SellerID == senderID {
 		if receiverID == senderID {
 			return nil, ErrBadRequest
 		}
-		supporter, err = m.Supporters.FindMembership(ctx, projectID, receiverID)
-		if err != nil || supporter == nil {
-			return nil, ErrForbidden
-		}
-		now = time.Now().UTC()
-		if err = entity.CanMessage(*supporter, now); err != nil {
-			return nil, ErrForbidden
+		if err = m.requireActiveMember(ctx, projectID, receiverID); err != nil {
+			return nil, err
 		}
 		return project, nil
 	}
 	if receiverID != project.SellerID {
 		return nil, ErrForbidden
 	}
-	supporter, err = m.Supporters.FindMembership(ctx, projectID, senderID)
-	if err != nil || supporter == nil {
-		return nil, ErrForbidden
-	}
-	now = time.Now().UTC()
-	if err = entity.CanMessage(*supporter, now); err != nil {
-		return nil, ErrForbidden
+	if err = m.requireActiveMember(ctx, projectID, senderID); err != nil {
+		return nil, err
 	}
 	return project, nil
 }

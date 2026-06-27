@@ -1,7 +1,6 @@
 package controller
 
 import (
-	"context"
 	"net/http"
 	"time"
 
@@ -10,15 +9,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/labstack/echo/v4"
 )
-
-type SupporterUseCase interface {
-	ListMine(ctx context.Context, userID uuid.UUID) ([]usecase.SupporterView, error)
-	Upgrade(ctx context.Context, userID, supporterID, planID uuid.UUID) (usecase.UpgradeOut, error)
-	UpgradeConfirm(ctx context.Context, userID, supporterID uuid.UUID, intentID string) (usecase.SupporterView, error)
-	Cancel(ctx context.Context, userID, supporterID uuid.UUID) (usecase.SupporterView, error)
-	Rejoin(ctx context.Context, userID, supporterID uuid.UUID) (usecase.SupporterView, error)
-	ChangeBilling(ctx context.Context, userID, supporterID uuid.UUID, in usecase.ChangeBillingIn) (usecase.SupporterView, error)
-}
 
 type SupporterController struct {
 	Supporters SupporterUseCase
@@ -224,7 +214,7 @@ type purchaseJSON struct {
 	PaymentMethod string              `json:"payment_method"`
 	CreatedAt     string              `json:"created_at"`
 	Project       *projectSummaryJSON `json:"project,omitempty"`
-	Buyer         *userJSON           `json:"buyer,omitempty"`
+	Buyer         *usecase.UserWire     `json:"buyer,omitempty"`
 }
 
 type listPurchasesResponse struct {
@@ -315,7 +305,7 @@ func purchaseToJSON(v usecase.PurchaseView) purchaseJSON {
 		out     purchaseJSON
 		suppID  *string
 		project projectSummaryJSON
-		buyer   userJSON
+		buyer   usecase.UserWire
 	)
 	p = v.Purchase
 	out = purchaseJSON{
@@ -338,7 +328,7 @@ func purchaseToJSON(v usecase.PurchaseView) purchaseJSON {
 		out.Project = &project
 	}
 	if v.Buyer != nil {
-		buyer = userToJSON(*v.Buyer)
+		buyer = usecase.UserWireFrom(*v.Buyer)
 		out.Buyer = &buyer
 	}
 	return out
