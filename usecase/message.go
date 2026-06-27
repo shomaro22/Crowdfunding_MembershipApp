@@ -9,7 +9,6 @@ import (
 	"crowdfund-app/repository"
 
 	"github.com/google/uuid"
-	"gorm.io/gorm"
 )
 
 type SendMessageIn struct {
@@ -25,12 +24,13 @@ type MessageUseCase struct {
 	Supporters repository.SupporterRepo
 	Users      repository.UserRepo
 	Activity   repository.ActivityRepo
-	DB         *gorm.DB
 	events     MessageEventHook
 }
 
-func (m *MessageUseCase) SetEventHook(h MessageEventHook) {
-	m.events = h
+func AttachMessageEvents(m *MessageUseCase, h MessageEventHook) {
+	if m != nil {
+		m.events = h
+	}
 }
 
 func threadKey(projectID, partnerID uuid.UUID) string {
@@ -81,6 +81,9 @@ func (m *MessageUseCase) ListThreads(ctx context.Context, userID uuid.UUID) ([]M
 	out = make([]MessageThreadView, 0, len(order))
 	for i = range order {
 		t = threads[order[i]]
+		if err = m.CanSubscribeProject(ctx, t.ProjectID, userID); err != nil {
+			continue
+		}
 		if err = m.enrichThread(ctx, t); err != nil {
 			return nil, err
 		}
@@ -124,23 +127,20 @@ func reverseMessageItems(items []MessageItemView) {
 
 func (m *MessageUseCase) Send(ctx context.Context, senderID uuid.UUID, in SendMessageIn) (MessageItemView, error) {
 	var (
-		project *entity.Project
-		sender  *entity.User
+		sender   *entity.User
 		receiver *entity.User
-		row     *entity.Message
-		now     time.Time
-		out     MessageItemView
-		err     error
+		row      *entity.Message
+		now      time.Time
+		out      MessageItemView
+		err      error
 	)
 	in.Content = strings.TrimSpace(in.Content)
 	if err = entity.ValidateMessage(in.Content); err != nil {
 		return MessageItemView{}, mapMessageEntityErr(err)
 	}
-	project, err = m.authorizeSend(ctx, senderID, in.ProjectID, in.ReceiverID)
-	if err != nil {
+	if _, err = m.authorizeSend(ctx, senderID, in.ProjectID, in.ReceiverID); err != nil {
 		return MessageItemView{}, err
 	}
-	_ = project
 	now = time.Now().UTC()
 	row = &entity.Message{
 		ID:         uuid.New(),
@@ -180,13 +180,13 @@ func (m *MessageUseCase) MarkRead(ctx context.Context, userID, messageID uuid.UU
 	if err = m.authorizeReadParticipant(msg, userID); err != nil {
 		return err
 	}
+	if err = m.CanSubscribeProject(ctx, msg.ProjectID, userID); err != nil {
+		return err
+	}
 	if msg.ReceiverID != userID {
 		return ErrForbidden
 	}
 	if msg.IsRead {
-		if m.events != nil {
-			m.events.OnMessageRead(ctx, msg.ProjectID, msg.ID, userID)
-		}
 		return nil
 	}
 	now = time.Now().UTC()
@@ -212,4 +212,12 @@ func (m *MessageUseCase) GetNotifications(ctx context.Context, userID uuid.UUID)
 		return NotificationsView{}, err
 	}
 	return NotificationsView{UnreadMessages: n}, nil
+}
+
+func (m *MessageUseCase) ConfirmWSSubscribe(ctx context.Context, userID, projectID uuid.UUID, meta RequestMeta) error {
+	if err := m.CanSubscribeProject(ctx, projectID, userID); err != nil {
+		return err
+	}
+	LogActivity(ctx, m.Activity, &userID, entity.SecWSSubscribe, "project", projectID.String(), meta, nil)
+	return nil
 }

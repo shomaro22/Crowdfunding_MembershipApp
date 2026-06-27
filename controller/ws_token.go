@@ -4,14 +4,12 @@ import (
 	"context"
 	"net/http"
 
-	"crowdfund-app/usecase"
-
 	"github.com/google/uuid"
 	"github.com/labstack/echo/v4"
 )
 
 type WSTokenUseCase interface {
-	Issue(ctx context.Context, userID uuid.UUID, meta usecase.RequestMeta) (string, error)
+	Issue(ctx context.Context, userID uuid.UUID) (string, error)
 }
 
 type WSTokenController struct {
@@ -37,7 +35,7 @@ func (h *WSTokenController) Issue(c echo.Context) error {
 	if err != nil {
 		return err
 	}
-	token, err = h.Tokens.Issue(c.Request().Context(), userID, requestMeta(c))
+	token, err = h.Tokens.Issue(c.Request().Context(), userID)
 	if err != nil {
 		return mapUseCaseError(err)
 	}
