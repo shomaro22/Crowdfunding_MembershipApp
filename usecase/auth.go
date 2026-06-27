@@ -41,7 +41,7 @@ type SessionTokens struct {
 }
 
 type LoginResult struct {
-	User         *entity.User
+	User         UserView
 	AuthToken    string
 	RefreshToken string
 	Requires2FA  bool
@@ -89,7 +89,7 @@ func (a *AuthUseCase) issueSession(ctx context.Context, u *entity.User, verified
 		now       time.Time
 		row       *entity.RefreshToken
 	)
-
+	// 1. JWT 発行（token_version を tv クレームに含める）
 	authToken, err = a.Tokens.Issue(auth.AuthClaims{
 		UserID:        u.ID,
 		Role:          u.Role,
@@ -100,11 +100,13 @@ func (a *AuthUseCase) issueSession(ctx context.Context, u *entity.User, verified
 	if err != nil {
 		return nil, err
 	}
+	// 2. Refresh Token 平文を生成
 	plain, err = auth.OpaqueHex()
 	if err != nil {
 		return nil, err
 	}
 	now = time.Now().UTC()
+	// 3. DB に INSERT（通常接続、WithTx 外）
 	row = &entity.RefreshToken{
 		ID:        uuid.New(),
 		UserID:    u.ID,
@@ -124,7 +126,7 @@ func (a *AuthUseCase) invalidateSessions(ctx context.Context, userID uuid.UUID) 
 	return repository.WithTx(ctx, a.DB, func(txCtx context.Context) error {
 		if _, err = a.Users.BumpTokenVer(txCtx, userID); err != nil {
 			return err
-		}
-		return a.RefreshTokens.RevokeUser(txCtx, userID, time.Now().UTC())
+		}// ① JWT も無効化
+		return a.RefreshTokens.RevokeAllByUser(txCtx, userID, time.Now().UTC())// ② 全 RefreshTokens 失効
 	})
 }

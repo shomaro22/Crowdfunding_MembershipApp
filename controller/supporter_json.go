@@ -90,7 +90,7 @@ func supporterToJSON(v usecase.SupporterView) supporterJSON {
 		out    supporterJSON
 		planID *string
 		change *string
-		proj   projectSummaryJSON
+		project   projectSummaryJSON
 		plan   projectPlanJSON
 		pend   projectPlanJSON
 	)
@@ -116,8 +116,8 @@ func supporterToJSON(v usecase.SupporterView) supporterJSON {
 		out.PlanChangeDate = change
 	}
 	if v.Project != nil {
-		proj = projectSummaryToJSON(&usecase.ProjectView{Project: v.Project, Plans: nil})
-		out.Project = &proj
+		project = projectSummaryToJSON(&usecase.ProjectView{Project: v.Project, Plans: nil})
+		out.Project = &project
 	}
 	if v.Plan != nil {
 		plan = projectPlanToJSON(v.Plan)
@@ -128,19 +128,6 @@ func supporterToJSON(v usecase.SupporterView) supporterJSON {
 		out.PendingPlan = &pend
 	}
 	return out
-}
-
-func projectPlanToJSON(pl *entity.ProjectPlan) projectPlanJSON {
-	return projectPlanJSON{
-		ID:             pl.ID.String(),
-		ProjectID:      pl.ProjectID.String(),
-		MembershipType: string(pl.MembershipType),
-		Price:          pl.Price,
-		MaxSupporters:  pl.MaxSupporters,
-		Benefits:       pl.Benefits,
-		IsActive:       pl.IsActive,
-		SupporterCount: pl.SupporterCount,
-	}
 }
 
 func listPurchasesJSON(rows []usecase.PurchaseView, total int64) listPurchasesResponse {
@@ -160,7 +147,7 @@ func purchaseToJSON(v usecase.PurchaseView) purchaseJSON {
 		p      *entity.Purchase
 		out    purchaseJSON
 		suppID *string
-		proj   projectSummaryJSON
+		project   projectSummaryJSON
 		buyer  userJSON
 	)
 	p = v.Purchase
@@ -180,11 +167,11 @@ func purchaseToJSON(v usecase.PurchaseView) purchaseJSON {
 		out.SupporterID = suppID
 	}
 	if v.Project != nil {
-		proj = projectSummaryToJSON(&usecase.ProjectView{Project: v.Project})
-		out.Project = &proj
+		project = projectSummaryToJSON(&usecase.ProjectView{Project: v.Project})
+		out.Project = &project
 	}
 	if v.Buyer != nil {
-		buyer = userToJSON(v.Buyer)
+		buyer = userToJSON(usecase.UserViewFrom(v.Buyer))
 		out.Buyer = &buyer
 	}
 	return out

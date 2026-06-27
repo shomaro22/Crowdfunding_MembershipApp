@@ -127,7 +127,7 @@ func (a *AuthUseCase) ExchangeOAuthCode(ctx context.Context, code string, meta A
 	if err != nil {
 		return nil, err
 	}
-	return &LoginResult{User: u, AuthToken: authToken}, nil
+	return &LoginResult{User: UserViewFrom(u), AuthToken: authToken}, nil
 }
 
 func (a *AuthUseCase) OAuthSuccessRedirect(from, code string) string {
