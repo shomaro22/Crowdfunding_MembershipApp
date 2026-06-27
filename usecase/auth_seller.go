@@ -25,7 +25,7 @@ type SellerRegIn struct {
 
 type SellerRegOut struct {
 	User         UserView
-	Registration *entity.SellerReg
+	Registration SellerRegItemView
 }
 
 func (a *AuthUseCase) GetUser(ctx context.Context, userID uuid.UUID) (UserView, error) {
@@ -149,5 +149,5 @@ func (a *AuthUseCase) RegisterSeller(ctx context.Context, in SellerRegIn, meta A
 	}
 
 	a.logActivity(ctx, &u.ID, entity.SellerRegister, "seller_registration", reg.ID.String(), meta, nil)
-	return &SellerRegOut{User: UserViewFrom(u), Registration: reg}, nil
+	return &SellerRegOut{User: UserViewFrom(u), Registration: SellerRegItemFrom(reg)}, nil
 }
