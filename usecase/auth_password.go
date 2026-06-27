@@ -19,8 +19,6 @@ func (a *AuthUseCase) ForgotPassword(ctx context.Context, email string) error {
 		plain      string
 		now        time.Time
 		row        *entity.ResetToken
-		base       string
-		url        string
 		mailer     Mailer
 	)
 
@@ -50,13 +48,11 @@ func (a *AuthUseCase) ForgotPassword(ctx context.Context, email string) error {
 	if err = a.ResetToks.Create(ctx, row); err != nil {
 		return err
 	}
-	base = strings.TrimRight(strings.TrimSpace(a.AppPublicURL), "/")
-	url = base + "/reset-password?token=" + plain
 	mailer = a.Mailer
 	if mailer == nil {
-		mailer = LogMailer{}
+		mailer = LogMailer{AppPublicURL: a.AppPublicURL}
 	}
-	return mailer.SendPasswordReset(ctx, u.Email, url)
+	return mailer.SendPasswordReset(ctx, u.Email, plain)
 }
 
 func (a *AuthUseCase) ResetPassword(ctx context.Context, plainToken, newPassword string) error {
@@ -99,7 +95,7 @@ func (a *AuthUseCase) ResetPassword(ctx context.Context, plainToken, newPassword
 		return err
 	}
 	// TX 内: BumpTokenVer + RevokeAllByUser
-	return a.invalidateSessions(ctx, u.ID)
+	return InvalidateUserSessions(ctx, a.DB, a.Users, a.RefreshTokens, u.ID)
 }
 
 func (a *AuthUseCase) ChangePassword(ctx context.Context, userID uuid.UUID, current, newPassword, totpCode string) error {
@@ -141,5 +137,5 @@ func (a *AuthUseCase) ChangePassword(ctx context.Context, userID uuid.UUID, curr
 	if err = a.Users.Update(ctx, u); err != nil {
 		return err
 	}
-	return a.invalidateSessions(ctx, u.ID)
+	return InvalidateUserSessions(ctx, a.DB, a.Users, a.RefreshTokens, u.ID)
 }

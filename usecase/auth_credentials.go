@@ -12,7 +12,7 @@ import (
 	"github.com/google/uuid"
 )
 
-func (a *AuthUseCase) RegisterBuyer(ctx context.Context, email, password string, name *string, meta AuthMeta) (UserView, error) {
+func (a *AuthUseCase) RegisterBuyer(ctx context.Context, email, password string, name *string, meta RequestMeta) (UserView, error) {
 	var (
 		normalized  string
 		err         error
@@ -82,7 +82,7 @@ func (a *AuthUseCase) EmailFree(ctx context.Context, email string) (bool, error)
 	return !exists, nil
 }
 
-func (a *AuthUseCase) Login(ctx context.Context, email, password string, meta AuthMeta) (*LoginResult, error) {
+func (a *AuthUseCase) Login(ctx context.Context, email, password string, meta RequestMeta) (*LoginResult, error) {
 	var (
 		normalized string
 		u          *entity.User
@@ -123,7 +123,7 @@ func (a *AuthUseCase) Login(ctx context.Context, email, password string, meta Au
 	}, nil
 }
 
-func (a *AuthUseCase) Refresh(ctx context.Context, refreshTokenPlain string, meta AuthMeta) (string, string, error) {
+func (a *AuthUseCase) Refresh(ctx context.Context, refreshTokenPlain string, meta RequestMeta) (string, string, error) {
 	var (
 		plain  string
 		hash   string
@@ -163,7 +163,7 @@ func (a *AuthUseCase) Refresh(ctx context.Context, refreshTokenPlain string, met
 	return tokens.AuthToken, tokens.RefreshToken, nil
 }
 
-func (a *AuthUseCase) Logout(ctx context.Context, refreshTokenPlain string, meta AuthMeta) error {
+func (a *AuthUseCase) Logout(ctx context.Context, refreshTokenPlain string, meta RequestMeta) error {
 	var (
 		plain string
 		hash  string

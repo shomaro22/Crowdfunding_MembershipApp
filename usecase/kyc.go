@@ -41,8 +41,8 @@ type KYCAccessUseCase struct {
 	SignSecret []byte
 }
 
-func (k *KYCAccessUseCase) SignURL(apiBase, storageKey string, now time.Time) string {
-	return auth.KYCAccessURL(apiBase, auth.SignKYCAccess(k.SignSecret, storageKey, now))
+func (k *KYCAccessUseCase) SignToken(storageKey string, now time.Time) string {
+	return auth.SignKYCAccess(k.SignSecret, storageKey, now)
 }
 
 func (k *KYCAccessUseCase) OpenWithToken(_ context.Context, token string) (*os.File, string, error) {

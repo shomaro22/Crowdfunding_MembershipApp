@@ -93,13 +93,13 @@ func (a *AuthUseCase) Verify2FASetup(ctx context.Context, userID uuid.UUID, code
 	if err != nil {
 		return nil, err
 	}
-	if err = a.invalidateSessions(ctx, u.ID); err != nil {
+	if err = InvalidateUserSessions(ctx, a.DB, a.Users, a.RefreshTokens, u.ID); err != nil {
 		return nil, err
 	}
 	return &TOTPVerifyResult{BackupCodes: codes}, nil
 }
 
-func (a *AuthUseCase) Challenge2FA(ctx context.Context, pendingToken, code string, meta AuthMeta) (*LoginResult, error) {
+func (a *AuthUseCase) Challenge2FA(ctx context.Context, pendingToken, code string, meta RequestMeta) (*LoginResult, error) {
 	var (
 		uid    uuid.UUID
 		err    error

@@ -9,8 +9,6 @@ import (
 
 	"crowdfund-app/bootstrap"
 	"crowdfund-app/usecase"
-
-	"gorm.io/gorm"
 )
 
 func main() {
@@ -37,20 +35,17 @@ func main() {
 
 func runBatch(job string, dryRun bool) error {
 	var (
-		ctx     context.Context
-		gormDB  *gorm.DB
-		batchUC *usecase.BatchUseCase
-		run     *usecase.BatchRunView
-		err     error
+		ctx  context.Context
+		app  *bootstrap.BatchApp
+		run  *usecase.BatchRunView
+		err  error
 	)
 	ctx = context.Background()
-	gormDB, err = bootstrap.OpenDB()
+	app, err = bootstrap.OpenForBatch(nil)
 	if err != nil {
 		return err
 	}
-	repos := bootstrap.NewRepositories(gormDB)
-	batchUC = bootstrap.NewBatchUseCase(gormDB, repos, bootstrap.StripeFromEnv())
-	run, err = batchUC.Run(ctx, job, "cli", dryRun)
+	run, err = app.Batch.Run(ctx, job, "cli", dryRun)
 	if err != nil {
 		return err
 	}

@@ -19,20 +19,16 @@ const (
 )
 
 type Mailer interface {
-	SendPasswordReset(ctx context.Context, email, resetURL string) error
+	SendPasswordReset(ctx context.Context, email, plainToken string) error
 }
 
-type LogMailer struct{}
+type LogMailer struct {
+	AppPublicURL string
+}
 
-func (LogMailer) SendPasswordReset(_ context.Context, email, resetURL string) error {
-	slog.Info("password_reset_email", "to", email, "url", resetURL)
+func (m LogMailer) SendPasswordReset(_ context.Context, email, plainToken string) error {
+	slog.Info("password_reset_email", "to", email, "url", auth.PasswordResetURL(m.AppPublicURL, plainToken))
 	return nil
-}
-
-type AuthMeta struct {
-	IPAddress string
-	UserAgent string
-	RequestID string
 }
 
 type SessionTokens struct {
@@ -71,12 +67,8 @@ type AuthUseCase struct {
 	AppPublicURL  string
 }
 
-func (a *AuthUseCase) logActivity(ctx context.Context, userID *uuid.UUID, action entity.ActivityAction, resource, resourceID string, meta AuthMeta, extra entity.JSONMetadata) {
-	LogActivity(ctx, a.Activity, userID, action, resource, resourceID, RequestMeta{
-		IPAddress: meta.IPAddress,
-		UserAgent: meta.UserAgent,
-		RequestID: meta.RequestID,
-	}, extra)
+func (a *AuthUseCase) logActivity(ctx context.Context, userID *uuid.UUID, action entity.ActivityAction, resource, resourceID string, meta RequestMeta, extra entity.JSONMetadata) {
+	LogActivity(ctx, a.Activity, userID, action, resource, resourceID, meta, extra)
 }
 
 func twoFAVerified(u *entity.User) bool {
@@ -123,10 +115,6 @@ func (a *AuthUseCase) issueSession(ctx context.Context, u *entity.User, verified
 		return nil, err
 	}
 	return &SessionTokens{AuthToken: authToken, RefreshToken: plain}, nil
-}
-
-func (a *AuthUseCase) invalidateSessions(ctx context.Context, userID uuid.UUID) error {
-	return InvalidateUserSessions(ctx, a.DB, a.Users, a.RefreshTokens, userID)
 }
 
 func (a *AuthUseCase) ValidateSession(ctx context.Context, claims auth.AuthClaims) (SessionInfo, error) {

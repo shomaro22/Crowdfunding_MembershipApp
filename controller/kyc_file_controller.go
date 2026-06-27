@@ -1,19 +1,22 @@
 package controller
 
 import (
+	"context"
 	"net/http"
 	"os"
-
-	"crowdfund-app/usecase"
 
 	"github.com/labstack/echo/v4"
 )
 
-type KYCFileController struct {
-	KYC *usecase.KYCAccessUseCase
+type KYCFileOpener interface {
+	OpenWithToken(ctx context.Context, token string) (*os.File, string, error)
 }
 
-func NewKYCFileController(kyc *usecase.KYCAccessUseCase) *KYCFileController {
+type KYCFileController struct {
+	KYC KYCFileOpener
+}
+
+func NewKYCFileController(kyc KYCFileOpener) *KYCFileController {
 	return &KYCFileController{KYC: kyc}
 }
 
@@ -30,7 +33,7 @@ func (h *KYCFileController) Serve(c echo.Context) error {
 		if he := mapNotFound(err); he != nil {
 			return he
 		}
-		return echo.NewHTTPError(http.StatusUnauthorized, apiError("invalid or expired token", "INVALID_TOKEN"))
+		return mapUseCaseError(err)
 	}
 	defer f.Close()
 	return c.Stream(http.StatusOK, ct, f)
