@@ -166,3 +166,7 @@ func supporterCanManage(s *entity.ProjectSupporter, now time.Time) bool {
 		return false
 	}
 }
+
+func (s *SupporterUseCase) ViewForSupporter(ctx context.Context, supporter *entity.ProjectSupporter) (SupporterView, error) {
+	return s.enrichView(ctx, supporter)
+}
