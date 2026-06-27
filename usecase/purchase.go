@@ -9,12 +9,6 @@ import (
 	"github.com/google/uuid"
 )
 
-type PurchaseView struct {
-	Purchase *entity.Purchase
-	Project  *entity.Project
-	Buyer    *entity.User
-}
-
 type PurchaseUseCase struct {
 	Users     repository.UserRepo
 	Projects  repository.ProjectRepo
@@ -47,17 +41,24 @@ func (p *PurchaseUseCase) ListMine(ctx context.Context, buyerID uuid.UUID, limit
 
 func (p *PurchaseUseCase) enrichPurchase(ctx context.Context, row *entity.Purchase) (PurchaseView, error) {
 	var (
-		v   PurchaseView
-		err error
+		v       PurchaseView
+		project *entity.Project
+		buyer   *entity.User
+		err     error
 	)
-	v.Purchase = row
-	v.Project, _, _, err = p.Projects.FindID(ctx, row.ProjectID)
+	if row == nil {
+		return PurchaseView{}, ErrNotFound
+	}
+	v.Purchase = PurchaseItemFrom(row)
+	project, _, _, err = p.Projects.FindID(ctx, row.ProjectID)
 	if err != nil {
 		return PurchaseView{}, err
 	}
-	v.Buyer, err = p.Users.FindID(ctx, row.BuyerID)
+	v.Project = ProjectItemPtrFrom(project)
+	buyer, err = p.Users.FindID(ctx, row.BuyerID)
 	if err != nil {
 		return PurchaseView{}, err
 	}
+	v.Buyer = UserViewPtr(buyer)
 	return v, nil
 }

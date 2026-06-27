@@ -12,13 +12,6 @@ import (
 	"gorm.io/gorm"
 )
 
-type SupporterView struct {
-	Supporter   *entity.ProjectSupporter
-	Project     *entity.Project
-	Plan        *entity.ProjectPlan
-	PendingPlan *entity.ProjectPlan
-}
-
 type UpgradeOut struct {
 	Supporter                 SupporterView
 	PaymentIntentClientSecret *string
@@ -36,8 +29,8 @@ type SupporterUseCase struct {
 }
 
 type ChangeBillingIn struct {
-	BillingMode   entity.BillingMode
-	PaymentMethod entity.PaymentMethod
+	BillingMode   string
+	PaymentMethod string
 }
 
 func (s *SupporterUseCase) Cancel(ctx context.Context, userID, supporterID uuid.UUID) (SupporterView, error) {
@@ -104,10 +97,12 @@ func (s *SupporterUseCase) Rejoin(ctx context.Context, userID, supporterID uuid.
 func (s *SupporterUseCase) ChangeBilling(ctx context.Context, userID, supporterID uuid.UUID, in ChangeBillingIn) (SupporterView, error) {
 	var (
 		supporter *entity.ProjectSupporter
+		mode      entity.BillingMode
 		now       time.Time
 		err       error
 	)
-	if !in.BillingMode.Valid() {
+	mode = entity.BillingMode(in.BillingMode)
+	if !mode.Valid() {
 		return SupporterView{}, ErrBadRequest
 	}
 	now = time.Now().UTC()
@@ -121,15 +116,14 @@ func (s *SupporterUseCase) ChangeBilling(ctx context.Context, userID, supporterI
 	if supporter.PendingBillingMode != nil {
 		return SupporterView{}, ErrBadRequest
 	}
-	if in.BillingMode == supporter.BillingMode {
+	if mode == supporter.BillingMode {
 		return SupporterView{}, ErrBadRequest
 	}
 	changeAt := supporter.CurrentPeriodEnd
-	mode := in.BillingMode
 	supporter.PendingBillingMode = &mode
 	supporter.PlanChangeDate = &changeAt
 	supporter.UpdatedAt = now
-	if in.BillingMode == entity.BillingModeKonbini &&
+	if mode == entity.BillingModeKonbini &&
 		supporter.BillingMode == entity.BillingModeAuto &&
 		supporter.StripeSubscriptionID != nil &&
 		s.Stripe != nil {
