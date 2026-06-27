@@ -2,17 +2,14 @@ package usecase
 
 import (
 	"context"
-	"encoding/json"
 
 	"crowdfund-app/entity"
 	"crowdfund-app/stripe"
-
-	stripesdk "github.com/stripe/stripe-go/v82"
 )
 
 func (p *PaymentUseCase) HandleWebhook(ctx context.Context, payload []byte, signature string) error {
 	var (
-		event stripesdk.Event
+		event stripe.WebhookEvent
 		err   error
 	)
 	if p.Stripe == nil {
@@ -23,14 +20,14 @@ func (p *PaymentUseCase) HandleWebhook(ctx context.Context, payload []byte, sign
 		return err
 	}
 	var claimed bool
-	claimed, err = p.Webhooks.Claim(ctx, event.ID, string(event.Type))
+	claimed, err = p.Webhooks.Claim(ctx, event.ID, event.Type)
 	if err != nil {
 		return err
 	}
 	if !claimed {
 		return nil
 	}
-	switch string(event.Type) {
+	switch event.Type {
 	case "checkout.session.completed":
 		err = p.onCheckoutCompleted(ctx, event)
 	case "checkout.session.async_payment_succeeded":
@@ -52,63 +49,63 @@ func (p *PaymentUseCase) HandleWebhook(ctx context.Context, payload []byte, sign
 		_ = p.Webhooks.Release(ctx, event.ID)
 		return err
 	}
-	p.logPaymentWebhook(ctx, string(event.Type), event.ID)
+	p.logPaymentWebhook(ctx, event.Type, event.ID)
 	return nil
 }
 
-func (p *PaymentUseCase) onAccountUpdated(ctx context.Context, event stripesdk.Event) error {
+func (p *PaymentUseCase) onAccountUpdated(ctx context.Context, event stripe.WebhookEvent) error {
 	var (
-		acct stripesdk.Account
+		acct stripe.AccountEvent
 		err  error
 	)
 	if p.ConnectSync == nil {
 		return nil
 	}
-	err = json.Unmarshal(event.Data.Raw, &acct)
+	acct, err = stripe.ParseWebhookAccount(event)
 	if err != nil {
 		return err
 	}
-	_, err = p.ConnectSync.SyncFromStripeAccountID(ctx, acct.ID)
+	_, err = p.ConnectSync.SyncFromStripeAccountID(ctx, acct.AccountID)
 	return err
 }
 
-func (p *PaymentUseCase) onCheckoutCompleted(ctx context.Context, event stripesdk.Event) error {
+func (p *PaymentUseCase) onCheckoutCompleted(ctx context.Context, event stripe.WebhookEvent) error {
 	var (
-		sess stripesdk.CheckoutSession
+		sess stripe.CheckoutSessionSnapshot
 		err  error
 	)
-	err = json.Unmarshal(event.Data.Raw, &sess)
+	sess, err = stripe.ParseWebhookCheckoutSession(event)
 	if err != nil {
 		return err
 	}
 	if isKonbiniSession(sess) {
 		return nil
 	}
-	if sess.PaymentStatus != stripesdk.CheckoutSessionPaymentStatusPaid {
+	if sess.PaymentStatus != stripe.CheckoutPaymentStatusPaid {
 		return nil
 	}
 	return p.fulfillCheckoutSession(ctx, sess)
 }
 
-func (p *PaymentUseCase) onCheckoutAsyncPaid(ctx context.Context, event stripesdk.Event) error {
+func (p *PaymentUseCase) onCheckoutAsyncPaid(ctx context.Context, event stripe.WebhookEvent) error {
 	var (
-		sess stripesdk.CheckoutSession
+		sess stripe.CheckoutSessionSnapshot
 		err  error
 	)
-	err = json.Unmarshal(event.Data.Raw, &sess)
+	sess, err = stripe.ParseWebhookCheckoutSession(event)
 	if err != nil {
 		return err
 	}
 	return p.fulfillCheckoutSession(ctx, sess)
 }
 
-func (p *PaymentUseCase) onCheckoutAsyncFailed(ctx context.Context, event stripesdk.Event) error {
+func (p *PaymentUseCase) onCheckoutAsyncFailed(ctx context.Context, event stripe.WebhookEvent) error {
 	var (
-		sess     stripesdk.CheckoutSession
+		sess     stripe.CheckoutSessionSnapshot
 		purchase *entity.Purchase
 		err      error
 	)
-	err = json.Unmarshal(event.Data.Raw, &sess)
+	sess, err = stripe.ParseWebhookCheckoutSession(event)
 	if err != nil {
 		return err
 	}
@@ -119,13 +116,13 @@ func (p *PaymentUseCase) onCheckoutAsyncFailed(ctx context.Context, event stripe
 	return p.handleKonbiniCheckoutUnpaid(ctx, purchase, "async payment failed", false)
 }
 
-func (p *PaymentUseCase) onCheckoutExpired(ctx context.Context, event stripesdk.Event) error {
+func (p *PaymentUseCase) onCheckoutExpired(ctx context.Context, event stripe.WebhookEvent) error {
 	var (
-		sess     stripesdk.CheckoutSession
+		sess     stripe.CheckoutSessionSnapshot
 		purchase *entity.Purchase
 		err      error
 	)
-	err = json.Unmarshal(event.Data.Raw, &sess)
+	sess, err = stripe.ParseWebhookCheckoutSession(event)
 	if err != nil {
 		return err
 	}
@@ -136,7 +133,7 @@ func (p *PaymentUseCase) onCheckoutExpired(ctx context.Context, event stripesdk.
 	return p.handleKonbiniCheckoutUnpaid(ctx, purchase, "checkout session expired", true)
 }
 
-func isKonbiniSession(sess stripesdk.CheckoutSession) bool {
+func isKonbiniSession(sess stripe.CheckoutSessionSnapshot) bool {
 	var i int
 	for i = range sess.PaymentMethodTypes {
 		if sess.PaymentMethodTypes[i] == "konbini" {
@@ -147,25 +144,25 @@ func isKonbiniSession(sess stripesdk.CheckoutSession) bool {
 		sess.Metadata[stripe.MetaBillingMode] == string(entity.BillingModeKonbini)
 }
 
-func (p *PaymentUseCase) onPaymentIntentSucceeded(ctx context.Context, event stripesdk.Event) error {
+func (p *PaymentUseCase) onPaymentIntentSucceeded(ctx context.Context, event stripe.WebhookEvent) error {
 	var (
-		pi  stripesdk.PaymentIntent
+		pi  stripe.PaymentIntentDetail
 		err error
 	)
-	err = json.Unmarshal(event.Data.Raw, &pi)
+	pi, err = stripe.ParseWebhookPaymentIntent(event)
 	if err != nil {
 		return err
 	}
 	return p.fulfillPaymentIntent(ctx, pi)
 }
 
-func (p *PaymentUseCase) onInvoicePaid(ctx context.Context, event stripesdk.Event) error {
+func (p *PaymentUseCase) onInvoicePaid(ctx context.Context, event stripe.WebhookEvent) error {
 	var (
-		inv    stripesdk.Invoice
+		inv    stripe.InvoiceSnapshot
 		exists *entity.Purchase
 		err    error
 	)
-	err = json.Unmarshal(event.Data.Raw, &inv)
+	inv, err = stripe.ParseWebhookInvoice(event)
 	if err != nil {
 		return err
 	}
@@ -176,7 +173,7 @@ func (p *PaymentUseCase) onInvoicePaid(ctx context.Context, event stripesdk.Even
 	if exists != nil {
 		return nil
 	}
-	if isAutoSubscriptionRenewal(inv) {
+	if stripe.IsAutoSubscriptionRenewal(inv.BillingReason) {
 		return p.fulfillAutoRenewal(ctx, inv)
 	}
 	return p.fulfillInvoiceFirstSupport(ctx, inv)

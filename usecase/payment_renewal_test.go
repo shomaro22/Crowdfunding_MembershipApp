@@ -5,23 +5,21 @@ import (
 	"time"
 
 	"crowdfund-app/entity"
-
-	stripesdk "github.com/stripe/stripe-go/v82"
+	"crowdfund-app/stripe"
 )
 
 func TestIsAutoSubscriptionRenewal(t *testing.T) {
 	var cases = []struct {
-		reason stripesdk.InvoiceBillingReason
+		reason string
 		want   bool
 	}{
-		{stripesdk.InvoiceBillingReasonSubscriptionCycle, true},
-		{stripesdk.InvoiceBillingReasonSubscriptionUpdate, true},
-		{stripesdk.InvoiceBillingReasonSubscriptionCreate, false},
-		{stripesdk.InvoiceBillingReasonManual, false},
+		{stripe.InvoiceBillingReasonSubscriptionCycle, true},
+		{stripe.InvoiceBillingReasonSubscriptionUpdate, true},
+		{"subscription_create", false},
+		{"manual", false},
 	}
 	for _, tc := range cases {
-		inv := stripesdk.Invoice{BillingReason: tc.reason}
-		if got := isAutoSubscriptionRenewal(inv); got != tc.want {
+		if got := stripe.IsAutoSubscriptionRenewal(tc.reason); got != tc.want {
 			t.Fatalf("billing_reason=%s: got %v want %v", tc.reason, got, tc.want)
 		}
 	}
@@ -49,13 +47,9 @@ func TestCanIssueKonbiniRenewal(t *testing.T) {
 }
 
 func TestInvoicePurchaseID_FromSubscriptionMetadata(t *testing.T) {
-	var inv stripesdk.Invoice
-	inv.Parent = &stripesdk.InvoiceParent{
-		SubscriptionDetails: &stripesdk.InvoiceParentSubscriptionDetails{
-			Metadata: map[string]string{"purchase_id": "abc-123"},
-		},
-	}
-	if got := invoicePurchaseID(inv); got != "abc-123" {
+	var inv stripe.InvoiceSnapshot
+	inv.SubscriptionMeta = map[string]string{"purchase_id": "abc-123"}
+	if got := inv.PurchaseID(); got != "abc-123" {
 		t.Fatalf("got %q", got)
 	}
 }
