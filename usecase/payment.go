@@ -113,3 +113,93 @@ func (p *PaymentUseCase) logPaymentWebhook(ctx context.Context, eventType, event
 		"event_type": eventType,
 	}))
 }
+
+func (p *PaymentUseCase) newPendingPurchase(
+	sc supportContext,
+	pm entity.PaymentMethod,
+	checkoutID, intentID *string,
+) *entity.Purchase {
+	var (
+		row entity.Purchase
+		key string
+	)
+	key = uuid.New().String()
+	row = entity.Purchase{
+		ID:               uuid.New(),
+		ProjectID:        sc.project.ID,
+		BuyerID:          sc.buyer.ID,
+		Quantity:         1,
+		TotalPrice:       sc.plan.Price,
+		Status:           entity.PurchaseStatusPending,
+		PaymentMethod:    pm,
+		StripeCheckoutID: checkoutID,
+		StripeIntentID:   intentID,
+		IdempotencyKey:   &key,
+		CreatedAt:        sc.now,
+		UpdatedAt:        sc.now,
+	}
+	if sc.purpose == checkoutKonbiniRenewal && sc.membership != nil {
+		row.SupporterID = &sc.membership.ID
+	}
+	return &row
+}
+
+func (p *PaymentUseCase) savePendingAfterStripe(ctx context.Context, purchase *entity.Purchase) error {
+	return repository.WithTx(ctx, p.DB, func(txCtx context.Context) error {
+		return p.Purchases.Create(txCtx, purchase)
+	})
+}
+
+func checkoutMetadata(sc supportContext, purchaseID uuid.UUID, pm entity.PaymentMethod) map[string]string {
+	var mode entity.BillingMode
+	if pm == entity.PaymentMethodKonbini {
+		mode = entity.BillingModeKonbini
+	} else {
+		mode = entity.BillingModeAuto
+	}
+	meta := paymentMetadata(
+		purchaseID,
+		sc.project.ID,
+		sc.plan.ID,
+		sc.buyer.ID,
+		mode,
+	)
+	meta[stripe.MetaCheckoutPurpose] = string(sc.purpose)
+	if sc.membership != nil {
+		meta[stripe.MetaSupporterID] = sc.membership.ID.String()
+	}
+	return meta
+}
+
+func paymentMetadata(purchaseID, projectID, planID, buyerID uuid.UUID, mode entity.BillingMode) map[string]string {
+	return map[string]string{
+		stripe.MetaPurchaseID:  purchaseID.String(),
+		stripe.MetaProjectID:   projectID.String(),
+		stripe.MetaPlanID:      planID.String(),
+		stripe.MetaBuyerID:     buyerID.String(),
+		stripe.MetaBillingMode: string(mode),
+	}
+}
+
+func checkoutURL(custom *string, fallback string) string {
+	if custom != nil && *custom != "" {
+		return *custom
+	}
+	return fallback
+}
+
+func parseCheckoutPurpose(meta map[string]string) checkoutPurpose {
+	if meta == nil {
+		return checkoutFirstSupport
+	}
+	switch meta[stripe.MetaCheckoutPurpose] {
+	case stripe.PurposeKonbiniRenewal:
+		return checkoutKonbiniRenewal
+	default:
+		return checkoutFirstSupport
+	}
+}
+
+func isKonbiniPurchase(purchase *entity.Purchase) bool {
+	return purchase.PaymentMethod == entity.PaymentMethodKonbini
+}
