@@ -41,7 +41,7 @@ func (p *ProjectUseCase) Create(ctx context.Context, sellerID uuid.UUID, in Crea
 		}
 	}
 	if err = entity.ValidateProject(in.Title, in.Description, in.TargetAmount, entity.DurationType(in.DurationType), in.StartDate, in.EndDate, planInputs); err != nil {
-		return nil, mapEntityErr(err)
+		return nil, mapProjectEntityErr(err)
 	}
 	now = time.Now().UTC()
 	project = &entity.Project{
@@ -72,7 +72,7 @@ func (p *ProjectUseCase) Create(ctx context.Context, sellerID uuid.UUID, in Crea
 	}
 	images, project.MainImageURL, err = buildProjectImages(in.Images, in.ImageURL, now)
 	if err != nil {
-		return nil, mapEntityErr(err)
+		return nil, mapProjectEntityErr(err)
 	}
 	if err = p.Projects.Create(ctx, project, plans, images); err != nil {
 		return nil, err
@@ -103,7 +103,7 @@ func (p *ProjectUseCase) Update(ctx context.Context, sellerID, projectID uuid.UU
 	now = time.Now().UTC()
 	if in.Title != nil {
 		if err = entity.ValidateTitle(*in.Title); err != nil {
-			return nil, mapEntityErr(err)
+			return nil, mapProjectEntityErr(err)
 		}
 		project.Title = strings.TrimSpace(*in.Title)
 	}
@@ -133,7 +133,7 @@ func (p *ProjectUseCase) Update(ctx context.Context, sellerID, projectID uuid.UU
 	}
 	if in.DurationType != nil || in.StartDate != nil || in.EndDate != nil {
 		if err = entity.ValidateDuration(dur, start, end); err != nil {
-			return nil, mapEntityErr(err)
+			return nil, mapProjectEntityErr(err)
 		}
 		project.DurationType = dur
 		project.StartDate = start
@@ -142,12 +142,12 @@ func (p *ProjectUseCase) Update(ctx context.Context, sellerID, projectID uuid.UU
 	if in.Images != nil {
 		images, project.MainImageURL, err = buildProjectImages(*in.Images, nil, now)
 		if err != nil {
-			return nil, mapEntityErr(err)
+			return nil, mapProjectEntityErr(err)
 		}
 	} else if in.ImageURL != nil {
 		images, project.MainImageURL, err = buildProjectImages(nil, in.ImageURL, now)
 		if err != nil {
-			return nil, mapEntityErr(err)
+			return nil, mapProjectEntityErr(err)
 		}
 	}
 	if in.IsReapply && project.Status == entity.ProjectStatusActive {

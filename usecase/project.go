@@ -2,7 +2,6 @@ package usecase
 
 import (
 	"context"
-	"errors"
 	"strings"
 	"time"
 
@@ -56,20 +55,6 @@ type ProjectUseCase struct {
 	DB       *gorm.DB
 }
 
-func mapEntityErr(err error) error {
-	switch {
-	case errors.Is(err, entity.ErrBadTitle),
-		errors.Is(err, entity.ErrBadProject),
-		errors.Is(err, entity.ErrBadDuration),
-		errors.Is(err, entity.ErrBadMembership),
-		errors.Is(err, entity.ErrBadPrice),
-		errors.Is(err, entity.ErrBadImages):
-		return ErrBadRequest
-	default:
-		return err
-	}
-}
-
 func buildProjectImages(ins []ImageIn, legacyURL *string, now time.Time) ([]entity.ProjectImage, *string, error) {
 	var (
 		inputs  []entity.ImageInput
@@ -95,7 +80,7 @@ func buildProjectImages(ins []ImageIn, legacyURL *string, now time.Time) ([]enti
 		inputs = []entity.ImageInput{{ImageURL: url, IsMain: true, Order: 0}}
 	}
 	if err = entity.ValidateProjectImages(inputs); err != nil {
-		return nil, nil, err
+		return nil, nil, mapProjectEntityErr(err)
 	}
 	if len(inputs) == 0 {
 		return nil, nil, nil

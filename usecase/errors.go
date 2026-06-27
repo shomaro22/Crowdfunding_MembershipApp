@@ -25,4 +25,5 @@ var (
 	ErrTokenRevoked       = errors.New("token revoked")
 	ErrUnsupportedMedia   = errors.New("unsupported media type")
 	ErrFileTooLarge       = errors.New("file too large")
+	ErrBadKYC             = errors.New("bad seller kyc")
 )
