@@ -130,19 +130,6 @@ func supporterToJSON(v usecase.SupporterView) supporterJSON {
 	return out
 }
 
-func projectPlanToJSON(pl *entity.ProjectPlan) projectPlanJSON {
-	return projectPlanJSON{
-		ID:             pl.ID.String(),
-		ProjectID:      pl.ProjectID.String(),
-		MembershipType: string(pl.MembershipType),
-		Price:          pl.Price,
-		MaxSupporters:  pl.MaxSupporters,
-		Benefits:       pl.Benefits,
-		IsActive:       pl.IsActive,
-		SupporterCount: pl.SupporterCount,
-	}
-}
-
 func listPurchasesJSON(rows []usecase.PurchaseView, total int64) listPurchasesResponse {
 	var (
 		items []purchaseJSON
@@ -184,7 +171,7 @@ func purchaseToJSON(v usecase.PurchaseView) purchaseJSON {
 		out.Project = &project
 	}
 	if v.Buyer != nil {
-		buyer = userToJSON(v.Buyer)
+		buyer = userToJSON(usecase.UserViewFrom(v.Buyer))
 		out.Buyer = &buyer
 	}
 	return out

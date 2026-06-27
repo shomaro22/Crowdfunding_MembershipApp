@@ -1,3 +1,5 @@
+//go:build integration
+
 package main
 
 import (
@@ -12,6 +14,7 @@ import (
 	"testing"
 	"time"
 
+	"crowdfund-app/bootstrap"
 	"crowdfund-app/db"
 	"crowdfund-app/entity"
 	"crowdfund-app/stripe"
@@ -54,10 +57,8 @@ func setupPaymentApp(t *testing.T) (*echo.Echo, *stripe.StubClient) {
 		t.Skip("DB 接続不可のためスキップ: ", err)
 	}
 	stub = stripe.NewStubClient()
-	setTestStripeClient(stub)
-	t.Cleanup(clearTestStripeClient)
 	_ = os.Setenv("JWT_SECRET", securityTestJWTSecret)
-	e, _, err = buildApp()
+	e, _, err = buildApp(&bootstrap.Options{Stripe: stub})
 	if err != nil {
 		t.Fatalf("buildApp: %v", err)
 	}
