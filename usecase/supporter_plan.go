@@ -17,7 +17,7 @@ func (s *SupporterUseCase) Upgrade(ctx context.Context, userID, supporterID, pla
 		supporter *entity.ProjectSupporter
 		current   *entity.ProjectPlan
 		target    *entity.ProjectPlan
-		proj      *entity.Project
+		project      *entity.Project
 		conn      *entity.ConnectAccount
 		now       time.Time
 		err       error
@@ -50,11 +50,11 @@ func (s *SupporterUseCase) Upgrade(ctx context.Context, userID, supporterID, pla
 	if s.Stripe == nil {
 		return UpgradeOut{}, ErrStripeUnavailable
 	}
-	proj, _, _, err = s.Projects.FindID(ctx, supporter.ProjectID)
-	if err != nil || proj == nil {
+	project, _, _, err = s.Projects.FindID(ctx, supporter.ProjectID)
+	if err != nil || project == nil {
 		return UpgradeOut{}, ErrNotFound
 	}
-	conn, err = s.Connect.FindUserID(ctx, proj.SellerID)
+	conn, err = s.Connect.FindUserID(ctx, project.SellerID)
 	if err != nil || conn == nil || !conn.CanCharge() {
 		return UpgradeOut{}, ErrForbidden
 	}

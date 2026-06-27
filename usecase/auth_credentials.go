@@ -145,9 +145,10 @@ func (a *AuthUseCase) Refresh(ctx context.Context, refreshTokenPlain string, met
 	if plain == "" {
 		return "", "", ErrInvalidToken
 	}
+	// ── TX の外（読み取り・検証）──
 	hash = auth.OpaqueHash(plain)
 	now = time.Now().UTC()
-	row, err = a.RefreshTokens.FindValidHash(ctx, hash, now)
+	row, err = a.RefreshTokens.FindValidHash(ctx, hash, now) // revoked_at IS NULL
 	if err != nil || row == nil {
 		return "", "", ErrInvalidToken
 	}
@@ -155,11 +156,12 @@ func (a *AuthUseCase) Refresh(ctx context.Context, refreshTokenPlain string, met
 	if err != nil || u == nil || !u.CanLogin() {
 		return "", "", ErrInvalidToken
 	}
+	// ── TX の中（原子的にローテーション）──
 	err = repository.WithTx(ctx, a.DB, func(txCtx context.Context) error {
 		if err = a.RefreshTokens.Revoke(txCtx, row.ID, now); err != nil {
 			return err
-		}
-		tokens, err = a.issueSession(txCtx, u, twoFAVerified(u))
+		} // ① 古い RefreshTokens を失効
+		tokens, err = a.issueSession(txCtx, u, twoFAVerified(u)) // ② 新 JWT + 新 RefreshTokens を INSERT
 		return err
 	})
 	if err != nil {

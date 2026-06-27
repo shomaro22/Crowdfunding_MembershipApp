@@ -161,13 +161,22 @@ func (s *SupporterUseCase) ChangeBilling(ctx context.Context, userID, supporterI
 	return s.enrichView(ctx, supporter)
 }
 
-func (s *SupporterUseCase) applyBillingModeSwitch(ctx context.Context, supporter *entity.ProjectSupporter, mode entity.BillingMode) error {
-	if mode == entity.BillingModeKonbini {
+func (s *SupporterUseCase) applyBillingMode(ctx context.Context, supporter *entity.ProjectSupporter, mode entity.BillingMode) error {
+	switch mode {
+	case entity.BillingModeKonbini:
 		supporter.StripeSubscriptionID = nil
 		return nil
+	case entity.BillingModeAuto:
+		if supporter.StripeSubscriptionID == nil {
+			return ErrBadRequest
+		}
+		if s.Stripe == nil {
+			return ErrStripeUnavailable
+		}
+		return s.Stripe.ResumeSubscription(ctx, *supporter.StripeSubscriptionID)
+	default:
+		return ErrBadRequest
 	}
-	_ = ctx
-	return nil
 }
 
 func (p *PurchaseUseCase) ListMine(ctx context.Context, buyerID uuid.UUID, limit, offset int) ([]PurchaseView, int64, error) {
