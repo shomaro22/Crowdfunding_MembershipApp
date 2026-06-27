@@ -24,12 +24,12 @@ type StubClient struct {
 type stubSession struct {
 	out           CheckoutSessionOut
 	in            CheckoutSessionIn
-	paymentStatus stripesdk.CheckoutSessionPaymentStatus
+	paymentStatus string
 }
 
 type stubIntent struct {
 	metadata map[string]string
-	status   stripesdk.PaymentIntentStatus
+	status   string
 	subID    string
 	custID   string
 }
@@ -53,10 +53,10 @@ func (c *StubClient) SetSessionPaid(sessionID string) {
 	if !ok {
 		return
 	}
-	s.paymentStatus = stripesdk.CheckoutSessionPaymentStatusPaid
+	s.paymentStatus = CheckoutPaymentStatusPaid
 	if s.out.PaymentIntentID != "" {
 		if pi, ok := c.intents[s.out.PaymentIntentID]; ok {
-			pi.status = stripesdk.PaymentIntentStatusSucceeded
+			pi.status = PaymentIntentStatusSucceeded
 		}
 	}
 }
@@ -66,7 +66,7 @@ func (c *StubClient) SetIntentSucceeded(intentID string) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	if pi, ok := c.intents[intentID]; ok {
-		pi.status = stripesdk.PaymentIntentStatusSucceeded
+		pi.status = PaymentIntentStatusSucceeded
 	}
 }
 
@@ -130,15 +130,19 @@ func (c *StubClient) GetAccount(ctx context.Context, accountID string) (AccountS
 	}, nil
 }
 
-func (c *StubClient) ConstructWebhookEvent(payload []byte, signature string) (stripesdk.Event, error) {
+func (c *StubClient) ConstructWebhookEvent(payload []byte, signature string) (WebhookEvent, error) {
 	if signature != StubWebhookSignature {
-		return stripesdk.Event{}, errors.New("invalid stripe signature")
+		return WebhookEvent{}, errors.New("invalid stripe signature")
 	}
 	var ev stripesdk.Event
 	if err := json.Unmarshal(payload, &ev); err != nil {
-		return stripesdk.Event{}, err
+		return WebhookEvent{}, err
 	}
-	return ev, nil
+	return WebhookEvent{
+		ID:      ev.ID,
+		Type:    string(ev.Type),
+		DataRaw: ev.Data.Raw,
+	}, nil
 }
 
 func (c *StubClient) ConnectReturnURL() string  { return c.cfg.ConnectReturn }
@@ -161,11 +165,11 @@ func (c *StubClient) CreateCheckoutSession(ctx context.Context, in CheckoutSessi
 	c.sessions[sid] = &stubSession{
 		out:           out,
 		in:            in,
-		paymentStatus: stripesdk.CheckoutSessionPaymentStatusUnpaid,
+		paymentStatus: CheckoutPaymentStatusUnpaid,
 	}
 	c.intents[pid] = &stubIntent{
 		metadata: cloneMeta(in.Metadata),
-		status:   stripesdk.PaymentIntentStatusRequiresPaymentMethod,
+		status:   "requires_payment_method",
 	}
 	return out, nil
 }
@@ -182,7 +186,7 @@ func (c *StubClient) CreateSubscriptionIntent(ctx context.Context, in Subscripti
 	)
 	c.intents[piID] = &stubIntent{
 		metadata: cloneMeta(in.Metadata),
-		status:   stripesdk.PaymentIntentStatusRequiresPaymentMethod,
+		status:   "requires_payment_method",
 		subID:    subID,
 		custID:   custID,
 	}
@@ -220,7 +224,7 @@ func (c *StubClient) CreateUpgradePaymentIntent(ctx context.Context, in UpgradeP
 	var piID = "pi_test_" + strings.ReplaceAll(uuid.New().String(), "-", "")
 	c.intents[piID] = &stubIntent{
 		metadata: cloneMeta(in.Metadata),
-		status:   stripesdk.PaymentIntentStatusRequiresPaymentMethod,
+		status:   "requires_payment_method",
 		custID:   in.CustomerID,
 	}
 	return UpgradePaymentOut{
@@ -240,19 +244,19 @@ func (c *StubClient) GetPaymentIntent(ctx context.Context, intentID string) (Pay
 	return PaymentIntentSnapshot{ID: intentID, Status: pi.status}, nil
 }
 
-func (c *StubClient) GetCheckoutSession(ctx context.Context, sessionID string) (*stripesdk.CheckoutSession, error) {
+func (c *StubClient) GetCheckoutSession(ctx context.Context, sessionID string) (CheckoutSessionSnapshot, error) {
 	_ = ctx
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	s, ok := c.sessions[sessionID]
 	if !ok {
-		return nil, errors.New("checkout session not found")
+		return CheckoutSessionSnapshot{}, errors.New("checkout session not found")
 	}
 	pm := []string{"card"}
 	if s.in.PaymentMethod == "konbini" {
 		pm = []string{"konbini"}
 	}
-	return &stripesdk.CheckoutSession{
+	return CheckoutSessionSnapshot{
 		ID:                 sessionID,
 		PaymentStatus:      s.paymentStatus,
 		Metadata:           cloneMeta(s.in.Metadata),
@@ -260,15 +264,15 @@ func (c *StubClient) GetCheckoutSession(ctx context.Context, sessionID string) (
 	}, nil
 }
 
-func (c *StubClient) GetPaymentIntentDetail(ctx context.Context, intentID string) (*stripesdk.PaymentIntent, error) {
+func (c *StubClient) GetPaymentIntentDetail(ctx context.Context, intentID string) (PaymentIntentDetail, error) {
 	_ = ctx
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	pi, ok := c.intents[intentID]
 	if !ok {
-		return nil, errors.New("payment intent not found")
+		return PaymentIntentDetail{}, errors.New("payment intent not found")
 	}
-	return &stripesdk.PaymentIntent{
+	return PaymentIntentDetail{
 		ID:       intentID,
 		Status:   pi.status,
 		Metadata: cloneMeta(pi.metadata),

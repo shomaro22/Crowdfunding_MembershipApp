@@ -8,7 +8,6 @@ import (
 	"crowdfund-app/stripe"
 
 	"github.com/google/uuid"
-	stripesdk "github.com/stripe/stripe-go/v82"
 )
 
 func (p *PaymentUseCase) CreateCheckout(ctx context.Context, in CheckoutIn) (CheckoutOut, error) {
@@ -107,7 +106,7 @@ func (p *PaymentUseCase) CreateIntent(ctx context.Context, in IntentIn) (IntentO
 
 func (p *PaymentUseCase) VerifyCheckout(ctx context.Context, buyerID uuid.UUID, sessionID string) (SupporterView, error) {
 	var (
-		sess     *stripesdk.CheckoutSession
+		sess     stripe.CheckoutSessionSnapshot
 		purchase *entity.Purchase
 		err      error
 	)
@@ -131,10 +130,10 @@ func (p *PaymentUseCase) VerifyCheckout(ctx context.Context, buyerID uuid.UUID, 
 	if purchase.Status == entity.PurchaseStatusPaid {
 		return p.supporterViewForPurchase(ctx, purchase)
 	}
-	if sess.PaymentStatus != stripesdk.CheckoutSessionPaymentStatusPaid {
+	if sess.PaymentStatus != stripe.CheckoutPaymentStatusPaid {
 		return SupporterView{}, ErrBadRequest
 	}
-	if err = p.fulfillCheckoutSession(ctx, *sess); err != nil {
+	if err = p.fulfillCheckoutSession(ctx, sess); err != nil {
 		return SupporterView{}, err
 	}
 	purchase, err = p.Purchases.FindID(ctx, purchase.ID)
@@ -146,7 +145,7 @@ func (p *PaymentUseCase) VerifyCheckout(ctx context.Context, buyerID uuid.UUID, 
 
 func (p *PaymentUseCase) VerifyIntent(ctx context.Context, buyerID uuid.UUID, intentID string) (SupporterView, error) {
 	var (
-		pi       *stripesdk.PaymentIntent
+		pi       stripe.PaymentIntentDetail
 		purchase *entity.Purchase
 		err      error
 	)
@@ -170,10 +169,10 @@ func (p *PaymentUseCase) VerifyIntent(ctx context.Context, buyerID uuid.UUID, in
 	if purchase.Status == entity.PurchaseStatusPaid {
 		return p.supporterViewForPurchase(ctx, purchase)
 	}
-	if pi.Status != stripesdk.PaymentIntentStatusSucceeded {
+	if pi.Status != stripe.PaymentIntentStatusSucceeded {
 		return SupporterView{}, ErrBadRequest
 	}
-	if err = p.fulfillPaymentIntent(ctx, *pi); err != nil {
+	if err = p.fulfillPaymentIntent(ctx, pi); err != nil {
 		return SupporterView{}, err
 	}
 	purchase, err = p.Purchases.FindID(ctx, purchase.ID)

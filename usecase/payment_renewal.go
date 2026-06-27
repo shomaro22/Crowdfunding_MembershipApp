@@ -9,37 +9,16 @@ import (
 	"crowdfund-app/stripe"
 
 	"github.com/google/uuid"
-	stripesdk "github.com/stripe/stripe-go/v82"
 )
 
-func isAutoSubscriptionRenewal(inv stripesdk.Invoice) bool {
-	switch inv.BillingReason {
-	case stripesdk.InvoiceBillingReasonSubscriptionCycle,
-		stripesdk.InvoiceBillingReasonSubscriptionThreshold,
-		stripesdk.InvoiceBillingReasonSubscriptionUpdate:
-		return true
-	default:
-		return false
-	}
-}
-
-func invoiceSubscriptionID(inv stripesdk.Invoice) string {
-	if inv.Parent != nil &&
-		inv.Parent.SubscriptionDetails != nil &&
-		inv.Parent.SubscriptionDetails.Subscription != nil {
-		return inv.Parent.SubscriptionDetails.Subscription.ID
-	}
-	return ""
-}
-
-func (p *PaymentUseCase) fulfillAutoRenewal(ctx context.Context, inv stripesdk.Invoice) error {
+func (p *PaymentUseCase) fulfillAutoRenewal(ctx context.Context, inv stripe.InvoiceSnapshot) error {
 	var (
 		subID     string
 		supporter *entity.ProjectSupporter
 		period    periodRange
 		err       error
 	)
-	subID = invoiceSubscriptionID(inv)
+	subID = inv.SubscriptionID
 	if subID == "" {
 		return nil
 	}
@@ -63,8 +42,8 @@ func (p *PaymentUseCase) fulfillAutoRenewal(ctx context.Context, inv stripesdk.I
 		)
 		now = time.Now().UTC()
 		invID = inv.ID
-		if inv.Customer != nil {
-			custID = stripeString(inv.Customer.ID)
+		if inv.CustomerID != "" {
+			custID = stripeString(inv.CustomerID)
 		}
 		purchase = entity.Purchase{
 			ID:              uuid.New(),
@@ -110,13 +89,13 @@ func (p *PaymentUseCase) fulfillAutoRenewal(ctx context.Context, inv stripesdk.I
 	})
 }
 
-func (p *PaymentUseCase) fulfillInvoiceFirstSupport(ctx context.Context, inv stripesdk.Invoice) error {
+func (p *PaymentUseCase) fulfillInvoiceFirstSupport(ctx context.Context, inv stripe.InvoiceSnapshot) error {
 	var (
 		purchaseIDStr string
 		purchase      *entity.Purchase
 		err           error
 	)
-	purchaseIDStr = invoicePurchaseID(inv)
+	purchaseIDStr = inv.PurchaseID()
 	if purchaseIDStr == "" {
 		return nil
 	}
@@ -135,31 +114,17 @@ func (p *PaymentUseCase) fulfillInvoiceFirstSupport(ctx context.Context, inv str
 		invID *string
 		subID string
 	)
-	if inv.Customer != nil {
-		cust = stripeString(inv.Customer.ID)
+	if inv.CustomerID != "" {
+		cust = stripeString(inv.CustomerID)
 	}
-	if subID = invoiceSubscriptionID(inv); subID != "" {
+	if subID = inv.SubscriptionID; subID != "" {
 		sub = stripeString(subID)
 	}
 	invID = stripeString(inv.ID)
 	return p.fulfillFirstSupport(ctx, purchase, uuid.Nil, periodRange{start, end}, cust, sub, invID)
 }
 
-func invoicePurchaseID(inv stripesdk.Invoice) string {
-	var subDetails *stripesdk.InvoiceParentSubscriptionDetails
-	if inv.Metadata != nil && inv.Metadata[stripe.MetaPurchaseID] != "" {
-		return inv.Metadata[stripe.MetaPurchaseID]
-	}
-	if inv.Parent != nil {
-		subDetails = inv.Parent.SubscriptionDetails
-	}
-	if subDetails != nil && subDetails.Metadata != nil {
-		return subDetails.Metadata[stripe.MetaPurchaseID]
-	}
-	return ""
-}
-
-func (p *PaymentUseCase) backfillPaidPurchaseInvoice(ctx context.Context, inv stripesdk.Invoice, purchase *entity.Purchase) error {
+func (p *PaymentUseCase) backfillPaidPurchaseInvoice(ctx context.Context, inv stripe.InvoiceSnapshot, purchase *entity.Purchase) error {
 	var (
 		supporter *entity.ProjectSupporter
 		period    periodRange
@@ -186,11 +151,11 @@ func (p *PaymentUseCase) backfillPaidPurchaseInvoice(ctx context.Context, inv st
 	}
 	supporter.CurrentPeriodStart = period.start
 	supporter.CurrentPeriodEnd = period.end
-	if inv.Customer != nil {
-		supporter.StripeCustomerID = stripeString(inv.Customer.ID)
+	if inv.CustomerID != "" {
+		supporter.StripeCustomerID = stripeString(inv.CustomerID)
 	}
-	if subID := invoiceSubscriptionID(inv); subID != "" {
-		supporter.StripeSubscriptionID = &subID
+	if inv.SubscriptionID != "" {
+		supporter.StripeSubscriptionID = &inv.SubscriptionID
 	}
 	supporter.UpdatedAt = time.Now().UTC()
 	return p.Supporters.Update(ctx, supporter)

@@ -23,7 +23,7 @@ type UpgradePaymentOut struct {
 
 type PaymentIntentSnapshot struct {
 	ID     string
-	Status stripesdk.PaymentIntentStatus
+	Status string
 }
 
 func (c *client) CancelSubscriptionAtPeriodEnd(ctx context.Context, subID string) error {
@@ -124,5 +124,5 @@ func (c *client) GetPaymentIntent(ctx context.Context, intentID string) (Payment
 	if err != nil {
 		return PaymentIntentSnapshot{}, err
 	}
-	return PaymentIntentSnapshot{ID: pi.ID, Status: pi.Status}, nil
+	return PaymentIntentSnapshot{ID: pi.ID, Status: string(pi.Status)}, nil
 }

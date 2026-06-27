@@ -21,7 +21,7 @@ type Client interface {
 	CreateExpressAccount(ctx context.Context, email string) (string, error)
 	CreateAccountLink(ctx context.Context, accountID, returnURL, refreshURL string) (string, error)
 	GetAccount(ctx context.Context, accountID string) (AccountSnapshot, error)
-	ConstructWebhookEvent(payload []byte, signature string) (stripesdk.Event, error)
+	ConstructWebhookEvent(payload []byte, signature string) (WebhookEvent, error)
 	ConnectReturnURL() string
 	ConnectRefreshURL() string
 	AppURL() string
@@ -32,8 +32,8 @@ type Client interface {
 	UpdateSubscriptionAmount(ctx context.Context, subID string, amount int64) error
 	CreateUpgradePaymentIntent(ctx context.Context, in UpgradePaymentIn) (UpgradePaymentOut, error)
 	GetPaymentIntent(ctx context.Context, intentID string) (PaymentIntentSnapshot, error)
-	GetCheckoutSession(ctx context.Context, sessionID string) (*stripesdk.CheckoutSession, error)
-	GetPaymentIntentDetail(ctx context.Context, intentID string) (*stripesdk.PaymentIntent, error)
+	GetCheckoutSession(ctx context.Context, sessionID string) (CheckoutSessionSnapshot, error)
+	GetPaymentIntentDetail(ctx context.Context, intentID string) (PaymentIntentDetail, error)
 }
 
 type client struct {
@@ -112,11 +112,19 @@ func (c *client) GetAccount(ctx context.Context, accountID string) (AccountSnaps
 	return out, nil
 }
 
-func (c *client) ConstructWebhookEvent(payload []byte, signature string) (stripesdk.Event, error) {
+func (c *client) ConstructWebhookEvent(payload []byte, signature string) (WebhookEvent, error) {
 	if strings.TrimSpace(c.cfg.WebhookSecret) == "" {
-		return stripesdk.Event{}, ErrWebhookNotConfigured
+		return WebhookEvent{}, ErrWebhookNotConfigured
 	}
-	return webhook.ConstructEvent(payload, signature, c.cfg.WebhookSecret)
+	ev, err := webhook.ConstructEvent(payload, signature, c.cfg.WebhookSecret)
+	if err != nil {
+		return WebhookEvent{}, err
+	}
+	return WebhookEvent{
+		ID:      ev.ID,
+		Type:    string(ev.Type),
+		DataRaw: ev.Data.Raw,
+	}, nil
 }
 
 func (c *client) ConnectReturnURL() string {
