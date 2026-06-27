@@ -121,12 +121,5 @@ func (a *AuthUseCase) issueSession(ctx context.Context, u *entity.User, verified
 }
 
 func (a *AuthUseCase) invalidateSessions(ctx context.Context, userID uuid.UUID) error {
-	var err error
-
-	return repository.WithTx(ctx, a.DB, func(txCtx context.Context) error {
-		if _, err = a.Users.BumpTokenVer(txCtx, userID); err != nil {
-			return err
-		}// ① JWT も無効化
-		return a.RefreshTokens.RevokeAllByUser(txCtx, userID, time.Now().UTC())// ② 全 RefreshTokens 失効
-	})
+	return InvalidateUserSessions(ctx, a.DB, a.Users, a.RefreshTokens, userID)
 }
