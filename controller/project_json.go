@@ -37,7 +37,7 @@ type projectSummaryJSON struct {
 	Status         string            `json:"status"`
 	ImageURL       *string           `json:"image_url"`
 	Plans          []projectPlanJSON `json:"plans"`
-	Seller         *userJSON         `json:"seller,omitempty"`
+	Seller         *usecase.UserWire  `json:"seller,omitempty"`
 }
 
 type listProjectsResponse struct {
@@ -84,7 +84,7 @@ func projectDetailJSON(v *usecase.ProjectView) projectDetailResponse {
 func projectSummaryToJSON(v *usecase.ProjectView) projectSummaryJSON {
 	var (
 		out    projectSummaryJSON
-		seller userJSON
+		seller usecase.UserWire
 	)
 	if v == nil {
 		return projectSummaryJSON{}
@@ -92,7 +92,7 @@ func projectSummaryToJSON(v *usecase.ProjectView) projectSummaryJSON {
 	out = projectItemFieldsJSON(v.Project)
 	out.Plans = projectPlansToJSON(v.Plans)
 	if v.Seller != nil {
-		seller = userToJSON(*v.Seller)
+		seller = usecase.UserWireFrom(*v.Seller)
 		out.Seller = &seller
 	}
 	return out

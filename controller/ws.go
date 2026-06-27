@@ -16,12 +16,12 @@ import (
 )
 
 type WSController struct {
-	Hub             WebSocketHub
-	Messages        MessageProjectAccess
-	allowedOrigins  map[string]struct{}
+	Hub            wshub.Hub
+	Messages       MessageProjectAccess
+	allowedOrigins map[string]struct{}
 }
 
-func NewWSController(hub WebSocketHub, messages MessageProjectAccess, allowedOrigins []string) *WSController {
+func NewWSController(hub wshub.Hub, messages MessageProjectAccess, allowedOrigins []string) *WSController {
 	var allowed map[string]struct{}
 	if len(allowedOrigins) > 0 {
 		allowed = make(map[string]struct{}, len(allowedOrigins))
@@ -38,10 +38,10 @@ const wsDBOpTimeout = 5 * time.Second
 
 func (w *WSController) Handle(c echo.Context) error {
 	var (
-		userID  uuid.UUID
-		conn    *websocket.Conn
+		userID   uuid.UUID
+		conn     *websocket.Conn
 		upgrader websocket.Upgrader
-		err     error
+		err      error
 	)
 	if w.Hub == nil {
 		return echo.NewHTTPError(http.StatusInternalServerError, apiError("websocket hub not configured", "INTERNAL_ERROR"))
@@ -103,9 +103,7 @@ func (w *WSController) Handle(c echo.Context) error {
 }
 
 func (w *WSController) checkOrigin(r *http.Request) bool {
-	var (
-		origin string
-	)
+	var origin string
 	origin = strings.TrimSpace(r.Header.Get("Origin"))
 	if origin == "" {
 		return true
@@ -163,11 +161,11 @@ func (w *WSController) dispatchClientFrame(c echo.Context, connID, userID uuid.U
 
 func (w *WSController) handleSubscribe(c echo.Context, connID, userID, projectID uuid.UUID, projectPtr string) {
 	var (
-		ctx    context.Context
-		cancel context.CancelFunc
-		code   string
+		ctx      context.Context
+		cancel   context.CancelFunc
+		code     string
 		internal bool
-		err    error
+		err      error
 	)
 	ctx, cancel = context.WithTimeout(c.Request().Context(), wsDBOpTimeout)
 	err = w.Messages.ConfirmWSSubscribe(ctx, userID, projectID, requestMeta(c))
@@ -195,13 +193,13 @@ func (w *WSController) handleSubscribe(c echo.Context, connID, userID, projectID
 
 func (w *WSController) handleTyping(connID, userID, projectID uuid.UUID, projectPtr string, isTyping *bool) {
 	var (
-		ctx     context.Context
-		cancel  context.CancelFunc
-		active  bool
-		payload []byte
-		code    string
+		ctx      context.Context
+		cancel   context.CancelFunc
+		active   bool
+		payload  []byte
+		code     string
 		internal bool
-		err     error
+		err      error
 	)
 	active = true
 	if isTyping != nil {
@@ -233,22 +231,8 @@ func (w *WSController) handleTyping(connID, userID, projectID uuid.UUID, project
 		projectID,
 		payload,
 		userID,
-		w.accessFilter(projectID),
+		w.Messages.SubscriberFilter(context.Background(), projectID),
 	)
-}
-
-func (w *WSController) accessFilter(projectID uuid.UUID) func(uuid.UUID) bool {
-	return func(userID uuid.UUID) bool {
-		var (
-			ctx    context.Context
-			cancel context.CancelFunc
-			err    error
-		)
-		ctx, cancel = context.WithTimeout(context.Background(), wsDBOpTimeout)
-		err = w.Messages.CanSubscribeProject(ctx, projectID, userID)
-		cancel()
-		return err == nil
-	}
 }
 
 func (w *WSController) revalidateSubscriptions(connID, userID uuid.UUID) {
@@ -296,7 +280,7 @@ func (w *WSController) writeWSError(connID uuid.UUID, code, msg string, projectI
 	})
 }
 
-func writeWSFrame[T any](hub WebSocketHub, connID uuid.UUID, v T) {
+func writeWSFrame[T any](hub wshub.Hub, connID uuid.UUID, v T) {
 	var (
 		b   []byte
 		err error

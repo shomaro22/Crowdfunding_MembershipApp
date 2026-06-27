@@ -7,9 +7,16 @@ import (
 	"os"
 
 	"crowdfund-app/stripe"
+	"crowdfund-app/usecase"
+	"crowdfund-app/wshub"
 
 	"github.com/joho/godotenv"
 )
+
+// Options は BuildHTTP の任意設定（主に統合テスト用 Stripe 差し替え）。
+type Options struct {
+	Stripe stripe.Client
+}
 
 func LoadDotEnv() {
 	const envFile = ".env"
@@ -44,4 +51,11 @@ func StripeFromEnv() stripe.Client {
 		return nil
 	}
 	return stripe.New(cfg)
+}
+
+func wireMessageEvents(msg *usecase.MessageUseCase, hub *wshub.ConnectionManager) {
+	if msg == nil || hub == nil {
+		return
+	}
+	usecase.AttachMessageEvents(msg, wshub.NewMessagePublisher(hub, msg))
 }
