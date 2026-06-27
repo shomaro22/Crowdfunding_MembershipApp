@@ -116,15 +116,15 @@ func supporterToJSON(v usecase.SupporterView) supporterJSON {
 		out.PlanChangeDate = change
 	}
 	if v.Project != nil {
-		project = projectSummaryToJSON(&usecase.ProjectView{Project: v.Project, Plans: nil})
+		project = projectItemToJSON(usecase.ProjectItemFrom(v.Project))
 		out.Project = &project
 	}
 	if v.Plan != nil {
-		plan = projectPlanToJSON(v.Plan)
+		plan = projectPlanViewToJSON(usecase.ProjectPlanFromPtr(v.Plan))
 		out.Plan = &plan
 	}
 	if v.PendingPlan != nil {
-		pend = projectPlanToJSON(v.PendingPlan)
+		pend = projectPlanViewToJSON(usecase.ProjectPlanFromPtr(v.PendingPlan))
 		out.PendingPlan = &pend
 	}
 	return out
@@ -167,7 +167,7 @@ func purchaseToJSON(v usecase.PurchaseView) purchaseJSON {
 		out.SupporterID = suppID
 	}
 	if v.Project != nil {
-		project = projectSummaryToJSON(&usecase.ProjectView{Project: v.Project})
+		project = projectItemToJSON(usecase.ProjectItemFrom(v.Project))
 		out.Project = &project
 	}
 	if v.Buyer != nil {

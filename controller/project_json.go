@@ -3,7 +3,6 @@ package controller
 import (
 	"time"
 
-	"crowdfund-app/entity"
 	"crowdfund-app/usecase"
 )
 
@@ -84,11 +83,14 @@ func projectDetailJSON(v *usecase.ProjectView) projectDetailResponse {
 
 func projectSummaryToJSON(v *usecase.ProjectView) projectSummaryJSON {
 	var (
-		p      *entity.Project
+		p      usecase.ProjectItemView
 		out    projectSummaryJSON
 		s      string
 		seller userJSON
 	)
+	if v == nil {
+		return projectSummaryJSON{}
+	}
 	p = v.Project
 	out = projectSummaryJSON{
 		ID:             p.ID.String(),
@@ -97,9 +99,9 @@ func projectSummaryToJSON(v *usecase.ProjectView) projectSummaryJSON {
 		TargetAmount:   p.TargetAmount,
 		CurrentAmount:  p.CurrentAmount,
 		SupporterCount: p.SupporterCount,
-		DurationType:   string(p.DurationType),
+		DurationType:   p.DurationType,
 		StartDate:      p.StartDate.UTC().Format(time.RFC3339),
-		Status:         string(p.Status),
+		Status:         p.Status,
 		ImageURL:       p.MainImageURL,
 		Plans:          projectPlansToJSON(v.Plans),
 	}
@@ -114,28 +116,47 @@ func projectSummaryToJSON(v *usecase.ProjectView) projectSummaryJSON {
 	return out
 }
 
-func projectPlansToJSON(plans []entity.ProjectPlan) []projectPlanJSON {
+func projectItemToJSON(p usecase.ProjectItemView) projectSummaryJSON {
 	var (
-		out []projectPlanJSON
-		i   int
-		pl  *entity.ProjectPlan
+		out projectSummaryJSON
+		s   string
 	)
-	out = make([]projectPlanJSON, 0, len(plans))
-	for i = 0; i < len(plans); i++ {
-		pl = &plans[i]
-		out = append(out, projectPlanToJSON(pl))
+	out = projectSummaryJSON{
+		ID:             p.ID.String(),
+		Title:          p.Title,
+		Description:    p.Description,
+		TargetAmount:   p.TargetAmount,
+		CurrentAmount:  p.CurrentAmount,
+		SupporterCount: p.SupporterCount,
+		DurationType:   p.DurationType,
+		StartDate:      p.StartDate.UTC().Format(time.RFC3339),
+		Status:         p.Status,
+		ImageURL:       p.MainImageURL,
+	}
+	if p.EndDate != nil {
+		s = p.EndDate.UTC().Format(time.RFC3339)
+		out.EndDate = &s
 	}
 	return out
 }
 
-func projectPlanToJSON(pl *entity.ProjectPlan) projectPlanJSON {
-	if pl == nil {
-		return projectPlanJSON{}
+func projectPlansToJSON(plans []usecase.ProjectPlanView) []projectPlanJSON {
+	var (
+		out []projectPlanJSON
+		i   int
+	)
+	out = make([]projectPlanJSON, 0, len(plans))
+	for i = 0; i < len(plans); i++ {
+		out = append(out, projectPlanViewToJSON(plans[i]))
 	}
+	return out
+}
+
+func projectPlanViewToJSON(pl usecase.ProjectPlanView) projectPlanJSON {
 	return projectPlanJSON{
 		ID:             pl.ID.String(),
 		ProjectID:      pl.ProjectID.String(),
-		MembershipType: string(pl.MembershipType),
+		MembershipType: pl.MembershipType,
 		Price:          pl.Price,
 		MaxSupporters:  pl.MaxSupporters,
 		Benefits:       pl.Benefits,
@@ -144,20 +165,18 @@ func projectPlanToJSON(pl *entity.ProjectPlan) projectPlanJSON {
 	}
 }
 
-func projectImagesToJSON(images []entity.ProjectImage) []projectImageJSON {
+func projectImagesToJSON(images []usecase.ProjectImageView) []projectImageJSON {
 	var (
 		out []projectImageJSON
 		i   int
-		img *entity.ProjectImage
 	)
 	out = make([]projectImageJSON, 0, len(images))
 	for i = 0; i < len(images); i++ {
-		img = &images[i]
 		out = append(out, projectImageJSON{
-			ID:       img.ID.String(),
-			ImageURL: img.ImageURL,
-			IsMain:   img.IsMain,
-			Order:    img.SortOrder,
+			ID:       images[i].ID.String(),
+			ImageURL: images[i].ImageURL,
+			IsMain:   images[i].IsMain,
+			Order:    images[i].SortOrder,
 		})
 	}
 	return out
