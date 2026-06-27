@@ -83,32 +83,14 @@ func projectDetailJSON(v *usecase.ProjectView) projectDetailResponse {
 
 func projectSummaryToJSON(v *usecase.ProjectView) projectSummaryJSON {
 	var (
-		p      usecase.ProjectItemView
 		out    projectSummaryJSON
-		s      string
 		seller userJSON
 	)
 	if v == nil {
 		return projectSummaryJSON{}
 	}
-	p = v.Project
-	out = projectSummaryJSON{
-		ID:             p.ID.String(),
-		Title:          p.Title,
-		Description:    p.Description,
-		TargetAmount:   p.TargetAmount,
-		CurrentAmount:  p.CurrentAmount,
-		SupporterCount: p.SupporterCount,
-		DurationType:   p.DurationType,
-		StartDate:      p.StartDate.UTC().Format(time.RFC3339),
-		Status:         p.Status,
-		ImageURL:       p.MainImageURL,
-		Plans:          projectPlansToJSON(v.Plans),
-	}
-	if p.EndDate != nil {
-		s = p.EndDate.UTC().Format(time.RFC3339)
-		out.EndDate = &s
-	}
+	out = projectItemFieldsJSON(v.Project)
+	out.Plans = projectPlansToJSON(v.Plans)
 	if v.Seller != nil {
 		seller = userToJSON(*v.Seller)
 		out.Seller = &seller
@@ -117,6 +99,10 @@ func projectSummaryToJSON(v *usecase.ProjectView) projectSummaryJSON {
 }
 
 func projectItemToJSON(p usecase.ProjectItemView) projectSummaryJSON {
+	return projectItemFieldsJSON(p)
+}
+
+func projectItemFieldsJSON(p usecase.ProjectItemView) projectSummaryJSON {
 	var (
 		out projectSummaryJSON
 		s   string

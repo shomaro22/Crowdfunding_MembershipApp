@@ -38,7 +38,7 @@ func (a *AuthUseCase) GoogleAuthURL(from string) (string, error) {
 	return authURL, err
 }
 
-func (a *AuthUseCase) GoogleCallback(ctx context.Context, code, state string, meta AuthMeta) (*OAuthCBOut, error) {
+func (a *AuthUseCase) GoogleCallback(ctx context.Context, code, state string, meta RequestMeta) (*OAuthCBOut, error) {
 	var (
 		from    string
 		ok      bool
@@ -94,7 +94,7 @@ func (a *AuthUseCase) GoogleCallback(ctx context.Context, code, state string, me
 	}, nil
 }
 
-func (a *AuthUseCase) ExchangeOAuthCode(ctx context.Context, code string, meta AuthMeta) (*LoginResult, error) {
+func (a *AuthUseCase) ExchangeOAuthCode(ctx context.Context, code string, meta RequestMeta) (*LoginResult, error) {
 	var (
 		userID    uuid.UUID
 		ok        bool

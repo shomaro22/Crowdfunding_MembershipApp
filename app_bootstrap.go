@@ -55,11 +55,11 @@ func buildApp(opts *bootstrap.Options) (*echo.Echo, string, error) {
 	cookieCfg = auth.CookieFromEnv()
 	authCtl = controller.NewAuthController(app.UseCases.Auth, cookieCfg, app.Config.AppPublicURL)
 	healthCtl = &controller.HealthController{SQL: app.DB, RDB: app.RDB}
-	adminCtl = controller.NewAdminController(app.UseCases.Admin)
+	adminCtl = controller.NewAdminController(app.UseCases.Admin, app.Config.APIPublicURL)
 	kycFileCtl = controller.NewKYCFileController(app.UseCases.KYCAccess)
 	projectCtl = controller.NewProjectController(app.UseCases.Project)
 	connectCtl = controller.NewConnectController(app.UseCases.Connect)
-	paymentCtl = controller.NewPaymentController(app.UseCases.Payment, app.UseCases.Purchase)
+	paymentCtl = controller.NewPaymentController(app.UseCases.Payment, app.UseCases.Purchase, app.Stripe.AppURL())
 	supporterCtl = controller.NewSupporterController(app.UseCases.Supporter)
 
 	validateSession = middleware.SessionValidateHTTP(app.UseCases.Auth.ValidateSession)

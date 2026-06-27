@@ -15,12 +15,11 @@ func (a *AdminUseCase) ListProjects(ctx context.Context, status *string, limit, 
 		rows   []entity.Project
 		total  int64
 		err    error
-		uc     *ProjectUseCase
 		filter *entity.ProjectStatus
 		st     entity.ProjectStatus
 	)
 
-	if a.Projects == nil {
+	if a.Projects == nil || a.ProjectsUC == nil {
 		return nil, 0, ErrNotFound
 	}
 	if status != nil && *status != "" {
@@ -34,8 +33,7 @@ func (a *AdminUseCase) ListProjects(ctx context.Context, status *string, limit, 
 	if err != nil {
 		return nil, 0, err
 	}
-	uc = &ProjectUseCase{Projects: a.Projects, Users: a.Users}
-	return uc.enrichList(ctx, rows, total)
+	return a.ProjectsUC.EnrichList(ctx, rows, total)
 }
 
 func (a *AdminUseCase) PatchProject(ctx context.Context, adminID, projectID uuid.UUID, status string, reason *string) (*ProjectView, error) {
