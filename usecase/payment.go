@@ -32,7 +32,7 @@ type CheckoutIn struct {
 	BuyerID       uuid.UUID
 	ProjectID     uuid.UUID
 	PlanID        uuid.UUID
-	PaymentMethod entity.PaymentMethod
+	PaymentMethod string
 	SuccessURL    *string
 	CancelURL     *string
 	Meta          RequestMeta

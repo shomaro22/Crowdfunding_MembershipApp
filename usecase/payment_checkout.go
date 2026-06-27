@@ -22,7 +22,7 @@ func (p *PaymentUseCase) CreateCheckout(ctx context.Context, in CheckoutIn) (Che
 	if p.Stripe == nil {
 		return CheckoutOut{}, ErrStripeUnavailable
 	}
-	pm = in.PaymentMethod
+	pm = entity.PaymentMethod(in.PaymentMethod)
 	if pm == "" {
 		pm = entity.PaymentMethodKonbini
 	}
