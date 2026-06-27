@@ -2,6 +2,7 @@ package usecase
 
 import (
 	"context"
+	"errors"
 	"strings"
 	"time"
 
@@ -13,7 +14,7 @@ import (
 )
 
 type PlanIn struct {
-	MembershipType entity.MembershipType
+	MembershipType string
 	Price          int
 	MaxSupporters  *int
 	Benefits       string
@@ -29,7 +30,7 @@ type CreateProjectIn struct {
 	Title        string
 	Description  string
 	TargetAmount int64
-	DurationType entity.DurationType
+	DurationType string
 	StartDate    time.Time
 	EndDate      *time.Time
 	ImageURL     *string
@@ -41,19 +42,12 @@ type UpdateProjectIn struct {
 	Title        *string
 	Description  *string
 	TargetAmount *int64
-	DurationType *entity.DurationType
+	DurationType *string
 	StartDate    *time.Time
 	EndDate      *time.Time
 	ImageURL     *string
 	Images       *[]ImageIn
 	IsReapply    bool
-}
-
-type ProjectView struct {
-	Project *entity.Project
-	Plans   []entity.ProjectPlan
-	Images  []entity.ProjectImage
-	Seller  *UserView
 }
 
 type ProjectUseCase struct {
@@ -63,8 +57,13 @@ type ProjectUseCase struct {
 }
 
 func mapEntityErr(err error) error {
-	switch err {
-	case entity.ErrBadTitle, entity.ErrBadProject, entity.ErrBadDuration, entity.ErrBadMembership, entity.ErrBadPrice, entity.ErrBadImages:
+	switch {
+	case errors.Is(err, entity.ErrBadTitle),
+		errors.Is(err, entity.ErrBadProject),
+		errors.Is(err, entity.ErrBadDuration),
+		errors.Is(err, entity.ErrBadMembership),
+		errors.Is(err, entity.ErrBadPrice),
+		errors.Is(err, entity.ErrBadImages):
 		return ErrBadRequest
 	default:
 		return err
@@ -172,7 +171,7 @@ func (p *ProjectUseCase) enrichList(ctx context.Context, rows []entity.Project, 
 			return nil, 0, err
 		}
 		projectCopy = project
-		out = append(out, ProjectView{Project: &projectCopy, Plans: plans, Images: images, Seller: seller})
+		out = append(out, AssembleProjectView(&projectCopy, plans, images, seller))
 	}
 	return out, total, nil
 }
@@ -216,7 +215,7 @@ func (p *ProjectUseCase) ListMine(ctx context.Context, sellerID uuid.UUID, limit
 	return p.enrichList(ctx, rows, total)
 }
 
-func (p *ProjectUseCase) FindView(ctx context.Context, id uuid.UUID, viewerID *uuid.UUID, viewerRole entity.UserRole) (*ProjectView, error) {
+func (p *ProjectUseCase) FindView(ctx context.Context, id uuid.UUID, viewerID *uuid.UUID, viewerRole string) (*ProjectView, error) {
 	var (
 		project   *entity.Project
 		plans  []entity.ProjectPlan
@@ -231,7 +230,7 @@ func (p *ProjectUseCase) FindView(ctx context.Context, id uuid.UUID, viewerID *u
 	if err != nil || project == nil {
 		return nil, ErrNotFound
 	}
-	if !canViewProject(project, viewerID, viewerRole, now) {
+	if !canViewProject(project, viewerID, parseUserRole(viewerRole), now) {
 		return nil, ErrNotFound
 	}
 	u, err = p.Users.FindID(ctx, project.SellerID)
@@ -239,10 +238,11 @@ func (p *ProjectUseCase) FindView(ctx context.Context, id uuid.UUID, viewerID *u
 		return nil, err
 	}
 	seller = UserViewPtr(u)
-	return &ProjectView{Project: project, Plans: plans, Images: images, Seller: seller}, nil
+	v := AssembleProjectView(project, plans, images, seller)
+	return &v, nil
 }
 
-func (p *ProjectUseCase) ListPlans(ctx context.Context, projectID uuid.UUID, viewerID *uuid.UUID, viewerRole entity.UserRole) ([]entity.ProjectPlan, error) {
+func (p *ProjectUseCase) ListPlans(ctx context.Context, projectID uuid.UUID, viewerID *uuid.UUID, viewerRole string) ([]ProjectPlanView, error) {
 	var (
 		project  *entity.Project
 		plans []entity.ProjectPlan
@@ -255,10 +255,19 @@ func (p *ProjectUseCase) ListPlans(ctx context.Context, projectID uuid.UUID, vie
 		return nil, ErrNotFound
 	}
 	now = time.Now().UTC()
-	if !canViewProject(project, viewerID, viewerRole, now) {
+	if !canViewProject(project, viewerID, parseUserRole(viewerRole), now) {
 		return nil, ErrNotFound
 	}
-	return plans, nil
+	return ProjectPlansFrom(plans), nil
+}
+
+func parseUserRole(raw string) entity.UserRole {
+	var role entity.UserRole
+	role = entity.UserRole(strings.TrimSpace(raw))
+	if role.Valid() {
+		return role
+	}
+	return ""
 }
 
 func canViewProject(project *entity.Project, viewerID *uuid.UUID, role entity.UserRole, now time.Time) bool {

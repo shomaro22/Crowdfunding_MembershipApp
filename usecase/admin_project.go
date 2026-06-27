@@ -86,7 +86,7 @@ func (a *AdminUseCase) PatchProject(ctx context.Context, adminID, projectID uuid
 		a.writeReviewDecision(ctx, adminID, entity.ReviewProject, projectID, entity.ReviewRejected, reason)
 	}
 	seller, _ = a.Users.FindID(ctx, project.SellerID)
-	return &ProjectView{Project: project, Plans: plans, Images: images, Seller: UserViewPtr(seller)}, nil
+	return AssembleProjectViewPtr(project, plans, images, UserViewPtr(seller)), nil
 }
 
 func (a *AdminUseCase) DeleteProject(ctx context.Context, adminID, projectID uuid.UUID) error {
@@ -164,5 +164,5 @@ func (a *AdminUseCase) PatchDeleteReq(ctx context.Context, adminID, projectID uu
 		return nil, ErrBadRequest
 	}
 	seller, _ = a.Users.FindID(ctx, project.SellerID)
-	return &ProjectView{Project: project, Plans: plans, Images: images, Seller: UserViewPtr(seller)}, nil
+	return AssembleProjectViewPtr(project, plans, images, UserViewPtr(seller)), nil
 }
