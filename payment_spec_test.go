@@ -1,3 +1,5 @@
+//go:build integration
+
 package main
 
 import (
@@ -12,6 +14,7 @@ import (
 	"testing"
 	"time"
 
+	"crowdfund-app/bootstrap"
 	"crowdfund-app/db"
 	"crowdfund-app/entity"
 	"crowdfund-app/stripe"
@@ -54,10 +57,8 @@ func setupPaymentApp(t *testing.T) (*echo.Echo, *stripe.StubClient) {
 		t.Skip("DB 接続不可のためスキップ: ", err)
 	}
 	stub = stripe.NewStubClient()
-	setTestStripeClient(stub)
-	t.Cleanup(clearTestStripeClient)
 	_ = os.Setenv("JWT_SECRET", securityTestJWTSecret)
-	e, _, err = buildApp()
+	e, _, err = buildApp(&bootstrap.Options{Stripe: stub})
 	if err != nil {
 		t.Fatalf("buildApp: %v", err)
 	}
@@ -74,7 +75,7 @@ func seedPaymentFixture(t *testing.T, gdb *gorm.DB) paymentFixture {
 		now    time.Time
 		seller *entity.User
 		buyer  *entity.User
-		proj   *entity.Project
+		project   *entity.Project
 		plan   *entity.ProjectPlan
 		conn   *entity.ConnectAccount
 		err    error
@@ -86,10 +87,10 @@ func seedPaymentFixture(t *testing.T, gdb *gorm.DB) paymentFixture {
 		TOTPEnabled: true,
 	})
 	buyer = seedSecurityUser(t, gdb, seedOpts{Role: entity.UserRoleBuyer})
-	proj = seedSecurityProject(t, gdb, seller.ID, entity.ProjectStatusActive)
+	project = seedSecurityProject(t, gdb, seller.ID, entity.ProjectStatusActive)
 	plan = &entity.ProjectPlan{
 		ID:             uuid.New(),
-		ProjectID:      proj.ID,
+		ProjectID:      project.ID,
 		MembershipType: entity.MembershipBronze,
 		Price:          1000,
 		Benefits:       "test benefits",
@@ -113,7 +114,7 @@ func seedPaymentFixture(t *testing.T, gdb *gorm.DB) paymentFixture {
 	if err = gdb.Create(conn).Error; err != nil {
 		t.Fatal(err)
 	}
-	return paymentFixture{seller: seller, buyer: buyer, project: proj, plan: plan}
+	return paymentFixture{seller: seller, buyer: buyer, project: project, plan: plan}
 }
 
 func TestPaymentKonbiniCheckoutAsyncWebhook(t *testing.T) {
@@ -128,7 +129,7 @@ func TestPaymentKonbiniCheckoutAsyncWebhook(t *testing.T) {
 		meta      map[string]string
 		purchase  entity.Purchase
 		supporter entity.ProjectSupporter
-		proj      entity.Project
+		project      entity.Project
 		err       error
 	)
 	e, stub = setupPaymentApp(t)
@@ -165,12 +166,12 @@ func TestPaymentKonbiniCheckoutAsyncWebhook(t *testing.T) {
 	if supporter.BillingMode != entity.BillingModeKonbini {
 		t.Fatalf("billing mode=%s want KONBINI", supporter.BillingMode)
 	}
-	err = gdb.Where("id = ?", fx.project.ID).First(&proj).Error
+	err = gdb.Where("id = ?", fx.project.ID).First(&project).Error
 	if err != nil {
 		t.Fatal(err)
 	}
-	if proj.CurrentAmount != int64(fx.plan.Price) {
-		t.Fatalf("current_amount=%d want %d", proj.CurrentAmount, fx.plan.Price)
+	if project.CurrentAmount != int64(fx.plan.Price) {
+		t.Fatalf("current_amount=%d want %d", project.CurrentAmount, fx.plan.Price)
 	}
 }
 

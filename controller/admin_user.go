@@ -4,6 +4,7 @@ import (
 	"net/http"
 
 	"crowdfund-app/entity"
+	"crowdfund-app/usecase"
 
 	"github.com/google/uuid"
 	"github.com/labstack/echo/v4"
@@ -16,7 +17,7 @@ func (h *AdminController) ResetUser2FA(c echo.Context) error {
 		body    struct {
 			Reason *string `json:"reason"`
 		}
-		u   *entity.User
+		u   usecase.UserView
 		err error
 	)
 	adminID, err = CurrentUserID(c)
@@ -43,7 +44,7 @@ func (h *AdminController) ChangeAdminRole(c echo.Context) error {
 			AdminRole string  `json:"admin_role"`
 			Reason    *string `json:"reason"`
 		}
-		u   *entity.User
+		u   usecase.UserView
 		err error
 	)
 	actorID, err = CurrentUserID(c)

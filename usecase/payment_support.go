@@ -41,36 +41,10 @@ func (p *PaymentUseCase) loadSupportContext(ctx context.Context, buyerID, projec
 }
 
 func (p *PaymentUseCase) loadCheckoutContext(ctx context.Context, buyerID, projectID, planID uuid.UUID, pm entity.PaymentMethod) (supportContext, error) {
-	var (
-		sc   supportContext
-		pend *entity.Purchase
-		err  error
-	)
 	if pm == entity.PaymentMethodKonbini {
 		return p.loadKonbiniCheckoutContext(ctx, buyerID, projectID, planID)
 	}
-	sc, err = p.loadBuyerProjectPlan(ctx, buyerID, projectID, planID)
-	if err != nil {
-		return sc, err
-	}
-	pend, err = p.Purchases.FindPendingBuyerProject(ctx, buyerID, projectID)
-	if err != nil {
-		return sc, err
-	}
-	if pend != nil {
-		return sc, ErrPendingCheckout
-	}
-	if sc.membership, err = p.Supporters.FindMembership(ctx, projectID, buyerID); err != nil {
-		return sc, err
-	}
-	if sc.membership != nil {
-		return sc, ErrAlreadySupporting
-	}
-	if sc.plan.MaxSupporters != nil && sc.plan.SupporterCount >= *sc.plan.MaxSupporters {
-		return sc, ErrForbidden
-	}
-	sc.purpose = checkoutFirstSupport
-	return sc, nil
+	return p.loadSupportContext(ctx, buyerID, projectID, planID)
 }
 
 func (p *PaymentUseCase) loadKonbiniCheckoutContext(ctx context.Context, buyerID, projectID, planID uuid.UUID) (supportContext, error) {
@@ -115,7 +89,7 @@ func (p *PaymentUseCase) loadBuyerProjectPlan(ctx context.Context, buyerID, proj
 	var (
 		sc   supportContext
 		u    *entity.User
-		proj *entity.Project
+		project *entity.Project
 		plan *entity.ProjectPlan
 		conn *entity.ConnectAccount
 		err  error
@@ -128,18 +102,18 @@ func (p *PaymentUseCase) loadBuyerProjectPlan(ctx context.Context, buyerID, proj
 	if !u.IsActive() || u.Role != entity.UserRoleBuyer {
 		return sc, ErrForbidden
 	}
-	proj, _, _, err = p.Projects.FindID(ctx, projectID)
-	if err != nil || proj == nil {
+	project, _, _, err = p.Projects.FindID(ctx, projectID)
+	if err != nil || project == nil {
 		return sc, ErrNotFound
 	}
-	if !proj.IsPublic(sc.now) {
+	if !project.IsPublic(sc.now) {
 		return sc, ErrForbidden
 	}
 	plan, err = p.Projects.FindPlan(ctx, projectID, planID)
 	if err != nil || plan == nil || !plan.IsActive {
 		return sc, ErrNotFound
 	}
-	conn, err = p.Connect.FindUserID(ctx, proj.SellerID)
+	conn, err = p.Connect.FindUserID(ctx, project.SellerID)
 	if err != nil {
 		return sc, err
 	}
@@ -147,7 +121,7 @@ func (p *PaymentUseCase) loadBuyerProjectPlan(ctx context.Context, buyerID, proj
 		return sc, ErrForbidden
 	}
 	sc.buyer = u
-	sc.project = proj
+	sc.project = project
 	sc.plan = plan
 	sc.connect = conn
 	return sc, nil

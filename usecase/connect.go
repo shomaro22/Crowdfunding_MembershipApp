@@ -17,9 +17,10 @@ type ConnectUseCase struct {
 	Stripe  stripe.Client
 }
 
-func (c *ConnectUseCase) GetAccount(ctx context.Context, sellerID uuid.UUID) (*entity.ConnectAccount, error) {
+func (c *ConnectUseCase) GetAccount(ctx context.Context, sellerID uuid.UUID) (*ConnectAccountView, error) {
 	var (
 		u   *entity.User
+		row *entity.ConnectAccount
 		err error
 	)
 	if c.Stripe == nil {
@@ -32,7 +33,11 @@ func (c *ConnectUseCase) GetAccount(ctx context.Context, sellerID uuid.UUID) (*e
 	if u.Role != entity.UserRoleSeller {
 		return nil, ErrForbidden
 	}
-	return c.Connect.FindUserID(ctx, sellerID)
+	row, err = c.Connect.FindUserID(ctx, sellerID)
+	if err != nil {
+		return nil, err
+	}
+	return ConnectAccountViewFrom(row), nil
 }
 
 func (c *ConnectUseCase) CreateOnboardingLink(ctx context.Context, sellerID uuid.UUID) (string, error) {

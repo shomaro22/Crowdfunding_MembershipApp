@@ -1,3 +1,5 @@
+//go:build integration
+
 package main
 
 import (
@@ -86,14 +88,14 @@ func TestProjectPendingHiddenFromPublic(t *testing.T) {
 		e       *echo.Echo
 		gdb     *gorm.DB
 		seller  *entity.User
-		proj    *entity.Project
+		project    *entity.Project
 		rec     *httptest.ResponseRecorder
 	)
 	e = setupSecurityApp(t)
 	gdb = openSecurityDB(t)
 	seller = seedSecurityUser(t, gdb, seedOpts{Role: entity.UserRoleSeller})
-	proj = seedSecurityProject(t, gdb, seller.ID, entity.ProjectStatusPending)
-	rec = securityGET(e, "/projects/"+proj.ID.String(), "")
+	project = seedSecurityProject(t, gdb, seller.ID, entity.ProjectStatusPending)
+	rec = securityGET(e, "/projects/"+project.ID.String(), "")
 	if rec.Code != http.StatusNotFound {
 		t.Fatalf("status=%d want 404", rec.Code)
 	}
@@ -104,7 +106,7 @@ func TestProjectSellerCanViewOwnPending(t *testing.T) {
 		e      *echo.Echo
 		gdb    *gorm.DB
 		seller *entity.User
-		proj   *entity.Project
+		project   *entity.Project
 		tok    string
 		rec    *httptest.ResponseRecorder
 	)
@@ -114,9 +116,9 @@ func TestProjectSellerCanViewOwnPending(t *testing.T) {
 		Role:        entity.UserRoleSeller,
 		TOTPEnabled: true,
 	})
-	proj = seedSecurityProject(t, gdb, seller.ID, entity.ProjectStatusPending)
+	project = seedSecurityProject(t, gdb, seller.ID, entity.ProjectStatusPending)
 	tok, _ = issueSecurityToken(seller, true)
-	rec = securityGET(e, "/projects/"+proj.ID.String(), tok)
+	rec = securityGET(e, "/projects/"+project.ID.String(), tok)
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status=%d want 200", rec.Code)
 	}
@@ -157,7 +159,7 @@ func TestProjectPatchRejectRequiresReason(t *testing.T) {
 		gdb    *gorm.DB
 		seller *entity.User
 		admin  *entity.User
-		proj   *entity.Project
+		project   *entity.Project
 		tok    string
 		role   entity.AdminRole
 		rec    *httptest.ResponseRecorder
@@ -165,7 +167,7 @@ func TestProjectPatchRejectRequiresReason(t *testing.T) {
 	e = setupSecurityApp(t)
 	gdb = openSecurityDB(t)
 	seller = seedSecurityUser(t, gdb, seedOpts{Role: entity.UserRoleSeller})
-	proj = seedSecurityProject(t, gdb, seller.ID, entity.ProjectStatusPending)
+	project = seedSecurityProject(t, gdb, seller.ID, entity.ProjectStatusPending)
 	role = entity.AdminRoleReviewAdmin
 	admin = seedSecurityUser(t, gdb, seedOpts{
 		Role:        entity.UserRoleAdmin,
@@ -173,7 +175,7 @@ func TestProjectPatchRejectRequiresReason(t *testing.T) {
 		TOTPEnabled: true,
 	})
 	tok, _ = issueSecurityToken(admin, true)
-	rec = securityPATCH(e, "/admin/projects/"+proj.ID.String(), tok, `{"status":"CANCELLED"}`)
+	rec = securityPATCH(e, "/admin/projects/"+project.ID.String(), tok, `{"status":"CANCELLED"}`)
 	if rec.Code != http.StatusBadRequest {
 		t.Fatalf("status=%d want 400", rec.Code)
 	}
@@ -185,7 +187,7 @@ func TestProjectHardDeleteActiveForbidden(t *testing.T) {
 		gdb    *gorm.DB
 		seller *entity.User
 		admin  *entity.User
-		proj   *entity.Project
+		project   *entity.Project
 		tok    string
 		role   entity.AdminRole
 		rec    *httptest.ResponseRecorder
@@ -193,7 +195,7 @@ func TestProjectHardDeleteActiveForbidden(t *testing.T) {
 	e = setupSecurityApp(t)
 	gdb = openSecurityDB(t)
 	seller = seedSecurityUser(t, gdb, seedOpts{Role: entity.UserRoleSeller})
-	proj = seedSecurityProject(t, gdb, seller.ID, entity.ProjectStatusActive)
+	project = seedSecurityProject(t, gdb, seller.ID, entity.ProjectStatusActive)
 	role = entity.AdminRoleReviewAdmin
 	admin = seedSecurityUser(t, gdb, seedOpts{
 		Role:        entity.UserRoleAdmin,
@@ -201,7 +203,7 @@ func TestProjectHardDeleteActiveForbidden(t *testing.T) {
 		TOTPEnabled: true,
 	})
 	tok, _ = issueSecurityToken(admin, true)
-	rec = securityDELETE(e, "/admin/projects/"+proj.ID.String(), tok)
+	rec = securityDELETE(e, "/admin/projects/"+project.ID.String(), tok)
 	if rec.Code != http.StatusBadRequest {
 		t.Fatalf("status=%d want 400", rec.Code)
 	}
@@ -213,7 +215,7 @@ func TestProjectHardDeleteDeletedAllowed(t *testing.T) {
 		gdb    *gorm.DB
 		seller *entity.User
 		admin  *entity.User
-		proj   *entity.Project
+		project   *entity.Project
 		tok    string
 		role   entity.AdminRole
 		rec    *httptest.ResponseRecorder
@@ -223,7 +225,7 @@ func TestProjectHardDeleteDeletedAllowed(t *testing.T) {
 	e = setupSecurityApp(t)
 	gdb = openSecurityDB(t)
 	seller = seedSecurityUser(t, gdb, seedOpts{Role: entity.UserRoleSeller})
-	proj = seedSecurityProject(t, gdb, seller.ID, entity.ProjectStatusDeleted)
+	project = seedSecurityProject(t, gdb, seller.ID, entity.ProjectStatusDeleted)
 	role = entity.AdminRoleReviewAdmin
 	admin = seedSecurityUser(t, gdb, seedOpts{
 		Role:        entity.UserRoleAdmin,
@@ -231,11 +233,11 @@ func TestProjectHardDeleteDeletedAllowed(t *testing.T) {
 		TOTPEnabled: true,
 	})
 	tok, _ = issueSecurityToken(admin, true)
-	rec = securityDELETE(e, "/admin/projects/"+proj.ID.String(), tok)
+	rec = securityDELETE(e, "/admin/projects/"+project.ID.String(), tok)
 	if rec.Code != http.StatusNoContent {
 		t.Fatalf("status=%d want 204", rec.Code)
 	}
-	err = gdb.Model(&entity.Project{}).Where("id = ?", proj.ID).Count(&n).Error
+	err = gdb.Model(&entity.Project{}).Where("id = ?", project.ID).Count(&n).Error
 	if err != nil {
 		t.Fatal(err)
 	}

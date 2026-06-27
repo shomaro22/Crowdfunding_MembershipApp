@@ -9,10 +9,9 @@ import (
 
 	"crowdfund-app/db"
 	"crowdfund-app/entity"
-	"crowdfund-app/repository"
+	"crowdfund-app/bootstrap"
 	"crowdfund-app/usecase"
 
-	"github.com/joho/godotenv"
 	"gorm.io/gorm"
 )
 
@@ -31,7 +30,7 @@ func main() {
 		os.Exit(2)
 	}
 	job = args[0]
-	loadDotEnv()
+	bootstrap.LoadDotEnv()
 	err = runBatch(job, dryRun)
 	if err != nil {
 		log.Fatal(err)
@@ -40,27 +39,23 @@ func main() {
 
 func runBatch(job string, dryRun bool) error {
 	var (
-		ctx         context.Context
-		databaseURL string
-		gormDB      *gorm.DB
-		batchUC     *usecase.BatchUseCase
-		run         *entity.BatchRun
-		err         error
+		ctx     context.Context
+		gormDB  *gorm.DB
+		batchUC *usecase.BatchUseCase
+		run     *entity.BatchRun
+		err     error
 	)
 	ctx = context.Background()
-	databaseURL = os.Getenv("DATABASE_URL")
-	if databaseURL == "" {
-		databaseURL = "postgres://postgres:postgres@localhost:5432/crowdfund?sslmode=disable"
-	}
-	err = db.Up(databaseURL)
+	err = db.Up(bootstrap.DatabaseURL())
 	if err != nil {
 		return err
 	}
-	gormDB, err = db.Open(databaseURL)
+	gormDB, err = db.Open(bootstrap.DatabaseURL())
 	if err != nil {
 		return err
 	}
-	batchUC = buildBatchUseCase(gormDB)
+	repos := bootstrap.NewRepositories(gormDB)
+	batchUC = bootstrap.NewBatchUseCase(gormDB, repos, bootstrap.StripeFromEnv())
 	run, err = batchUC.Run(ctx, job, "cli", dryRun)
 	if err != nil {
 		return err
@@ -70,36 +65,4 @@ func runBatch(job string, dryRun bool) error {
 		log.Printf("batch note: %s", *run.ErrorMessage)
 	}
 	return nil
-}
-
-func buildBatchUseCase(gormDB *gorm.DB) *usecase.BatchUseCase {
-	var (
-		supporterRepo repository.SupporterRepo
-		batchRepo     repository.BatchRepo
-		supporterUC   *usecase.SupporterUseCase
-	)
-	supporterRepo = repository.NewSupporterRepo(gormDB)
-	batchRepo = repository.NewBatchRepo(gormDB)
-	supporterUC = &usecase.SupporterUseCase{
-		DB:         gormDB,
-		Supporters: supporterRepo,
-	}
-	return &usecase.BatchUseCase{
-		DB:         gormDB,
-		Runs:       batchRepo,
-		Supporters: supporterUC,
-	}
-}
-
-func loadDotEnv() {
-	const envFile = ".env"
-	var err error
-	_, err = os.Stat(envFile)
-	if err != nil {
-		return
-	}
-	err = godotenv.Load(envFile)
-	if err != nil {
-		log.Printf("warning: load .env: %v", err)
-	}
 }
