@@ -28,7 +28,7 @@ type AdminUseCase struct {
 }
 
 type SellerRegView struct {
-	Registration *entity.SellerReg
+	Registration SellerRegItemView
 	User         UserView
 	FrontURL     *string
 	BackURL      *string
