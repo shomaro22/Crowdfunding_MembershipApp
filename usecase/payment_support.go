@@ -115,7 +115,7 @@ func (p *PaymentUseCase) loadBuyerProjectPlan(ctx context.Context, buyerID, proj
 	var (
 		sc   supportContext
 		u    *entity.User
-		proj *entity.Project
+		project *entity.Project
 		plan *entity.ProjectPlan
 		conn *entity.ConnectAccount
 		err  error
@@ -128,18 +128,18 @@ func (p *PaymentUseCase) loadBuyerProjectPlan(ctx context.Context, buyerID, proj
 	if !u.IsActive() || u.Role != entity.UserRoleBuyer {
 		return sc, ErrForbidden
 	}
-	proj, _, _, err = p.Projects.FindID(ctx, projectID)
-	if err != nil || proj == nil {
+	project, _, _, err = p.Projects.FindID(ctx, projectID)
+	if err != nil || project == nil {
 		return sc, ErrNotFound
 	}
-	if !proj.IsPublic(sc.now) {
+	if !project.IsPublic(sc.now) {
 		return sc, ErrForbidden
 	}
 	plan, err = p.Projects.FindPlan(ctx, projectID, planID)
 	if err != nil || plan == nil || !plan.IsActive {
 		return sc, ErrNotFound
 	}
-	conn, err = p.Connect.FindUserID(ctx, proj.SellerID)
+	conn, err = p.Connect.FindUserID(ctx, project.SellerID)
 	if err != nil {
 		return sc, err
 	}
@@ -147,7 +147,7 @@ func (p *PaymentUseCase) loadBuyerProjectPlan(ctx context.Context, buyerID, proj
 		return sc, ErrForbidden
 	}
 	sc.buyer = u
-	sc.project = proj
+	sc.project = project
 	sc.plan = plan
 	sc.connect = conn
 	return sc, nil

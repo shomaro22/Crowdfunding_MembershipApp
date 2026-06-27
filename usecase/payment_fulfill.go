@@ -54,7 +54,7 @@ func (p *PaymentUseCase) fulfillFirstSupport(
 			membership *entity.ProjectSupporter
 			supporter  entity.ProjectSupporter
 			resolved  uuid.UUID
-			proj      *entity.Project
+			project      *entity.Project
 			plans     []entity.ProjectPlan
 			now       time.Time
 			err       error
@@ -78,8 +78,8 @@ func (p *PaymentUseCase) fulfillFirstSupport(
 		if membership != nil {
 			return p.markPurchasePaid(txCtx, purchase, membership.ID, period, invoiceID)
 		}
-		proj, plans, _, err = p.Projects.FindID(txCtx, purchase.ProjectID)
-		if err != nil || proj == nil {
+		project, plans, _, err = p.Projects.FindID(txCtx, purchase.ProjectID)
+		if err != nil || project == nil {
 			return ErrNotFound
 		}
 		resolved = planID
