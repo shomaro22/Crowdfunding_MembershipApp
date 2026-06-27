@@ -10,6 +10,10 @@ const EventSchemaVersion = 1
 
 const ClientSchemaVersion = 1
 
+const MaxReadBytes = 8192
+
+const TypingMinInterval = 2 * time.Second
+
 var (
 	PingInterval = 30 * time.Second
 	ReadDeadline = 90 * time.Second
@@ -42,6 +46,7 @@ const (
 	CodeSchemaVersion         = "SCHEMA_VERSION_MISMATCH"
 	CodeMissingType           = "MISSING_TYPE"
 	CodeMissingProjectID      = "MISSING_PROJECT_ID"
+	CodeRateLimited           = "RATE_LIMITED"
 )
 
 type ClientMessage struct {

@@ -13,6 +13,7 @@ import (
 type WSTokenRepo interface {
 	Create(ctx context.Context, row *entity.WSToken) error
 	ConsumeValidHash(ctx context.Context, hash string, now time.Time) (*entity.WSToken, error)
+	PurgeBefore(ctx context.Context, before time.Time) (int64, error)
 }
 
 type wsTokenRepo struct {
@@ -68,4 +69,16 @@ func (r *wsTokenRepo) ConsumeValidHash(ctx context.Context, hash string, now tim
 		return nil, err
 	}
 	return &row, nil
+}
+
+func (r *wsTokenRepo) PurgeBefore(ctx context.Context, now time.Time) (int64, error) {
+	var (
+		res        *gorm.DB
+		usedCutoff time.Time
+	)
+	usedCutoff = now.Add(-7 * 24 * time.Hour)
+	res = dbFromCtx(ctx, r.db).
+		Where("expires_at < ? OR (used_at IS NOT NULL AND used_at < ?)", now, usedCutoff).
+		Delete(&entity.WSToken{})
+	return res.RowsAffected, res.Error
 }

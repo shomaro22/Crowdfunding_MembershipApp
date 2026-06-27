@@ -25,4 +25,5 @@ const (
 	ApplyPlans       = "apply_plans"
 	ExpireSupporters = "expire_supporters"
 	ReconcileStripe  = "reconcile_stripe"
+	PurgeTokens      = "purge_tokens"
 )

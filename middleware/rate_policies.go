@@ -160,6 +160,9 @@ var (
 	PolicyWSConnect = RatePolicy{
 		Name:   "ws_connect",
 		Period: time.Minute,
-		Rules:  []RateRule{{Limit: 30, Key: KeyIP}},
+		Rules: []RateRule{
+			{Limit: 30, Key: KeyIP},
+			{Limit: 10, Key: KeyUserID},
+		},
 	}
 )

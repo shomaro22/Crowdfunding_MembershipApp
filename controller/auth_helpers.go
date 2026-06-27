@@ -37,18 +37,18 @@ func requestMeta(c echo.Context) usecase.RequestMeta {
 }
 
 type registerResponse struct {
-	User    usecase.UserWire `json:"user"`
+	User    UserWire `json:"user"`
 	Message string           `json:"message"`
 }
 
 type login2FAResponse struct {
 	Requires2FA bool             `json:"requires_2fa"`
-	User        usecase.UserWire `json:"user"`
+	User        UserWire `json:"user"`
 }
 
 type authTokenResponse struct {
 	AuthToken string           `json:"auth_token"`
-	User      usecase.UserWire `json:"user"`
+	User      UserWire `json:"user"`
 }
 
 type verify2FAResponse struct {
@@ -57,7 +57,7 @@ type verify2FAResponse struct {
 }
 
 type sellerCreateJSON struct {
-	User         usecase.UserWire `json:"user"`
+	User         UserWire `json:"user"`
 	Registration sellerRegJSON    `json:"registration"`
 }
 
@@ -96,7 +96,7 @@ func sellerRegToJSON(r usecase.SellerRegItemView) sellerRegJSON {
 }
 
 type usersPageJSON struct {
-	Users []usecase.UserWire `json:"users"`
+	Users []UserWire `json:"users"`
 	Total int64              `json:"total"`
 }
 
@@ -107,7 +107,7 @@ type sellerRegsPageJSON struct {
 
 type sellerRegViewJSON struct {
 	sellerRegJSON
-	User     usecase.UserWire `json:"user"`
+	User     UserWire `json:"user"`
 	FrontURL *string          `json:"identity_document_front_url,omitempty"`
 	BackURL  *string          `json:"identity_document_back_url,omitempty"`
 }
@@ -119,7 +119,7 @@ func sellerRegViewToJSON(apiBase string, d *usecase.SellerRegView) sellerRegView
 	)
 	out = sellerRegViewJSON{
 		sellerRegJSON: sellerRegToJSON(d.Registration),
-		User:          usecase.UserWireFrom(d.User),
+		User:          UserWireFrom(d.User),
 	}
 	if d.FrontAccessToken != nil {
 		url = auth.KYCAccessURL(apiBase, *d.FrontAccessToken)
