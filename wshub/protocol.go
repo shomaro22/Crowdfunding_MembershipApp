@@ -3,8 +3,6 @@ package wshub
 import (
 	"time"
 
-	"crowdfund-app/usecase"
-
 	"github.com/google/uuid"
 )
 
@@ -84,13 +82,6 @@ type TypingOutbound struct {
 	ProjectID     uuid.UUID `json:"project_id"`
 	UserID        uuid.UUID `json:"user_id"`
 	IsTyping      bool      `json:"is_typing"`
-}
-
-type MessageCreatedBroadcast struct {
-	Type          string                  `json:"type"`
-	SchemaVersion int                     `json:"schema_version"`
-	ProjectID     uuid.UUID               `json:"project_id"`
-	Message       usecase.MessageItemWire `json:"message"`
 }
 
 type ReadUpdatedBroadcast struct {

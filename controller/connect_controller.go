@@ -1,7 +1,6 @@
 package controller
 
 import (
-	"context"
 	"net/http"
 
 	"crowdfund-app/usecase"
@@ -9,11 +8,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/labstack/echo/v4"
 )
-
-type ConnectUseCase interface {
-	GetAccount(ctx context.Context, sellerID uuid.UUID) (*usecase.ConnectAccountView, error)
-	CreateOnboardingLink(ctx context.Context, sellerID uuid.UUID) (string, error)
-}
 
 type ConnectController struct {
 	Connect ConnectUseCase

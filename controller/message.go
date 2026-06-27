@@ -1,7 +1,6 @@
 package controller
 
 import (
-	"context"
 	"net/http"
 
 	"crowdfund-app/usecase"
@@ -10,25 +9,12 @@ import (
 	"github.com/labstack/echo/v4"
 )
 
-type MessageUseCase interface {
-	ListThreads(ctx context.Context, userID uuid.UUID) ([]usecase.MessageThreadView, error)
-	Send(ctx context.Context, senderID uuid.UUID, in usecase.SendMessageIn) (usecase.MessageItemView, error)
-	MarkRead(ctx context.Context, userID, messageID uuid.UUID, meta usecase.RequestMeta) error
-	GetNotifications(ctx context.Context, userID uuid.UUID) (usecase.NotificationsView, error)
-}
-
 type MessageController struct {
 	Messages MessageUseCase
 }
 
 func NewMessageController(messages MessageUseCase) *MessageController {
 	return &MessageController{Messages: messages}
-}
-
-type sendMessageRequestJSON struct {
-	ProjectID  string `json:"project_id"`
-	ReceiverID string `json:"receiver_id"`
-	Content    string `json:"content"`
 }
 
 func (h *MessageController) List(c echo.Context) error {
@@ -45,7 +31,7 @@ func (h *MessageController) List(c echo.Context) error {
 	if err != nil {
 		return mapUseCaseError(err)
 	}
-	return c.JSON(http.StatusOK, listMessageThreadsJSON(rows))
+	return c.JSON(http.StatusOK, usecase.ListMessageThreadsWireFrom(rows))
 }
 
 func (h *MessageController) Send(c echo.Context) error {
@@ -72,7 +58,7 @@ func (h *MessageController) Send(c echo.Context) error {
 	if err != nil {
 		return mapUseCaseError(err)
 	}
-	return c.JSON(http.StatusCreated, messageItemToJSON(out))
+	return c.JSON(http.StatusCreated, usecase.MessageItemWireFrom(out))
 }
 
 func (h *MessageController) MarkRead(c echo.Context) error {
@@ -110,7 +96,7 @@ func (h *MessageController) Notifications(c echo.Context) error {
 	if err != nil {
 		return mapUseCaseError(err)
 	}
-	return c.JSON(http.StatusOK, notificationsResponse{UnreadMessages: view.UnreadMessages})
+	return c.JSON(http.StatusOK, usecase.NotificationsWire{UnreadMessages: view.UnreadMessages})
 }
 
 func (body sendMessageRequestJSON) toInput() (usecase.SendMessageIn, error) {
