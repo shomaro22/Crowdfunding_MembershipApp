@@ -30,9 +30,6 @@ func (h *KYCFileController) Serve(c echo.Context) error {
 	token = c.QueryParam("token")
 	f, ct, err = h.KYC.OpenWithToken(c.Request().Context(), token)
 	if err != nil {
-		if he := mapNotFound(err); he != nil {
-			return he
-		}
 		return mapUseCaseError(err)
 	}
 	defer f.Close()

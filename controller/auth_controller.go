@@ -65,7 +65,7 @@ func (h *AuthController) Register(c echo.Context) error {
 		return mapUseCaseError(err)
 	}
 	return c.JSON(http.StatusCreated, registerResponse{
-		User:    userToJSON(u),
+		User:    usecase.UserWireFrom(u),
 		Message: "Registration pending admin approval",
 	})
 }
@@ -87,13 +87,13 @@ func (h *AuthController) Login(c echo.Context) error {
 		auth.SetPending2FA(c, h.CookieCfg, h.Auth.SigningKey(), res.User.ID)
 		return c.JSON(http.StatusOK, login2FAResponse{
 			Requires2FA: true,
-			User:        userToJSON(res.User),
+			User:        usecase.UserWireFrom(res.User),
 		})
 	}
 	auth.SetRefreshCookie(c, h.CookieCfg, res.RefreshToken)
 	return c.JSON(http.StatusOK, authTokenResponse{
 		AuthToken: res.AuthToken,
-		User:      userToJSON(res.User),
+		User:      usecase.UserWireFrom(res.User),
 	})
 }
 
@@ -166,7 +166,7 @@ func (h *AuthController) Me(c echo.Context) error {
 	if err != nil {
 		return mapUseCaseError(err)
 	}
-	return c.JSON(http.StatusOK, map[string]userJSON{"user": userToJSON(u)})
+	return c.JSON(http.StatusOK, map[string]usecase.UserWire{"user": usecase.UserWireFrom(u)})
 }
 
 func (h *AuthController) ChangePassword(c echo.Context) error {
@@ -272,7 +272,7 @@ func (h *AuthController) Challenge2FA(c echo.Context) error {
 	auth.SetRefreshCookie(c, h.CookieCfg, res.RefreshToken)
 	return c.JSON(http.StatusOK, authTokenResponse{
 		AuthToken: res.AuthToken,
-		User:      userToJSON(res.User),
+		User:      usecase.UserWireFrom(res.User),
 	})
 }
 
@@ -329,7 +329,7 @@ func (h *AuthController) OAuthExchange(c echo.Context) error {
 	}
 	return c.JSON(http.StatusOK, authTokenResponse{
 		AuthToken: res.AuthToken,
-		User:      userToJSON(res.User),
+		User:      usecase.UserWireFrom(res.User),
 	})
 }
 
@@ -440,7 +440,7 @@ func (h *AuthController) RegisterSeller(c echo.Context) error {
 		return mapUseCaseError(err)
 	}
 	return c.JSON(http.StatusCreated, sellerCreateJSON{
-		User:         userToJSON(res.User),
+		User:         usecase.UserWireFrom(res.User),
 		Registration: sellerRegToJSON(res.Registration),
 	})
 }

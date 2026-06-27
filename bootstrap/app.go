@@ -23,14 +23,17 @@ type App struct {
 
 func OpenApp(opts *Options) (*App, error) {
 	var (
-		cfg      Config
-		gormDB   *gorm.DB
-		rdb      *redis.Client
-		repos    Repositories
+		cfg        Config
+		gormDB     *gorm.DB
+		rdb        *redis.Client
+		repos      Repositories
 		redisRepos RedisRepositories
-		kyc      *repository.LocalKYCStore
+		kyc        *repository.LocalKYCStore
 		stripeClient stripe.Client
-		err      error
+		hub        *wshub.ConnectionManager
+		useCases   UseCases
+		app        *App
+		err        error
 	)
 	cfg, err = LoadConfig()
 	if err != nil {
@@ -45,24 +48,28 @@ func OpenApp(opts *Options) (*App, error) {
 	redisRepos = NewRedisRepositories(rdb)
 	kyc = repository.NewLocalKYC(cfg.PrivateRoot)
 	stripeClient = stripeClientFrom(opts)
-	return &App{
+	hub = wshub.NewConnectionManager()
+	useCases = NewUseCases(gormDB, repos, redisRepos, kyc, stripeClient, cfg)
+	app = &App{
 		DB:         gormDB,
 		RDB:        rdb,
 		Repos:      repos,
 		RedisRepos: redisRepos,
 		KYC:        kyc,
 		Stripe:     stripeClient,
-		Hub:        wshub.NewConnectionManager(),
-		UseCases:   NewUseCases(gormDB, repos, redisRepos, kyc, stripeClient, cfg),
+		Hub:        hub,
+		UseCases:   useCases,
 		Config:     cfg,
-	}, nil
+	}
+	app.WireRealtimeMessaging()
+	return app, nil
 }
 
 func (a *App) WireRealtimeMessaging() {
 	if a == nil {
 		return
 	}
-	WireMessageEvents(a.UseCases.Message, a.Hub)
+	wireMessageEvents(a.UseCases.Message, a.Hub)
 }
 
 func stripeClientFrom(opts *Options) stripe.Client {
