@@ -4,6 +4,7 @@ import (
 	"context"
 	"io"
 	"net/http"
+	"strconv"
 
 	"crowdfund-app/middleware"
 	"crowdfund-app/usecase"
@@ -21,11 +22,16 @@ type PaymentUseCase interface {
 }
 
 type PaymentController struct {
-	Payments PaymentUseCase
+	Payments  PaymentUseCase
+	Purchases PurchaseUseCase
 }
 
-func NewPaymentController(uc PaymentUseCase) *PaymentController {
-	return &PaymentController{Payments: uc}
+func NewPaymentController(payments PaymentUseCase, purchases PurchaseUseCase) *PaymentController {
+	return &PaymentController{Payments: payments, Purchases: purchases}
+}
+
+type PurchaseUseCase interface {
+	ListMine(ctx context.Context, buyerID uuid.UUID, limit, offset int) ([]usecase.PurchaseView, int64, error)
 }
 
 type checkoutRequestJSON struct {
@@ -223,4 +229,26 @@ func (body intentRequestJSON) toInput(buyerID uuid.UUID) (usecase.IntentIn, erro
 
 func mapPaymentError(err error) *echo.HTTPError {
 	return mapUseCaseError(err)
+}
+
+func (h *PaymentController) ListPurchases(c echo.Context) error {
+	var (
+		userID uuid.UUID
+		limit  int
+		offset int
+		rows   []usecase.PurchaseView
+		total  int64
+		err    error
+	)
+	userID, err = CurrentUserID(c)
+	if err != nil {
+		return err
+	}
+	limit, _ = strconv.Atoi(c.QueryParam("limit"))
+	offset, _ = strconv.Atoi(c.QueryParam("offset"))
+	rows, total, err = h.Purchases.ListMine(c.Request().Context(), userID, limit, offset)
+	if err != nil {
+		return mapUseCaseError(err)
+	}
+	return c.JSON(http.StatusOK, listPurchasesJSON(rows, total))
 }
