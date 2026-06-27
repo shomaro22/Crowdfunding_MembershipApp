@@ -47,13 +47,13 @@ func (h *AuthController) Login(c echo.Context) error {
 		auth.SetPending2FA(c, h.CookieCfg, h.Auth.SigningKey(), res.User.ID)
 		return c.JSON(http.StatusOK, login2FAResponse{
 			Requires2FA: true,
-			User:        usecase.UserWireFrom(res.User),
+			User:        UserWireFrom(res.User),
 		})
 	}
 	auth.SetRefreshCookie(c, h.CookieCfg, res.RefreshToken)
 	return c.JSON(http.StatusOK, authTokenResponse{
 		AuthToken: res.AuthToken,
-		User:      usecase.UserWireFrom(res.User),
+		User:      UserWireFrom(res.User),
 	})
 }
 
@@ -126,7 +126,7 @@ func (h *AuthController) Me(c echo.Context) error {
 	if err != nil {
 		return mapUseCaseError(err)
 	}
-	return c.JSON(http.StatusOK, map[string]usecase.UserWire{"user": usecase.UserWireFrom(u)})
+	return c.JSON(http.StatusOK, map[string]UserWire{"user": UserWireFrom(u)})
 }
 
 func (h *AuthController) ChangePassword(c echo.Context) error {

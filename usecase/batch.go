@@ -16,6 +16,7 @@ type BatchUseCase struct {
 	DB         *gorm.DB
 	Runs       repository.BatchRepo
 	Supporters *SupporterUseCase
+	WSTokens   repository.WSTokenRepo
 }
 
 func (b *BatchUseCase) Run(ctx context.Context, jobName, triggeredBy string, dryRun bool) (*BatchRunView, error) {
@@ -46,6 +47,8 @@ func (b *BatchUseCase) Run(ctx context.Context, jobName, triggeredBy string, dry
 		processed, failed, runErr = b.Supporters.RunApplyPlans(ctx, dryRun)
 	case entity.ExpireSupporters:
 		processed, failed, runErr = b.Supporters.RunExpireSupporters(ctx, dryRun)
+	case entity.PurgeTokens:
+		processed, failed, runErr = b.runPurgeTokens(ctx, dryRun)
 	default:
 		runErr = ErrBadRequest
 	}
@@ -70,9 +73,28 @@ func (b *BatchUseCase) Run(ctx context.Context, jobName, triggeredBy string, dry
 	return BatchRunViewFrom(run), runErr
 }
 
+func (b *BatchUseCase) runPurgeTokens(ctx context.Context, dryRun bool) (processed, failed int, err error) {
+	var (
+		n   int64
+		now time.Time
+	)
+	if b == nil || b.WSTokens == nil {
+		return 0, 0, ErrBadRequest
+	}
+	now = time.Now().UTC()
+	if dryRun {
+		return 0, 0, nil
+	}
+	n, err = b.WSTokens.PurgeBefore(ctx, now)
+	if err != nil {
+		return 0, 1, err
+	}
+	return int(n), 0, nil
+}
+
 func isSupportedBatchJob(name string) bool {
 	switch name {
-	case entity.ApplyPlans, entity.ExpireSupporters:
+	case entity.ApplyPlans, entity.ExpireSupporters, entity.PurgeTokens:
 		return true
 	default:
 		return false

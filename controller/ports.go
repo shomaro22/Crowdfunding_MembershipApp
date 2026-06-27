@@ -83,7 +83,7 @@ type SupporterUseCase interface {
 }
 
 type MessageUseCase interface {
-	ListThreads(ctx context.Context, userID uuid.UUID) ([]usecase.MessageThreadView, error)
+	ListThreads(ctx context.Context, userID uuid.UUID, q usecase.ListThreadsQuery) (usecase.ListThreadsResult, error)
 	Send(ctx context.Context, senderID uuid.UUID, in usecase.SendMessageIn) (usecase.MessageItemView, error)
 	MarkRead(ctx context.Context, userID, messageID uuid.UUID, meta usecase.RequestMeta) error
 	GetNotifications(ctx context.Context, userID uuid.UUID) (usecase.NotificationsView, error)
@@ -92,7 +92,6 @@ type MessageUseCase interface {
 type MessageProjectAccess interface {
 	CanSubscribeProject(ctx context.Context, projectID, userID uuid.UUID) error
 	ConfirmWSSubscribe(ctx context.Context, userID, projectID uuid.UUID, meta usecase.RequestMeta) error
-	SubscriberFilter(ctx context.Context, projectID uuid.UUID) func(uuid.UUID) bool
 }
 
 type WSTokenUseCase interface {

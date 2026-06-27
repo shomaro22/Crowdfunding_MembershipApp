@@ -43,7 +43,7 @@ func (h *AdminController) ResetUser2FA(c echo.Context) error {
 	if err != nil {
 		return mapUseCaseError(err)
 	}
-	return c.JSON(http.StatusOK, map[string]usecase.UserWire{"user": usecase.UserWireFrom(u)})
+	return c.JSON(http.StatusOK, map[string]UserWire{"user": UserWireFrom(u)})
 }
 
 func (h *AdminController) ChangeAdminRole(c echo.Context) error {
@@ -72,7 +72,7 @@ func (h *AdminController) ChangeAdminRole(c echo.Context) error {
 	if err != nil {
 		return mapUseCaseError(err)
 	}
-	return c.JSON(http.StatusOK, map[string]usecase.UserWire{"user": usecase.UserWireFrom(u)})
+	return c.JSON(http.StatusOK, map[string]UserWire{"user": UserWireFrom(u)})
 }
 
 func (h *AdminController) ListProjects(c echo.Context) error {
@@ -182,7 +182,7 @@ func (h *AdminController) ListBuyerPending(c echo.Context) error {
 		offset int
 		users  []usecase.UserView
 		total  int64
-		items  []usecase.UserWire
+		items  []UserWire
 		i      int
 		err    error
 	)
@@ -192,9 +192,9 @@ func (h *AdminController) ListBuyerPending(c echo.Context) error {
 	if err != nil {
 		return mapUseCaseError(err)
 	}
-	items = make([]usecase.UserWire, 0, len(users))
+	items = make([]UserWire, 0, len(users))
 	for i = 0; i < len(users); i++ {
-		items = append(items, usecase.UserWireFrom(users[i]))
+		items = append(items, UserWireFrom(users[i]))
 	}
 	return c.JSON(http.StatusOK, usersPageJSON{Users: items, Total: total})
 }
@@ -218,7 +218,7 @@ func (h *AdminController) ApproveBuyer(c echo.Context) error {
 	if err != nil {
 		return mapUseCaseError(err)
 	}
-	return c.JSON(http.StatusOK, usecase.UserWireFrom(u))
+	return c.JSON(http.StatusOK, UserWireFrom(u))
 }
 
 func (h *AdminController) RejectBuyer(c echo.Context) error {
@@ -249,7 +249,7 @@ func (h *AdminController) RejectBuyer(c echo.Context) error {
 	if err != nil {
 		return mapUseCaseError(err)
 	}
-	return c.JSON(http.StatusOK, usecase.UserWireFrom(u))
+	return c.JSON(http.StatusOK, UserWireFrom(u))
 }
 
 func (h *AdminController) ListSellerRegs(c echo.Context) error {

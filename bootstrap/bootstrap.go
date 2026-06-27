@@ -57,5 +57,5 @@ func wireMessageEvents(msg *usecase.MessageUseCase, hub *wshub.ConnectionManager
 	if msg == nil || hub == nil {
 		return
 	}
-	usecase.AttachMessageEvents(msg, wshub.NewMessagePublisher(hub, msg))
+	usecase.AttachMessageEvents(msg, newMessageEventBridge(hub))
 }

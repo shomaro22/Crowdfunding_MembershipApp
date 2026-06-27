@@ -22,7 +22,7 @@ func main() {
 	flag.Parse()
 	args = flag.Args()
 	if len(args) != 1 {
-		fmt.Fprintf(os.Stderr, "usage: batch [-dry-run] <apply_plans|expire_supporters>\n")
+		fmt.Fprintf(os.Stderr, "usage: batch [-dry-run] <apply_plans|expire_supporters|purge_tokens>\n")
 		os.Exit(2)
 	}
 	job = args[0]
