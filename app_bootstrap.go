@@ -30,6 +30,9 @@ func buildApp(opts *bootstrap.Options) (*echo.Echo, string, error) {
 		connectCtl      *controller.ConnectController
 		paymentCtl      *controller.PaymentController
 		supporterCtl    *controller.SupporterController
+		messageCtl      *controller.MessageController
+		wsTokenCtl      *controller.WSTokenController
+		wsCtl           *controller.WSController
 		preAuth         []echo.MiddlewareFunc
 		corsRaw         string
 		origins         []string
@@ -52,18 +55,6 @@ func buildApp(opts *bootstrap.Options) (*echo.Echo, string, error) {
 		return nil, "", err
 	}
 
-	cookieCfg = auth.CookieFromEnv()
-	authCtl = controller.NewAuthController(app.UseCases.Auth, cookieCfg, app.Config.AppPublicURL)
-	healthCtl = &controller.HealthController{SQL: app.DB, RDB: app.RDB}
-	adminCtl = controller.NewAdminController(app.UseCases.Admin, app.Config.APIPublicURL)
-	kycFileCtl = controller.NewKYCFileController(app.UseCases.KYCAccess)
-	projectCtl = controller.NewProjectController(app.UseCases.Project)
-	connectCtl = controller.NewConnectController(app.UseCases.Connect)
-	paymentCtl = controller.NewPaymentController(app.UseCases.Payment, app.UseCases.Purchase, app.Stripe.AppURL())
-	supporterCtl = controller.NewSupporterController(app.UseCases.Supporter)
-
-	validateSession = middleware.SessionValidateHTTP(app.UseCases.Auth.ValidateSession)
-
 	corsRaw = strings.TrimSpace(os.Getenv("CORS_ALLOW_ORIGINS"))
 	if corsRaw != "" {
 		for _, p = range strings.Split(corsRaw, ",") {
@@ -72,17 +63,35 @@ func buildApp(opts *bootstrap.Options) (*echo.Echo, string, error) {
 				origins = append(origins, s)
 			}
 		}
-		if len(origins) > 0 {
-			preAuth = append(preAuth, labmw.CORSWithConfig(labmw.CORSConfig{
-				AllowOrigins:     origins,
-				AllowCredentials: true,
-				AllowHeaders:     []string{"Origin", "Content-Type", "Accept", "Authorization", "X-Request-ID"},
-				AllowMethods: []string{
-					http.MethodGet, http.MethodHead, http.MethodPut, http.MethodPatch,
-					http.MethodPost, http.MethodDelete, http.MethodOptions,
-				},
-			}))
-		}
+	}
+
+	cookieCfg = auth.CookieFromEnv()
+	authCtl = controller.NewAuthController(app.UseCases.Auth, cookieCfg, app.Config.AppPublicURL)
+	healthCtl = &controller.HealthController{SQL: app.DB, RDB: app.RDB}
+	adminCtl = controller.NewAdminController(app.UseCases.Admin, app.Config.APIPublicURL)
+	kycFileCtl = controller.NewKYCFileController(app.UseCases.KYCAccess)
+	projectCtl = controller.NewProjectController(app.UseCases.Project)
+	connectCtl = controller.NewConnectController(app.UseCases.Connect)
+	if app.Stripe != nil {
+		paymentCtl = controller.NewPaymentController(app.UseCases.Payment, app.UseCases.Purchase, app.Stripe.AppURL())
+	}
+	supporterCtl = controller.NewSupporterController(app.UseCases.Supporter)
+	messageCtl = controller.NewMessageController(app.UseCases.Message)
+	wsTokenCtl = controller.NewWSTokenController(app.UseCases.WSToken)
+	wsCtl = controller.NewWSController(app.Hub, app.UseCases.Message, origins)
+
+	validateSession = middleware.SessionValidateHTTP(app.UseCases.Auth.ValidateSession)
+
+	if len(origins) > 0 {
+		preAuth = append(preAuth, labmw.CORSWithConfig(labmw.CORSConfig{
+			AllowOrigins:     origins,
+			AllowCredentials: true,
+			AllowHeaders:     []string{"Origin", "Content-Type", "Accept", "Authorization", "X-Request-ID"},
+			AllowMethods: []string{
+				http.MethodGet, http.MethodHead, http.MethodPut, http.MethodPatch,
+				http.MethodPost, http.MethodDelete, http.MethodOptions,
+			},
+		}))
 	}
 
 	protected = []echo.MiddlewareFunc{
@@ -108,6 +117,10 @@ func buildApp(opts *bootstrap.Options) (*echo.Echo, string, error) {
 		Connect:            connectCtl,
 		Payments:           paymentCtl,
 		Supporters:         supporterCtl,
+		Messages:           messageCtl,
+		WSToken:            wsTokenCtl,
+		WS:                 wsCtl,
+		WSTokenAuth:        middleware.WSTokenAuth(app.UseCases.WSToken.Consume),
 		Admin:              adminCtl,
 		KYCFiles:           kycFileCtl,
 		RateLimit:          rateLimiter,

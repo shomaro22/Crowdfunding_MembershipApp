@@ -36,32 +36,100 @@ func requestMeta(c echo.Context) usecase.RequestMeta {
 	}
 }
 
-func userToJSON(u usecase.UserView) userJSON {
-	return userJSON{
-		ID:        u.ID.String(),
-		Email:     u.Email,
-		Name:      u.Name,
-		Role:      string(u.Role),
-		IsActive:  u.IsActive(),
-		AvatarURL: u.AvatarURL,
-		CreatedAt: u.CreatedAt.UTC().Format(time.RFC3339),
-		UpdatedAt: u.UpdatedAt.UTC().Format(time.RFC3339),
+type registerResponse struct {
+	User    usecase.UserWire `json:"user"`
+	Message string           `json:"message"`
+}
+
+type login2FAResponse struct {
+	Requires2FA bool             `json:"requires_2fa"`
+	User        usecase.UserWire `json:"user"`
+}
+
+type authTokenResponse struct {
+	AuthToken string           `json:"auth_token"`
+	User      usecase.UserWire `json:"user"`
+}
+
+type verify2FAResponse struct {
+	Enabled     bool     `json:"enabled"`
+	BackupCodes []string `json:"backup_codes"`
+}
+
+type sellerCreateJSON struct {
+	User         usecase.UserWire `json:"user"`
+	Registration sellerRegJSON    `json:"registration"`
+}
+
+type sellerRegJSON struct {
+	ID           string  `json:"id"`
+	UserID       string  `json:"user_id"`
+	FullName     string  `json:"full_name"`
+	BirthDate    string  `json:"birth_date"`
+	Address      string  `json:"address"`
+	PhotoPresent bool    `json:"photo_present"`
+	IDDocType    string  `json:"identity_document_type"`
+	HasIDFront   bool    `json:"has_identity_document_front"`
+	HasIDBack    bool    `json:"has_identity_document_back"`
+	Status       string  `json:"status"`
+	RejectReason *string `json:"rejection_reason"`
+	CreatedAt    string  `json:"created_at"`
+	UpdatedAt    string  `json:"updated_at"`
+}
+
+func sellerRegToJSON(r usecase.SellerRegItemView) sellerRegJSON {
+	return sellerRegJSON{
+		ID:           r.ID.String(),
+		UserID:       r.UserID.String(),
+		FullName:     r.FullName,
+		BirthDate:    r.BirthDate.Format("2006-01-02"),
+		Address:      r.Address,
+		PhotoPresent: r.PhotoPresent,
+		IDDocType:    "DRIVERS_LICENSE",
+		HasIDFront:   r.HasIDFront,
+		HasIDBack:    r.HasIDBack,
+		Status:       r.Status,
+		RejectReason: r.RejectReason,
+		CreatedAt:    r.CreatedAt.UTC().Format(time.RFC3339),
+		UpdatedAt:    r.UpdatedAt.UTC().Format(time.RFC3339),
 	}
 }
 
-type userJSON struct {
-	ID        string  `json:"id"`
-	Email     string  `json:"email"`
-	Name      *string `json:"name"`
-	Role      string  `json:"role"`
-	IsActive  bool    `json:"is_active"`
-	AvatarURL *string `json:"avatar_url"`
-	CreatedAt string  `json:"created_at"`
-	UpdatedAt string  `json:"updated_at"`
+type usersPageJSON struct {
+	Users []usecase.UserWire `json:"users"`
+	Total int64              `json:"total"`
 }
 
-func apiError(msg, code string) map[string]string {
-	return map[string]string{"error": msg, "code": code}
+type sellerRegsPageJSON struct {
+	Registrations []sellerRegJSON `json:"registrations"`
+	Total         int64           `json:"total"`
+}
+
+type sellerRegViewJSON struct {
+	sellerRegJSON
+	User     usecase.UserWire `json:"user"`
+	FrontURL *string          `json:"identity_document_front_url,omitempty"`
+	BackURL  *string          `json:"identity_document_back_url,omitempty"`
+}
+
+func sellerRegViewToJSON(apiBase string, d *usecase.SellerRegView) sellerRegViewJSON {
+	var (
+		out sellerRegViewJSON
+		url string
+	)
+	out = sellerRegViewJSON{
+		sellerRegJSON: sellerRegToJSON(d.Registration),
+		User:          usecase.UserWireFrom(d.User),
+	}
+	if d.FrontAccessToken != nil {
+		url = auth.KYCAccessURL(apiBase, *d.FrontAccessToken)
+		out.FrontURL = &url
+	}
+	if d.BackAccessToken != nil {
+		url = auth.KYCAccessURL(apiBase, *d.BackAccessToken)
+		out.BackURL = &url
+	}
+	return out
 }
 
 func oauthCallbackURL(appPublicURL string, v usecase.OAuthRedirectView) string {
@@ -84,66 +152,4 @@ func oauthCallbackURL(appPublicURL string, v usecase.OAuthRedirectView) string {
 		return base
 	}
 	return base + "?" + q.Encode()
-}
-
-type registerResponse struct {
-	User    userJSON `json:"user"`
-	Message string   `json:"message"`
-}
-
-type login2FAResponse struct {
-	Requires2FA bool     `json:"requires_2fa"`
-	User        userJSON `json:"user"`
-}
-
-type authTokenResponse struct {
-	AuthToken string   `json:"auth_token"`
-	User      userJSON `json:"user"`
-}
-
-type verify2FAResponse struct {
-	Enabled     bool     `json:"enabled"`
-	BackupCodes []string `json:"backup_codes"`
-}
-
-type sellerCreateJSON struct {
-	User         userJSON      `json:"user"`
-	Registration sellerRegJSON `json:"registration"`
-}
-
-type usersPageJSON struct {
-	Users []userJSON `json:"users"`
-	Total int64      `json:"total"`
-}
-
-type sellerRegsPageJSON struct {
-	Registrations []sellerRegJSON `json:"registrations"`
-	Total         int64           `json:"total"`
-}
-
-type sellerRegViewJSON struct {
-	sellerRegJSON
-	User     userJSON `json:"user"`
-	FrontURL *string  `json:"identity_document_front_url,omitempty"`
-	BackURL  *string  `json:"identity_document_back_url,omitempty"`
-}
-
-func sellerRegViewToJSON(apiBase string, d *usecase.SellerRegView) sellerRegViewJSON {
-	var (
-		out sellerRegViewJSON
-		url string
-	)
-	out = sellerRegViewJSON{
-		sellerRegJSON: sellerRegToJSON(d.Registration),
-		User:          userToJSON(d.User),
-	}
-	if d.FrontAccessToken != nil {
-		url = auth.KYCAccessURL(apiBase, *d.FrontAccessToken)
-		out.FrontURL = &url
-	}
-	if d.BackAccessToken != nil {
-		url = auth.KYCAccessURL(apiBase, *d.BackAccessToken)
-		out.BackURL = &url
-	}
-	return out
 }

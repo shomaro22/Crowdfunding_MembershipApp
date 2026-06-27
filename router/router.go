@@ -15,11 +15,15 @@ type Config struct {
 	Connect           *controller.ConnectController
 	Payments          *controller.PaymentController
 	Supporters        *controller.SupporterController
+	Messages          *controller.MessageController
+	WSToken           *controller.WSTokenController
+	WS                *controller.WSController
 	Admin             *controller.AdminController
 	KYCFiles          *controller.KYCFileController
 	RateLimit         *middleware.RateLimiter
 	Policy2FAChallenge middleware.RatePolicy
 	OAuthEnabled      bool
+	WSTokenAuth       echo.MiddlewareFunc
 	PreAuthMiddleware []echo.MiddlewareFunc
 	Protected         []echo.MiddlewareFunc
 	OptionalJWT       []echo.MiddlewareFunc
@@ -115,6 +119,26 @@ func New(cfg Config) *echo.Echo {
 		e.POST("/supporters/:supporterId/cancel", cfg.Supporters.Cancel, pm...)
 		e.POST("/supporters/:supporterId/rejoin", cfg.Supporters.Rejoin, pm...)
 		e.POST("/supporters/:supporterId/billing/change", cfg.Supporters.ChangeBilling, pm...)
+	}
+
+	if cfg.Messages != nil {
+		pm = cfg.Protected
+		e.GET("/messages", cfg.Messages.List, pm...)
+		e.POST("/messages", cfg.Messages.Send, append(pm, rl(middleware.PolicyMessageSend))...)
+		e.POST("/messages/:messageId/read", cfg.Messages.MarkRead, pm...)
+		e.GET("/me/notifications", cfg.Messages.Notifications, pm...)
+	}
+
+	if cfg.WSToken != nil {
+		pm = cfg.Protected
+		e.POST("/ws/token", cfg.WSToken.Issue, append(pm, rl(middleware.PolicyWSToken))...)
+	}
+
+	if cfg.WS != nil && cfg.WSTokenAuth != nil {
+		var wsMW []echo.MiddlewareFunc
+		wsMW = append(wsMW, cfg.PreAuthMiddleware...)
+		wsMW = append(wsMW, cfg.WSTokenAuth, rl(middleware.PolicyWSConnect))
+		e.GET("/ws", cfg.WS.Handle, wsMW...)
 	}
 
 	if cfg.KYCFiles != nil {

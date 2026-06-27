@@ -1,7 +1,6 @@
 package controller
 
 import (
-	"context"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -13,16 +12,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/labstack/echo/v4"
 )
-
-type ProjectUseCase interface {
-	Create(ctx context.Context, sellerID uuid.UUID, in usecase.CreateProjectIn) (*usecase.ProjectView, error)
-	ListPublic(ctx context.Context, search, sort string, limit, offset int) ([]usecase.ProjectView, int64, error)
-	ListMine(ctx context.Context, sellerID uuid.UUID, limit, offset int) ([]usecase.ProjectView, int64, error)
-	FindView(ctx context.Context, id uuid.UUID, viewerID *uuid.UUID, viewerRole string) (*usecase.ProjectView, error)
-	ListPlans(ctx context.Context, projectID uuid.UUID, viewerID *uuid.UUID, viewerRole string) ([]usecase.ProjectPlanView, error)
-	Update(ctx context.Context, sellerID, projectID uuid.UUID, in usecase.UpdateProjectIn) (*usecase.ProjectView, error)
-	RequestDelete(ctx context.Context, sellerID, projectID uuid.UUID) (*usecase.ProjectView, error)
-}
 
 type ProjectController struct {
 	Projects ProjectUseCase

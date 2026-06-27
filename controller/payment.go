@@ -1,7 +1,6 @@
 package controller
 
 import (
-	"context"
 	"io"
 	"net/http"
 	"strconv"
@@ -13,14 +12,6 @@ import (
 	"github.com/labstack/echo/v4"
 )
 
-type PaymentUseCase interface {
-	CreateCheckout(ctx context.Context, in usecase.CheckoutIn) (usecase.CheckoutOut, error)
-	CreateIntent(ctx context.Context, in usecase.IntentIn) (usecase.IntentOut, error)
-	VerifyCheckout(ctx context.Context, buyerID uuid.UUID, sessionID string) (usecase.SupporterView, error)
-	VerifyIntent(ctx context.Context, buyerID uuid.UUID, intentID string) (usecase.SupporterView, error)
-	HandleWebhook(ctx context.Context, payload []byte, signature string) error
-}
-
 type PaymentController struct {
 	Payments     PaymentUseCase
 	Purchases    PurchaseUseCase
@@ -29,10 +20,6 @@ type PaymentController struct {
 
 func NewPaymentController(payments PaymentUseCase, purchases PurchaseUseCase, stripeAppURL string) *PaymentController {
 	return &PaymentController{Payments: payments, Purchases: purchases, StripeAppURL: stripeAppURL}
-}
-
-type PurchaseUseCase interface {
-	ListMine(ctx context.Context, buyerID uuid.UUID, limit, offset int) ([]usecase.PurchaseView, int64, error)
 }
 
 type checkoutRequestJSON struct {

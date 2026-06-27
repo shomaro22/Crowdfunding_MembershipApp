@@ -1949,6 +1949,27 @@ paths:
         "403":
           $ref: "#/components/responses/Forbidden"
 
+  /ws/token:
+    post:
+      tags: [WebSocket]
+      summary: Issue one-time WebSocket connection token
+      description: |
+        Returns a single-use `ws_token` valid for 60 seconds.
+        Use with `GET /ws?ws_token=` only. Do not pass JWT in WebSocket query strings.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Token issued
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WSTokenResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+
   /ws:
     get:
       tags: [WebSocket]
@@ -1956,7 +1977,9 @@ paths:
         WebSocket upgrade for real-time messaging（仕様書 §17.2）。
         `POST /ws/token` で発行した one-time `ws_token` のみで接続する。
         `?access_token=` および JWT / AuthToken をクエリに載せることは禁止（ログ・Referer 漏洩防止）。
-        Client sends subscribe/unsubscribe/ping/typing; server sends message_created/read_updated.
+        Client sends subscribe/unsubscribe/ping/typing; server sends session_ready,
+        subscribed/unsubscribed, message_created, read_updated, typing, pong, and error frames.
+        WebSocket Origin must match CORS_ALLOW_ORIGINS (same as HTTP CORS).
       security: []
       parameters:
         - in: query
@@ -1968,15 +1991,13 @@ paths:
       responses:
         "101":
           description: |
-            Switching Protocols. Client frames use WSClientSubscribe;
-            server frames use WSMessageCreatedEvent or WSReadUpdatedEvent.
+            Switching Protocols. See components/schemas WS* types for client and server frames.
           content:
             application/json:
               schema:
                 oneOf:
-                  - $ref: "#/components/schemas/WSClientSubscribe"
-                  - $ref: "#/components/schemas/WSMessageCreatedEvent"
-                  - $ref: "#/components/schemas/WSReadUpdatedEvent"
+                  - $ref: "#/components/schemas/WSClientFrame"
+                  - $ref: "#/components/schemas/WSServerFrame"
         "401":
           $ref: "#/components/responses/Unauthorized"
         "429":
@@ -3109,6 +3130,23 @@ components:
               count:
                 type: integer
 
+    WSClientFrame:
+      oneOf:
+        - $ref: "#/components/schemas/WSClientSubscribe"
+        - $ref: "#/components/schemas/WSClientTyping"
+        - $ref: "#/components/schemas/WSClientPing"
+
+    WSServerFrame:
+      oneOf:
+        - $ref: "#/components/schemas/WSSessionReadyEvent"
+        - $ref: "#/components/schemas/WSSubscribedEvent"
+        - $ref: "#/components/schemas/WSUnsubscribedEvent"
+        - $ref: "#/components/schemas/WSMessageCreatedEvent"
+        - $ref: "#/components/schemas/WSReadUpdatedEvent"
+        - $ref: "#/components/schemas/WSTypingEvent"
+        - $ref: "#/components/schemas/WSPongEvent"
+        - $ref: "#/components/schemas/WSErrorEvent"
+
     WSClientSubscribe:
       type: object
       required: [type, project_id]
@@ -3122,6 +3160,133 @@ components:
         project_id:
           type: string
           format: uuid
+
+    WSClientTyping:
+      type: object
+      required: [type, project_id]
+      properties:
+        type:
+          type: string
+          enum: [typing]
+        schema_version:
+          type: integer
+          enum: [1]
+        project_id:
+          type: string
+          format: uuid
+        is_typing:
+          type: boolean
+
+    WSClientPing:
+      type: object
+      required: [type]
+      properties:
+        type:
+          type: string
+          enum: [ping]
+        schema_version:
+          type: integer
+          enum: [1]
+
+    WSSessionReadyEvent:
+      type: object
+      required: [type, schema_version, user_id]
+      properties:
+        type:
+          type: string
+          enum: [session_ready]
+        schema_version:
+          type: integer
+          enum: [1]
+        user_id:
+          type: string
+          format: uuid
+
+    WSSubscribedEvent:
+      type: object
+      required: [type, schema_version, project_id]
+      properties:
+        type:
+          type: string
+          enum: [subscribed]
+        schema_version:
+          type: integer
+          enum: [1]
+        project_id:
+          type: string
+          format: uuid
+
+    WSUnsubscribedEvent:
+      type: object
+      required: [type, schema_version, project_id]
+      properties:
+        type:
+          type: string
+          enum: [unsubscribed]
+        schema_version:
+          type: integer
+          enum: [1]
+        project_id:
+          type: string
+          format: uuid
+
+    WSPongEvent:
+      type: object
+      required: [type, schema_version]
+      properties:
+        type:
+          type: string
+          enum: [pong]
+        schema_version:
+          type: integer
+          enum: [1]
+
+    WSTypingEvent:
+      type: object
+      required: [type, schema_version, project_id, user_id, is_typing]
+      properties:
+        type:
+          type: string
+          enum: [typing]
+        schema_version:
+          type: integer
+          enum: [1]
+        project_id:
+          type: string
+          format: uuid
+        user_id:
+          type: string
+          format: uuid
+        is_typing:
+          type: boolean
+
+    WSErrorEvent:
+      type: object
+      required: [type, schema_version, code, message]
+      properties:
+        type:
+          type: string
+          enum: [error]
+        schema_version:
+          type: integer
+          enum: [1]
+        code:
+          type: string
+        message:
+          type: string
+        project_id:
+          type: string
+          format: uuid
+
+    WSTokenResponse:
+      type: object
+      required: [ws_token, expires_in]
+      properties:
+        ws_token:
+          type: string
+        expires_in:
+          type: integer
+          description: Seconds until token expiry (60)
 
     WSMessageCreatedEvent:
       type: object
@@ -3161,19 +3326,8 @@ components:
 
     NotificationsResponse:
       type: object
+      required: [unread_messages]
       properties:
         unread_messages:
           type: integer
-        items:
-          type: array
-          items:
-            type: object
-            properties:
-              type:
-                type: string
-                enum: [unread_message, project_update]
-              title:
-                type: string
-              created_at:
-                type: string
-                format: date-time
+          format: int64

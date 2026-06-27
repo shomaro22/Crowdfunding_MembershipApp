@@ -21,6 +21,8 @@ type UseCases struct {
 	Purchase  *usecase.PurchaseUseCase
 	RateLimit *usecase.RateLimitUseCase
 	KYCAccess *usecase.KYCAccessUseCase
+	Message   *usecase.MessageUseCase
+	WSToken   *usecase.WSTokenUseCase
 }
 
 func NewUseCases(
@@ -114,6 +116,18 @@ func NewUseCases(
 		},
 		RateLimit: &usecase.RateLimitUseCase{Repo: redisRepos.RateLimit},
 		KYCAccess: kycAccess,
+		Message: &usecase.MessageUseCase{
+			Messages:   repos.Messages,
+			Projects:   repos.Projects,
+			Supporters: repos.Supporters,
+			Users:      repos.Users,
+			Activity:   repos.Activity,
+		},
+		WSToken: &usecase.WSTokenUseCase{
+			Tokens:   repos.WSTokens,
+			Users:    repos.Users,
+			Activity: repos.Activity,
+		},
 	}
 }
 
