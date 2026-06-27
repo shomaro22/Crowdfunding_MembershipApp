@@ -43,6 +43,7 @@ jobs:
     env:
       DATABASE_URL: postgres://postgres:postgres@localhost:5432/crowdfund?sslmode=disable
       REDIS_ADDR: localhost:6379
+      JWT_SECRET: ci-test-jwt-secret-must-be-at-least-32-chars
 
     steps:
       - uses: actions/checkout@v4
@@ -63,6 +64,9 @@ jobs:
 
       - name: Test
         run: go test ./...
+
+      - name: Integration test
+        run: go test -tags=integration -count=1 ./...
 
   docker:
     runs-on: ubuntu-latest
