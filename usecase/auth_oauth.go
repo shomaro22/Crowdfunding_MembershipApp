@@ -3,7 +3,6 @@ package usecase
 import (
 	"context"
 	"fmt"
-	"net/url"
 	"strings"
 	"time"
 
@@ -15,11 +14,15 @@ import (
 
 const oauthCallbackCodeTTL = 2 * time.Minute
 
+type OAuthRedirectView struct {
+	Code  string
+	From  string
+	Error string
+}
+
 type OAuthCBOut struct {
 	RefreshToken string
-	CallbackCode string
-	From         string
-	User         *entity.User
+	Redirect     OAuthRedirectView
 }
 
 func (a *AuthUseCase) GoogleAuthURL(from string) (string, error) {
@@ -84,9 +87,10 @@ func (a *AuthUseCase) GoogleCallback(ctx context.Context, code, state string, me
 	a.logActivity(ctx, &u.ID, entity.UserLogin, "user", u.ID.String(), meta, entity.ProviderMeta("google"))
 	return &OAuthCBOut{
 		RefreshToken: tokens.RefreshToken,
-		CallbackCode: cbCode,
-		From:         from,
-		User:         u,
+		Redirect: OAuthRedirectView{
+			Code: cbCode,
+			From: from,
+		},
 	}, nil
 }
 
@@ -128,25 +132,6 @@ func (a *AuthUseCase) ExchangeOAuthCode(ctx context.Context, code string, meta A
 		return nil, err
 	}
 	return &LoginResult{User: UserViewFrom(u), AuthToken: authToken}, nil
-}
-
-func (a *AuthUseCase) OAuthSuccessRedirect(from, code string) string {
-	var base string
-
-	base = strings.TrimRight(strings.TrimSpace(a.AppPublicURL), "/") + "/auth/callback"
-	if from != "" {
-		base += "?from=" + url.QueryEscape(from) + "&code=" + url.QueryEscape(code)
-	} else {
-		base += "?code=" + url.QueryEscape(code)
-	}
-	return base
-}
-
-func (a *AuthUseCase) OAuthErrorRedirect(reason string) string {
-	var base string
-
-	base = strings.TrimRight(strings.TrimSpace(a.AppPublicURL), "/") + "/auth/callback"
-	return base + "?error=" + url.QueryEscape(reason)
 }
 
 func (a *AuthUseCase) resolveGoogleUser(ctx context.Context, profile *auth.GoogleProfile) (*entity.User, error) {

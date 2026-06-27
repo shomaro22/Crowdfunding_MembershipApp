@@ -7,8 +7,6 @@ import (
 	"log"
 	"os"
 
-	"crowdfund-app/db"
-	"crowdfund-app/entity"
 	"crowdfund-app/bootstrap"
 	"crowdfund-app/usecase"
 
@@ -42,15 +40,11 @@ func runBatch(job string, dryRun bool) error {
 		ctx     context.Context
 		gormDB  *gorm.DB
 		batchUC *usecase.BatchUseCase
-		run     *entity.BatchRun
+		run     *usecase.BatchRunView
 		err     error
 	)
 	ctx = context.Background()
-	err = db.Up(bootstrap.DatabaseURL())
-	if err != nil {
-		return err
-	}
-	gormDB, err = db.Open(bootstrap.DatabaseURL())
+	gormDB, err = bootstrap.OpenDB()
 	if err != nil {
 		return err
 	}

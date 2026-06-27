@@ -9,10 +9,9 @@ import (
 	"crowdfund-app/stripe"
 
 	"github.com/google/uuid"
-	stripesdk "github.com/stripe/stripe-go/v82"
 )
 
-func (p *PaymentUseCase) fulfillCheckoutSession(ctx context.Context, sess stripesdk.CheckoutSession) error {
+func (p *PaymentUseCase) fulfillCheckoutSession(ctx context.Context, sess stripe.CheckoutSessionSnapshot) error {
 	var (
 		purchase *entity.Purchase
 		planID   uuid.UUID
@@ -151,7 +150,7 @@ func konbiniRenewalPeriod(supporter *entity.ProjectSupporter, paidAt time.Time) 
 	return periodRange{start: start, end: start.AddDate(0, 0, supportPeriodDays)}
 }
 
-func (p *PaymentUseCase) fulfillPaymentIntent(ctx context.Context, pi stripesdk.PaymentIntent) error {
+func (p *PaymentUseCase) fulfillPaymentIntent(ctx context.Context, pi stripe.PaymentIntentDetail) error {
 	var (
 		planID uuid.UUID
 		err    error
@@ -169,7 +168,7 @@ func (p *PaymentUseCase) fulfillPaymentIntent(ctx context.Context, pi stripesdk.
 	return p.fulfillKonbiniPaymentIntent(ctx, pi)
 }
 
-func (p *PaymentUseCase) fulfillKonbiniPaymentIntent(ctx context.Context, pi stripesdk.PaymentIntent) error {
+func (p *PaymentUseCase) fulfillKonbiniPaymentIntent(ctx context.Context, pi stripe.PaymentIntentDetail) error {
 	var (
 		purchase *entity.Purchase
 		planID   uuid.UUID

@@ -8,12 +8,28 @@ import (
 	"github.com/stripe/stripe-go/v82/paymentintent"
 )
 
-func (c *client) GetCheckoutSession(ctx context.Context, sessionID string) (*stripesdk.CheckoutSession, error) {
+func (c *client) GetCheckoutSession(ctx context.Context, sessionID string) (CheckoutSessionSnapshot, error) {
+	var (
+		sess *stripesdk.CheckoutSession
+		err  error
+	)
 	_ = ctx
-	return session.Get(sessionID, nil)
+	sess, err = session.Get(sessionID, nil)
+	if err != nil {
+		return CheckoutSessionSnapshot{}, err
+	}
+	return checkoutSessionFromSDK(*sess), nil
 }
 
-func (c *client) GetPaymentIntentDetail(ctx context.Context, intentID string) (*stripesdk.PaymentIntent, error) {
+func (c *client) GetPaymentIntentDetail(ctx context.Context, intentID string) (PaymentIntentDetail, error) {
+	var (
+		pi  *stripesdk.PaymentIntent
+		err error
+	)
 	_ = ctx
-	return paymentintent.Get(intentID, nil)
+	pi, err = paymentintent.Get(intentID, nil)
+	if err != nil {
+		return PaymentIntentDetail{}, err
+	}
+	return paymentIntentFromSDK(*pi), nil
 }

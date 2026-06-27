@@ -97,7 +97,7 @@ func (c *ConnectUseCase) CreateOnboardingLink(ctx context.Context, sellerID uuid
 	return url, err
 }
 
-func (c *ConnectUseCase) SyncFromStripeAccountID(ctx context.Context, stripeAccountID string) (*entity.ConnectAccount, error) {
+func (c *ConnectUseCase) SyncFromStripeAccountID(ctx context.Context, stripeAccountID string) (*ConnectAccountView, error) {
 	var (
 		row  *entity.ConnectAccount
 		snap stripe.AccountSnapshot
@@ -123,5 +123,5 @@ func (c *ConnectUseCase) SyncFromStripeAccountID(ctx context.Context, stripeAcco
 	if err = c.Connect.Update(ctx, row); err != nil {
 		return nil, err
 	}
-	return row, nil
+	return ConnectAccountViewFrom(row), nil
 }

@@ -9,7 +9,6 @@ import (
 	"crowdfund-app/stripe"
 
 	"github.com/google/uuid"
-	stripesdk "github.com/stripe/stripe-go/v82"
 )
 
 func (s *SupporterUseCase) Upgrade(ctx context.Context, userID, supporterID, planID uuid.UUID) (UpgradeOut, error) {
@@ -182,7 +181,7 @@ func (s *SupporterUseCase) UpgradeConfirm(ctx context.Context, userID, supporter
 	if err != nil {
 		return SupporterView{}, err
 	}
-	if pi.Status != stripesdk.PaymentIntentStatusSucceeded {
+	if pi.Status != stripe.PaymentIntentStatusSucceeded {
 		return SupporterView{}, ErrBadRequest
 	}
 	return s.finalizePaidUpgrade(ctx, supporter, purchase, now)

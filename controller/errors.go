@@ -17,8 +17,11 @@ func mapForbidden(err error) *echo.HTTPError {
 }
 
 func mapBadRequest(err error) *echo.HTTPError {
-	if errors.Is(err, usecase.ErrBadRequest) {
+	switch {
+	case errors.Is(err, usecase.ErrBadRequest):
 		return echo.NewHTTPError(http.StatusBadRequest, apiError("bad request", "BAD_REQUEST"))
+	case errors.Is(err, usecase.ErrBadKYC):
+		return echo.NewHTTPError(http.StatusBadRequest, apiError("invalid seller kyc metadata", "BAD_SELLER_KYC"))
 	}
 	return nil
 }

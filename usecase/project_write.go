@@ -21,7 +21,7 @@ func (p *ProjectUseCase) Create(ctx context.Context, sellerID uuid.UUID, in Crea
 		plans      []entity.ProjectPlan
 		images     []entity.ProjectImage
 		i          int
-		pl         PlanIn
+		plan       PlanIn
 	)
 
 	u, err = p.Users.FindID(ctx, sellerID)
@@ -32,16 +32,16 @@ func (p *ProjectUseCase) Create(ctx context.Context, sellerID uuid.UUID, in Crea
 		return nil, ErrForbidden
 	}
 	planInputs = make([]entity.PlanInput, len(in.Plans))
-	for i, pl = range in.Plans {
+	for i, plan = range in.Plans {
 		planInputs[i] = entity.PlanInput{
-			MembershipType: entity.MembershipType(pl.MembershipType),
-			Price:          pl.Price,
-			MaxSupporters:  pl.MaxSupporters,
-			Benefits:       pl.Benefits,
+			MembershipType: entity.MembershipType(plan.MembershipType),
+			Price:          plan.Price,
+			MaxSupporters:  plan.MaxSupporters,
+			Benefits:       plan.Benefits,
 		}
 	}
 	if err = entity.ValidateProject(in.Title, in.Description, in.TargetAmount, entity.DurationType(in.DurationType), in.StartDate, in.EndDate, planInputs); err != nil {
-		return nil, mapEntityErr(err)
+		return nil, mapProjectEntityErr(err)
 	}
 	now = time.Now().UTC()
 	project = &entity.Project{
@@ -58,13 +58,13 @@ func (p *ProjectUseCase) Create(ctx context.Context, sellerID uuid.UUID, in Crea
 		UpdatedAt:    now,
 	}
 	plans = make([]entity.ProjectPlan, 0, len(in.Plans))
-	for _, pl = range in.Plans {
+	for _, plan = range in.Plans {
 		plans = append(plans, entity.ProjectPlan{
 			ID:             uuid.New(),
-			MembershipType: entity.MembershipType(pl.MembershipType),
-			Price:          pl.Price,
-			MaxSupporters:  pl.MaxSupporters,
-			Benefits:       strings.TrimSpace(pl.Benefits),
+			MembershipType: entity.MembershipType(plan.MembershipType),
+			Price:          plan.Price,
+			MaxSupporters:  plan.MaxSupporters,
+			Benefits:       strings.TrimSpace(plan.Benefits),
 			IsActive:       true,
 			CreatedAt:      now,
 			UpdatedAt:      now,
@@ -72,7 +72,7 @@ func (p *ProjectUseCase) Create(ctx context.Context, sellerID uuid.UUID, in Crea
 	}
 	images, project.MainImageURL, err = buildProjectImages(in.Images, in.ImageURL, now)
 	if err != nil {
-		return nil, mapEntityErr(err)
+		return nil, mapProjectEntityErr(err)
 	}
 	if err = p.Projects.Create(ctx, project, plans, images); err != nil {
 		return nil, err
@@ -103,7 +103,7 @@ func (p *ProjectUseCase) Update(ctx context.Context, sellerID, projectID uuid.UU
 	now = time.Now().UTC()
 	if in.Title != nil {
 		if err = entity.ValidateTitle(*in.Title); err != nil {
-			return nil, mapEntityErr(err)
+			return nil, mapProjectEntityErr(err)
 		}
 		project.Title = strings.TrimSpace(*in.Title)
 	}
@@ -133,7 +133,7 @@ func (p *ProjectUseCase) Update(ctx context.Context, sellerID, projectID uuid.UU
 	}
 	if in.DurationType != nil || in.StartDate != nil || in.EndDate != nil {
 		if err = entity.ValidateDuration(dur, start, end); err != nil {
-			return nil, mapEntityErr(err)
+			return nil, mapProjectEntityErr(err)
 		}
 		project.DurationType = dur
 		project.StartDate = start
@@ -142,12 +142,12 @@ func (p *ProjectUseCase) Update(ctx context.Context, sellerID, projectID uuid.UU
 	if in.Images != nil {
 		images, project.MainImageURL, err = buildProjectImages(*in.Images, nil, now)
 		if err != nil {
-			return nil, mapEntityErr(err)
+			return nil, mapProjectEntityErr(err)
 		}
 	} else if in.ImageURL != nil {
 		images, project.MainImageURL, err = buildProjectImages(nil, in.ImageURL, now)
 		if err != nil {
-			return nil, mapEntityErr(err)
+			return nil, mapProjectEntityErr(err)
 		}
 	}
 	if in.IsReapply && project.Status == entity.ProjectStatusActive {

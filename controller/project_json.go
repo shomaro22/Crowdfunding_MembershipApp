@@ -152,16 +152,16 @@ func projectPlansToJSON(plans []usecase.ProjectPlanView) []projectPlanJSON {
 	return out
 }
 
-func projectPlanViewToJSON(pl usecase.ProjectPlanView) projectPlanJSON {
+func projectPlanViewToJSON(plan usecase.ProjectPlanView) projectPlanJSON {
 	return projectPlanJSON{
-		ID:             pl.ID.String(),
-		ProjectID:      pl.ProjectID.String(),
-		MembershipType: pl.MembershipType,
-		Price:          pl.Price,
-		MaxSupporters:  pl.MaxSupporters,
-		Benefits:       pl.Benefits,
-		IsActive:       pl.IsActive,
-		SupporterCount: pl.SupporterCount,
+		ID:             plan.ID.String(),
+		ProjectID:      plan.ProjectID.String(),
+		MembershipType: plan.MembershipType,
+		Price:          plan.Price,
+		MaxSupporters:  plan.MaxSupporters,
+		Benefits:       plan.Benefits,
+		IsActive:       plan.IsActive,
+		SupporterCount: plan.SupporterCount,
 	}
 }
 

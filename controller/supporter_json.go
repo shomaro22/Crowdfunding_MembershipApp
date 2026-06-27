@@ -3,7 +3,6 @@ package controller
 import (
 	"time"
 
-	"crowdfund-app/entity"
 	"crowdfund-app/usecase"
 )
 
@@ -21,19 +20,19 @@ type changeBillingJSON struct {
 }
 
 type supporterJSON struct {
-	ID             string             `json:"id"`
-	ProjectID      string             `json:"project_id"`
-	PlanID         string             `json:"plan_id"`
-	UserID         string             `json:"user_id"`
-	Status         string             `json:"status"`
-	BillingMode    string             `json:"billing_mode"`
-	StartDate      string             `json:"start_date"`
-	EndDate        string             `json:"end_date"`
-	PendingPlanID  *string            `json:"pending_plan_id"`
-	PlanChangeDate *string            `json:"plan_change_date"`
+	ID             string              `json:"id"`
+	ProjectID      string              `json:"project_id"`
+	PlanID         string              `json:"plan_id"`
+	UserID         string              `json:"user_id"`
+	Status         string              `json:"status"`
+	BillingMode    string              `json:"billing_mode"`
+	StartDate      string              `json:"start_date"`
+	EndDate        string              `json:"end_date"`
+	PendingPlanID  *string             `json:"pending_plan_id"`
+	PlanChangeDate *string             `json:"plan_change_date"`
 	Project        *projectSummaryJSON `json:"project,omitempty"`
-	Plan           *projectPlanJSON   `json:"plan,omitempty"`
-	PendingPlan    *projectPlanJSON   `json:"pending_plan,omitempty"`
+	Plan           *projectPlanJSON    `json:"plan,omitempty"`
+	PendingPlan    *projectPlanJSON    `json:"pending_plan,omitempty"`
 }
 
 type listSupportersResponse struct {
@@ -42,7 +41,7 @@ type listSupportersResponse struct {
 }
 
 type upgradePlanResponse struct {
-	Supporter                  supporterJSON `json:"supporter"`
+	Supporter                 supporterJSON `json:"supporter"`
 	PaymentIntentClientSecret *string       `json:"payment_intent_client_secret"`
 }
 
@@ -79,18 +78,18 @@ func listSupportersJSON(rows []usecase.SupporterView) listSupportersResponse {
 
 func upgradePlanJSONResponse(out usecase.UpgradeOut) upgradePlanResponse {
 	return upgradePlanResponse{
-		Supporter:                  supporterToJSON(out.Supporter),
+		Supporter:                 supporterToJSON(out.Supporter),
 		PaymentIntentClientSecret: out.PaymentIntentClientSecret,
 	}
 }
 
 func supporterToJSON(v usecase.SupporterView) supporterJSON {
 	var (
-		s      *entity.ProjectSupporter
+		s      usecase.SupporterItemView
 		out    supporterJSON
 		planID *string
 		change *string
-		project   projectSummaryJSON
+		project projectSummaryJSON
 		plan   projectPlanJSON
 		pend   projectPlanJSON
 	)
@@ -100,8 +99,8 @@ func supporterToJSON(v usecase.SupporterView) supporterJSON {
 		ProjectID:   s.ProjectID.String(),
 		PlanID:      s.PlanID.String(),
 		UserID:      s.UserID.String(),
-		Status:      string(s.Status),
-		BillingMode: string(s.BillingMode),
+		Status:      s.Status,
+		BillingMode: s.BillingMode,
 		StartDate:   s.CurrentPeriodStart.UTC().Format(time.RFC3339),
 		EndDate:     s.CurrentPeriodEnd.UTC().Format(time.RFC3339),
 	}
@@ -116,15 +115,15 @@ func supporterToJSON(v usecase.SupporterView) supporterJSON {
 		out.PlanChangeDate = change
 	}
 	if v.Project != nil {
-		project = projectItemToJSON(usecase.ProjectItemFrom(v.Project))
+		project = projectItemToJSON(*v.Project)
 		out.Project = &project
 	}
 	if v.Plan != nil {
-		plan = projectPlanViewToJSON(usecase.ProjectPlanFromPtr(v.Plan))
+		plan = projectPlanViewToJSON(*v.Plan)
 		out.Plan = &plan
 	}
 	if v.PendingPlan != nil {
-		pend = projectPlanViewToJSON(usecase.ProjectPlanFromPtr(v.PendingPlan))
+		pend = projectPlanViewToJSON(*v.PendingPlan)
 		out.PendingPlan = &pend
 	}
 	return out
@@ -144,11 +143,11 @@ func listPurchasesJSON(rows []usecase.PurchaseView, total int64) listPurchasesRe
 
 func purchaseToJSON(v usecase.PurchaseView) purchaseJSON {
 	var (
-		p      *entity.Purchase
-		out    purchaseJSON
-		suppID *string
-		project   projectSummaryJSON
-		buyer  userJSON
+		p       usecase.PurchaseItemView
+		out     purchaseJSON
+		suppID  *string
+		project projectSummaryJSON
+		buyer   userJSON
 	)
 	p = v.Purchase
 	out = purchaseJSON{
@@ -157,8 +156,8 @@ func purchaseToJSON(v usecase.PurchaseView) purchaseJSON {
 		BuyerID:       p.BuyerID.String(),
 		Quantity:      p.Quantity,
 		TotalPrice:    p.TotalPrice,
-		Status:        string(p.Status),
-		PaymentMethod: string(p.PaymentMethod),
+		Status:        p.Status,
+		PaymentMethod: p.PaymentMethod,
 		CreatedAt:     p.CreatedAt.UTC().Format(time.RFC3339),
 	}
 	if p.SupporterID != nil {
@@ -167,11 +166,11 @@ func purchaseToJSON(v usecase.PurchaseView) purchaseJSON {
 		out.SupporterID = suppID
 	}
 	if v.Project != nil {
-		project = projectItemToJSON(usecase.ProjectItemFrom(v.Project))
+		project = projectItemToJSON(*v.Project)
 		out.Project = &project
 	}
 	if v.Buyer != nil {
-		buyer = userToJSON(usecase.UserViewFrom(v.Buyer))
+		buyer = userToJSON(*v.Buyer)
 		out.Buyer = &buyer
 	}
 	return out

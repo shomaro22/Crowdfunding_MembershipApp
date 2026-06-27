@@ -109,16 +109,16 @@ func (h *AuthController) GoogleCallback(c echo.Context) error {
 	)
 	errMsg = c.QueryParam("error")
 	if errMsg != "" {
-		return c.Redirect(http.StatusFound, h.Auth.OAuthErrorRedirect(errMsg))
+		return c.Redirect(http.StatusFound, oauthCallbackURL(h.AppPublicURL, usecase.OAuthRedirectView{Error: errMsg}))
 	}
 	code = c.QueryParam("code")
 	state = c.QueryParam("state")
 	res, err = h.Auth.GoogleCallback(c.Request().Context(), code, state, authMeta(c))
 	if err != nil {
-		return c.Redirect(http.StatusFound, h.Auth.OAuthErrorRedirect(oauthErrCode(err)))
+		return c.Redirect(http.StatusFound, oauthCallbackURL(h.AppPublicURL, usecase.OAuthRedirectView{Error: oauthErrCode(err)}))
 	}
 	auth.SetRefreshCookie(c, h.CookieCfg, res.RefreshToken)
-	return c.Redirect(http.StatusFound, h.Auth.OAuthSuccessRedirect(res.From, res.CallbackCode))
+	return c.Redirect(http.StatusFound, oauthCallbackURL(h.AppPublicURL, res.Redirect))
 }
 
 func (h *AuthController) OAuthExchange(c echo.Context) error {
