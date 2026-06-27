@@ -27,7 +27,5 @@ type AuthUseCase interface {
 	GoogleAuthURL(from string) (string, error)
 	GoogleCallback(ctx context.Context, code, state string, meta usecase.AuthMeta) (*usecase.OAuthCBOut, error)
 	ExchangeOAuthCode(ctx context.Context, code string, meta usecase.AuthMeta) (*usecase.LoginResult, error)
-	OAuthSuccessRedirect(from, code string) string
-	OAuthErrorRedirect(reason string) string
 	SigningKey() []byte
 }

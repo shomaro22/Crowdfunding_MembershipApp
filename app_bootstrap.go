@@ -1,7 +1,6 @@
 package main
 
 import (
-	"errors"
 	"log/slog"
 	"net/http"
 	"os"
@@ -13,7 +12,6 @@ import (
 	"crowdfund-app/entity"
 	"crowdfund-app/middleware"
 	"crowdfund-app/router"
-	"crowdfund-app/usecase"
 
 	"github.com/labstack/echo/v4"
 	labmw "github.com/labstack/echo/v4/middleware"
@@ -45,7 +43,7 @@ func buildApp(opts *bootstrap.Options) (*echo.Echo, string, error) {
 		adminOnly       []echo.MiddlewareFunc
 		rateLimiter     *middleware.RateLimiter
 		e               *echo.Echo
-		validateSession func(echo.Context, auth.AuthClaims) error
+		validateSession middleware.SessionValidator
 	)
 
 	slog.SetDefault(slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo})))
@@ -56,7 +54,7 @@ func buildApp(opts *bootstrap.Options) (*echo.Echo, string, error) {
 	}
 
 	cookieCfg = auth.CookieFromEnv()
-	authCtl = controller.NewAuthController(app.UseCases.Auth, cookieCfg)
+	authCtl = controller.NewAuthController(app.UseCases.Auth, cookieCfg, app.Config.AppPublicURL)
 	healthCtl = &controller.HealthController{SQL: app.DB, RDB: app.RDB}
 	adminCtl = controller.NewAdminController(app.UseCases.Admin)
 	kycFileCtl = controller.NewKYCFileController(app.UseCases.KYCAccess)
@@ -66,26 +64,7 @@ func buildApp(opts *bootstrap.Options) (*echo.Echo, string, error) {
 	supporterCtl = controller.NewSupporterController(app.UseCases.Supporter)
 	purchaseCtl = controller.NewPurchaseController(app.UseCases.Purchase)
 
-	validateSession = func(c echo.Context, claims auth.AuthClaims) error {
-		var (
-			info usecase.SessionInfo
-			err  error
-		)
-		info, err = app.UseCases.Auth.ValidateSession(c.Request().Context(), claims)
-		if err != nil {
-			switch {
-			case errors.Is(err, usecase.ErrInactiveUser):
-				return echo.NewHTTPError(http.StatusForbidden, map[string]string{"error": "user inactive", "code": "USER_INACTIVE"})
-			case errors.Is(err, usecase.ErrTokenRevoked):
-				return echo.NewHTTPError(http.StatusUnauthorized, map[string]string{"error": "token revoked", "code": "TOKEN_REVOKED"})
-			default:
-				return echo.NewHTTPError(http.StatusInternalServerError, map[string]string{"error": "internal error", "code": "INTERNAL_ERROR"})
-			}
-		}
-		c.Set(middleware.CtxUserRole, string(info.Role))
-		middleware.SetAdminRoleFromSession(c, info.Role, info.AdminRole)
-		return nil
-	}
+	validateSession = middleware.SessionValidateHTTP(app.UseCases.Auth.ValidateSession)
 
 	corsRaw = strings.TrimSpace(os.Getenv("CORS_ALLOW_ORIGINS"))
 	if corsRaw != "" {
