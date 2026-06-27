@@ -1,0 +1,2 @@
+DROP TABLE IF EXISTS ws_tokens;
+DROP TABLE IF EXISTS messages;
