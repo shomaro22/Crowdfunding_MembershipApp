@@ -74,7 +74,9 @@ func buildApp(opts *bootstrap.Options) (*echo.Echo, string, error) {
 	kycFileCtl = controller.NewKYCFileController(app.UseCases.KYCAccess)
 	projectCtl = controller.NewProjectController(app.UseCases.Project)
 	connectCtl = controller.NewConnectController(app.UseCases.Connect)
-	paymentCtl = controller.NewPaymentController(app.UseCases.Payment, app.UseCases.Purchase, app.Stripe.AppURL())
+	if app.Stripe != nil {
+		paymentCtl = controller.NewPaymentController(app.UseCases.Payment, app.UseCases.Purchase, app.Stripe.AppURL())
+	}
 	supporterCtl = controller.NewSupporterController(app.UseCases.Supporter)
 	hubAdapter = bootstrap.NewWSHubAdapter(app.Hub)
 	messageCtl = controller.NewMessageController(app.UseCases.Message)
