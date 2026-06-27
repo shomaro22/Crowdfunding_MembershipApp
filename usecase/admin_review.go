@@ -91,19 +91,21 @@ func (a *AdminUseCase) RejectBuyer(ctx context.Context, adminID, userID uuid.UUI
 	return UserViewFrom(u), nil
 }
 
-func (a *AdminUseCase) ListSellerRegs(ctx context.Context, status entity.RegStatus, limit, offset int) ([]SellerRegItemView, int64, error) {
+func (a *AdminUseCase) ListSellerRegs(ctx context.Context, status string, limit, offset int) ([]SellerRegItemView, int64, error) {
 	var (
 		rows  []entity.SellerReg
 		total int64
 		out   []SellerRegItemView
 		err   error
 		i     int
+		st    entity.RegStatus
 	)
 
-	if !status.Valid() {
-		status = entity.RegPending
+	st = entity.RegStatus(status)
+	if !st.Valid() {
+		st = entity.RegPending
 	}
-	rows, total, err = a.SellerRegs.List(ctx, status, limit, offset)
+	rows, total, err = a.SellerRegs.List(ctx, st, limit, offset)
 	if err != nil {
 		return nil, 0, err
 	}

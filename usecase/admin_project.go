@@ -10,18 +10,27 @@ import (
 	"github.com/google/uuid"
 )
 
-func (a *AdminUseCase) ListProjects(ctx context.Context, status *entity.ProjectStatus, limit, offset int) ([]ProjectView, int64, error) {
+func (a *AdminUseCase) ListProjects(ctx context.Context, status *string, limit, offset int) ([]ProjectView, int64, error) {
 	var (
-		rows  []entity.Project
-		total int64
-		err   error
-		uc    *ProjectUseCase
+		rows   []entity.Project
+		total  int64
+		err    error
+		uc     *ProjectUseCase
+		filter *entity.ProjectStatus
+		st     entity.ProjectStatus
 	)
 
 	if a.Projects == nil {
 		return nil, 0, ErrNotFound
 	}
-	rows, total, err = a.Projects.ListAll(ctx, status, limit, offset)
+	if status != nil && *status != "" {
+		st = entity.ProjectStatus(*status)
+		if !st.Valid() {
+			return nil, 0, ErrBadRequest
+		}
+		filter = &st
+	}
+	rows, total, err = a.Projects.ListAll(ctx, filter, limit, offset)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -29,17 +38,22 @@ func (a *AdminUseCase) ListProjects(ctx context.Context, status *entity.ProjectS
 	return uc.enrichList(ctx, rows, total)
 }
 
-func (a *AdminUseCase) PatchProject(ctx context.Context, adminID, projectID uuid.UUID, status entity.ProjectStatus, reason *string) (*ProjectView, error) {
+func (a *AdminUseCase) PatchProject(ctx context.Context, adminID, projectID uuid.UUID, status string, reason *string) (*ProjectView, error) {
 	var (
 		project   *entity.Project
-		plans  []entity.ProjectPlan
-		images []entity.ProjectImage
-		err    error
-		now    time.Time
-		action string
-		seller *entity.User
+		plans     []entity.ProjectPlan
+		images    []entity.ProjectImage
+		err       error
+		now       time.Time
+		action    string
+		seller    *entity.User
+		projectSt entity.ProjectStatus
 	)
 
+	projectSt = entity.ProjectStatus(status)
+	if !projectSt.Valid() {
+		return nil, ErrBadRequest
+	}
 	if err = a.requireReviewAdmin(ctx, adminID); err != nil {
 		return nil, err
 	}
@@ -50,10 +64,7 @@ func (a *AdminUseCase) PatchProject(ctx context.Context, adminID, projectID uuid
 	if err != nil || project == nil {
 		return nil, ErrNotFound
 	}
-	if !status.Valid() {
-		return nil, ErrBadRequest
-	}
-	switch status {
+	switch projectSt {
 	case entity.ProjectStatusActive:
 		if project.Status != entity.ProjectStatusPending {
 			return nil, ErrInvalidState
@@ -70,17 +81,17 @@ func (a *AdminUseCase) PatchProject(ctx context.Context, adminID, projectID uuid
 		return nil, ErrInvalidState
 	}
 	now = time.Now().UTC()
-	project.Status = status
+	project.Status = projectSt
 	project.UpdatedAt = now
 	if err = a.Projects.Update(ctx, project); err != nil {
 		return nil, err
 	}
 	action = "project.approve"
-	if status == entity.ProjectStatusCancelled {
+	if projectSt == entity.ProjectStatusCancelled {
 		action = "project.reject"
 	}
 	a.writeAudit(ctx, adminID, action, "project", project.ID.String(), reason, nil)
-	if status == entity.ProjectStatusActive {
+	if projectSt == entity.ProjectStatusActive {
 		a.writeReviewDecision(ctx, adminID, entity.ReviewProject, projectID, entity.ReviewApproved, reason)
 	} else {
 		a.writeReviewDecision(ctx, adminID, entity.ReviewProject, projectID, entity.ReviewRejected, reason)

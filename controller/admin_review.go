@@ -5,7 +5,6 @@ import (
 	"strconv"
 	"strings"
 
-	"crowdfund-app/entity"
 	"crowdfund-app/usecase"
 
 	"github.com/google/uuid"
@@ -90,7 +89,7 @@ func (h *AdminController) RejectBuyer(c echo.Context) error {
 
 func (h *AdminController) ListSellerRegs(c echo.Context) error {
 	var (
-		status entity.RegStatus
+		status string
 		limit  int
 		offset int
 		regs   []usecase.SellerRegItemView
@@ -99,10 +98,7 @@ func (h *AdminController) ListSellerRegs(c echo.Context) error {
 		i      int
 		err    error
 	)
-	status = entity.RegStatus(c.QueryParam("status"))
-	if status == "" {
-		status = entity.RegPending
-	}
+	status = c.QueryParam("status")
 	limit, _ = strconv.Atoi(c.QueryParam("limit"))
 	offset, _ = strconv.Atoi(c.QueryParam("offset"))
 	regs, total, err = h.Admin.ListSellerRegs(c.Request().Context(), status, limit, offset)

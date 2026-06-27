@@ -4,7 +4,6 @@ import (
 	"net/http"
 	"strconv"
 
-	"crowdfund-app/entity"
 	"crowdfund-app/usecase"
 
 	"github.com/google/uuid"
@@ -13,9 +12,8 @@ import (
 
 func (h *AdminController) ListProjects(c echo.Context) error {
 	var (
-		status *entity.ProjectStatus
+		status *string
 		s      string
-		st     entity.ProjectStatus
 		limit  int
 		offset int
 		rows   []usecase.ProjectView
@@ -24,8 +22,7 @@ func (h *AdminController) ListProjects(c echo.Context) error {
 	)
 	s = c.QueryParam("status")
 	if s != "" {
-		st = entity.ProjectStatus(s)
-		status = &st
+		status = &s
 	}
 	limit, _ = strconv.Atoi(c.QueryParam("limit"))
 	offset, _ = strconv.Atoi(c.QueryParam("offset"))
@@ -58,7 +55,7 @@ func (h *AdminController) PatchProject(c echo.Context) error {
 	if err = c.Bind(&body); err != nil || body.Status == "" {
 		return echo.NewHTTPError(http.StatusBadRequest, apiError("status required", "BAD_REQUEST"))
 	}
-	view, err = h.Admin.PatchProject(c.Request().Context(), adminID, id, entity.ProjectStatus(body.Status), body.Reason)
+	view, err = h.Admin.PatchProject(c.Request().Context(), adminID, id, body.Status, body.Reason)
 	if err != nil {
 		return mapAdminError(err)
 	}

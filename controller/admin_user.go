@@ -3,7 +3,6 @@ package controller
 import (
 	"net/http"
 
-	"crowdfund-app/entity"
 	"crowdfund-app/usecase"
 
 	"github.com/google/uuid"
@@ -58,7 +57,7 @@ func (h *AdminController) ChangeAdminRole(c echo.Context) error {
 	if err = c.Bind(&body); err != nil || body.AdminRole == "" {
 		return echo.NewHTTPError(http.StatusBadRequest, apiError("admin_role required", "BAD_REQUEST"))
 	}
-	u, err = h.Admin.ChangeAdminRole(c.Request().Context(), actorID, userID, entity.AdminRole(body.AdminRole), body.Reason)
+	u, err = h.Admin.ChangeAdminRole(c.Request().Context(), actorID, userID, body.AdminRole, body.Reason)
 	if err != nil {
 		return mapAdminError(err)
 	}

@@ -125,3 +125,11 @@ func (c *ConnectUseCase) SyncFromStripeAccountID(ctx context.Context, stripeAcco
 	}
 	return ConnectAccountViewFrom(row), nil
 }
+
+type ConnectSyncer interface {
+	SyncFromStripeAccountID(ctx context.Context, stripeAccountID string) (*ConnectAccountView, error)
+}
+
+type SupporterViewer interface {
+	ViewForSupporter(ctx context.Context, supporter *entity.ProjectSupporter) (SupporterView, error)
+}

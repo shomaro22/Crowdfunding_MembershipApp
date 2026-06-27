@@ -107,7 +107,7 @@ func (a *AdminUseCase) ResetUser2FA(ctx context.Context, adminID, targetUserID u
 	return UserViewFrom(u), nil
 }
 
-func (a *AdminUseCase) ChangeAdminRole(ctx context.Context, actorID, targetUserID uuid.UUID, newRole entity.AdminRole, reason *string) (UserView, error) {
+func (a *AdminUseCase) ChangeAdminRole(ctx context.Context, actorID, targetUserID uuid.UUID, newRole string, reason *string) (UserView, error) {
 	var (
 		actor   *entity.User
 		u       *entity.User
@@ -115,9 +115,11 @@ func (a *AdminUseCase) ChangeAdminRole(ctx context.Context, actorID, targetUserI
 		now     time.Time
 		oldRole string
 		details string
+		role    entity.AdminRole
 	)
 
-	if !newRole.Valid() {
+	role = entity.AdminRole(newRole)
+	if !role.Valid() {
 		return UserView{}, ErrBadRequest
 	}
 	actor, err = a.Users.FindID(ctx, actorID)
@@ -132,15 +134,15 @@ func (a *AdminUseCase) ChangeAdminRole(ctx context.Context, actorID, targetUserI
 	if u.Role != entity.UserRoleAdmin {
 		return UserView{}, ErrInvalidState
 	}
-	if u.AdminRole != nil && *u.AdminRole == newRole {
+	if u.AdminRole != nil && *u.AdminRole == role {
 		return UserViewFrom(u), nil
 	}
 	if u.AdminRole != nil {
 		oldRole = string(*u.AdminRole)
 	}
 	now = time.Now().UTC()
-	role := newRole
-	u.AdminRole = &role
+	roleCopy := role
+	u.AdminRole = &roleCopy
 	u.UpdatedAt = now
 	if err = a.Users.Update(ctx, u); err != nil {
 		return UserView{}, err
@@ -148,23 +150,13 @@ func (a *AdminUseCase) ChangeAdminRole(ctx context.Context, actorID, targetUserI
 	if err = a.invalidateSessions(ctx, targetUserID); err != nil {
 		return UserView{}, err
 	}
-	details = fmt.Sprintf("%s -> %s", oldRole, newRole)
+	details = fmt.Sprintf("%s -> %s", oldRole, role)
 	a.writeAudit(ctx, actorID, "user.change_admin_role", "user", u.ID.String(), reason, &details)
 	return UserViewFrom(u), nil
 }
 
 func (a *AdminUseCase) invalidateSessions(ctx context.Context, userID uuid.UUID) error {
-	var err error
-
-	return repository.WithTx(ctx, a.DB, func(txCtx context.Context) error {
-		if _, err = a.Users.BumpTokenVer(txCtx, userID); err != nil {
-			return err
-		}
-		if a.RefreshTokens == nil {
-			return nil
-		}
-		return a.RefreshTokens.RevokeAllByUser(txCtx, userID, time.Now().UTC())
-	})
+	return InvalidateUserSessions(ctx, a.DB, a.Users, a.RefreshTokens, userID)
 }
 
 func (a *AdminUseCase) writeReviewDecision(ctx context.Context, reviewerID uuid.UUID, resourceType string, resourceID uuid.UUID, decision string, reason *string) {
