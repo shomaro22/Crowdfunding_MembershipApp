@@ -63,7 +63,7 @@ func (h *AuthController) OAuthExchange(c echo.Context) error {
 	}
 	return c.JSON(http.StatusOK, authTokenResponse{
 		AuthToken: res.AuthToken,
-		User:      usecase.UserWireFrom(res.User),
+		User:      UserWireFrom(res.User),
 	})
 }
 

@@ -214,7 +214,7 @@ type purchaseJSON struct {
 	PaymentMethod string              `json:"payment_method"`
 	CreatedAt     string              `json:"created_at"`
 	Project       *projectSummaryJSON `json:"project,omitempty"`
-	Buyer         *usecase.UserWire     `json:"buyer,omitempty"`
+	Buyer         *UserWire     `json:"buyer,omitempty"`
 }
 
 type listPurchasesResponse struct {
@@ -305,7 +305,7 @@ func purchaseToJSON(v usecase.PurchaseView) purchaseJSON {
 		out     purchaseJSON
 		suppID  *string
 		project projectSummaryJSON
-		buyer   usecase.UserWire
+		buyer   UserWire
 	)
 	p = v.Purchase
 	out = purchaseJSON{
@@ -328,7 +328,7 @@ func purchaseToJSON(v usecase.PurchaseView) purchaseJSON {
 		out.Project = &project
 	}
 	if v.Buyer != nil {
-		buyer = usecase.UserWireFrom(*v.Buyer)
+		buyer = UserWireFrom(*v.Buyer)
 		out.Buyer = &buyer
 	}
 	return out

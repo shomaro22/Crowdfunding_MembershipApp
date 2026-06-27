@@ -41,7 +41,7 @@ func (h *AuthController) Register(c echo.Context) error {
 		return mapUseCaseError(err)
 	}
 	return c.JSON(http.StatusCreated, registerResponse{
-		User:    usecase.UserWireFrom(u),
+		User:    UserWireFrom(u),
 		Message: "Registration pending admin approval",
 	})
 }
@@ -99,7 +99,7 @@ func (h *AuthController) RegisterSeller(c echo.Context) error {
 		return mapUseCaseError(err)
 	}
 	return c.JSON(http.StatusCreated, sellerCreateJSON{
-		User:         usecase.UserWireFrom(res.User),
+		User:         UserWireFrom(res.User),
 		Registration: sellerRegToJSON(res.Registration),
 	})
 }

@@ -11,6 +11,14 @@ import (
 	"github.com/google/uuid"
 )
 
+const (
+	defaultThreadsPage          = 1
+	defaultThreadsPerPage       = 20
+	maxThreadsPerPage           = 50
+	defaultMessagesPerThread    = 20
+	maxMessagesPerThread        = 50
+)
+
 type SendMessageIn struct {
 	ProjectID  uuid.UUID
 	ReceiverID uuid.UUID
@@ -38,61 +46,72 @@ func AttachMessageEvents(m *MessageUseCase, h MessageEventHook) {
 	}
 }
 
-func threadKey(projectID, partnerID uuid.UUID) string {
-	return projectID.String() + "|" + partnerID.String()
+func normalizeListThreadsQuery(q ListThreadsQuery) ListThreadsQuery {
+	if q.Page < 1 {
+		q.Page = defaultThreadsPage
+	}
+	if q.PerPage < 1 {
+		q.PerPage = defaultThreadsPerPage
+	}
+	if q.PerPage > maxThreadsPerPage {
+		q.PerPage = maxThreadsPerPage
+	}
+	if q.MessagesPerThread < 1 {
+		q.MessagesPerThread = defaultMessagesPerThread
+	}
+	if q.MessagesPerThread > maxMessagesPerThread {
+		q.MessagesPerThread = maxMessagesPerThread
+	}
+	return q
 }
 
-func (m *MessageUseCase) ListThreads(ctx context.Context, userID uuid.UUID) ([]MessageThreadView, error) {
+func (m *MessageUseCase) ListThreads(ctx context.Context, userID uuid.UUID, q ListThreadsQuery) (ListThreadsResult, error) {
 	var (
-		rows    []entity.Message
-		err     error
-		threads map[string]*MessageThreadView
-		order   []string
-		i       int
-		msg     entity.Message
-		partner uuid.UUID
-		key     string
-		t       *MessageThreadView
-		out     []MessageThreadView
+		qNorm    ListThreadsQuery
+		summaries []repository.MessageThreadSummary
+		total    int64
+		offset   int
+		rows     []entity.Message
+		out      ListThreadsResult
+		i        int
+		s        repository.MessageThreadSummary
+		t        MessageThreadView
+		err      error
 	)
-	rows, err = m.Messages.ListForUser(ctx, userID)
+	qNorm = normalizeListThreadsQuery(q)
+	offset = (qNorm.Page - 1) * qNorm.PerPage
+	summaries, total, err = m.Messages.ListThreadSummaries(ctx, userID, offset, qNorm.PerPage)
 	if err != nil {
-		return nil, err
+		return ListThreadsResult{}, err
 	}
-	threads = make(map[string]*MessageThreadView)
-	for i = range rows {
-		msg = rows[i]
-		if msg.SenderID == userID {
-			partner = msg.ReceiverID
-		} else {
-			partner = msg.SenderID
-		}
-		key = threadKey(msg.ProjectID, partner)
-		t = threads[key]
-		if t == nil {
-			t = &MessageThreadView{
-				ProjectID: msg.ProjectID,
-				Partner:   UserView{ID: partner},
-				Messages:  make([]MessageItemView, 0),
-			}
-			threads[key] = t
-			order = append(order, key)
-		}
-		if !msg.IsRead && msg.ReceiverID == userID {
-			t.UnreadCount++
-		}
-		t.Messages = append(t.Messages, MessageItemFrom(&msg))
+	out = ListThreadsResult{
+		Total:   total,
+		Page:    qNorm.Page,
+		PerPage: qNorm.PerPage,
+		Threads: make([]MessageThreadView, 0, len(summaries)),
 	}
-	out = make([]MessageThreadView, 0, len(order))
-	for i = range order {
-		t = threads[order[i]]
-		if err = m.CanSubscribeProject(ctx, t.ProjectID, userID); err != nil {
+	for i = range summaries {
+		s = summaries[i]
+		if err = m.CanSubscribeProject(ctx, s.ProjectID, userID); err != nil {
 			continue
 		}
-		if err = m.enrichThread(ctx, t); err != nil {
-			return nil, err
+		rows, err = m.Messages.ListMessagesInThread(ctx, userID, s.ProjectID, s.PartnerID, qNorm.MessagesPerThread)
+		if err != nil {
+			return ListThreadsResult{}, err
 		}
-		out = append(out, *t)
+		t = MessageThreadView{
+			ProjectID:   s.ProjectID,
+			Partner:     UserView{ID: s.PartnerID},
+			UnreadCount: s.UnreadCount,
+			Messages:    make([]MessageItemView, 0, len(rows)),
+		}
+		for _, msg := range rows {
+			t.Messages = append(t.Messages, MessageItemFrom(&msg))
+		}
+		if err = m.enrichThread(ctx, &t); err != nil {
+			return ListThreadsResult{}, err
+		}
+		out.Threads = append(out.Threads, t)
 	}
 	return out, nil
 }
