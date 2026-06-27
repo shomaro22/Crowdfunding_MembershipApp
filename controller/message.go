@@ -2,6 +2,7 @@ package controller
 
 import (
 	"net/http"
+	"strconv"
 
 	"crowdfund-app/usecase"
 
@@ -20,18 +21,44 @@ func NewMessageController(messages MessageUseCase) *MessageController {
 func (h *MessageController) List(c echo.Context) error {
 	var (
 		userID uuid.UUID
-		rows   []usecase.MessageThreadView
+		result usecase.ListThreadsResult
 		err    error
 	)
 	userID, err = CurrentUserID(c)
 	if err != nil {
 		return err
 	}
-	rows, err = h.Messages.ListThreads(c.Request().Context(), userID)
+	result, err = h.Messages.ListThreads(c.Request().Context(), userID, listThreadsQueryFrom(c))
 	if err != nil {
 		return mapUseCaseError(err)
 	}
-	return c.JSON(http.StatusOK, usecase.ListMessageThreadsWireFrom(rows))
+	return c.JSON(http.StatusOK, ListMessageThreadsWireFrom(result))
+}
+
+func listThreadsQueryFrom(c echo.Context) usecase.ListThreadsQuery {
+	var (
+		page              int
+		perPage           int
+		messagesPerThread int
+		err               error
+	)
+	page, err = strconv.Atoi(c.QueryParam("page"))
+	if err != nil || page < 1 {
+		page = 1
+	}
+	perPage, err = strconv.Atoi(c.QueryParam("per_page"))
+	if err != nil || perPage < 1 {
+		perPage = 20
+	}
+	messagesPerThread, err = strconv.Atoi(c.QueryParam("messages_per_thread"))
+	if err != nil || messagesPerThread < 1 {
+		messagesPerThread = 20
+	}
+	return usecase.ListThreadsQuery{
+		Page:              page,
+		PerPage:           perPage,
+		MessagesPerThread: messagesPerThread,
+	}
 }
 
 func (h *MessageController) Send(c echo.Context) error {
@@ -58,7 +85,7 @@ func (h *MessageController) Send(c echo.Context) error {
 	if err != nil {
 		return mapUseCaseError(err)
 	}
-	return c.JSON(http.StatusCreated, usecase.MessageItemWireFrom(out))
+	return c.JSON(http.StatusCreated, MessageItemWireFrom(out))
 }
 
 func (h *MessageController) MarkRead(c echo.Context) error {
@@ -96,7 +123,7 @@ func (h *MessageController) Notifications(c echo.Context) error {
 	if err != nil {
 		return mapUseCaseError(err)
 	}
-	return c.JSON(http.StatusOK, usecase.NotificationsWire{UnreadMessages: view.UnreadMessages})
+	return c.JSON(http.StatusOK, NotificationsWire{UnreadMessages: view.UnreadMessages})
 }
 
 func (body sendMessageRequestJSON) toInput() (usecase.SendMessageIn, error) {

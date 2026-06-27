@@ -9,7 +9,6 @@ import (
 	"github.com/google/uuid"
 )
 
-const messagingAccessTimeout = 3 * time.Second
 
 func (m *MessageUseCase) loadProject(ctx context.Context, projectID uuid.UUID) (*entity.Project, error) {
 	var (
@@ -51,19 +50,6 @@ func (m *MessageUseCase) CanSubscribeProject(ctx context.Context, projectID, use
 		return nil
 	}
 	return m.requireActiveMember(ctx, projectID, userID)
-}
-
-func (m *MessageUseCase) SubscriberFilter(ctx context.Context, projectID uuid.UUID) func(uuid.UUID) bool {
-	return func(userID uuid.UUID) bool {
-		var (
-			checkCtx context.Context
-			cancel   context.CancelFunc
-		)
-		checkCtx, cancel = context.WithTimeout(ctx, messagingAccessTimeout)
-		err := m.CanSubscribeProject(checkCtx, projectID, userID)
-		cancel()
-		return err == nil
-	}
 }
 
 func (m *MessageUseCase) authorizeSend(

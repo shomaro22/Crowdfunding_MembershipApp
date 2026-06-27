@@ -149,5 +149,6 @@ func NewBatchUseCase(db *gorm.DB, repos Repositories, stripeClient stripe.Client
 		DB:         db,
 		Runs:       repos.Batch,
 		Supporters: NewSupporterUseCase(db, repos, stripeClient),
+		WSTokens:   repos.WSTokens,
 	}
 }

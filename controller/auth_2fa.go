@@ -80,6 +80,6 @@ func (h *AuthController) Challenge2FA(c echo.Context) error {
 	auth.SetRefreshCookie(c, h.CookieCfg, res.RefreshToken)
 	return c.JSON(http.StatusOK, authTokenResponse{
 		AuthToken: res.AuthToken,
-		User:      usecase.UserWireFrom(res.User),
+		User:      UserWireFrom(res.User),
 	})
 }
