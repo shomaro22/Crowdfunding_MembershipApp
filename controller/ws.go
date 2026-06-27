@@ -59,6 +59,7 @@ func (w *WSController) Handle(c echo.Context) error {
 	if err != nil {
 		return err
 	}
+	conn.SetReadLimit(wshub.MaxReadBytes)
 	conn.SetPongHandler(func(string) error {
 		return conn.SetReadDeadline(time.Now().Add(wshub.ReadDeadline))
 	})
@@ -201,6 +202,10 @@ func (w *WSController) handleTyping(connID, userID, projectID uuid.UUID, project
 		internal bool
 		err      error
 	)
+	if !w.Hub.AllowTyping(connID, projectID) {
+		w.writeWSError(connID, wshub.CodeRateLimited, "typing rate limit exceeded", &projectPtr)
+		return
+	}
 	active = true
 	if isTyping != nil {
 		active = *isTyping
@@ -227,12 +232,7 @@ func (w *WSController) handleTyping(connID, userID, projectID uuid.UUID, project
 	if err != nil {
 		return
 	}
-	w.Hub.BroadcastToProjectExceptUserFiltered(
-		projectID,
-		payload,
-		userID,
-		w.Messages.SubscriberFilter(context.Background(), projectID),
-	)
+	w.Hub.BroadcastToProjectExceptUser(projectID, payload, userID)
 }
 
 func (w *WSController) revalidateSubscriptions(connID, userID uuid.UUID) {

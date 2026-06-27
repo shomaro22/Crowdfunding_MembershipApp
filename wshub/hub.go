@@ -14,10 +14,6 @@ type Hub interface {
 	ProjectIDs(connID uuid.UUID) []uuid.UUID
 	WriteText(connID uuid.UUID, payload []byte) bool
 	SendPing(connID uuid.UUID) bool
-	BroadcastToProjectExceptUserFiltered(
-		projectID uuid.UUID,
-		payload []byte,
-		excludeUserID uuid.UUID,
-		filter SubscriberFilter,
-	)
+	BroadcastToProjectExceptUser(projectID uuid.UUID, payload []byte, excludeUserID uuid.UUID)
+	AllowTyping(connID, projectID uuid.UUID) bool
 }

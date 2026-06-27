@@ -1,58 +1,45 @@
 package wshub
 
 import (
-	"context"
 	"encoding/json"
-
-	"crowdfund-app/usecase"
 
 	"github.com/google/uuid"
 )
 
-type MessageSubscriberFilter interface {
-	SubscriberFilter(ctx context.Context, projectID uuid.UUID) func(uuid.UUID) bool
-}
-
 type MessagePublisher struct {
-	Hub    *ConnectionManager
-	Access MessageSubscriberFilter
+	Hub *ConnectionManager
 }
 
-func NewMessagePublisher(hub *ConnectionManager, access MessageSubscriberFilter) *MessagePublisher {
-	return &MessagePublisher{Hub: hub, Access: access}
+func NewMessagePublisher(hub *ConnectionManager) *MessagePublisher {
+	return &MessagePublisher{Hub: hub}
 }
 
-func (p *MessagePublisher) OnMessageCreated(ctx context.Context, view usecase.MessageItemView) {
+func (p *MessagePublisher) PublishMessageCreated(projectID uuid.UUID, item MessageItemPayload) {
 	var (
 		payload []byte
 		err     error
 	)
-	if p == nil || p.Hub == nil || p.Access == nil {
+	if p == nil || p.Hub == nil {
 		return
 	}
-	payload, err = json.Marshal(struct {
-		Type          string                  `json:"type"`
-		SchemaVersion int                     `json:"schema_version"`
-		ProjectID     uuid.UUID               `json:"project_id"`
-		Message       usecase.MessageItemWire `json:"message"`
-	}{
+	payload, err = json.Marshal(MessageCreatedOutbound{
 		Type:          EventMessageCreated,
 		SchemaVersion: EventSchemaVersion,
-		ProjectID:     view.ProjectID,
-		Message:       usecase.MessageItemWireFrom(view),
+		ProjectID:     projectID,
+		Message:       item,
 	})
 	if err != nil {
 		return
 	}
-	p.Hub.BroadcastToProjectFiltered(view.ProjectID, payload, p.Access.SubscriberFilter(ctx, view.ProjectID))
+	p.Hub.BroadcastToProjectAsync(projectID, payload)
 }
 
-func (p *MessagePublisher) OnMessageRead(ctx context.Context, projectID, messageID, readerID uuid.UUID) {
+func (p *MessagePublisher) PublishReadUpdated(projectID, messageID, readerID uuid.UUID) {
 	var (
 		payload []byte
 		err     error
 	)
-	if p == nil || p.Hub == nil || p.Access == nil {
+	if p == nil || p.Hub == nil {
 		return
 	}
 	payload, err = json.Marshal(ReadUpdatedBroadcast{
@@ -65,5 +52,5 @@ func (p *MessagePublisher) OnMessageRead(ctx context.Context, projectID, message
 	if err != nil {
 		return
 	}
-	p.Hub.BroadcastToProjectFiltered(projectID, payload, p.Access.SubscriberFilter(ctx, projectID))
+	p.Hub.BroadcastToProjectAsync(projectID, payload)
 }
