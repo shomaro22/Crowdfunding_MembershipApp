@@ -18,7 +18,7 @@ type BatchUseCase struct {
 	Supporters *SupporterUseCase
 }
 
-func (b *BatchUseCase) Run(ctx context.Context, jobName, triggeredBy string, dryRun bool) (*entity.BatchRun, error) {
+func (b *BatchUseCase) Run(ctx context.Context, jobName, triggeredBy string, dryRun bool) (*BatchRunView, error) {
 	var (
 		run       *entity.BatchRun
 		processed int
@@ -65,9 +65,9 @@ func (b *BatchUseCase) Run(ctx context.Context, jobName, triggeredBy string, dry
 		}
 	}
 	if err = b.Runs.Update(ctx, run); err != nil {
-		return run, err
+		return BatchRunViewFrom(run), err
 	}
-	return run, runErr
+	return BatchRunViewFrom(run), runErr
 }
 
 func isSupportedBatchJob(name string) bool {
