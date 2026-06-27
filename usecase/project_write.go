@@ -21,7 +21,7 @@ func (p *ProjectUseCase) Create(ctx context.Context, sellerID uuid.UUID, in Crea
 		plans      []entity.ProjectPlan
 		images     []entity.ProjectImage
 		i          int
-		pl         PlanIn
+		plan       PlanIn
 	)
 
 	u, err = p.Users.FindID(ctx, sellerID)
@@ -32,12 +32,12 @@ func (p *ProjectUseCase) Create(ctx context.Context, sellerID uuid.UUID, in Crea
 		return nil, ErrForbidden
 	}
 	planInputs = make([]entity.PlanInput, len(in.Plans))
-	for i, pl = range in.Plans {
+	for i, plan = range in.Plans {
 		planInputs[i] = entity.PlanInput{
-			MembershipType: entity.MembershipType(pl.MembershipType),
-			Price:          pl.Price,
-			MaxSupporters:  pl.MaxSupporters,
-			Benefits:       pl.Benefits,
+			MembershipType: entity.MembershipType(plan.MembershipType),
+			Price:          plan.Price,
+			MaxSupporters:  plan.MaxSupporters,
+			Benefits:       plan.Benefits,
 		}
 	}
 	if err = entity.ValidateProject(in.Title, in.Description, in.TargetAmount, entity.DurationType(in.DurationType), in.StartDate, in.EndDate, planInputs); err != nil {
@@ -58,13 +58,13 @@ func (p *ProjectUseCase) Create(ctx context.Context, sellerID uuid.UUID, in Crea
 		UpdatedAt:    now,
 	}
 	plans = make([]entity.ProjectPlan, 0, len(in.Plans))
-	for _, pl = range in.Plans {
+	for _, plan = range in.Plans {
 		plans = append(plans, entity.ProjectPlan{
 			ID:             uuid.New(),
-			MembershipType: entity.MembershipType(pl.MembershipType),
-			Price:          pl.Price,
-			MaxSupporters:  pl.MaxSupporters,
-			Benefits:       strings.TrimSpace(pl.Benefits),
+			MembershipType: entity.MembershipType(plan.MembershipType),
+			Price:          plan.Price,
+			MaxSupporters:  plan.MaxSupporters,
+			Benefits:       strings.TrimSpace(plan.Benefits),
 			IsActive:       true,
 			CreatedAt:      now,
 			UpdatedAt:      now,
