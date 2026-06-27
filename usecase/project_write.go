@@ -17,7 +17,7 @@ func (p *ProjectUseCase) Create(ctx context.Context, sellerID uuid.UUID, in Crea
 		err        error
 		planInputs []entity.PlanInput
 		now        time.Time
-		proj       *entity.Project
+		project       *entity.Project
 		plans      []entity.ProjectPlan
 		images     []entity.ProjectImage
 		i          int
@@ -44,7 +44,7 @@ func (p *ProjectUseCase) Create(ctx context.Context, sellerID uuid.UUID, in Crea
 		return nil, mapEntityErr(err)
 	}
 	now = time.Now().UTC()
-	proj = &entity.Project{
+	project = &entity.Project{
 		ID:           uuid.New(),
 		SellerID:     sellerID,
 		Title:        strings.TrimSpace(in.Title),
@@ -70,19 +70,19 @@ func (p *ProjectUseCase) Create(ctx context.Context, sellerID uuid.UUID, in Crea
 			UpdatedAt:      now,
 		})
 	}
-	images, proj.MainImageURL, err = buildProjectImages(in.Images, in.ImageURL, now)
+	images, project.MainImageURL, err = buildProjectImages(in.Images, in.ImageURL, now)
 	if err != nil {
 		return nil, mapEntityErr(err)
 	}
-	if err = p.Projects.Create(ctx, proj, plans, images); err != nil {
+	if err = p.Projects.Create(ctx, project, plans, images); err != nil {
 		return nil, err
 	}
-	return &ProjectView{Project: proj, Plans: plans, Images: images, Seller: u}, nil
+	return &ProjectView{Project: project, Plans: plans, Images: images, Seller: u}, nil
 }
 
 func (p *ProjectUseCase) Update(ctx context.Context, sellerID, projectID uuid.UUID, in UpdateProjectIn) (*ProjectView, error) {
 	var (
-		proj   *entity.Project
+		project   *entity.Project
 		plans  []entity.ProjectPlan
 		images []entity.ProjectImage
 		seller *entity.User
@@ -93,11 +93,11 @@ func (p *ProjectUseCase) Update(ctx context.Context, sellerID, projectID uuid.UU
 		end    *time.Time
 	)
 
-	proj, plans, images, err = p.Projects.FindID(ctx, projectID)
-	if err != nil || proj == nil {
+	project, plans, images, err = p.Projects.FindID(ctx, projectID)
+	if err != nil || project == nil {
 		return nil, ErrNotFound
 	}
-	if proj.SellerID != sellerID {
+	if project.SellerID != sellerID {
 		return nil, ErrForbidden
 	}
 	now = time.Now().UTC()
@@ -105,23 +105,23 @@ func (p *ProjectUseCase) Update(ctx context.Context, sellerID, projectID uuid.UU
 		if err = entity.ValidateTitle(*in.Title); err != nil {
 			return nil, mapEntityErr(err)
 		}
-		proj.Title = strings.TrimSpace(*in.Title)
+		project.Title = strings.TrimSpace(*in.Title)
 	}
 	if in.Description != nil {
 		if strings.TrimSpace(*in.Description) == "" {
 			return nil, ErrBadRequest
 		}
-		proj.Description = strings.TrimSpace(*in.Description)
+		project.Description = strings.TrimSpace(*in.Description)
 	}
 	if in.TargetAmount != nil {
 		if *in.TargetAmount < 0 {
 			return nil, ErrBadRequest
 		}
-		proj.TargetAmount = *in.TargetAmount
+		project.TargetAmount = *in.TargetAmount
 	}
-	dur = proj.DurationType
-	start = proj.StartDate
-	end = proj.EndDate
+	dur = project.DurationType
+	start = project.StartDate
+	end = project.EndDate
 	if in.DurationType != nil {
 		dur = *in.DurationType
 	}
@@ -135,27 +135,27 @@ func (p *ProjectUseCase) Update(ctx context.Context, sellerID, projectID uuid.UU
 		if err = entity.ValidateDuration(dur, start, end); err != nil {
 			return nil, mapEntityErr(err)
 		}
-		proj.DurationType = dur
-		proj.StartDate = start
-		proj.EndDate = end
+		project.DurationType = dur
+		project.StartDate = start
+		project.EndDate = end
 	}
 	if in.Images != nil {
-		images, proj.MainImageURL, err = buildProjectImages(*in.Images, nil, now)
+		images, project.MainImageURL, err = buildProjectImages(*in.Images, nil, now)
 		if err != nil {
 			return nil, mapEntityErr(err)
 		}
 	} else if in.ImageURL != nil {
-		images, proj.MainImageURL, err = buildProjectImages(nil, in.ImageURL, now)
+		images, project.MainImageURL, err = buildProjectImages(nil, in.ImageURL, now)
 		if err != nil {
 			return nil, mapEntityErr(err)
 		}
 	}
-	if in.IsReapply && proj.Status == entity.ProjectStatusActive {
-		proj.Status = entity.ProjectStatusPending
+	if in.IsReapply && project.Status == entity.ProjectStatusActive {
+		project.Status = entity.ProjectStatusPending
 	}
-	proj.UpdatedAt = now
+	project.UpdatedAt = now
 	err = repository.WithTx(ctx, p.DB, func(txCtx context.Context) error {
-		if err = p.Projects.Update(txCtx, proj); err != nil {
+		if err = p.Projects.Update(txCtx, project); err != nil {
 			return err
 		}
 		if in.Images != nil || in.ImageURL != nil {
@@ -166,13 +166,13 @@ func (p *ProjectUseCase) Update(ctx context.Context, sellerID, projectID uuid.UU
 	if err != nil {
 		return nil, err
 	}
-	seller, _ = p.Users.FindID(ctx, proj.SellerID)
-	return &ProjectView{Project: proj, Plans: plans, Images: images, Seller: seller}, nil
+	seller, _ = p.Users.FindID(ctx, project.SellerID)
+	return &ProjectView{Project: project, Plans: plans, Images: images, Seller: seller}, nil
 }
 
 func (p *ProjectUseCase) RequestDelete(ctx context.Context, sellerID, projectID uuid.UUID) (*ProjectView, error) {
 	var (
-		proj   *entity.Project
+		project   *entity.Project
 		plans  []entity.ProjectPlan
 		images []entity.ProjectImage
 		seller *entity.User
@@ -180,23 +180,23 @@ func (p *ProjectUseCase) RequestDelete(ctx context.Context, sellerID, projectID 
 		now    time.Time
 	)
 
-	proj, plans, images, err = p.Projects.FindID(ctx, projectID)
-	if err != nil || proj == nil {
+	project, plans, images, err = p.Projects.FindID(ctx, projectID)
+	if err != nil || project == nil {
 		return nil, ErrNotFound
 	}
-	if proj.SellerID != sellerID {
+	if project.SellerID != sellerID {
 		return nil, ErrForbidden
 	}
-	if proj.Status != entity.ProjectStatusActive {
+	if project.Status != entity.ProjectStatusActive {
 		return nil, ErrInvalidState
 	}
 	now = time.Now().UTC()
-	proj.DeleteRequested = true
-	proj.Status = entity.ProjectStatusDeleteRequested
-	proj.UpdatedAt = now
-	if err = p.Projects.Update(ctx, proj); err != nil {
+	project.DeleteRequested = true
+	project.Status = entity.ProjectStatusDeleteRequested
+	project.UpdatedAt = now
+	if err = p.Projects.Update(ctx, project); err != nil {
 		return nil, err
 	}
-	seller, _ = p.Users.FindID(ctx, proj.SellerID)
-	return &ProjectView{Project: proj, Plans: plans, Images: images, Seller: seller}, nil
+	seller, _ = p.Users.FindID(ctx, project.SellerID)
+	return &ProjectView{Project: project, Plans: plans, Images: images, Seller: seller}, nil
 }

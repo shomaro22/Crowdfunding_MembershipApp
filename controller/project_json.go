@@ -8,14 +8,14 @@ import (
 )
 
 type projectPlanJSON struct {
-	ID              string `json:"id"`
-	ProjectID       string `json:"project_id"`
-	MembershipType  string `json:"membership_type"`
-	Price           int    `json:"price"`
-	MaxSupporters   *int   `json:"max_supporters"`
-	Benefits        string `json:"benefits"`
-	IsActive        bool   `json:"is_active"`
-	SupporterCount  int    `json:"supporter_count"`
+	ID             string `json:"id"`
+	ProjectID      string `json:"project_id"`
+	MembershipType string `json:"membership_type"`
+	Price          int    `json:"price"`
+	MaxSupporters  *int   `json:"max_supporters"`
+	Benefits       string `json:"benefits"`
+	IsActive       bool   `json:"is_active"`
+	SupporterCount int    `json:"supporter_count"`
 }
 
 type projectImageJSON struct {
@@ -26,19 +26,19 @@ type projectImageJSON struct {
 }
 
 type projectSummaryJSON struct {
-	ID              string             `json:"id"`
-	Title           string             `json:"title"`
-	Description     string             `json:"description"`
-	TargetAmount    int64              `json:"target_amount"`
-	CurrentAmount   int64              `json:"current_amount"`
-	SupporterCount  int                `json:"supporter_count"`
-	DurationType    string             `json:"duration_type"`
-	StartDate       string             `json:"start_date"`
-	EndDate         *string            `json:"end_date"`
-	Status          string             `json:"status"`
-	ImageURL        *string            `json:"image_url"`
-	Plans           []projectPlanJSON  `json:"plans"`
-	Seller          *userJSON          `json:"seller,omitempty"`
+	ID             string            `json:"id"`
+	Title          string            `json:"title"`
+	Description    string            `json:"description"`
+	TargetAmount   int64             `json:"target_amount"`
+	CurrentAmount  int64             `json:"current_amount"`
+	SupporterCount int               `json:"supporter_count"`
+	DurationType   string            `json:"duration_type"`
+	StartDate      string            `json:"start_date"`
+	EndDate        *string           `json:"end_date"`
+	Status         string            `json:"status"`
+	ImageURL       *string           `json:"image_url"`
+	Plans          []projectPlanJSON `json:"plans"`
+	Seller         *userJSON         `json:"seller,omitempty"`
 }
 
 type listProjectsResponse struct {
