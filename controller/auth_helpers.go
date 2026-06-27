@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"time"
 
 	"crowdfund-app/auth"
 	"crowdfund-app/middleware"
@@ -56,8 +57,42 @@ type verify2FAResponse struct {
 }
 
 type sellerCreateJSON struct {
-	User         usecase.UserWire      `json:"user"`
-	Registration sellerRegJSON         `json:"registration"`
+	User         usecase.UserWire `json:"user"`
+	Registration sellerRegJSON    `json:"registration"`
+}
+
+type sellerRegJSON struct {
+	ID           string  `json:"id"`
+	UserID       string  `json:"user_id"`
+	FullName     string  `json:"full_name"`
+	BirthDate    string  `json:"birth_date"`
+	Address      string  `json:"address"`
+	PhotoPresent bool    `json:"photo_present"`
+	IDDocType    string  `json:"identity_document_type"`
+	HasIDFront   bool    `json:"has_identity_document_front"`
+	HasIDBack    bool    `json:"has_identity_document_back"`
+	Status       string  `json:"status"`
+	RejectReason *string `json:"rejection_reason"`
+	CreatedAt    string  `json:"created_at"`
+	UpdatedAt    string  `json:"updated_at"`
+}
+
+func sellerRegToJSON(r usecase.SellerRegItemView) sellerRegJSON {
+	return sellerRegJSON{
+		ID:           r.ID.String(),
+		UserID:       r.UserID.String(),
+		FullName:     r.FullName,
+		BirthDate:    r.BirthDate.Format("2006-01-02"),
+		Address:      r.Address,
+		PhotoPresent: r.PhotoPresent,
+		IDDocType:    "DRIVERS_LICENSE",
+		HasIDFront:   r.HasIDFront,
+		HasIDBack:    r.HasIDBack,
+		Status:       r.Status,
+		RejectReason: r.RejectReason,
+		CreatedAt:    r.CreatedAt.UTC().Format(time.RFC3339),
+		UpdatedAt:    r.UpdatedAt.UTC().Format(time.RFC3339),
+	}
 }
 
 type usersPageJSON struct {
