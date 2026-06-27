@@ -10,7 +10,6 @@ import (
 	"crowdfund-app/repository"
 
 	"github.com/google/uuid"
-	"gorm.io/gorm"
 )
 
 const wsTokenTTL = 60 * time.Second
@@ -19,10 +18,9 @@ type WSTokenUseCase struct {
 	Tokens   repository.WSTokenRepo
 	Users    repository.UserRepo
 	Activity repository.ActivityRepo
-	DB       *gorm.DB
 }
 
-func (w *WSTokenUseCase) Issue(ctx context.Context, userID uuid.UUID, meta RequestMeta) (string, error) {
+func (w *WSTokenUseCase) Issue(ctx context.Context, userID uuid.UUID) (string, error) {
 	var (
 		u     *entity.User
 		plain string
@@ -49,11 +47,10 @@ func (w *WSTokenUseCase) Issue(ctx context.Context, userID uuid.UUID, meta Reque
 	if err = w.Tokens.Create(ctx, row); err != nil {
 		return "", err
 	}
-	LogActivity(ctx, w.Activity, &userID, entity.SecWSConnect, "ws_token", row.ID.String(), meta, nil)
 	return plain, nil
 }
 
-func (w *WSTokenUseCase) Consume(ctx context.Context, plain string) (uuid.UUID, error) {
+func (w *WSTokenUseCase) Consume(ctx context.Context, plain string, meta RequestMeta) (uuid.UUID, error) {
 	var (
 		row   *entity.WSToken
 		u     *entity.User
@@ -65,16 +62,17 @@ func (w *WSTokenUseCase) Consume(ctx context.Context, plain string) (uuid.UUID, 
 		return uuid.Nil, ErrInvalidToken
 	}
 	now = time.Now().UTC()
-	row, err = w.Tokens.FindValidHash(ctx, auth.OpaqueHash(plain), now)
-	if err != nil || row == nil {
+	row, err = w.Tokens.ConsumeValidHash(ctx, auth.OpaqueHash(plain), now)
+	if err != nil {
+		return uuid.Nil, err
+	}
+	if row == nil {
 		return uuid.Nil, ErrInvalidToken
 	}
 	u, err = w.Users.FindID(ctx, row.UserID)
 	if err != nil || u == nil || !u.IsActive() {
 		return uuid.Nil, ErrInvalidToken
 	}
-	if err = w.Tokens.MarkUsed(ctx, row.ID, now); err != nil {
-		return uuid.Nil, err
-	}
+	LogActivity(ctx, w.Activity, &row.UserID, entity.SecWSConnect, "ws_token", row.ID.String(), meta, nil)
 	return row.UserID, nil
 }

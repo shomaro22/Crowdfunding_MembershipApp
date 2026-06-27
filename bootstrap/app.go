@@ -58,6 +58,13 @@ func OpenApp(opts *Options) (*App, error) {
 	}, nil
 }
 
+func (a *App) WireRealtimeMessaging() {
+	if a == nil {
+		return
+	}
+	WireMessageEvents(a.UseCases.Message, a.Hub)
+}
+
 func stripeClientFrom(opts *Options) stripe.Client {
 	if opts != nil && opts.Stripe != nil {
 		return opts.Stripe
