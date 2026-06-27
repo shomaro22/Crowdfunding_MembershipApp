@@ -14,6 +14,7 @@ import (
 	"crowdfund-app/db"
 	"crowdfund-app/entity"
 	"crowdfund-app/middleware"
+	"crowdfund-app/bootstrap"
 	"crowdfund-app/repository"
 	"crowdfund-app/router"
 	"crowdfund-app/stripe"
@@ -92,10 +93,7 @@ func buildApp() (*echo.Echo, string, error) {
 
 	slog.SetDefault(slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo})))
 
-	databaseURL = os.Getenv("DATABASE_URL")
-	if databaseURL == "" {
-		databaseURL = "postgres://postgres:postgres@localhost:5432/crowdfund?sslmode=disable"
-	}
+	databaseURL = bootstrap.DatabaseURL()
 	err = db.Up(databaseURL)
 	if err != nil {
 		return nil, "", err
@@ -114,7 +112,6 @@ func buildApp() (*echo.Echo, string, error) {
 	}
 
 	rdb = db.OpenRedis()
-	_ = rdb
 
 	jwtSecret = os.Getenv("JWT_SECRET")
 	if len(jwtSecret) < 32 {
@@ -236,16 +233,14 @@ func buildApp() (*echo.Echo, string, error) {
 		Stripe:     stripeClient,
 		ConnectUC:  connectUC,
 	}
-	supporterUC = &usecase.SupporterUseCase{
-		DB:         gormDB,
+	supporterUC = bootstrap.NewSupporterUseCase(gormDB, bootstrap.Repositories{
 		Users:      userRepo,
 		Projects:   projectRepo,
 		Supporters: supporterRepo,
 		Purchases:  purchaseRepo,
 		Connect:    connectRepo,
 		Activity:   activityRepo,
-		Stripe:     stripeClient,
-	}
+	}, stripeClient)
 	purchaseUC = &usecase.PurchaseUseCase{
 		Users:     userRepo,
 		Projects:  projectRepo,
