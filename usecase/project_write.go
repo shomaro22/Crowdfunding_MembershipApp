@@ -77,7 +77,7 @@ func (p *ProjectUseCase) Create(ctx context.Context, sellerID uuid.UUID, in Crea
 	if err = p.Projects.Create(ctx, project, plans, images); err != nil {
 		return nil, err
 	}
-	return &ProjectView{Project: project, Plans: plans, Images: images, Seller: u}, nil
+	return &ProjectView{Project: project, Plans: plans, Images: images, Seller: UserViewPtr(u)}, nil
 }
 
 func (p *ProjectUseCase) Update(ctx context.Context, sellerID, projectID uuid.UUID, in UpdateProjectIn) (*ProjectView, error) {
@@ -167,7 +167,7 @@ func (p *ProjectUseCase) Update(ctx context.Context, sellerID, projectID uuid.UU
 		return nil, err
 	}
 	seller, _ = p.Users.FindID(ctx, project.SellerID)
-	return &ProjectView{Project: project, Plans: plans, Images: images, Seller: seller}, nil
+	return &ProjectView{Project: project, Plans: plans, Images: images, Seller: UserViewPtr(seller)}, nil
 }
 
 func (p *ProjectUseCase) RequestDelete(ctx context.Context, sellerID, projectID uuid.UUID) (*ProjectView, error) {
@@ -198,5 +198,5 @@ func (p *ProjectUseCase) RequestDelete(ctx context.Context, sellerID, projectID 
 		return nil, err
 	}
 	seller, _ = p.Users.FindID(ctx, project.SellerID)
-	return &ProjectView{Project: project, Plans: plans, Images: images, Seller: seller}, nil
+	return &ProjectView{Project: project, Plans: plans, Images: images, Seller: UserViewPtr(seller)}, nil
 }

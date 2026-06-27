@@ -53,7 +53,7 @@ type ProjectView struct {
 	Project *entity.Project
 	Plans   []entity.ProjectPlan
 	Images  []entity.ProjectImage
-	Seller  *entity.User
+	Seller  *UserView
 }
 
 type ProjectUseCase struct {
@@ -142,10 +142,10 @@ func imageSortOrders(inputs []entity.ImageInput) []int {
 func (p *ProjectUseCase) enrichList(ctx context.Context, rows []entity.Project, total int64) ([]ProjectView, int64, error) {
 	var (
 		out         []ProjectView
-		sellerCache map[uuid.UUID]*entity.User
+		sellerCache map[uuid.UUID]*UserView
 		i           int
 		project        entity.Project
-		seller      *entity.User
+		seller      *UserView
 		ok          bool
 		u           *entity.User
 		plans       []entity.ProjectPlan
@@ -155,7 +155,7 @@ func (p *ProjectUseCase) enrichList(ctx context.Context, rows []entity.Project, 
 	)
 
 	out = make([]ProjectView, 0, len(rows))
-	sellerCache = map[uuid.UUID]*entity.User{}
+	sellerCache = map[uuid.UUID]*UserView{}
 	for i = range rows {
 		project = rows[i]
 		seller, ok = sellerCache[project.SellerID]
@@ -164,8 +164,8 @@ func (p *ProjectUseCase) enrichList(ctx context.Context, rows []entity.Project, 
 			if err != nil {
 				return nil, 0, err
 			}
-			seller = u
-			sellerCache[project.SellerID] = u
+			seller = UserViewPtr(u)
+			sellerCache[project.SellerID] = seller
 		}
 		_, plans, images, err = p.Projects.FindID(ctx, project.ID)
 		if err != nil {
@@ -221,7 +221,8 @@ func (p *ProjectUseCase) FindView(ctx context.Context, id uuid.UUID, viewerID *u
 		project   *entity.Project
 		plans  []entity.ProjectPlan
 		images []entity.ProjectImage
-		seller *entity.User
+		u      *entity.User
+		seller *UserView
 		err    error
 		now    = time.Now().UTC()
 	)
@@ -233,10 +234,11 @@ func (p *ProjectUseCase) FindView(ctx context.Context, id uuid.UUID, viewerID *u
 	if !canViewProject(project, viewerID, viewerRole, now) {
 		return nil, ErrNotFound
 	}
-	seller, err = p.Users.FindID(ctx, project.SellerID)
+	u, err = p.Users.FindID(ctx, project.SellerID)
 	if err != nil {
 		return nil, err
 	}
+	seller = UserViewPtr(u)
 	return &ProjectView{Project: project, Plans: plans, Images: images, Seller: seller}, nil
 }
 

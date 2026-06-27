@@ -41,36 +41,10 @@ func (p *PaymentUseCase) loadSupportContext(ctx context.Context, buyerID, projec
 }
 
 func (p *PaymentUseCase) loadCheckoutContext(ctx context.Context, buyerID, projectID, planID uuid.UUID, pm entity.PaymentMethod) (supportContext, error) {
-	var (
-		sc   supportContext
-		pend *entity.Purchase
-		err  error
-	)
 	if pm == entity.PaymentMethodKonbini {
 		return p.loadKonbiniCheckoutContext(ctx, buyerID, projectID, planID)
 	}
-	sc, err = p.loadBuyerProjectPlan(ctx, buyerID, projectID, planID)
-	if err != nil {
-		return sc, err
-	}
-	pend, err = p.Purchases.FindPendingBuyerProject(ctx, buyerID, projectID)
-	if err != nil {
-		return sc, err
-	}
-	if pend != nil {
-		return sc, ErrPendingCheckout
-	}
-	if sc.membership, err = p.Supporters.FindMembership(ctx, projectID, buyerID); err != nil {
-		return sc, err
-	}
-	if sc.membership != nil {
-		return sc, ErrAlreadySupporting
-	}
-	if sc.plan.MaxSupporters != nil && sc.plan.SupporterCount >= *sc.plan.MaxSupporters {
-		return sc, ErrForbidden
-	}
-	sc.purpose = checkoutFirstSupport
-	return sc, nil
+	return p.loadSupportContext(ctx, buyerID, projectID, planID)
 }
 
 func (p *PaymentUseCase) loadKonbiniCheckoutContext(ctx context.Context, buyerID, projectID, planID uuid.UUID) (supportContext, error) {

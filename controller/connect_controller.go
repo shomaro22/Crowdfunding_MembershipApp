@@ -4,7 +4,6 @@ import (
 	"context"
 	"net/http"
 
-	"crowdfund-app/entity"
 	"crowdfund-app/usecase"
 
 	"github.com/google/uuid"
@@ -12,7 +11,7 @@ import (
 )
 
 type ConnectUseCase interface {
-	GetAccount(ctx context.Context, sellerID uuid.UUID) (*entity.ConnectAccount, error)
+	GetAccount(ctx context.Context, sellerID uuid.UUID) (*usecase.ConnectAccountView, error)
 	CreateOnboardingLink(ctx context.Context, sellerID uuid.UUID) (string, error)
 }
 
@@ -27,7 +26,7 @@ func NewConnectController(uc ConnectUseCase) *ConnectController {
 func (h *ConnectController) GetAccount(c echo.Context) error {
 	var (
 		sellerID uuid.UUID
-		row      *entity.ConnectAccount
+		row      *usecase.ConnectAccountView
 		err      error
 	)
 	sellerID, err = CurrentUserID(c)
@@ -68,7 +67,10 @@ type connectAccountResp struct {
 	DetailsSubmitted bool   `json:"details_submitted"`
 }
 
-func toConnectAccountJSON(row *entity.ConnectAccount) connectAccountResp {
+func toConnectAccountJSON(row *usecase.ConnectAccountView) connectAccountResp {
+	if row == nil {
+		return connectAccountResp{}
+	}
 	return connectAccountResp{
 		StripeAccountID:  row.StripeAccountID,
 		ChargesEnabled:   row.ChargesEnabled,
@@ -78,12 +80,5 @@ func toConnectAccountJSON(row *entity.ConnectAccount) connectAccountResp {
 }
 
 func mapConnectError(err error) *echo.HTTPError {
-	switch err {
-	case usecase.ErrForbidden:
-		return echo.NewHTTPError(http.StatusForbidden, apiError("forbidden", "FORBIDDEN"))
-	case usecase.ErrStripeUnavailable:
-		return echo.NewHTTPError(http.StatusServiceUnavailable, apiError("stripe unavailable", "STRIPE_UNAVAILABLE"))
-	default:
-		return mapAuthError(err)
-	}
+	return mapUseCaseError(err)
 }

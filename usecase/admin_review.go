@@ -5,17 +5,33 @@ import (
 	"strings"
 	"time"
 
+	"crowdfund-app/auth"
 	"crowdfund-app/entity"
 	"crowdfund-app/repository"
 
 	"github.com/google/uuid"
 )
 
-func (a *AdminUseCase) ListBuyerPending(ctx context.Context, limit, offset int) ([]entity.User, int64, error) {
-	return a.Users.ListRoleStatus(ctx, entity.UserRoleBuyer, entity.AccountStatusPending, limit, offset)
+func (a *AdminUseCase) ListBuyerPending(ctx context.Context, limit, offset int) ([]UserView, int64, error) {
+	var (
+		rows  []entity.User
+		total int64
+		out   []UserView
+		err   error
+		i     int
+	)
+	rows, total, err = a.Users.ListRoleStatus(ctx, entity.UserRoleBuyer, entity.AccountStatusPending, limit, offset)
+	if err != nil {
+		return nil, 0, err
+	}
+	out = make([]UserView, len(rows))
+	for i = range rows {
+		out[i] = UserViewFrom(&rows[i])
+	}
+	return out, total, nil
 }
 
-func (a *AdminUseCase) ApproveBuyer(ctx context.Context, adminID, userID uuid.UUID, reason *string) (*entity.User, error) {
+func (a *AdminUseCase) ApproveBuyer(ctx context.Context, adminID, userID uuid.UUID, reason *string) (UserView, error) {
 	var (
 		u   *entity.User
 		err error
@@ -23,27 +39,27 @@ func (a *AdminUseCase) ApproveBuyer(ctx context.Context, adminID, userID uuid.UU
 	)
 
 	if err = a.requireReviewAdmin(ctx, adminID); err != nil {
-		return nil, err
+		return UserView{}, err
 	}
 	u, err = a.Users.FindID(ctx, userID)
 	if err != nil || u == nil {
-		return nil, ErrNotFound
+		return UserView{}, ErrNotFound
 	}
 	if u.Role != entity.UserRoleBuyer || u.AccountStatus != entity.AccountStatusPending {
-		return nil, ErrInvalidState
+		return UserView{}, ErrInvalidState
 	}
 	now = time.Now().UTC()
 	u.AccountStatus = entity.AccountStatusActive
 	u.UpdatedAt = now
 	if err = a.Users.Update(ctx, u); err != nil {
-		return nil, err
+		return UserView{}, err
 	}
 	a.writeAudit(ctx, adminID, "buyer_registration.approve", "user", u.ID.String(), reason, nil)
 	a.writeReviewDecision(ctx, adminID, entity.ReviewBuyerRegistration, userID, entity.ReviewApproved, reason)
-	return u, nil
+	return UserViewFrom(u), nil
 }
 
-func (a *AdminUseCase) RejectBuyer(ctx context.Context, adminID, userID uuid.UUID, reason *string) (*entity.User, error) {
+func (a *AdminUseCase) RejectBuyer(ctx context.Context, adminID, userID uuid.UUID, reason *string) (UserView, error) {
 	var (
 		u   *entity.User
 		err error
@@ -51,28 +67,28 @@ func (a *AdminUseCase) RejectBuyer(ctx context.Context, adminID, userID uuid.UUI
 	)
 
 	if err = requireReviewReason(reason); err != nil {
-		return nil, err
+		return UserView{}, err
 	}
 	reason = normalizeReviewReason(reason)
 	if err = a.requireReviewAdmin(ctx, adminID); err != nil {
-		return nil, err
+		return UserView{}, err
 	}
 	u, err = a.Users.FindID(ctx, userID)
 	if err != nil || u == nil {
-		return nil, ErrNotFound
+		return UserView{}, ErrNotFound
 	}
 	if u.Role != entity.UserRoleBuyer || u.AccountStatus != entity.AccountStatusPending {
-		return nil, ErrInvalidState
+		return UserView{}, ErrInvalidState
 	}
 	now = time.Now().UTC()
 	u.AccountStatus = entity.AccountStatusSuspended
 	u.UpdatedAt = now
 	if err = a.Users.Update(ctx, u); err != nil {
-		return nil, err
+		return UserView{}, err
 	}
 	a.writeAudit(ctx, adminID, "buyer_registration.reject", "user", u.ID.String(), reason, nil)
 	a.writeReviewDecision(ctx, adminID, entity.ReviewBuyerRegistration, userID, entity.ReviewRejected, reason)
-	return u, nil
+	return UserViewFrom(u), nil
 }
 
 func (a *AdminUseCase) ListSellerRegs(ctx context.Context, status entity.RegStatus, limit, offset int) ([]entity.SellerReg, int64, error) {
@@ -102,15 +118,15 @@ func (a *AdminUseCase) GetSellerReg(ctx context.Context, id uuid.UUID) (*SellerR
 		return nil, ErrNotFound
 	}
 	now = time.Now().UTC()
-	out = &SellerRegView{Registration: reg, User: u}
+	out = &SellerRegView{Registration: reg, User: UserViewFrom(u)}
 	if reg.HasIDFront() {
-		tok = repository.SignKYCAccess(a.SignSecret, *reg.IDFrontKey, now)
-		url = repository.KYCAccessURL(a.APIBase, tok)
+		tok = auth.SignKYCAccess(a.SignSecret, *reg.IDFrontKey, now)
+		url = auth.KYCAccessURL(a.APIBase, tok)
 		out.FrontURL = &url
 	}
 	if reg.HasIDBack() {
-		tok = repository.SignKYCAccess(a.SignSecret, *reg.IDBackKey, now)
-		url = repository.KYCAccessURL(a.APIBase, tok)
+		tok = auth.SignKYCAccess(a.SignSecret, *reg.IDBackKey, now)
+		url = auth.KYCAccessURL(a.APIBase, tok)
 		out.BackURL = &url
 	}
 	return out, nil

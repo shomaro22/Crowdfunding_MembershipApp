@@ -1,9 +1,10 @@
-package repository
+package auth
 
 import (
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"hash"
 	"net/url"
@@ -12,17 +13,19 @@ import (
 	"time"
 )
 
-const kycTokenTTL = 5 * time.Minute
+const KYCAccessTokenTTL = 5 * time.Minute
 
-func SignKYCAccess(secret []byte, key string, now time.Time) string {
+var ErrInvalidKYCToken = errors.New("invalid kyc access token")
+
+func SignKYCAccess(secret []byte, storageKey string, now time.Time) string {
 	var (
 		exp     int64
 		payload string
 		mac     hash.Hash
 		sig     string
 	)
-	exp = now.Add(kycTokenTTL).Unix()
-	payload = key + "|" + strconv.FormatInt(exp, 10)
+	exp = now.Add(KYCAccessTokenTTL).Unix()
+	payload = storageKey + "|" + strconv.FormatInt(exp, 10)
 	mac = hmac.New(sha256.New, secret)
 	_, _ = mac.Write([]byte(payload))
 	sig = base64.RawURLEncoding.EncodeToString(mac.Sum(nil))
@@ -44,26 +47,26 @@ func VerifyKYCAccess(secret []byte, token string, now time.Time) (string, error)
 	)
 	raw, err = base64.RawURLEncoding.DecodeString(token)
 	if err != nil {
-		return "", ErrBadToken
+		return "", ErrInvalidKYCToken
 	}
 	parts = strings.Split(string(raw), "|")
 	if len(parts) != 3 {
-		return "", ErrBadToken
+		return "", ErrInvalidKYCToken
 	}
 	key, expStr, sig = parts[0], parts[1], parts[2]
 	exp, err = strconv.ParseInt(expStr, 10, 64)
 	if err != nil || now.Unix() > exp {
-		return "", ErrBadToken
+		return "", ErrInvalidKYCToken
 	}
 	payload = key + "|" + expStr
 	mac = hmac.New(sha256.New, secret)
 	_, _ = mac.Write([]byte(payload))
 	expected = base64.RawURLEncoding.EncodeToString(mac.Sum(nil))
 	if !hmac.Equal([]byte(sig), []byte(expected)) {
-		return "", ErrBadToken
+		return "", ErrInvalidKYCToken
 	}
 	if strings.Contains(key, "..") {
-		return "", ErrBadToken
+		return "", ErrInvalidKYCToken
 	}
 	return key, nil
 }

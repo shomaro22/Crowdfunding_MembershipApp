@@ -24,8 +24,5 @@ func (BatchRun) TableName() string { return "batch_job_runs" }
 const (
 	ApplyPlans       = "apply_plans"
 	ExpireSupporters = "expire_supporters"
-	ExpireProjects   = "expire_projects"
 	ReconcileStripe  = "reconcile_stripe"
-	PurgeTokens      = "purge_tokens"
-	ArchiveActivity  = "archive_activity"
 )

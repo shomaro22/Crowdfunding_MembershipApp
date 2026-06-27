@@ -223,20 +223,5 @@ func (body intentRequestJSON) toInput(buyerID uuid.UUID) (usecase.IntentIn, erro
 }
 
 func mapPaymentError(err error) *echo.HTTPError {
-	switch err {
-	case usecase.ErrForbidden:
-		return echo.NewHTTPError(http.StatusForbidden, apiError("forbidden", "FORBIDDEN"))
-	case usecase.ErrBadRequest:
-		return echo.NewHTTPError(http.StatusBadRequest, apiError("bad request", "BAD_REQUEST"))
-	case usecase.ErrPendingCheckout:
-		return echo.NewHTTPError(http.StatusConflict, apiError("pending checkout exists", "CONFLICT"))
-	case usecase.ErrAlreadySupporting:
-		return echo.NewHTTPError(http.StatusConflict, apiError("already supporting", "CONFLICT"))
-	case usecase.ErrNotFound:
-		return echo.NewHTTPError(http.StatusNotFound, apiError("not found", "NOT_FOUND"))
-	case usecase.ErrStripeUnavailable:
-		return echo.NewHTTPError(http.StatusServiceUnavailable, apiError("stripe unavailable", "STRIPE_UNAVAILABLE"))
-	default:
-		return mapAuthError(err)
-	}
+	return mapUseCaseError(err)
 }
