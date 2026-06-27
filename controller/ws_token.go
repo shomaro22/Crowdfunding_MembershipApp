@@ -1,16 +1,11 @@
 package controller
 
 import (
-	"context"
 	"net/http"
 
 	"github.com/google/uuid"
 	"github.com/labstack/echo/v4"
 )
-
-type WSTokenUseCase interface {
-	Issue(ctx context.Context, userID uuid.UUID) (string, error)
-}
 
 type WSTokenController struct {
 	Tokens WSTokenUseCase

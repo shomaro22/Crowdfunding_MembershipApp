@@ -1,16 +1,12 @@
-package controller
+package wshub
 
 import (
-	"context"
-
-	"crowdfund-app/usecase"
-	"crowdfund-app/wshub"
-
 	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
 )
 
-type WebSocketHub interface {
+// Hub is the WebSocket connection registry used by HTTP controllers.
+type Hub interface {
 	Register(userID uuid.UUID, conn *websocket.Conn) uuid.UUID
 	RemoveConn(connID uuid.UUID)
 	Subscribe(connID, projectID uuid.UUID)
@@ -22,11 +18,6 @@ type WebSocketHub interface {
 		projectID uuid.UUID,
 		payload []byte,
 		excludeUserID uuid.UUID,
-		filter wshub.SubscriberFilter,
+		filter SubscriberFilter,
 	)
-}
-
-type MessageProjectAccess interface {
-	CanSubscribeProject(ctx context.Context, projectID, userID uuid.UUID) error
-	ConfirmWSSubscribe(ctx context.Context, userID, projectID uuid.UUID, meta usecase.RequestMeta) error
 }
