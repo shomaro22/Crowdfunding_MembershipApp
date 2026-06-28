@@ -84,6 +84,8 @@ func New(cfg Config) *echo.Echo {
 		e.POST("/auth/logout", cfg.Auth.Logout)
 		pm = cfg.Protected
 		e.GET("/me", cfg.Auth.Me, pm...)
+		e.GET("/me/profile", cfg.Auth.GetProfile, pm...)
+		e.PUT("/me/profile", cfg.Auth.UpdateProfile, pm...)
 		e.POST("/me/change-password", cfg.Auth.ChangePassword, pm...)
 		e.POST("/auth/2fa/setup", cfg.Auth.Setup2FA, pm...)
 		e.POST("/auth/2fa/verify", cfg.Auth.Verify2FA, pm...)
