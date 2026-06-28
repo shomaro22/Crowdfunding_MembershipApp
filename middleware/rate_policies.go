@@ -165,4 +165,12 @@ var (
 			{Limit: 10, Key: KeyUserID},
 		},
 	}
+	PolicyMediaUpload = RatePolicy{
+		Name:   "media_upload",
+		Period: time.Minute,
+		Rules: []RateRule{
+			{Limit: 20, Key: KeyIP},
+			{Limit: 10, Key: KeyUserID},
+		},
+	}
 )

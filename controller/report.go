@@ -1,0 +1,187 @@
+package controller
+
+import (
+	"net/http"
+	"strconv"
+	"time"
+
+	"crowdfund-app/usecase"
+
+	"github.com/google/uuid"
+	"github.com/labstack/echo/v4"
+)
+
+type ReportController struct {
+	Reports ReportUseCase
+}
+
+func NewReportController(reports ReportUseCase) *ReportController {
+	return &ReportController{Reports: reports}
+}
+
+func (h *ReportController) Create(c echo.Context) error {
+	var (
+		userID uuid.UUID
+		body   createReportJSON
+		view   usecase.ReportView
+		err    error
+	)
+	userID, err = CurrentUserID(c)
+	if err != nil {
+		return err
+	}
+	if err = c.Bind(&body); err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, apiError("invalid request body", "BAD_REQUEST"))
+	}
+	targetID, err := uuid.Parse(body.TargetID)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, apiError("invalid target_id", "BAD_REQUEST"))
+	}
+	view, err = h.Reports.Create(c.Request().Context(), userID, usecase.CreateReportIn{
+		TargetType: body.TargetType,
+		TargetID:   targetID,
+		Reason:     body.Reason,
+		Detail:     body.Detail,
+		Meta:       requestMeta(c),
+	})
+	if err != nil {
+		return mapUseCaseError(err)
+	}
+	return c.JSON(http.StatusCreated, reportWireFrom(view))
+}
+
+func (h *ReportController) ListAdmin(c echo.Context) error {
+	var (
+		status *string
+		s      string
+		limit  int
+		offset int
+		result usecase.ReportsResult
+		err    error
+	)
+	s = c.QueryParam("status")
+	if s != "" {
+		status = &s
+	}
+	limit, _ = strconv.Atoi(c.QueryParam("limit"))
+	offset, _ = strconv.Atoi(c.QueryParam("offset"))
+	result, err = h.Reports.ListAdmin(c.Request().Context(), status, limit, offset)
+	if err != nil {
+		return mapUseCaseError(err)
+	}
+	return c.JSON(http.StatusOK, listReportsWireFrom(result))
+}
+
+func (h *ReportController) PatchAdmin(c echo.Context) error {
+	var (
+		adminID  uuid.UUID
+		reportID uuid.UUID
+		body     patchReportJSON
+		view     usecase.ReportView
+		err      error
+	)
+	adminID, err = CurrentUserID(c)
+	if err != nil {
+		return err
+	}
+	reportID, err = uuid.Parse(c.Param("reportId"))
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, apiError("invalid report id", "BAD_REQUEST"))
+	}
+	if err = c.Bind(&body); err != nil || body.Status == "" {
+		return echo.NewHTTPError(http.StatusBadRequest, apiError("status required", "BAD_REQUEST"))
+	}
+	view, err = h.Reports.UpdateAdmin(c.Request().Context(), adminID, reportID, usecase.UpdateReportIn{
+		Status:     body.Status,
+		Resolution: body.Resolution,
+		Reason:     body.Reason,
+	})
+	if err != nil {
+		return mapUseCaseError(err)
+	}
+	return c.JSON(http.StatusOK, reportWireFrom(view))
+}
+
+type createReportJSON struct {
+	TargetType string  `json:"target_type"`
+	TargetID   string  `json:"target_id"`
+	Reason     string  `json:"reason"`
+	Detail     *string `json:"detail"`
+}
+
+type patchReportJSON struct {
+	Status     string  `json:"status"`
+	Resolution *string `json:"resolution"`
+	Reason     *string `json:"reason"`
+}
+
+type reportWire struct {
+	ID         string  `json:"id"`
+	ReporterID string  `json:"reporter_id"`
+	TargetType string  `json:"target_type"`
+	TargetID   string  `json:"target_id"`
+	Reason     string  `json:"reason"`
+	Detail     *string `json:"detail,omitempty"`
+	Status     string  `json:"status"`
+	ReviewedBy *string `json:"reviewed_by,omitempty"`
+	ReviewedAt *string `json:"reviewed_at,omitempty"`
+	Resolution *string `json:"resolution,omitempty"`
+	CreatedAt  string  `json:"created_at"`
+	UpdatedAt  string  `json:"updated_at"`
+}
+
+type listReportsWire struct {
+	Reports []reportWire `json:"reports"`
+	Total   int64        `json:"total"`
+	Limit   int          `json:"limit"`
+	Offset  int          `json:"offset"`
+}
+
+func reportWireFrom(v usecase.ReportView) reportWire {
+	var (
+		out        reportWire
+		reviewedBy *string
+		reviewedAt *string
+		s          string
+	)
+	out = reportWire{
+		ID:         v.ID.String(),
+		ReporterID: v.ReporterID.String(),
+		TargetType: v.TargetType,
+		TargetID:   v.TargetID.String(),
+		Reason:     v.Reason,
+		Detail:     v.Detail,
+		Status:     v.Status,
+		Resolution: v.Resolution,
+		CreatedAt:  v.CreatedAt.UTC().Format(time.RFC3339),
+		UpdatedAt:  v.UpdatedAt.UTC().Format(time.RFC3339),
+	}
+	if v.ReviewedBy != nil {
+		s = v.ReviewedBy.String()
+		reviewedBy = &s
+		out.ReviewedBy = reviewedBy
+	}
+	if v.ReviewedAt != nil {
+		s = v.ReviewedAt.UTC().Format(time.RFC3339)
+		reviewedAt = &s
+		out.ReviewedAt = reviewedAt
+	}
+	return out
+}
+
+func listReportsWireFrom(r usecase.ReportsResult) listReportsWire {
+	var (
+		out listReportsWire
+		i   int
+	)
+	out = listReportsWire{
+		Reports: make([]reportWire, len(r.Reports)),
+		Total:   r.Total,
+		Limit:   r.Limit,
+		Offset:  r.Offset,
+	}
+	for i = range r.Reports {
+		out.Reports[i] = reportWireFrom(r.Reports[i])
+	}
+	return out
+}

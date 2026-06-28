@@ -24,6 +24,9 @@ type UseCases struct {
 	Message     *usecase.MessageUseCase
 	WSToken     *usecase.WSTokenUseCase
 	Operations  *usecase.OperationsUseCase
+	Favorite    *usecase.FavoriteUseCase
+	Report      *usecase.ReportUseCase
+	Media       *usecase.MediaUseCase
 }
 
 func NewUseCases(
@@ -31,6 +34,7 @@ func NewUseCases(
 	repos Repositories,
 	redisRepos RedisRepositories,
 	kyc *repository.LocalKYCStore,
+	media *repository.LocalMediaStore,
 	stripeClient stripe.Client,
 	cfg Config,
 ) UseCases {
@@ -136,6 +140,23 @@ func NewUseCases(
 			Runs:     repos.Batch,
 			Users:    repos.Users,
 			Batch:    batchUC,
+		},
+		Favorite: &usecase.FavoriteUseCase{
+			Favorites: repos.Favorites,
+			Projects:  projectUC,
+			Activity:  repos.Activity,
+		},
+		Report: &usecase.ReportUseCase{
+			Reports:  repos.Reports,
+			Users:    repos.Users,
+			Projects: repos.Projects,
+			Messages: repos.Messages,
+			Activity: repos.Activity,
+			Audit:    repos.Audit,
+		},
+		Media: &usecase.MediaUseCase{
+			Store:        media,
+			APIPublicURL: cfg.APIPublicURL,
 		},
 	}
 }

@@ -7,6 +7,7 @@ import (
 
 	"crowdfund-app/entity"
 	"crowdfund-app/repository"
+	"crowdfund-app/validator"
 
 	"github.com/google/uuid"
 )
@@ -159,7 +160,7 @@ func (m *MessageUseCase) Send(ctx context.Context, senderID uuid.UUID, in SendMe
 		err      error
 	)
 	in.Content = strings.TrimSpace(in.Content)
-	if err = entity.ValidateMessage(in.Content); err != nil {
+	if err = validator.ValidateMessage(in.Content); err != nil {
 		return MessageItemView{}, mapMessageEntityErr(err)
 	}
 	if _, err = m.authorizeSend(ctx, senderID, in.ProjectID, in.ReceiverID); err != nil {
