@@ -3,19 +3,13 @@ package usecase
 import (
 	"context"
 	"fmt"
-	"strings"
 	"time"
 
 	"crowdfund-app/entity"
 	"crowdfund-app/repository"
+	"crowdfund-app/validator"
 
 	"github.com/google/uuid"
-)
-
-const (
-	maxOperationsRange   = 90 * 24 * time.Hour
-	defaultSecurityRange = 24 * time.Hour
-	defaultActivityRange = 30 * 24 * time.Hour
 )
 
 type ActivityLogsQuery struct {
@@ -54,52 +48,51 @@ type OperationsUseCase struct {
 
 func (o *OperationsUseCase) ListActivityLogs(ctx context.Context, q ActivityLogsQuery) (ActivityLogsResult, error) {
 	var (
-		from, to time.Time
-		action   *entity.ActivityAction
-		rows     []entity.ActivityLog
-		total    int64
-		out      ActivityLogsResult
-		limit    int
-		offset   int
-		i        int
-		row      entity.ActivityLog
-		view     ActivityLogView
-		u        *entity.User
-		err      error
+		norm   validator.ActivityLogsNormalized
+		rows   []entity.ActivityLog
+		total  int64
+		out    ActivityLogsResult
+		i      int
+		row    entity.ActivityLog
+		view   ActivityLogView
+		u      *entity.User
+		err    error
 	)
 	if o == nil || o.Activity == nil {
 		return ActivityLogsResult{}, ErrBadRequest
 	}
-	from, to, err = resolveActivityTimeRange(q.From, q.To)
-	if err != nil {
-		return ActivityLogsResult{}, err
-	}
-	if q.Action != nil {
-		a := entity.ActivityAction(strings.TrimSpace(*q.Action))
-		if !a.Valid() {
-			return ActivityLogsResult{}, ErrBadRequest
-		}
-		action = &a
-	}
-	limit, offset = paginateQuery(q.Limit, q.Offset)
-	rows, total, err = o.Activity.List(ctx, repository.ActivityListFilter{
+	norm, err = validator.ValidateActivityLogs(validator.ActivityLogsInput{
 		UserID:     q.UserID,
-		Action:     action,
-		Resource:   trimStringPtr(q.Resource),
-		ResourceID: trimStringPtr(q.ResourceID),
-		IP:         trimStringPtr(q.IP),
-		From:       &from,
-		To:         &to,
-		Limit:      limit,
-		Offset:     offset,
+		Action:     q.Action,
+		Resource:   q.Resource,
+		ResourceID: q.ResourceID,
+		IP:         q.IP,
+		From:       q.From,
+		To:         q.To,
+		Limit:      q.Limit,
+		Offset:     q.Offset,
+	})
+	if err != nil {
+		return ActivityLogsResult{}, ErrBadRequest
+	}
+	rows, total, err = o.Activity.List(ctx, repository.ActivityListFilter{
+		UserID:     norm.UserID,
+		Action:     norm.Action,
+		Resource:   norm.Resource,
+		ResourceID: norm.ResourceID,
+		IP:         norm.IP,
+		From:       &norm.From,
+		To:         &norm.To,
+		Limit:      norm.Limit,
+		Offset:     norm.Offset,
 	})
 	if err != nil {
 		return ActivityLogsResult{}, err
 	}
 	out = ActivityLogsResult{
 		Total:  total,
-		Limit:  limit,
-		Offset: offset,
+		Limit:  norm.Limit,
+		Offset: norm.Offset,
 		Logs:   make([]ActivityLogView, 0, len(rows)),
 	}
 	for i = range rows {
@@ -119,11 +112,10 @@ func (o *OperationsUseCase) ListActivityLogs(ctx context.Context, q ActivityLogs
 
 func (o *OperationsUseCase) ListAuditLogs(ctx context.Context, q AuditLogsQuery) (AuditLogsResult, error) {
 	var (
+		norm   validator.AuditLogsNormalized
 		rows   []entity.AuditLog
 		total  int64
 		out    AuditLogsResult
-		limit  int
-		offset int
 		i      int
 		row    entity.AuditLog
 		email  string
@@ -133,21 +125,30 @@ func (o *OperationsUseCase) ListAuditLogs(ctx context.Context, q AuditLogsQuery)
 	if o == nil || o.Audit == nil {
 		return AuditLogsResult{}, ErrBadRequest
 	}
-	limit, offset = paginateQuery(q.Limit, q.Offset)
-	rows, total, err = o.Audit.List(ctx, repository.AuditListFilter{
+	norm, err = validator.ValidateAuditLogs(validator.AuditLogsInput{
 		AdminID:  q.AdminID,
-		Action:   trimStringPtr(q.Action),
-		Resource: trimStringPtr(q.Resource),
-		Limit:    limit,
-		Offset:   offset,
+		Action:   q.Action,
+		Resource: q.Resource,
+		Limit:    q.Limit,
+		Offset:   q.Offset,
+	})
+	if err != nil {
+		return AuditLogsResult{}, ErrBadRequest
+	}
+	rows, total, err = o.Audit.List(ctx, repository.AuditListFilter{
+		AdminID:  norm.AdminID,
+		Action:   norm.Action,
+		Resource: norm.Resource,
+		Limit:    norm.Limit,
+		Offset:   norm.Offset,
 	})
 	if err != nil {
 		return AuditLogsResult{}, err
 	}
 	out = AuditLogsResult{
 		Total:  total,
-		Limit:  limit,
-		Offset: offset,
+		Limit:  norm.Limit,
+		Offset: norm.Offset,
 		Logs:   make([]AuditLogView, 0, len(rows)),
 	}
 	for i = range rows {
@@ -166,31 +167,30 @@ func (o *OperationsUseCase) ListAuditLogs(ctx context.Context, q AuditLogsQuery)
 
 func (o *OperationsUseCase) ListBatchRuns(ctx context.Context, q BatchRunsQuery) (BatchRunsResult, error) {
 	var (
-		rows    []entity.BatchRun
-		total   int64
-		status  *entity.BatchStatus
-		out     BatchRunsResult
-		limit   int
-		i       int
-		view    *BatchRunView
-		err     error
+		norm   validator.BatchRunsNormalized
+		rows   []entity.BatchRun
+		total  int64
+		out    BatchRunsResult
+		i      int
+		view   *BatchRunView
+		err    error
 	)
 	if o == nil || o.Runs == nil {
 		return BatchRunsResult{}, ErrBadRequest
 	}
-	if q.Status != nil && strings.TrimSpace(*q.Status) != "" {
-		s := entity.BatchStatus(strings.TrimSpace(*q.Status))
-		if !s.Valid() {
-			return BatchRunsResult{}, ErrBadRequest
-		}
-		status = &s
+	norm, err = validator.ValidateBatchRuns(validator.BatchRunsInput{
+		JobName: q.JobName,
+		Status:  q.Status,
+		Limit:   q.Limit,
+	})
+	if err != nil {
+		return BatchRunsResult{}, ErrBadRequest
 	}
-	limit, _ = paginateQuery(q.Limit, 0)
-	rows, total, err = o.Runs.List(ctx, trimStringPtr(q.JobName), status, limit)
+	rows, total, err = o.Runs.List(ctx, norm.JobName, norm.Status, norm.Limit)
 	if err != nil {
 		return BatchRunsResult{}, err
 	}
-	out = BatchRunsResult{Total: total, Limit: limit, Runs: make([]BatchRunView, 0, len(rows))}
+	out = BatchRunsResult{Total: total, Limit: norm.Limit, Runs: make([]BatchRunView, 0, len(rows))}
 	for i = range rows {
 		view = BatchRunViewFrom(&rows[i])
 		if view != nil {
@@ -213,9 +213,9 @@ func (o *OperationsUseCase) GetSecurityEvents(ctx context.Context, from, to *tim
 	if o == nil || o.Activity == nil {
 		return SecurityEventsView{}, ErrBadRequest
 	}
-	start, end, err = resolveSecurityTimeRange(from, to)
+	start, end, err = validator.ValidateSecurityTimeRange(from, to)
 	if err != nil {
-		return SecurityEventsView{}, err
+		return SecurityEventsView{}, ErrBadRequest
 	}
 	loginFail, err = o.Activity.CountByActionBetween(ctx, entity.UserLoginFail, start, end)
 	if err != nil {
@@ -249,104 +249,21 @@ func (o *OperationsUseCase) RunBatch(ctx context.Context, adminID uuid.UUID, job
 	var (
 		run     *BatchRunView
 		details string
+		valid   string
 		err     error
 	)
 	if o == nil || o.Batch == nil {
 		return nil, ErrBadRequest
 	}
-	jobName = strings.TrimSpace(jobName)
-	if jobName == "" {
+	valid, err = validator.ValidateBatchJobName(jobName)
+	if err != nil {
 		return nil, ErrBadRequest
 	}
-	run, err = o.Batch.Run(ctx, jobName, fmt.Sprintf("admin:%s", adminID.String()), dryRun)
-	details = fmt.Sprintf("job=%s dry_run=%v", jobName, dryRun)
+	run, err = o.Batch.Run(ctx, valid, fmt.Sprintf("admin:%s", adminID.String()), dryRun)
+	details = fmt.Sprintf("job=%s dry_run=%v", valid, dryRun)
 	if run != nil {
 		details = fmt.Sprintf("%s run_id=%s status=%s", details, run.ID, run.Status)
 	}
-	WriteAudit(ctx, o.Audit, adminID, "batch.manual_run", "batch", jobName, nil, &details)
+	WriteAudit(ctx, o.Audit, adminID, "batch.manual_run", "batch", valid, nil, &details)
 	return run, err
-}
-
-func resolveActivityTimeRange(from, to *time.Time) (time.Time, time.Time, error) {
-	var (
-		start time.Time
-		end   time.Time
-		now   time.Time
-	)
-	now = time.Now().UTC()
-	if from == nil && to == nil {
-		end = now
-		start = now.Add(-defaultActivityRange)
-		return start, end, nil
-	}
-	if from != nil {
-		start = from.UTC()
-	} else {
-		start = now.Add(-defaultActivityRange)
-	}
-	if to != nil {
-		end = to.UTC()
-	} else {
-		end = now
-	}
-	return clampTimeRange(start, end)
-}
-
-func resolveSecurityTimeRange(from, to *time.Time) (time.Time, time.Time, error) {
-	var (
-		start time.Time
-		end   time.Time
-		now   time.Time
-	)
-	now = time.Now().UTC()
-	if from == nil && to == nil {
-		end = now
-		start = now.Add(-defaultSecurityRange)
-		return start, end, nil
-	}
-	if from != nil {
-		start = from.UTC()
-	} else {
-		start = now.Add(-defaultSecurityRange)
-	}
-	if to != nil {
-		end = to.UTC()
-	} else {
-		end = now
-	}
-	return clampTimeRange(start, end)
-}
-
-func clampTimeRange(start, end time.Time) (time.Time, time.Time, error) {
-	if end.Before(start) {
-		return time.Time{}, time.Time{}, ErrBadRequest
-	}
-	if end.Sub(start) > maxOperationsRange {
-		return time.Time{}, time.Time{}, ErrBadRequest
-	}
-	return start, end, nil
-}
-
-func paginateQuery(limit, offset int) (int, int) {
-	if limit <= 0 {
-		limit = 50
-	}
-	if limit > 100 {
-		limit = 100
-	}
-	if offset < 0 {
-		offset = 0
-	}
-	return limit, offset
-}
-
-func trimStringPtr(s *string) *string {
-	if s == nil {
-		return nil
-	}
-	v := strings.TrimSpace(*s)
-	if v == "" {
-		return nil
-	}
-	return &v
 }

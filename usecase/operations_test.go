@@ -9,35 +9,7 @@ import (
 	"crowdfund-app/repository"
 )
 
-func TestClampTimeRangeRejectsInverted(t *testing.T) {
-	var (
-		start time.Time
-		end   time.Time
-		err   error
-	)
-	start = time.Now().UTC()
-	end = start.Add(-time.Hour)
-	_, _, err = clampTimeRange(start, end)
-	if err != ErrBadRequest {
-		t.Fatalf("expected ErrBadRequest, got %v", err)
-	}
-}
-
-func TestClampTimeRangeRejectsTooWide(t *testing.T) {
-	var (
-		start time.Time
-		end   time.Time
-		err   error
-	)
-	start = time.Now().UTC().Add(-100 * 24 * time.Hour)
-	end = time.Now().UTC()
-	_, _, err = clampTimeRange(start, end)
-	if err != ErrBadRequest {
-		t.Fatalf("expected ErrBadRequest, got %v", err)
-	}
-}
-
-func TestListActivityLogsRejectsInvalidAction(t *testing.T) {
+func TestListActivityLogsRejectsInvalidActionViaValidator(t *testing.T) {
 	var (
 		ops OperationsUseCase
 		q   ActivityLogsQuery
@@ -46,6 +18,22 @@ func TestListActivityLogsRejectsInvalidAction(t *testing.T) {
 	)
 	bad = "not.a.real.action"
 	q.Action = &bad
+	ops = OperationsUseCase{Activity: stubActivityRepoForOps{}}
+	_, err = ops.ListActivityLogs(t.Context(), q)
+	if err != ErrBadRequest {
+		t.Fatalf("expected ErrBadRequest, got %v", err)
+	}
+}
+
+func TestListActivityLogsRejectsInvalidIPViaValidator(t *testing.T) {
+	var (
+		ops OperationsUseCase
+		q   ActivityLogsQuery
+		err error
+		ip  string
+	)
+	ip = "not-an-ip"
+	q.IP = &ip
 	ops = OperationsUseCase{Activity: stubActivityRepoForOps{}}
 	_, err = ops.ListActivityLogs(t.Context(), q)
 	if err != ErrBadRequest {
