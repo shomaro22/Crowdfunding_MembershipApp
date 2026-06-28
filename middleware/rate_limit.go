@@ -24,8 +24,11 @@ type RatePolicy struct {
 }
 
 type RateLimiter struct {
-	UC *usecase.RateLimitUseCase
+	UC       *usecase.RateLimitUseCase
+	OnDenied RateLimitDeniedHook
 }
+
+type RateLimitDeniedHook func(c echo.Context, policy RatePolicy, ruleKey string)
 
 func NewRateLimiter(uc *usecase.RateLimitUseCase) *RateLimiter {
 	return &RateLimiter{UC: uc}
@@ -61,6 +64,9 @@ func (l *RateLimiter) Middleware(policy RatePolicy) echo.MiddlewareFunc {
 					return next(c)
 				}
 				if !ok {
+					if l.OnDenied != nil {
+						l.OnDenied(c, policy, full)
+					}
 					c.Response().Header().Set("Retry-After", strconv.Itoa(retry))
 					return rateLimited(retry)
 				}
