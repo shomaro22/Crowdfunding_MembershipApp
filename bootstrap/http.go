@@ -1,4 +1,4 @@
-package main
+package bootstrap
 
 import (
 	"log/slog"
@@ -8,7 +8,6 @@ import (
 	"strings"
 
 	"crowdfund-app/auth"
-	"crowdfund-app/bootstrap"
 	"crowdfund-app/controller"
 	"crowdfund-app/entity"
 	"crowdfund-app/middleware"
@@ -18,9 +17,9 @@ import (
 	labmw "github.com/labstack/echo/v4/middleware"
 )
 
-func buildApp(opts *bootstrap.Options) (*echo.Echo, string, error) {
+func BuildHTTP(opts *Options) (*echo.Echo, string, error) {
 	var (
-		app             *bootstrap.App
+		app             *App
 		err             error
 		cookieCfg       auth.CookieCfg
 		authCtl         *controller.AuthController
@@ -56,7 +55,7 @@ func buildApp(opts *bootstrap.Options) (*echo.Echo, string, error) {
 
 	slog.SetDefault(slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo})))
 
-	app, err = bootstrap.OpenApp(opts)
+	app, err = OpenApp(opts)
 	if err != nil {
 		return nil, "", err
 	}
@@ -119,7 +118,7 @@ func buildApp(opts *bootstrap.Options) (*echo.Echo, string, error) {
 		middleware.Require2FA(),
 	)
 	rateLimiter = middleware.NewRateLimiter(app.UseCases.RateLimit)
-	bootstrap.WireRateLimitActivity(app, rateLimiter)
+	WireRateLimitActivity(app, rateLimiter)
 
 	e = router.New(router.Config{
 		PreAuthMiddleware:  preAuth,

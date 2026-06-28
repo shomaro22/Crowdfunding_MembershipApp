@@ -1,9 +1,8 @@
 //go:build integration
 
-package main
+package integration
 
 import (
-	"bytes"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -20,12 +19,12 @@ func TestProfileUnauthorized(t *testing.T) {
 		e   *echo.Echo
 		rec *httptest.ResponseRecorder
 	)
-	e = setupSecurityApp(t)
-	rec = securityGET(e, "/me/profile", "")
+	e = setupApp(t)
+	rec = httpGET(e, "/me/profile", "")
 	if rec.Code != http.StatusUnauthorized {
 		t.Fatalf("get status=%d want 401", rec.Code)
 	}
-	rec = securityPUT(e, "/me/profile", "", `{"name":"Alice"}`)
+	rec = httpPUT(e, "/me/profile", "", `{"name":"Alice"}`)
 	if rec.Code != http.StatusUnauthorized {
 		t.Fatalf("put status=%d want 401", rec.Code)
 	}
@@ -40,12 +39,12 @@ func TestProfileGetAndUpdate(t *testing.T) {
 		rec    *httptest.ResponseRecorder
 		body   map[string]any
 	)
-	e = setupSecurityApp(t)
-	gdb = openSecurityDB(t)
-	buyer = seedSecurityUser(t, gdb, seedOpts{Role: entity.UserRoleBuyer})
-	tok, _ = issueSecurityToken(buyer, true)
+	e = setupApp(t)
+	gdb = openDB(t)
+	buyer = seedUser(t, gdb, seedOpts{Role: entity.UserRoleBuyer})
+	tok, _ = issueToken(buyer, true)
 
-	rec = securityGET(e, "/me/profile", tok)
+	rec = httpGET(e, "/me/profile", tok)
 	if rec.Code != http.StatusOK {
 		t.Fatalf("get status=%d body=%s", rec.Code, rec.Body.String())
 	}
@@ -56,7 +55,7 @@ func TestProfileGetAndUpdate(t *testing.T) {
 		t.Fatalf("email=%v want %s", body["email"], buyer.Email)
 	}
 
-	rec = securityPUT(e, "/me/profile", tok, `{"name":"Alice","avatar_url":"https://example.com/a.png"}`)
+	rec = httpPUT(e, "/me/profile", tok, `{"name":"Alice","avatar_url":"https://example.com/a.png"}`)
 	if rec.Code != http.StatusOK {
 		t.Fatalf("put status=%d body=%s", rec.Code, rec.Body.String())
 	}
@@ -71,7 +70,7 @@ func TestProfileGetAndUpdate(t *testing.T) {
 		t.Fatalf("avatar_url=%v", body["avatar_url"])
 	}
 
-	rec = securityGET(e, "/me/profile", tok)
+	rec = httpGET(e, "/me/profile", tok)
 	if rec.Code != http.StatusOK {
 		t.Fatalf("get after update status=%d body=%s", rec.Code, rec.Body.String())
 	}
@@ -92,33 +91,18 @@ func TestProfileUpdateBadRequest(t *testing.T) {
 		tok   string
 		rec   *httptest.ResponseRecorder
 	)
-	e = setupSecurityApp(t)
-	gdb = openSecurityDB(t)
-	buyer = seedSecurityUser(t, gdb, seedOpts{Role: entity.UserRoleBuyer})
-	tok, _ = issueSecurityToken(buyer, true)
+	e = setupApp(t)
+	gdb = openDB(t)
+	buyer = seedUser(t, gdb, seedOpts{Role: entity.UserRoleBuyer})
+	tok, _ = issueToken(buyer, true)
 
-	rec = securityPUT(e, "/me/profile", tok, `{}`)
+	rec = httpPUT(e, "/me/profile", tok, `{}`)
 	if rec.Code != http.StatusBadRequest {
 		t.Fatalf("empty update status=%d want 400", rec.Code)
 	}
 
-	rec = securityPUT(e, "/me/profile", tok, `{"avatar_url":"not-a-url"}`)
+	rec = httpPUT(e, "/me/profile", tok, `{"avatar_url":"not-a-url"}`)
 	if rec.Code != http.StatusBadRequest {
 		t.Fatalf("bad avatar status=%d want 400 body=%s", rec.Code, rec.Body.String())
 	}
-}
-
-func securityPUT(e *echo.Echo, path, token, body string) *httptest.ResponseRecorder {
-	var (
-		rec *httptest.ResponseRecorder
-		req *http.Request
-	)
-	rec = httptest.NewRecorder()
-	req = httptest.NewRequest(http.MethodPut, path, bytes.NewBufferString(body))
-	req.Header.Set("Content-Type", "application/json")
-	if token != "" {
-		req.Header.Set("Authorization", "Bearer "+token)
-	}
-	e.ServeHTTP(rec, req)
-	return rec
 }

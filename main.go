@@ -15,7 +15,7 @@ func main() {
 		err  error
 	)
 	bootstrap.LoadDotEnv()
-	e, addr, err = buildApp(nil)
+	e, addr, err = bootstrap.BuildHTTP(nil)
 	if err != nil {
 		log.Fatal(err)
 	}
