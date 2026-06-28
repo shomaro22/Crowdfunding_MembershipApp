@@ -1071,6 +1071,54 @@ paths:
         "401":
           $ref: "#/components/responses/Unauthorized"
 
+  /seller/connect:
+    get:
+      tags: [Seller]
+      summary: Get Stripe Connect Express account status
+      description: Returns the seller's Connect account snapshot, or null if not yet onboarded.
+      responses:
+        "200":
+          description: Connect account status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConnectAccountResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "503":
+          description: Stripe is not configured
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /seller/connect/onboarding:
+    post:
+      tags: [Seller]
+      summary: Create or refresh Stripe Connect onboarding link
+      description: |
+        Creates a Stripe Express account if missing, syncs account flags from Stripe,
+        and returns a hosted onboarding URL.
+      responses:
+        "200":
+          description: Onboarding URL
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConnectOnboardingResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "503":
+          description: Stripe is not configured
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
   /seller/dashboard/stats:
     get:
       tags: [Seller]
@@ -1784,6 +1832,43 @@ paths:
           $ref: "#/components/responses/Unauthorized"
         "403":
           $ref: "#/components/responses/Forbidden"
+
+  /admin/kyc-documents:
+    get:
+      tags: [Admin]
+      summary: Stream KYC identity document (signed token)
+      description: |
+        Serves a seller identity image using a short-lived HMAC token issued in
+        `GET /admin/seller-registrations/{registrationId}` (`identity_document_*_url`).
+        Bearer auth is not used; the `token` query parameter is required.
+      security: []
+      parameters:
+        - in: query
+          name: token
+          required: true
+          schema:
+            type: string
+          description: Signed token from seller registration detail
+      responses:
+        "200":
+          description: Identity document binary
+          content:
+            image/jpeg:
+              schema:
+                type: string
+                format: binary
+            image/png:
+              schema:
+                type: string
+                format: binary
+            image/webp:
+              schema:
+                type: string
+                format: binary
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
 
   /admin/activity:
     get:
@@ -2881,6 +2966,33 @@ components:
         total_revenue:
           type: integer
 
+    ConnectAccount:
+      type: object
+      properties:
+        stripe_account_id:
+          type: string
+        charges_enabled:
+          type: boolean
+        payouts_enabled:
+          type: boolean
+        details_submitted:
+          type: boolean
+
+    ConnectAccountResponse:
+      type: object
+      properties:
+        account:
+          allOf:
+            - $ref: "#/components/schemas/ConnectAccount"
+          nullable: true
+
+    ConnectOnboardingResponse:
+      type: object
+      properties:
+        url:
+          type: string
+          format: uri
+
     ProjectAnalysisResponse:
       type: object
       properties:
@@ -3019,11 +3131,12 @@ components:
             identity_document_front_url:
               type: string
               format: uri
-              description: Short-lived signed URL for admin preview only
+              description: Short-lived signed URL (`GET /admin/kyc-documents?token=...`) for admin preview only
             identity_document_back_url:
               type: string
               format: uri
               nullable: true
+              description: Short-lived signed URL (`GET /admin/kyc-documents?token=...`) when back image exists
 
     ListSellerRegistrationsResponse:
       type: object
