@@ -116,6 +116,13 @@ type MediaUseCase interface {
 	UploadImage(ctx context.Context, userID uuid.UUID, in usecase.MediaUploadIn) (string, error)
 }
 
+type SellerUseCase interface {
+	DashboardStats(ctx context.Context, sellerID uuid.UUID) (usecase.SellerDashboardStatsView, error)
+	ListSupporters(ctx context.Context, sellerID uuid.UUID, projectID *uuid.UUID, limit, offset int) (usecase.SellerSupportersResult, error)
+	ExportSupporters(ctx context.Context, sellerID uuid.UUID, projectID *uuid.UUID) ([]usecase.SupporterView, error)
+	ProjectAnalysis(ctx context.Context, sellerID uuid.UUID) (usecase.ProjectAnalysisResult, error)
+}
+
 type OperationsUseCase interface {
 	ListActivityLogs(ctx context.Context, q usecase.ActivityLogsQuery) (usecase.ActivityLogsResult, error)
 	ListAuditLogs(ctx context.Context, q usecase.AuditLogsQuery) (usecase.AuditLogsResult, error)
