@@ -29,28 +29,74 @@ type SellerRegOut struct {
 	Registration SellerRegItemView
 }
 
-func (a *AuthUseCase) GetUser(ctx context.Context, userID uuid.UUID) (UserView, error) {
+func (a *AuthUseCase) RegisterBuyer(ctx context.Context, email, password string, name *string, meta RequestMeta) (UserView, error) {
 	var (
-		u   *entity.User
-		err error
+		normalized  string
+		err         error
+		exists      bool
+		hash        string
+		now         time.Time
+		trimmedName *string
+		n           string
+		u           *entity.User
 	)
 
-	u, err = a.Users.FindID(ctx, userID)
+	normalized, err = validator.ValidateBuyerReg(email, password)
+	if err != nil {
+		return UserView{}, mapBuyerRegEntityErr(err)
+	}
+	exists, err = a.Users.EmailExists(ctx, normalized)
 	if err != nil {
 		return UserView{}, err
 	}
-	if u == nil {
-		return UserView{}, ErrNotFound
+	if exists {
+		return UserView{}, ErrEmailInUse
 	}
+	hash, err = auth.HashPassword(password)
+	if err != nil {
+		return UserView{}, err
+	}
+	now = time.Now().UTC()
+	if name != nil {
+		n = strings.TrimSpace(*name)
+		if n != "" {
+			trimmedName = &n
+		}
+	}
+	u = &entity.User{
+		ID:            uuid.New(),
+		Email:         normalized,
+		Name:          trimmedName,
+		PasswordHash:  hash,
+		Role:          entity.UserRoleBuyer,
+		AccountStatus: entity.AccountStatusPending,
+		SellerStatus:  entity.SellerStatusNotApplicable,
+		CreatedAt:     now,
+		UpdatedAt:     now,
+	}
+	if err = a.Users.Create(ctx, u); err != nil {
+		return UserView{}, err
+	}
+	a.logActivity(ctx, &u.ID, entity.UserRegister, "user", u.ID.String(), meta, nil)
 	return UserViewFrom(u), nil
 }
 
-func (a *AuthUseCase) ParseToken(raw string) (auth.AuthClaims, error) {
-	return a.Tokens.Parse(raw)
-}
+func (a *AuthUseCase) EmailFree(ctx context.Context, email string) (bool, error) {
+	var (
+		normalized string
+		err        error
+		exists     bool
+	)
 
-func (a *AuthUseCase) SigningKey() []byte {
-	return a.TOTPKey
+	normalized, err = validator.ValidateEmail(email)
+	if err != nil {
+		return false, ErrInvalidEmail
+	}
+	exists, err = a.Users.EmailExists(ctx, normalized)
+	if err != nil {
+		return false, err
+	}
+	return !exists, nil
 }
 
 func (a *AuthUseCase) RegisterSeller(ctx context.Context, in SellerRegIn, meta RequestMeta) (*SellerRegOut, error) {
@@ -90,12 +136,12 @@ func (a *AuthUseCase) RegisterSeller(ctx context.Context, in SellerRegIn, meta R
 	userID = uuid.New()
 	frontKey, err = a.KYCStore.Save(ctx, userID, "front", in.Front.toStoreImage())
 	if err != nil {
-		return nil, mapKYCStoreError(err)
+		return nil, mapMediaStoreError(err)
 	}
 	backKey, err = a.KYCStore.Save(ctx, userID, "back", in.Back.toStoreImage())
 	if err != nil {
 		_ = a.KYCStore.Remove(ctx, frontKey)
-		return nil, mapKYCStoreError(err)
+		return nil, mapMediaStoreError(err)
 	}
 
 	hash, err = auth.HashPassword(in.Password)
