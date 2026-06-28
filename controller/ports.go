@@ -20,6 +20,7 @@ type AuthUseCase interface {
 	ResetPassword(ctx context.Context, plainToken, newPassword string) error
 	ChangePassword(ctx context.Context, userID uuid.UUID, current, newPassword, totpCode string) error
 	GetUser(ctx context.Context, userID uuid.UUID) (usecase.UserView, error)
+	UpdateProfile(ctx context.Context, userID uuid.UUID, in usecase.UpdateProfileIn) (usecase.UserView, error)
 	EmailFree(ctx context.Context, email string) (bool, error)
 	ParseToken(raw string) (auth.AuthClaims, error)
 	Setup2FA(ctx context.Context, userID uuid.UUID) (*usecase.TOTPSetupResult, error)
