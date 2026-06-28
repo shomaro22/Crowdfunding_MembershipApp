@@ -20,6 +20,22 @@ import (
 	"gorm.io/gorm"
 )
 
+func TestMain(m *testing.M) {
+	var (
+		code int
+		err  error
+	)
+	if strings.TrimSpace(os.Getenv("DATABASE_URL")) != "" {
+		err = db.Up(os.Getenv("DATABASE_URL"))
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "integration migrations: %v\n", err)
+			os.Exit(1)
+		}
+	}
+	code = m.Run()
+	os.Exit(code)
+}
+
 func openIntegrationDB(t *testing.T) *gorm.DB {
 	var (
 		gdb *gorm.DB
