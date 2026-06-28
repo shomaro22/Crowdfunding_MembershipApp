@@ -33,6 +33,13 @@ type AuditListFilter struct {
 type ActivityRepo interface {
 	Create(ctx context.Context, row *entity.ActivityLog) error
 	List(ctx context.Context, f ActivityListFilter) ([]entity.ActivityLog, int64, error)
+	CountByActionBetween(ctx context.Context, action entity.ActivityAction, from, to time.Time) (int64, error)
+	TopIPsBetween(ctx context.Context, from, to time.Time, limit int) ([]ActivityIPCount, error)
+}
+
+type ActivityIPCount struct {
+	IP    string
+	Count int64
 }
 
 type activityRepo struct {
@@ -95,6 +102,47 @@ func applyActivityListFilter(q *gorm.DB, f ActivityListFilter) *gorm.DB {
 		q = q.Where("created_at <= ?", *f.To)
 	}
 	return q
+}
+
+func (r *activityRepo) CountByActionBetween(ctx context.Context, action entity.ActivityAction, from, to time.Time) (int64, error) {
+	var (
+		n   int64
+		err error
+	)
+	err = r.dbCtx(ctx).Model(&entity.ActivityLog{}).
+		Where("action = ? AND created_at >= ? AND created_at <= ?", action, from, to).
+		Count(&n).Error
+	return n, err
+}
+
+func (r *activityRepo) TopIPsBetween(ctx context.Context, from, to time.Time, limit int) ([]ActivityIPCount, error) {
+	var (
+		rows []ActivityIPCount
+		err  error
+	)
+	if limit <= 0 {
+		limit = 10
+	}
+	if limit > 50 {
+		limit = 50
+	}
+	err = r.dbCtx(ctx).Raw(`
+		SELECT ip_address AS ip, COUNT(*) AS count
+		FROM activity_logs
+		WHERE created_at >= ? AND created_at <= ?
+		  AND ip_address IS NOT NULL
+		  AND (
+		    action = ?
+		    OR action LIKE 'security.%'
+		  )
+		GROUP BY ip_address
+		ORDER BY count DESC
+		LIMIT ?
+	`, from, to, entity.UserLoginFail, limit).Scan(&rows).Error
+	if err != nil {
+		return nil, err
+	}
+	return rows, nil
 }
 
 type AuditRepo interface {
