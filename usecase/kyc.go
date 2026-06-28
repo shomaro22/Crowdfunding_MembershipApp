@@ -25,17 +25,6 @@ func (u KYCUpload) toStoreImage() repository.KYCImage {
 	}
 }
 
-func mapKYCStoreError(err error) error {
-	switch {
-	case errors.Is(err, repository.ErrBadMedia):
-		return ErrUnsupportedMedia
-	case errors.Is(err, repository.ErrTooLarge):
-		return ErrFileTooLarge
-	default:
-		return err
-	}
-}
-
 type KYCAccessUseCase struct {
 	KYC        repository.KYCStore
 	SignSecret []byte

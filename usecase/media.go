@@ -2,7 +2,6 @@ package usecase
 
 import (
 	"context"
-	"errors"
 	"io"
 	"strings"
 
@@ -47,15 +46,4 @@ func (m *MediaUseCase) UploadImage(ctx context.Context, userID uuid.UUID, in Med
 		return "", ErrBadRequest
 	}
 	return base + "/" + path, nil
-}
-
-func mapMediaStoreError(err error) error {
-	switch {
-	case errors.Is(err, repository.ErrBadMedia):
-		return ErrUnsupportedMedia
-	case errors.Is(err, repository.ErrTooLarge):
-		return ErrFileTooLarge
-	default:
-		return err
-	}
 }
