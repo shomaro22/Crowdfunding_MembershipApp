@@ -8,6 +8,7 @@ import (
 	"crowdfund-app/auth"
 	"crowdfund-app/entity"
 	"crowdfund-app/repository"
+	"crowdfund-app/validator"
 
 	"github.com/google/uuid"
 )
@@ -70,11 +71,11 @@ func (a *AuthUseCase) RegisterSeller(ctx context.Context, in SellerRegIn, meta R
 		return nil, ErrNotFound
 	}
 
-	normalized, err = entity.ValidateBuyerReg(in.Email, in.Password)
+	normalized, err = validator.ValidateBuyerReg(in.Email, in.Password)
 	if err != nil {
 		return nil, mapBuyerRegEntityErr(err)
 	}
-	if err = entity.ValidateSellerKYC(in.FullName, in.BirthDate, in.Address, in.PhotoPresent); err != nil {
+	if err = validator.ValidateSellerKYC(in.FullName, in.BirthDate, in.Address, in.PhotoPresent); err != nil {
 		return nil, mapSellerKYCEntityErr(err)
 	}
 

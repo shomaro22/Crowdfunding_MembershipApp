@@ -1896,7 +1896,13 @@ paths:
             default: false
       responses:
         "200":
-          description: Job finished (sync execution)
+          description: Job finished successfully (sync execution)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BatchJobRun"
+        "422":
+          description: Job ran to completion but finished with FAILED status
           content:
             application/json:
               schema:

@@ -1,9 +1,9 @@
 package controller
 
 import (
+	"encoding/json"
 	"time"
 
-	"crowdfund-app/entity"
 	"crowdfund-app/usecase"
 )
 
@@ -16,7 +16,7 @@ type ActivityLogWire struct {
 	IPAddress  *string         `json:"ip_address,omitempty"`
 	UserAgent  *string         `json:"user_agent,omitempty"`
 	RequestID  *string         `json:"request_id,omitempty"`
-	Metadata   entity.JSONMetadata `json:"metadata,omitempty"`
+	Metadata   json.RawMessage `json:"metadata,omitempty"`
 	CreatedAt  string          `json:"created_at"`
 	User       *UserWire       `json:"user,omitempty"`
 }
