@@ -99,6 +99,12 @@ type WSTokenUseCase interface {
 	Issue(ctx context.Context, userID uuid.UUID) (string, error)
 }
 
+type FavoriteUseCase interface {
+	List(ctx context.Context, userID uuid.UUID) ([]usecase.ProjectView, error)
+	Toggle(ctx context.Context, userID uuid.UUID, in usecase.ToggleFavoriteIn) (usecase.FavoriteStatusView, error)
+	Check(ctx context.Context, userID, projectID uuid.UUID) (usecase.FavoriteStatusView, error)
+}
+
 type OperationsUseCase interface {
 	ListActivityLogs(ctx context.Context, q usecase.ActivityLogsQuery) (usecase.ActivityLogsResult, error)
 	ListAuditLogs(ctx context.Context, q usecase.AuditLogsQuery) (usecase.AuditLogsResult, error)
