@@ -7,6 +7,7 @@ import (
 
 	"crowdfund-app/entity"
 	"crowdfund-app/repository"
+	"crowdfund-app/validator"
 
 	"github.com/google/uuid"
 	"gorm.io/gorm"
@@ -93,10 +94,5 @@ func (b *BatchUseCase) runPurgeTokens(ctx context.Context, dryRun bool) (process
 }
 
 func isSupportedBatchJob(name string) bool {
-	switch name {
-	case entity.ApplyPlans, entity.ExpireSupporters, entity.PurgeTokens:
-		return true
-	default:
-		return false
-	}
+	return validator.IsSupportedBatchJob(name)
 }

@@ -1878,26 +1878,31 @@ paths:
   /admin/batches/{jobName}/run:
     post:
       tags: [Admin, Operations]
-      summary: Manually trigger a batch job
+      summary: Manually trigger a batch job (synchronous)
+      description: |
+        Runs the batch job to completion and returns the final `BatchJobRun` record.
+        Only jobs supported by `cmd/batch` are allowed.
       parameters:
         - in: path
           name: jobName
           required: true
           schema:
             type: string
-            enum: [apply_plans, expire_supporters, expire_projects, reconcile_stripe, purge_tokens]
+            enum: [apply_plans, expire_supporters, purge_tokens]
         - in: query
           name: dry_run
           schema:
             type: boolean
             default: false
       responses:
-        "202":
-          description: Job accepted
+        "200":
+          description: Job finished (sync execution)
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/BatchJobRun"
+        "400":
+          $ref: "#/components/responses/BadRequest"
         "401":
           $ref: "#/components/responses/Unauthorized"
         "403":
@@ -3060,6 +3065,10 @@ components:
             $ref: "#/components/schemas/AuditLog"
         total:
           type: integer
+        limit:
+          type: integer
+        offset:
+          type: integer
 
     ActivityLog:
       type: object
@@ -3102,6 +3111,10 @@ components:
             $ref: "#/components/schemas/ActivityLog"
         total:
           type: integer
+        limit:
+          type: integer
+        offset:
+          type: integer
 
     BatchJobRun:
       type: object
@@ -3111,6 +3124,7 @@ components:
           format: uuid
         job_name:
           type: string
+          enum: [apply_plans, expire_supporters, purge_tokens]
         status:
           type: string
           enum: [RUNNING, SUCCESS, FAILED]
@@ -3140,6 +3154,8 @@ components:
             $ref: "#/components/schemas/BatchJobRun"
         total:
           type: integer
+        limit:
+          type: integer
 
     SecurityEventsResponse:
       type: object
@@ -3157,6 +3173,12 @@ components:
                 type: string
               count:
                 type: integer
+        from:
+          type: string
+          format: date-time
+        to:
+          type: string
+          format: date-time
 
     WSClientFrame:
       oneOf:

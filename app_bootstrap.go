@@ -25,6 +25,7 @@ func buildApp(opts *bootstrap.Options) (*echo.Echo, string, error) {
 		authCtl         *controller.AuthController
 		healthCtl       *controller.HealthController
 		adminCtl        *controller.AdminController
+		adminOpsCtl     *controller.AdminOperationsController
 		kycFileCtl      *controller.KYCFileController
 		projectCtl      *controller.ProjectController
 		connectCtl      *controller.ConnectController
@@ -69,6 +70,7 @@ func buildApp(opts *bootstrap.Options) (*echo.Echo, string, error) {
 	authCtl = controller.NewAuthController(app.UseCases.Auth, cookieCfg, app.Config.AppPublicURL)
 	healthCtl = &controller.HealthController{SQL: app.DB, RDB: app.RDB}
 	adminCtl = controller.NewAdminController(app.UseCases.Admin, app.Config.APIPublicURL)
+	adminOpsCtl = controller.NewAdminOperationsController(app.UseCases.Operations)
 	kycFileCtl = controller.NewKYCFileController(app.UseCases.KYCAccess)
 	projectCtl = controller.NewProjectController(app.UseCases.Project)
 	connectCtl = controller.NewConnectController(app.UseCases.Connect)
@@ -108,6 +110,7 @@ func buildApp(opts *bootstrap.Options) (*echo.Echo, string, error) {
 		middleware.Require2FA(),
 	)
 	rateLimiter = middleware.NewRateLimiter(app.UseCases.RateLimit)
+	bootstrap.WireRateLimitActivity(app, rateLimiter)
 
 	e = router.New(router.Config{
 		PreAuthMiddleware:  preAuth,
@@ -122,6 +125,7 @@ func buildApp(opts *bootstrap.Options) (*echo.Echo, string, error) {
 		WS:                 wsCtl,
 		WSTokenAuth:        middleware.WSTokenAuth(app.UseCases.WSToken.Consume),
 		Admin:              adminCtl,
+		AdminOperations:    adminOpsCtl,
 		KYCFiles:           kycFileCtl,
 		RateLimit:          rateLimiter,
 		Policy2FAChallenge: middleware.Policy2FAChallenge([]byte(app.Config.JWTSecret)),
