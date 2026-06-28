@@ -15,6 +15,10 @@ type PurchaseUseCase struct {
 	Purchases repository.PurchaseRepo
 }
 
+func (p *PurchaseUseCase) EnrichPurchase(ctx context.Context, row *entity.Purchase) (PurchaseView, error) {
+	return p.enrichPurchase(ctx, row)
+}
+
 func (p *PurchaseUseCase) ListMine(ctx context.Context, buyerID uuid.UUID, limit, offset int) ([]PurchaseView, int64, error) {
 	var (
 		rows  []entity.Purchase
