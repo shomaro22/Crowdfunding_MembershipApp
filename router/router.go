@@ -13,6 +13,7 @@ type Config struct {
 	Auth              *controller.AuthController
 	Projects          *controller.ProjectController
 	Connect           *controller.ConnectController
+	Seller            *controller.SellerController
 	Payments          *controller.PaymentController
 	Supporters        *controller.SupporterController
 	Messages          *controller.MessageController
@@ -84,6 +85,8 @@ func New(cfg Config) *echo.Echo {
 		e.POST("/auth/logout", cfg.Auth.Logout)
 		pm = cfg.Protected
 		e.GET("/me", cfg.Auth.Me, pm...)
+		e.GET("/me/profile", cfg.Auth.GetProfile, pm...)
+		e.PUT("/me/profile", cfg.Auth.UpdateProfile, pm...)
 		e.POST("/me/change-password", cfg.Auth.ChangePassword, pm...)
 		e.POST("/auth/2fa/setup", cfg.Auth.Setup2FA, pm...)
 		e.POST("/auth/2fa/verify", cfg.Auth.Verify2FA, pm...)
@@ -103,6 +106,13 @@ func New(cfg Config) *echo.Echo {
 	if cfg.Connect != nil {
 		e.GET("/seller/connect", cfg.Connect.GetAccount, cfg.SellerRead...)
 		e.POST("/seller/connect/onboarding", cfg.Connect.CreateOnboarding, cfg.SellerWrite...)
+	}
+
+	if cfg.Seller != nil {
+		e.GET("/seller/dashboard/stats", cfg.Seller.DashboardStats, cfg.SellerRead...)
+		e.GET("/seller/supporters", cfg.Seller.ListSupporters, cfg.SellerRead...)
+		e.GET("/seller/supporters/export", cfg.Seller.ExportSupporters, cfg.SellerRead...)
+		e.GET("/seller/projects/analysis", cfg.Seller.ProjectAnalysis, cfg.SellerRead...)
 	}
 
 	if cfg.Payments != nil {
@@ -170,6 +180,8 @@ func New(cfg Config) *echo.Echo {
 		var (
 			reviewAdmin      echo.MiddlewareFunc
 			reportModeration echo.MiddlewareFunc
+			userManagement   echo.MiddlewareFunc
+			financeAdmin     echo.MiddlewareFunc
 		)
 		admin = e.Group("/admin", cfg.AdminOnly...)
 		reportModeration = middleware.RequireAdminRole(
@@ -179,6 +191,14 @@ func New(cfg Config) *echo.Echo {
 		)
 		if cfg.Admin != nil {
 			reviewAdmin = middleware.RequireAdminRole(entity.AdminRoleReviewAdmin, entity.AdminRoleSuperAdmin)
+			userManagement = middleware.RequireAdminRole(entity.AdminRoleSuperAdmin, entity.AdminRoleSupportAdmin)
+			financeAdmin = middleware.RequireAdminRole(entity.AdminRoleSuperAdmin, entity.AdminRoleFinanceAdmin)
+			admin.GET("/stats", cfg.Admin.DashboardStats, userManagement)
+			admin.GET("/users", cfg.Admin.ListUsers, userManagement)
+			admin.PUT("/users/:userId", cfg.Admin.UpdateUser, userManagement)
+			admin.DELETE("/users/:userId", cfg.Admin.DeleteUser, userManagement)
+			admin.GET("/purchases", cfg.Admin.ListPurchases, financeAdmin)
+			admin.PATCH("/purchases/:purchaseId", cfg.Admin.PatchPurchase, financeAdmin)
 			admin.GET("/reviews/users", cfg.Admin.ListBuyerPending, reviewAdmin)
 			admin.POST("/reviews/users/:userId/approve", cfg.Admin.ApproveBuyer, reviewAdmin)
 			admin.POST("/reviews/users/:userId/reject", cfg.Admin.RejectBuyer, reviewAdmin)

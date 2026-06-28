@@ -73,3 +73,10 @@ func mapMessageEntityErr(err error) error {
 	}
 	return err
 }
+
+func mapProfileEntityErr(err error) error {
+	if errors.Is(err, entity.ErrBadProfile) {
+		return ErrBadRequest
+	}
+	return err
+}

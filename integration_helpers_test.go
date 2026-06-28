@@ -15,16 +15,24 @@ import (
 	"time"
 
 	"crowdfund-app/auth"
+	"crowdfund-app/bootstrap"
 	"crowdfund-app/db"
 	"crowdfund-app/entity"
+	"crowdfund-app/stripe"
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
 	"github.com/labstack/echo/v4"
+	"github.com/redis/go-redis/v9"
 	"gorm.io/gorm"
 )
 
 const securityTestJWTSecret = "01234567890123456789012345678901"
+
+var (
+	integrationGDB *gorm.DB
+	integrationRDB *redis.Client
+)
 
 type seedOpts struct {
 	Role          entity.UserRole
@@ -33,30 +41,82 @@ type seedOpts struct {
 	AccountStatus entity.AccountStatus
 }
 
-func setupSecurityApp(t *testing.T) *echo.Echo {
+func TestMain(m *testing.M) {
 	var (
-		e     *echo.Echo
-		gdb   *gorm.DB
+		code int
+		err  error
+	)
+	if strings.TrimSpace(os.Getenv("DATABASE_URL")) != "" {
+		err = initIntegrationInfra()
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "integration infra: %v\n", err)
+			os.Exit(1)
+		}
+		defer closeIntegrationInfra()
+	}
+	code = m.Run()
+	os.Exit(code)
+}
+
+func initIntegrationInfra() error {
+	var (
 		sqlDB *sql.DB
 		err   error
 	)
+	err = db.Up(os.Getenv("DATABASE_URL"))
+	if err != nil {
+		return err
+	}
+	integrationGDB, err = db.Open(os.Getenv("DATABASE_URL"))
+	if err != nil {
+		return err
+	}
+	sqlDB, err = integrationGDB.DB()
+	if err != nil {
+		return err
+	}
+	err = sqlDB.Ping()
+	if err != nil {
+		return err
+	}
+	integrationRDB = db.OpenRedis()
+	return nil
+}
+
+func closeIntegrationInfra() {
+	var sqlDB *sql.DB
+	if integrationGDB != nil {
+		sqlDB, _ = integrationGDB.DB()
+		if sqlDB != nil {
+			_ = sqlDB.Close()
+		}
+		integrationGDB = nil
+	}
+	if integrationRDB != nil {
+		_ = integrationRDB.Close()
+		integrationRDB = nil
+	}
+}
+
+func integrationAppOptions(stripeClient stripe.Client) *bootstrap.Options {
+	return &bootstrap.Options{
+		Stripe: stripeClient,
+		DB:     integrationGDB,
+		Redis:  integrationRDB,
+	}
+}
+
+func setupSecurityApp(t *testing.T) *echo.Echo {
+	var (
+		e   *echo.Echo
+		err error
+	)
 	t.Helper()
-	if strings.TrimSpace(os.Getenv("DATABASE_URL")) == "" {
+	if integrationGDB == nil {
 		t.Skip("DATABASE_URL が未設定のためスキップ")
 	}
-	gdb, err = db.Open(os.Getenv("DATABASE_URL"))
-	if err != nil {
-		t.Skip("DB 接続不可のためスキップ: ", err)
-	}
-	sqlDB, err = gdb.DB()
-	if err != nil {
-		t.Skip("DB 接続不可のためスキップ: ", err)
-	}
-	if err = sqlDB.Ping(); err != nil {
-		t.Skip("DB 接続不可のためスキップ: ", err)
-	}
 	_ = os.Setenv("JWT_SECRET", securityTestJWTSecret)
-	e, _, err = buildApp(nil)
+	e, _, err = buildApp(integrationAppOptions(nil))
 	if err != nil {
 		t.Fatalf("buildApp: %v", err)
 	}
@@ -64,16 +124,11 @@ func setupSecurityApp(t *testing.T) *echo.Echo {
 }
 
 func openSecurityDB(t *testing.T) *gorm.DB {
-	var (
-		gdb *gorm.DB
-		err error
-	)
 	t.Helper()
-	gdb, err = db.Open(os.Getenv("DATABASE_URL"))
-	if err != nil {
-		t.Fatal(err)
+	if integrationGDB == nil {
+		t.Fatal("DATABASE_URL が未設定")
 	}
-	return gdb
+	return integrationGDB
 }
 
 func seedSecurityUser(t *testing.T, gdb *gorm.DB, opts seedOpts) *entity.User {

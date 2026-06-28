@@ -4,18 +4,14 @@ package main
 
 import (
 	"bytes"
-	"database/sql"
 	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"os"
-	"strings"
 	"testing"
 	"time"
 
-	"crowdfund-app/bootstrap"
-	"crowdfund-app/db"
 	"crowdfund-app/entity"
 	"crowdfund-app/stripe"
 
@@ -35,30 +31,17 @@ type paymentFixture struct {
 
 func setupPaymentApp(t *testing.T) (*echo.Echo, *stripe.StubClient) {
 	var (
-		e     *echo.Echo
-		gdb   *gorm.DB
-		sqlDB *sql.DB
-		stub  *stripe.StubClient
-		err   error
+		e    *echo.Echo
+		stub *stripe.StubClient
+		err  error
 	)
 	t.Helper()
-	if strings.TrimSpace(os.Getenv("DATABASE_URL")) == "" {
+	if integrationGDB == nil {
 		t.Skip("DATABASE_URL が未設定のためスキップ")
-	}
-	gdb, err = dbOpenPaymentTest(t)
-	if err != nil {
-		t.Skip("DB 接続不可のためスキップ: ", err)
-	}
-	sqlDB, err = gdb.DB()
-	if err != nil {
-		t.Skip("DB 接続不可のためスキップ: ", err)
-	}
-	if err = sqlDB.Ping(); err != nil {
-		t.Skip("DB 接続不可のためスキップ: ", err)
 	}
 	stub = stripe.NewStubClient()
 	_ = os.Setenv("JWT_SECRET", securityTestJWTSecret)
-	e, _, err = buildApp(&bootstrap.Options{Stripe: stub})
+	e, _, err = buildApp(integrationAppOptions(stub))
 	if err != nil {
 		t.Fatalf("buildApp: %v", err)
 	}
@@ -67,7 +50,10 @@ func setupPaymentApp(t *testing.T) (*echo.Echo, *stripe.StubClient) {
 
 func dbOpenPaymentTest(t *testing.T) (*gorm.DB, error) {
 	t.Helper()
-	return db.Open(os.Getenv("DATABASE_URL"))
+	if integrationGDB == nil {
+		return nil, fmt.Errorf("DATABASE_URL が未設定")
+	}
+	return integrationGDB, nil
 }
 
 func seedPaymentFixture(t *testing.T, gdb *gorm.DB) paymentFixture {

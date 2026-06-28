@@ -27,6 +27,8 @@ type Repositories struct {
 	WSTokens        repository.WSTokenRepo
 	Favorites       repository.FavoriteRepo
 	Reports         repository.ReportRepo
+	Seller          repository.SellerRepo
+	Admin           repository.AdminRepo
 }
 
 type RedisRepositories struct {
@@ -55,6 +57,8 @@ func NewRepositories(db *gorm.DB) Repositories {
 		WSTokens:        repository.NewWSTokenRepo(db),
 		Favorites:       repository.NewFavoriteRepo(db),
 		Reports:         repository.NewReportRepo(db),
+		Seller:          repository.NewSellerRepo(db),
+		Admin:           repository.NewAdminRepo(db),
 	}
 }
 

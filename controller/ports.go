@@ -20,6 +20,7 @@ type AuthUseCase interface {
 	ResetPassword(ctx context.Context, plainToken, newPassword string) error
 	ChangePassword(ctx context.Context, userID uuid.UUID, current, newPassword, totpCode string) error
 	GetUser(ctx context.Context, userID uuid.UUID) (usecase.UserView, error)
+	UpdateProfile(ctx context.Context, userID uuid.UUID, in usecase.UpdateProfileIn) (usecase.UserView, error)
 	EmailFree(ctx context.Context, email string) (bool, error)
 	ParseToken(raw string) (auth.AuthClaims, error)
 	Setup2FA(ctx context.Context, userID uuid.UUID) (*usecase.TOTPSetupResult, error)
@@ -45,6 +46,12 @@ type AdminUseCase interface {
 	PatchProject(ctx context.Context, adminID, projectID uuid.UUID, status string, reason *string) (*usecase.ProjectView, error)
 	DeleteProject(ctx context.Context, adminID, projectID uuid.UUID) error
 	PatchDeleteReq(ctx context.Context, adminID, projectID uuid.UUID, action string, reason *string) (*usecase.ProjectView, error)
+	DashboardStats(ctx context.Context) (usecase.AdminStatsView, error)
+	ListUsers(ctx context.Context, role, search string, limit, offset int) ([]usecase.UserView, int64, error)
+	UpdateUser(ctx context.Context, adminID, userID uuid.UUID, in usecase.AdminUpdateUserIn) (usecase.UserView, error)
+	DeleteUser(ctx context.Context, adminID, userID uuid.UUID) error
+	ListPurchases(ctx context.Context, status string, limit, offset int) ([]usecase.PurchaseView, int64, error)
+	PatchPurchaseStatus(ctx context.Context, adminID, purchaseID uuid.UUID, status string) (usecase.PurchaseView, error)
 }
 
 type ProjectUseCase interface {
@@ -113,6 +120,13 @@ type ReportUseCase interface {
 
 type MediaUseCase interface {
 	UploadImage(ctx context.Context, userID uuid.UUID, in usecase.MediaUploadIn) (string, error)
+}
+
+type SellerUseCase interface {
+	DashboardStats(ctx context.Context, sellerID uuid.UUID) (usecase.SellerDashboardStatsView, error)
+	ListSupporters(ctx context.Context, sellerID uuid.UUID, projectID *uuid.UUID, limit, offset int) (usecase.SellerSupportersResult, error)
+	ExportSupporters(ctx context.Context, sellerID uuid.UUID, projectID *uuid.UUID) ([]usecase.SupporterView, error)
+	ProjectAnalysis(ctx context.Context, sellerID uuid.UUID) (usecase.ProjectAnalysisResult, error)
 }
 
 type OperationsUseCase interface {

@@ -27,6 +27,7 @@ type UseCases struct {
 	Favorite    *usecase.FavoriteUseCase
 	Report      *usecase.ReportUseCase
 	Media       *usecase.MediaUseCase
+	Seller      *usecase.SellerUseCase
 }
 
 func NewUseCases(
@@ -42,8 +43,9 @@ func NewUseCases(
 		tokenSvc   = auth.NewTokenService([]byte(cfg.JWTSecret), auth.DefaultAuthTTL)
 		authUC     *usecase.AuthUseCase
 		connectUC  *usecase.ConnectUseCase
-		supportUC  *usecase.SupporterUseCase
-		projectUC  *usecase.ProjectUseCase
+	supportUC  *usecase.SupporterUseCase
+	purchaseUC *usecase.PurchaseUseCase
+	projectUC  *usecase.ProjectUseCase
 		kycAccess  *usecase.KYCAccessUseCase
 		google     *auth.GoogleOAuth
 		err        error
@@ -81,6 +83,11 @@ func NewUseCases(
 		Stripe:  stripeClient,
 	}
 	supportUC = NewSupporterUseCase(db, repos, stripeClient)
+	purchaseUC = &usecase.PurchaseUseCase{
+		Users:     repos.Users,
+		Projects:  repos.Projects,
+		Purchases: repos.Purchases,
+	}
 	batchUC := NewBatchUseCase(db, repos, stripeClient)
 	paymentUC := &usecase.PaymentUseCase{
 		DB:              db,
@@ -109,17 +116,16 @@ func NewUseCases(
 			KYC:             kyc,
 			ProjectsUC:      projectUC,
 			KYCAccess:       kycAccess,
+			AdminStats:      repos.Admin,
+			Purchases:       repos.Purchases,
+			PurchaseViews:   purchaseUC,
 			DB:              db,
 		},
 		Project:   projectUC,
 		Connect:   connectUC,
 		Payment:   paymentUC,
 		Supporter: supportUC,
-		Purchase: &usecase.PurchaseUseCase{
-			Users:     repos.Users,
-			Projects:  repos.Projects,
-			Purchases: repos.Purchases,
-		},
+		Purchase: purchaseUC,
 		RateLimit: &usecase.RateLimitUseCase{Repo: redisRepos.RateLimit},
 		KYCAccess: kycAccess,
 		Message: &usecase.MessageUseCase{
@@ -157,6 +163,11 @@ func NewUseCases(
 		Media: &usecase.MediaUseCase{
 			Store:        media,
 			APIPublicURL: cfg.APIPublicURL,
+		},
+		Seller: &usecase.SellerUseCase{
+			Projects:   repos.Projects,
+			Seller:     repos.Seller,
+			Supporters: supportUC,
 		},
 	}
 }
