@@ -4,6 +4,7 @@ package repository_test
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"os"
 	"strings"
@@ -32,6 +33,13 @@ func openIntegrationDB(t *testing.T) *gorm.DB {
 	if err != nil {
 		t.Fatal(err)
 	}
+	t.Cleanup(func() {
+		var sqlDB *sql.DB
+		sqlDB, err = gdb.DB()
+		if err == nil && sqlDB != nil {
+			_ = sqlDB.Close()
+		}
+	})
 	return gdb
 }
 

@@ -11,11 +11,15 @@ import (
 	"crowdfund-app/wshub"
 
 	"github.com/joho/godotenv"
+	"github.com/redis/go-redis/v9"
+	"gorm.io/gorm"
 )
 
-// Options は BuildHTTP の任意設定（主に統合テスト用 Stripe 差し替え）。
+// Options は BuildHTTP の任意設定（主に統合テスト用）。
 type Options struct {
 	Stripe stripe.Client
+	DB     *gorm.DB
+	Redis  *redis.Client
 }
 
 func LoadDotEnv() {

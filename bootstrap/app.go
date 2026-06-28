@@ -41,11 +41,19 @@ func OpenApp(opts *Options) (*App, error) {
 	if err != nil {
 		return nil, err
 	}
-	gormDB, err = OpenDB()
-	if err != nil {
-		return nil, err
+	if opts != nil && opts.DB != nil {
+		gormDB = opts.DB
+	} else {
+		gormDB, err = OpenDB()
+		if err != nil {
+			return nil, err
+		}
 	}
-	rdb = OpenRedis()
+	if opts != nil && opts.Redis != nil {
+		rdb = opts.Redis
+	} else {
+		rdb = OpenRedis()
+	}
 	repos = NewRepositories(gormDB)
 	redisRepos = NewRedisRepositories(rdb)
 	kyc = repository.NewLocalKYC(cfg.PrivateRoot)
