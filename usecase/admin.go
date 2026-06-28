@@ -103,7 +103,7 @@ func (a *AdminUseCase) ResetUser2FA(ctx context.Context, adminID, targetUserID u
 	if err = InvalidateUserSessions(ctx, a.DB, a.Users, a.RefreshTokens, targetUserID); err != nil {
 		return UserView{}, err
 	}
-	a.writeAudit(ctx, adminID, "user.reset_2fa", "user", u.ID.String(), reason, nil)
+	WriteAudit(ctx, a.Audit, adminID, "user.reset_2fa", "user", u.ID.String(), reason, nil)
 	return UserViewFrom(u), nil
 }
 
@@ -151,7 +151,7 @@ func (a *AdminUseCase) ChangeAdminRole(ctx context.Context, actorID, targetUserI
 		return UserView{}, err
 	}
 	details = fmt.Sprintf("%s -> %s", oldRole, role)
-	a.writeAudit(ctx, actorID, "user.change_admin_role", "user", u.ID.String(), reason, &details)
+	WriteAudit(ctx, a.Audit, actorID, "user.change_admin_role", "user", u.ID.String(), reason, &details)
 	return UserViewFrom(u), nil
 }
 
@@ -167,21 +167,5 @@ func (a *AdminUseCase) writeReviewDecision(ctx context.Context, reviewerID uuid.
 		Decision:     decision,
 		Reason:       reason,
 		CreatedAt:    time.Now().UTC(),
-	})
-}
-
-func (a *AdminUseCase) writeAudit(ctx context.Context, adminID uuid.UUID, action, resource, resourceID string, reason, details *string) {
-	if a.Audit == nil {
-		return
-	}
-	_ = a.Audit.Create(ctx, &entity.AuditLog{
-		ID:         uuid.New(),
-		AdminID:    adminID,
-		Action:     action,
-		Resource:   resource,
-		ResourceID: resourceID,
-		Reason:     reason,
-		Details:    details,
-		CreatedAt:  time.Now().UTC(),
 	})
 }
