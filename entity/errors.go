@@ -35,4 +35,5 @@ var (
 	ErrBadPrice      = errors.New("plan price must be between 1 and 100000 JPY")
 	ErrBadKYC        = errors.New("seller KYC metadata is incomplete")
 	ErrBadImages     = errors.New("project images are invalid")
+	ErrBadProfile    = errors.New("invalid profile fields")
 )
