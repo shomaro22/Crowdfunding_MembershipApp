@@ -32,6 +32,7 @@ func buildApp(opts *bootstrap.Options) (*echo.Echo, string, error) {
 		paymentCtl      *controller.PaymentController
 		supporterCtl    *controller.SupporterController
 		favoriteCtl     *controller.FavoriteController
+		reportCtl       *controller.ReportController
 		messageCtl      *controller.MessageController
 		wsTokenCtl      *controller.WSTokenController
 		wsCtl           *controller.WSController
@@ -80,6 +81,7 @@ func buildApp(opts *bootstrap.Options) (*echo.Echo, string, error) {
 	}
 	supporterCtl = controller.NewSupporterController(app.UseCases.Supporter)
 	favoriteCtl = controller.NewFavoriteController(app.UseCases.Favorite)
+	reportCtl = controller.NewReportController(app.UseCases.Report)
 	messageCtl = controller.NewMessageController(app.UseCases.Message)
 	wsTokenCtl = controller.NewWSTokenController(app.UseCases.WSToken)
 	wsCtl = controller.NewWSController(app.Hub, app.UseCases.Message, origins)
@@ -123,6 +125,7 @@ func buildApp(opts *bootstrap.Options) (*echo.Echo, string, error) {
 		Payments:           paymentCtl,
 		Supporters:         supporterCtl,
 		Favorites:          favoriteCtl,
+		Reports:            reportCtl,
 		Messages:           messageCtl,
 		WSToken:            wsTokenCtl,
 		WS:                 wsCtl,

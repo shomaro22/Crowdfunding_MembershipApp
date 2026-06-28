@@ -83,6 +83,8 @@ func MapHTTP(err error) (int, Body) {
 		return http.StatusConflict, Payload("CONFLICT", "email already in use")
 	case errors.Is(err, usecase.ErrFavoriteExists):
 		return http.StatusConflict, Payload("CONFLICT", "favorite already exists")
+	case errors.Is(err, usecase.ErrReportExists):
+		return http.StatusConflict, Payload("CONFLICT", "report already exists")
 	case errors.Is(err, usecase.Err2FAAlreadyEnabled):
 		return http.StatusConflict, Payload("2FA_ALREADY_ENABLED", "2fa already enabled")
 	case errors.Is(err, usecase.ErrStripeUnavailable):
