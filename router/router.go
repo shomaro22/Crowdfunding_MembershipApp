@@ -180,6 +180,8 @@ func New(cfg Config) *echo.Echo {
 		var (
 			reviewAdmin      echo.MiddlewareFunc
 			reportModeration echo.MiddlewareFunc
+			userManagement   echo.MiddlewareFunc
+			financeAdmin     echo.MiddlewareFunc
 		)
 		admin = e.Group("/admin", cfg.AdminOnly...)
 		reportModeration = middleware.RequireAdminRole(
@@ -189,6 +191,14 @@ func New(cfg Config) *echo.Echo {
 		)
 		if cfg.Admin != nil {
 			reviewAdmin = middleware.RequireAdminRole(entity.AdminRoleReviewAdmin, entity.AdminRoleSuperAdmin)
+			userManagement = middleware.RequireAdminRole(entity.AdminRoleSuperAdmin, entity.AdminRoleSupportAdmin)
+			financeAdmin = middleware.RequireAdminRole(entity.AdminRoleSuperAdmin, entity.AdminRoleFinanceAdmin)
+			admin.GET("/stats", cfg.Admin.DashboardStats, userManagement)
+			admin.GET("/users", cfg.Admin.ListUsers, userManagement)
+			admin.PUT("/users/:userId", cfg.Admin.UpdateUser, userManagement)
+			admin.DELETE("/users/:userId", cfg.Admin.DeleteUser, userManagement)
+			admin.GET("/purchases", cfg.Admin.ListPurchases, financeAdmin)
+			admin.PATCH("/purchases/:purchaseId", cfg.Admin.PatchPurchase, financeAdmin)
 			admin.GET("/reviews/users", cfg.Admin.ListBuyerPending, reviewAdmin)
 			admin.POST("/reviews/users/:userId/approve", cfg.Admin.ApproveBuyer, reviewAdmin)
 			admin.POST("/reviews/users/:userId/reject", cfg.Admin.RejectBuyer, reviewAdmin)
