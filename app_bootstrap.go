@@ -108,6 +108,7 @@ func buildApp(opts *bootstrap.Options) (*echo.Echo, string, error) {
 		middleware.Require2FA(),
 	)
 	rateLimiter = middleware.NewRateLimiter(app.UseCases.RateLimit)
+	bootstrap.WireRateLimitActivity(app, rateLimiter)
 
 	e = router.New(router.Config{
 		PreAuthMiddleware:  preAuth,
