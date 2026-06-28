@@ -3,6 +3,7 @@ package usecase_test
 import (
 	"context"
 	"testing"
+	"time"
 
 	"crowdfund-app/entity"
 	"crowdfund-app/repository"
@@ -22,6 +23,14 @@ func (s *stubActivityRepo) Create(_ context.Context, row *entity.ActivityLog) er
 
 func (s *stubActivityRepo) List(_ context.Context, _ repository.ActivityListFilter) ([]entity.ActivityLog, int64, error) {
 	return nil, 0, nil
+}
+
+func (s *stubActivityRepo) CountByActionBetween(_ context.Context, _ entity.ActivityAction, _, _ time.Time) (int64, error) {
+	return 0, nil
+}
+
+func (s *stubActivityRepo) TopIPsBetween(_ context.Context, _, _ time.Time, _ int) ([]repository.ActivityIPCount, error) {
+	return nil, nil
 }
 
 func TestLogRateLimitDenied(t *testing.T) {
