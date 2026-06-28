@@ -4,6 +4,7 @@ import (
 	"errors"
 
 	"crowdfund-app/entity"
+	"crowdfund-app/repository"
 )
 
 var (
@@ -79,4 +80,15 @@ func mapProfileEntityErr(err error) error {
 		return ErrBadRequest
 	}
 	return err
+}
+
+func mapMediaStoreError(err error) error {
+	switch {
+	case errors.Is(err, repository.ErrBadMedia):
+		return ErrUnsupportedMedia
+	case errors.Is(err, repository.ErrTooLarge):
+		return ErrFileTooLarge
+	default:
+		return err
+	}
 }
