@@ -88,7 +88,7 @@ func (a *AdminUseCase) PatchProject(ctx context.Context, adminID, projectID uuid
 	if projectSt == entity.ProjectStatusCancelled {
 		action = "project.reject"
 	}
-	a.writeAudit(ctx, adminID, action, "project", project.ID.String(), reason, nil)
+	WriteAudit(ctx, a.Audit, adminID, action, "project", project.ID.String(), reason, nil)
 	if projectSt == entity.ProjectStatusActive {
 		a.writeReviewDecision(ctx, adminID, entity.ReviewProject, projectID, entity.ReviewApproved, reason)
 	} else {
@@ -122,7 +122,7 @@ func (a *AdminUseCase) DeleteProject(ctx context.Context, adminID, projectID uui
 	if err = a.Projects.Delete(ctx, projectID); err != nil {
 		return err
 	}
-	a.writeAudit(ctx, adminID, "project.delete", "project", projectID.String(), nil, nil)
+	WriteAudit(ctx, a.Audit, adminID, "project.delete", "project", projectID.String(), nil, nil)
 	return nil
 }
 
@@ -158,7 +158,7 @@ func (a *AdminUseCase) PatchDeleteReq(ctx context.Context, adminID, projectID uu
 		if err = a.Projects.Update(ctx, project); err != nil {
 			return nil, err
 		}
-		a.writeAudit(ctx, adminID, "project.delete_request.approve", "project", project.ID.String(), reason, nil)
+		WriteAudit(ctx, a.Audit, adminID, "project.delete_request.approve", "project", project.ID.String(), reason, nil)
 		a.writeReviewDecision(ctx, adminID, entity.ReviewProjectDelete, projectID, entity.ReviewApproved, reason)
 	case "reject":
 		project.Status = entity.ProjectStatusActive
@@ -167,7 +167,7 @@ func (a *AdminUseCase) PatchDeleteReq(ctx context.Context, adminID, projectID uu
 		if err = a.Projects.Update(ctx, project); err != nil {
 			return nil, err
 		}
-		a.writeAudit(ctx, adminID, "project.delete_request.reject", "project", project.ID.String(), reason, nil)
+		WriteAudit(ctx, a.Audit, adminID, "project.delete_request.reject", "project", project.ID.String(), reason, nil)
 		a.writeReviewDecision(ctx, adminID, entity.ReviewProjectDelete, projectID, entity.ReviewRejected, reason)
 	default:
 		return nil, ErrBadRequest
