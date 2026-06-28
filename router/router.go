@@ -20,6 +20,7 @@ type Config struct {
 	WS                *controller.WSController
 	Favorites         *controller.FavoriteController
 	Reports           *controller.ReportController
+	Media             *controller.MediaController
 	Admin             *controller.AdminController
 	AdminOperations   *controller.AdminOperationsController
 	KYCFiles          *controller.KYCFileController
@@ -134,6 +135,11 @@ func New(cfg Config) *echo.Echo {
 	if cfg.Reports != nil {
 		pm = cfg.Protected
 		e.POST("/reports", cfg.Reports.Create, pm...)
+	}
+
+	if cfg.Media != nil {
+		pm = cfg.Protected
+		e.POST("/media/images", cfg.Media.UploadImage, append(pm, rl(middleware.PolicyMediaUpload))...)
 	}
 
 	if cfg.Messages != nil {

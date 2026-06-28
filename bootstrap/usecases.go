@@ -26,6 +26,7 @@ type UseCases struct {
 	Operations  *usecase.OperationsUseCase
 	Favorite    *usecase.FavoriteUseCase
 	Report      *usecase.ReportUseCase
+	Media       *usecase.MediaUseCase
 }
 
 func NewUseCases(
@@ -33,6 +34,7 @@ func NewUseCases(
 	repos Repositories,
 	redisRepos RedisRepositories,
 	kyc *repository.LocalKYCStore,
+	media *repository.LocalMediaStore,
 	stripeClient stripe.Client,
 	cfg Config,
 ) UseCases {
@@ -151,6 +153,10 @@ func NewUseCases(
 			Messages: repos.Messages,
 			Activity: repos.Activity,
 			Audit:    repos.Audit,
+		},
+		Media: &usecase.MediaUseCase{
+			Store:        media,
+			APIPublicURL: cfg.APIPublicURL,
 		},
 	}
 }
