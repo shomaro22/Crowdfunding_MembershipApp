@@ -24,6 +24,7 @@ type UseCases struct {
 	Message     *usecase.MessageUseCase
 	WSToken     *usecase.WSTokenUseCase
 	Operations  *usecase.OperationsUseCase
+	Favorite    *usecase.FavoriteUseCase
 }
 
 func NewUseCases(
@@ -136,6 +137,11 @@ func NewUseCases(
 			Runs:     repos.Batch,
 			Users:    repos.Users,
 			Batch:    batchUC,
+		},
+		Favorite: &usecase.FavoriteUseCase{
+			Favorites: repos.Favorites,
+			Projects:  projectUC,
+			Activity:  repos.Activity,
 		},
 	}
 }
