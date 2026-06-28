@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"crowdfund-app/entity"
+	"crowdfund-app/repository"
 	"crowdfund-app/usecase"
 
 	"github.com/google/uuid"
@@ -17,6 +18,10 @@ type stubActivityRepo struct {
 func (s *stubActivityRepo) Create(_ context.Context, row *entity.ActivityLog) error {
 	s.last = row
 	return nil
+}
+
+func (s *stubActivityRepo) List(_ context.Context, _ repository.ActivityListFilter) ([]entity.ActivityLog, int64, error) {
+	return nil, 0, nil
 }
 
 func TestLogRateLimitDenied(t *testing.T) {
