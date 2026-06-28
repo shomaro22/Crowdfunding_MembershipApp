@@ -93,6 +93,8 @@ func MapHTTP(err error) (int, Body) {
 		return http.StatusUnsupportedMediaType, Payload("UNSUPPORTED_MEDIA", "unsupported media type")
 	case errors.Is(err, usecase.ErrFileTooLarge):
 		return http.StatusRequestEntityTooLarge, Payload("FILE_TOO_LARGE", "file too large")
+	case errors.Is(err, usecase.ErrBatchJobFailed):
+		return http.StatusUnprocessableEntity, Payload("BATCH_JOB_FAILED", "batch job failed")
 	default:
 		return http.StatusInternalServerError, Payload("INTERNAL_ERROR", "internal error")
 	}

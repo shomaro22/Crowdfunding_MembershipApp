@@ -71,7 +71,10 @@ func (b *BatchUseCase) Run(ctx context.Context, jobName, triggeredBy string, dry
 	if err = b.Runs.Update(ctx, run); err != nil {
 		return BatchRunViewFrom(run), err
 	}
-	return BatchRunViewFrom(run), runErr
+	if runErr != nil {
+		return BatchRunViewFrom(run), ErrBatchJobFailed
+	}
+	return BatchRunViewFrom(run), nil
 }
 
 func (b *BatchUseCase) runPurgeTokens(ctx context.Context, dryRun bool) (processed, failed int, err error) {
