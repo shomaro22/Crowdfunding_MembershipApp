@@ -11,10 +11,36 @@ import (
 )
 
 const (
+	FavoriteActionAdd    = "add"
+	FavoriteActionRemove = "remove"
 	MaxReportReasonLen     = 500
 	MaxReportDetailLen     = 4000
 	MaxReportResolutionLen = 4000
 )
+
+type FavoriteToggleInput struct {
+	ProjectID uuid.UUID
+	Action    string
+}
+
+func ValidateFavoriteToggle(in FavoriteToggleInput) (uuid.UUID, string, error) {
+	var (
+		action string
+		err    error
+	)
+	action = strings.TrimSpace(in.Action)
+	err = validation.ValidateStruct(&in,
+		validation.Field(&in.ProjectID, validation.Required),
+	)
+	if err != nil {
+		return uuid.Nil, "", err
+	}
+	err = validation.Validate(action, validation.Required, validation.In(FavoriteActionAdd, FavoriteActionRemove))
+	if err != nil {
+		return uuid.Nil, "", err
+	}
+	return in.ProjectID, action, nil
+}
 
 type CreateReportInput struct {
 	TargetType string

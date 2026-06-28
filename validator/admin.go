@@ -5,6 +5,7 @@ import (
 
 	"crowdfund-app/entity"
 
+	"github.com/google/uuid"
 	validation "github.com/go-ozzo/ozzo-validation/v4"
 )
 
@@ -30,13 +31,13 @@ type AdminUpdateUserInput struct {
 }
 
 type AdminUpdateUserNormalized struct {
-	Email         *string
-	Name          *string
-	NameSet       bool
-	Role          *entity.UserRole
-	RoleSet       bool
-	IsActive      *bool
-	IsActiveSet   bool
+	Email       *string
+	Name        *string
+	NameSet     bool
+	Role        *entity.UserRole
+	RoleSet     bool
+	IsActive    *bool
+	IsActiveSet bool
 }
 
 type AdminPurchaseListInput struct {
@@ -53,7 +54,7 @@ type AdminPurchaseListNormalized struct {
 
 func ValidateAdminUserList(in AdminUserListInput) (AdminUserListNormalized, error) {
 	var (
-		out AdminUserListNormalized
+		out  AdminUserListNormalized
 		role entity.UserRole
 		err  error
 	)
@@ -147,4 +148,29 @@ func ValidateAdminPurchaseStatus(status string) (entity.PurchaseStatus, error) {
 	default:
 		return "", entity.ErrBadPurchase
 	}
+}
+
+type SellerSupporterListInput struct {
+	ProjectID *uuid.UUID
+	Limit     int
+	Offset    int
+}
+
+type SellerSupporterListNormalized struct {
+	ProjectID *uuid.UUID
+	Limit     int
+	Offset    int
+}
+
+func ValidateSellerSupporterList(in SellerSupporterListInput) (SellerSupporterListNormalized, error) {
+	var (
+		out SellerSupporterListNormalized
+		err error
+	)
+	out.Limit, out.Offset, err = Paginate(in.Limit, in.Offset)
+	if err != nil {
+		return SellerSupporterListNormalized{}, err
+	}
+	out.ProjectID = in.ProjectID
+	return out, nil
 }
