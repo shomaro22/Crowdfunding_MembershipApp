@@ -27,6 +27,7 @@ type UseCases struct {
 	Favorite    *usecase.FavoriteUseCase
 	Report      *usecase.ReportUseCase
 	Media       *usecase.MediaUseCase
+	Seller      *usecase.SellerUseCase
 }
 
 func NewUseCases(
@@ -157,6 +158,11 @@ func NewUseCases(
 		Media: &usecase.MediaUseCase{
 			Store:        media,
 			APIPublicURL: cfg.APIPublicURL,
+		},
+		Seller: &usecase.SellerUseCase{
+			Projects:   repos.Projects,
+			Seller:     repos.Seller,
+			Supporters: supportUC,
 		},
 	}
 }
