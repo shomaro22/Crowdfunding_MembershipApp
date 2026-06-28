@@ -1,6 +1,7 @@
 package controller
 
 import (
+	"errors"
 	"net/http"
 	"strconv"
 	"strings"
@@ -86,7 +87,10 @@ func (h *AdminOperationsController) RunBatch(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusBadRequest, apiError("invalid dry_run", "BAD_REQUEST"))
 	}
 	run, err = h.Operations.RunBatch(c.Request().Context(), adminID, jobName, dryRun)
-	if run == nil {
+	if err != nil {
+		if run != nil && errors.Is(err, usecase.ErrBatchJobFailed) {
+			return c.JSON(http.StatusUnprocessableEntity, BatchJobRunWireFrom(*run))
+		}
 		return mapUseCaseError(err)
 	}
 	return c.JSON(http.StatusOK, BatchJobRunWireFrom(*run))

@@ -7,6 +7,7 @@ import (
 
 	"crowdfund-app/entity"
 	"crowdfund-app/repository"
+	"crowdfund-app/validator"
 
 	"github.com/google/uuid"
 	"gorm.io/gorm"
@@ -79,7 +80,7 @@ func buildProjectImages(ins []ImageIn, legacyURL *string, now time.Time) ([]enti
 		url = strings.TrimSpace(*legacyURL)
 		inputs = []entity.ImageInput{{ImageURL: url, IsMain: true, Order: 0}}
 	}
-	if err = entity.ValidateProjectImages(inputs); err != nil {
+	if err = validator.ValidateProjectImages(inputs); err != nil {
 		return nil, nil, mapProjectEntityErr(err)
 	}
 	if len(inputs) == 0 {

@@ -14,6 +14,7 @@ type App struct {
 	RDB        *redis.Client
 	Repos      Repositories
 	RedisRepos RedisRepositories
+	Media      *repository.LocalMediaStore
 	KYC        *repository.LocalKYCStore
 	Stripe     stripe.Client
 	Hub        *wshub.ConnectionManager
@@ -29,6 +30,7 @@ func OpenApp(opts *Options) (*App, error) {
 		repos      Repositories
 		redisRepos RedisRepositories
 		kyc        *repository.LocalKYCStore
+		media      *repository.LocalMediaStore
 		stripeClient stripe.Client
 		hub        *wshub.ConnectionManager
 		useCases   UseCases
@@ -47,15 +49,17 @@ func OpenApp(opts *Options) (*App, error) {
 	repos = NewRepositories(gormDB)
 	redisRepos = NewRedisRepositories(rdb)
 	kyc = repository.NewLocalKYC(cfg.PrivateRoot)
+	media = repository.NewLocalMedia(cfg.PublicRoot)
 	stripeClient = stripeClientFrom(opts)
 	hub = wshub.NewConnectionManager()
-	useCases = NewUseCases(gormDB, repos, redisRepos, kyc, stripeClient, cfg)
+	useCases = NewUseCases(gormDB, repos, redisRepos, kyc, media, stripeClient, cfg)
 	app = &App{
 		DB:         gormDB,
 		RDB:        rdb,
 		Repos:      repos,
 		RedisRepos: redisRepos,
 		KYC:        kyc,
+		Media:      media,
 		Stripe:     stripeClient,
 		Hub:        hub,
 		UseCases:   useCases,

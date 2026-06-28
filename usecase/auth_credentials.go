@@ -8,6 +8,7 @@ import (
 	"crowdfund-app/auth"
 	"crowdfund-app/entity"
 	"crowdfund-app/repository"
+	"crowdfund-app/validator"
 
 	"github.com/google/uuid"
 )
@@ -24,7 +25,7 @@ func (a *AuthUseCase) RegisterBuyer(ctx context.Context, email, password string,
 		u           *entity.User
 	)
 
-	normalized, err = entity.ValidateBuyerReg(email, password)
+	normalized, err = validator.ValidateBuyerReg(email, password)
 	if err != nil {
 		return UserView{}, mapBuyerRegEntityErr(err)
 	}
@@ -71,7 +72,7 @@ func (a *AuthUseCase) EmailFree(ctx context.Context, email string) (bool, error)
 		exists     bool
 	)
 
-	normalized, err = entity.ValidateEmail(email)
+	normalized, err = validator.ValidateEmail(email)
 	if err != nil {
 		return false, ErrInvalidEmail
 	}
