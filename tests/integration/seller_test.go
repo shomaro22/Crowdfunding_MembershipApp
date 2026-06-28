@@ -1,6 +1,6 @@
 //go:build integration
 
-package main
+package integration
 
 import (
 	"encoding/json"
@@ -26,11 +26,11 @@ func TestSellerDashboardForbiddenForBuyer(t *testing.T) {
 		tok   string
 		rec   *httptest.ResponseRecorder
 	)
-	e = setupSecurityApp(t)
-	gdb = openSecurityDB(t)
-	buyer = seedSecurityUser(t, gdb, seedOpts{Role: entity.UserRoleBuyer})
-	tok, _ = issueSecurityToken(buyer, true)
-	rec = securityGET(e, "/seller/dashboard/stats", tok)
+	e = setupApp(t)
+	gdb = openDB(t)
+	buyer = seedUser(t, gdb, seedOpts{Role: entity.UserRoleBuyer})
+	tok, _ = issueToken(buyer, true)
+	rec = httpGET(e, "/seller/dashboard/stats", tok)
 	if rec.Code != http.StatusForbidden {
 		t.Fatalf("status=%d want 403", rec.Code)
 	}
@@ -45,12 +45,12 @@ func TestSellerDashboardStatsAndSupporters(t *testing.T) {
 		rec       *httptest.ResponseRecorder
 		body      map[string]any
 	)
-	e = setupSecurityApp(t)
-	gdb = openSecurityDB(t)
+	e = setupApp(t)
+	gdb = openDB(t)
 	fx = seedSellerFixture(t, gdb)
-	tok, _ = issueSecurityToken(fx.seller, true)
+	tok, _ = issueToken(fx.seller, true)
 
-	rec = securityGET(e, "/seller/dashboard/stats", tok)
+	rec = httpGET(e, "/seller/dashboard/stats", tok)
 	if rec.Code != http.StatusOK {
 		t.Fatalf("stats status=%d body=%s", rec.Code, rec.Body.String())
 	}
@@ -67,7 +67,7 @@ func TestSellerDashboardStatsAndSupporters(t *testing.T) {
 		t.Fatalf("total_revenue=%v", body["total_revenue"])
 	}
 
-	rec = securityGET(e, fmt.Sprintf("/seller/supporters?project_id=%s", fx.project.ID), tok)
+	rec = httpGET(e, fmt.Sprintf("/seller/supporters?project_id=%s", fx.project.ID), tok)
 	if rec.Code != http.StatusOK {
 		t.Fatalf("list status=%d body=%s", rec.Code, rec.Body.String())
 	}
@@ -80,7 +80,7 @@ func TestSellerDashboardStatsAndSupporters(t *testing.T) {
 		t.Fatalf("supporters len=%d want 1", len(supporters))
 	}
 
-	rec = securityGET(e, "/seller/supporters/export", tok)
+	rec = httpGET(e, "/seller/supporters/export", tok)
 	if rec.Code != http.StatusOK {
 		t.Fatalf("export status=%d body=%s", rec.Code, rec.Body.String())
 	}
@@ -91,7 +91,7 @@ func TestSellerDashboardStatsAndSupporters(t *testing.T) {
 		t.Fatalf("csv missing buyer id: %s", rec.Body.String())
 	}
 
-	rec = securityGET(e, "/seller/projects/analysis", tok)
+	rec = httpGET(e, "/seller/projects/analysis", tok)
 	if rec.Code != http.StatusOK {
 		t.Fatalf("analysis status=%d body=%s", rec.Code, rec.Body.String())
 	}
@@ -123,9 +123,9 @@ func seedSellerFixture(t *testing.T, gdb *gorm.DB) sellerFixture {
 	)
 	t.Helper()
 	now = time.Now().UTC()
-	seller = seedSecurityUser(t, gdb, seedOpts{Role: entity.UserRoleSeller, TOTPEnabled: true})
-	buyer = seedSecurityUser(t, gdb, seedOpts{Role: entity.UserRoleBuyer})
-	project = seedSecurityProject(t, gdb, seller.ID, entity.ProjectStatusActive)
+	seller = seedUser(t, gdb, seedOpts{Role: entity.UserRoleSeller, TOTPEnabled: true})
+	buyer = seedUser(t, gdb, seedOpts{Role: entity.UserRoleBuyer})
+	project = seedProject(t, gdb, seller.ID, entity.ProjectStatusActive)
 	err = gdb.Model(project).Updates(map[string]any{"supporter_count": 1}).Error
 	if err != nil {
 		t.Fatal(err)

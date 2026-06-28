@@ -1,6 +1,6 @@
 //go:build integration
 
-package main
+package integration
 
 import (
 	"bytes"
@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
-	"os"
 	"testing"
 	"time"
 
@@ -29,33 +28,6 @@ type paymentFixture struct {
 	plan    *entity.ProjectPlan
 }
 
-func setupPaymentApp(t *testing.T) (*echo.Echo, *stripe.StubClient) {
-	var (
-		e    *echo.Echo
-		stub *stripe.StubClient
-		err  error
-	)
-	t.Helper()
-	if integrationGDB == nil {
-		t.Skip("DATABASE_URL が未設定のためスキップ")
-	}
-	stub = stripe.NewStubClient()
-	_ = os.Setenv("JWT_SECRET", securityTestJWTSecret)
-	e, _, err = buildApp(integrationAppOptions(stub))
-	if err != nil {
-		t.Fatalf("buildApp: %v", err)
-	}
-	return e, stub
-}
-
-func dbOpenPaymentTest(t *testing.T) (*gorm.DB, error) {
-	t.Helper()
-	if integrationGDB == nil {
-		return nil, fmt.Errorf("DATABASE_URL が未設定")
-	}
-	return integrationGDB, nil
-}
-
 func seedPaymentFixture(t *testing.T, gdb *gorm.DB) paymentFixture {
 	var (
 		now    time.Time
@@ -68,12 +40,12 @@ func seedPaymentFixture(t *testing.T, gdb *gorm.DB) paymentFixture {
 	)
 	t.Helper()
 	now = time.Now().UTC()
-	seller = seedSecurityUser(t, gdb, seedOpts{
+	seller = seedUser(t, gdb, seedOpts{
 		Role:        entity.UserRoleSeller,
 		TOTPEnabled: true,
 	})
-	buyer = seedSecurityUser(t, gdb, seedOpts{Role: entity.UserRoleBuyer})
-	project = seedSecurityProject(t, gdb, seller.ID, entity.ProjectStatusActive)
+	buyer = seedUser(t, gdb, seedOpts{Role: entity.UserRoleBuyer})
+	project = seedProject(t, gdb, seller.ID, entity.ProjectStatusActive)
 	plan = &entity.ProjectPlan{
 		ID:             uuid.New(),
 		ProjectID:      project.ID,
@@ -119,10 +91,10 @@ func TestPaymentKonbiniCheckoutAsyncWebhook(t *testing.T) {
 		err       error
 	)
 	e, stub = setupPaymentApp(t)
-	gdb = openSecurityDB(t)
+	gdb = openDB(t)
 	fx = seedPaymentFixture(t, gdb)
-	tok, _ = issueSecurityToken(fx.buyer, true)
-	rec = securityPOST(e, "/payments/checkout", tok, fmt.Sprintf(
+	tok, _ = issueToken(fx.buyer, true)
+	rec = httpPOST(e, "/payments/checkout", tok, fmt.Sprintf(
 		`{"project_id":%q,"plan_id":%q,"payment_method":"KONBINI"}`,
 		fx.project.ID, fx.plan.ID,
 	))
@@ -176,10 +148,10 @@ func TestPaymentAutoIntentWebhook(t *testing.T) {
 		err       error
 	)
 	e, stub = setupPaymentApp(t)
-	gdb = openSecurityDB(t)
+	gdb = openDB(t)
 	fx = seedPaymentFixture(t, gdb)
-	tok, _ = issueSecurityToken(fx.buyer, true)
-	rec = securityPOST(e, "/payments/intent", tok, fmt.Sprintf(
+	tok, _ = issueToken(fx.buyer, true)
+	rec = httpPOST(e, "/payments/intent", tok, fmt.Sprintf(
 		`{"project_id":%q,"plan_id":%q}`,
 		fx.project.ID, fx.plan.ID,
 	))
@@ -221,10 +193,10 @@ func TestPaymentVerifyCheckoutFallback(t *testing.T) {
 		err       error
 	)
 	e, stub = setupPaymentApp(t)
-	gdb = openSecurityDB(t)
+	gdb = openDB(t)
 	fx = seedPaymentFixture(t, gdb)
-	tok, _ = issueSecurityToken(fx.buyer, true)
-	rec = securityPOST(e, "/payments/checkout", tok, fmt.Sprintf(
+	tok, _ = issueToken(fx.buyer, true)
+	rec = httpPOST(e, "/payments/checkout", tok, fmt.Sprintf(
 		`{"project_id":%q,"plan_id":%q,"payment_method":"KONBINI"}`,
 		fx.project.ID, fx.plan.ID,
 	))
@@ -233,7 +205,7 @@ func TestPaymentVerifyCheckoutFallback(t *testing.T) {
 	}
 	sessionID = jsonStringField(t, rec, "session_id")
 	stub.SetSessionPaid(sessionID)
-	rec = securityPOST(e, "/payments/verify/checkout", tok, fmt.Sprintf(`{"session_id":%q}`, sessionID))
+	rec = httpPOST(e, "/payments/verify/checkout", tok, fmt.Sprintf(`{"session_id":%q}`, sessionID))
 	if rec.Code != http.StatusOK {
 		t.Fatalf("verify status=%d body=%s", rec.Code, rec.Body.String())
 	}
@@ -261,10 +233,10 @@ func TestPaymentWebhookIdempotent(t *testing.T) {
 		err       error
 	)
 	e, stub = setupPaymentApp(t)
-	gdb = openSecurityDB(t)
+	gdb = openDB(t)
 	fx = seedPaymentFixture(t, gdb)
-	tok, _ = issueSecurityToken(fx.buyer, true)
-	rec = securityPOST(e, "/payments/checkout", tok, fmt.Sprintf(
+	tok, _ = issueToken(fx.buyer, true)
+	rec = httpPOST(e, "/payments/checkout", tok, fmt.Sprintf(
 		`{"project_id":%q,"plan_id":%q,"payment_method":"KONBINI"}`,
 		fx.project.ID, fx.plan.ID,
 	))
@@ -306,10 +278,10 @@ func TestPaymentKonbiniCheckoutExpired(t *testing.T) {
 		err       error
 	)
 	e, _ = setupPaymentApp(t)
-	gdb = openSecurityDB(t)
+	gdb = openDB(t)
 	fx = seedPaymentFixture(t, gdb)
-	tok, _ = issueSecurityToken(fx.buyer, true)
-	rec = securityPOST(e, "/payments/checkout", tok, fmt.Sprintf(
+	tok, _ = issueToken(fx.buyer, true)
+	rec = httpPOST(e, "/payments/checkout", tok, fmt.Sprintf(
 		`{"project_id":%q,"plan_id":%q,"payment_method":"KONBINI"}`,
 		fx.project.ID, fx.plan.ID,
 	))
@@ -345,7 +317,7 @@ func TestPaymentAlreadySupportingConflict(t *testing.T) {
 		err  error
 	)
 	e, _ = setupPaymentApp(t)
-	gdb = openSecurityDB(t)
+	gdb = openDB(t)
 	fx = seedPaymentFixture(t, gdb)
 	now = time.Now().UTC()
 	err = gdb.Create(&entity.ProjectSupporter{
@@ -363,8 +335,8 @@ func TestPaymentAlreadySupportingConflict(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	tok, _ = issueSecurityToken(fx.buyer, true)
-	rec = securityPOST(e, "/payments/intent", tok, fmt.Sprintf(
+	tok, _ = issueToken(fx.buyer, true)
+	rec = httpPOST(e, "/payments/intent", tok, fmt.Sprintf(
 		`{"project_id":%q,"plan_id":%q}`,
 		fx.project.ID, fx.plan.ID,
 	))
