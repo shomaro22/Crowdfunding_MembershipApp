@@ -1,6 +1,6 @@
 //go:build integration
 
-package main
+package integration
 
 import (
 	"encoding/json"
@@ -22,8 +22,8 @@ func TestOperationsNoAuthReturns401(t *testing.T) {
 		e   *echo.Echo
 		rec *httptest.ResponseRecorder
 	)
-	e = setupSecurityApp(t)
-	rec = securityGET(e, "/admin/activity", "")
+	e = setupApp(t)
+	rec = httpGET(e, "/admin/activity", "")
 	if rec.Code != http.StatusUnauthorized {
 		t.Fatalf("status=%d want 401", rec.Code)
 	}
@@ -37,11 +37,11 @@ func TestOperationsBuyerCannotAccessActivity(t *testing.T) {
 		tok string
 		rec *httptest.ResponseRecorder
 	)
-	e = setupSecurityApp(t)
-	gdb = openSecurityDB(t)
-	u = seedSecurityUser(t, gdb, seedOpts{Role: entity.UserRoleBuyer})
-	tok, _ = issueSecurityToken(u, true)
-	rec = securityGET(e, "/admin/activity", tok)
+	e = setupApp(t)
+	gdb = openDB(t)
+	u = seedUser(t, gdb, seedOpts{Role: entity.UserRoleBuyer})
+	tok, _ = issueToken(u, true)
+	rec = httpGET(e, "/admin/activity", tok)
 	if rec.Code != http.StatusForbidden {
 		t.Fatalf("status=%d want 403", rec.Code)
 	}
@@ -56,16 +56,16 @@ func TestOperationsRequires2FA(t *testing.T) {
 		role entity.AdminRole
 		rec  *httptest.ResponseRecorder
 	)
-	e = setupSecurityApp(t)
-	gdb = openSecurityDB(t)
+	e = setupApp(t)
+	gdb = openDB(t)
 	role = entity.AdminRoleSuperAdmin
-	u = seedSecurityUser(t, gdb, seedOpts{
+	u = seedUser(t, gdb, seedOpts{
 		Role:        entity.UserRoleAdmin,
 		AdminRole:   &role,
 		TOTPEnabled: true,
 	})
-	tok, _ = issueSecurityToken(u, false)
-	rec = securityGET(e, "/admin/activity", tok)
+	tok, _ = issueToken(u, false)
+	rec = httpGET(e, "/admin/activity", tok)
 	if rec.Code != http.StatusForbidden {
 		t.Fatalf("status=%d want 403", rec.Code)
 	}
@@ -82,8 +82,8 @@ func TestOperationsSuperAdminCanAccessAll(t *testing.T) {
 		path string
 		rec  *httptest.ResponseRecorder
 	)
-	e = setupSecurityApp(t)
-	gdb = openSecurityDB(t)
+	e = setupApp(t)
+	gdb = openDB(t)
 	tok = issueAdminToken(t, gdb, entity.AdminRoleSuperAdmin)
 
 	for _, path = range []string{
@@ -92,13 +92,13 @@ func TestOperationsSuperAdminCanAccessAll(t *testing.T) {
 		"/admin/batches",
 		"/admin/audit-logs",
 	} {
-		rec = securityGET(e, path, tok)
+		rec = httpGET(e, path, tok)
 		if rec.Code != http.StatusOK {
 			t.Fatalf("GET %s status=%d want 200 body=%s", path, rec.Code, rec.Body.String())
 		}
 	}
 
-	rec = securityPOST(e, "/admin/batches/purge_tokens/run?dry_run=true", tok, "")
+	rec = httpPOST(e, "/admin/batches/purge_tokens/run?dry_run=true", tok, "")
 	if rec.Code != http.StatusOK {
 		t.Fatalf("POST batch run status=%d want 200 body=%s", rec.Code, rec.Body.String())
 	}
@@ -111,25 +111,25 @@ func TestOperationsFinanceAdminRBAC(t *testing.T) {
 		tok  string
 		rec  *httptest.ResponseRecorder
 	)
-	e = setupSecurityApp(t)
-	gdb = openSecurityDB(t)
+	e = setupApp(t)
+	gdb = openDB(t)
 	tok = issueAdminToken(t, gdb, entity.AdminRoleFinanceAdmin)
 
 	for _, path := range []string{"/admin/activity", "/admin/batches"} {
-		rec = securityGET(e, path, tok)
+		rec = httpGET(e, path, tok)
 		if rec.Code != http.StatusOK {
 			t.Fatalf("GET %s status=%d want 200", path, rec.Code)
 		}
 	}
 
 	for _, path := range []string{"/admin/security", "/admin/audit-logs"} {
-		rec = securityGET(e, path, tok)
+		rec = httpGET(e, path, tok)
 		if rec.Code != http.StatusForbidden {
 			t.Fatalf("GET %s status=%d want 403", path, rec.Code)
 		}
 	}
 
-	rec = securityPOST(e, "/admin/batches/purge_tokens/run?dry_run=true", tok, "")
+	rec = httpPOST(e, "/admin/batches/purge_tokens/run?dry_run=true", tok, "")
 	if rec.Code != http.StatusForbidden {
 		t.Fatalf("POST batch run status=%d want 403", rec.Code)
 	}
@@ -142,25 +142,25 @@ func TestOperationsSupportAdminRBAC(t *testing.T) {
 		tok string
 		rec *httptest.ResponseRecorder
 	)
-	e = setupSecurityApp(t)
-	gdb = openSecurityDB(t)
+	e = setupApp(t)
+	gdb = openDB(t)
 	tok = issueAdminToken(t, gdb, entity.AdminRoleSupportAdmin)
 
 	for _, path := range []string{"/admin/activity", "/admin/security"} {
-		rec = securityGET(e, path, tok)
+		rec = httpGET(e, path, tok)
 		if rec.Code != http.StatusOK {
 			t.Fatalf("GET %s status=%d want 200", path, rec.Code)
 		}
 	}
 
 	for _, path := range []string{"/admin/batches", "/admin/audit-logs"} {
-		rec = securityGET(e, path, tok)
+		rec = httpGET(e, path, tok)
 		if rec.Code != http.StatusForbidden {
 			t.Fatalf("GET %s status=%d want 403", path, rec.Code)
 		}
 	}
 
-	rec = securityPOST(e, "/admin/batches/purge_tokens/run?dry_run=true", tok, "")
+	rec = httpPOST(e, "/admin/batches/purge_tokens/run?dry_run=true", tok, "")
 	if rec.Code != http.StatusForbidden {
 		t.Fatalf("POST batch run status=%d want 403", rec.Code)
 	}
@@ -174,8 +174,8 @@ func TestOperationsReviewAdminDenied(t *testing.T) {
 		path string
 		rec  *httptest.ResponseRecorder
 	)
-	e = setupSecurityApp(t)
-	gdb = openSecurityDB(t)
+	e = setupApp(t)
+	gdb = openDB(t)
 	tok = issueAdminToken(t, gdb, entity.AdminRoleReviewAdmin)
 
 	for _, path = range []string{
@@ -184,7 +184,7 @@ func TestOperationsReviewAdminDenied(t *testing.T) {
 		"/admin/batches",
 		"/admin/audit-logs",
 	} {
-		rec = securityGET(e, path, tok)
+		rec = httpGET(e, path, tok)
 		if rec.Code != http.StatusForbidden {
 			t.Fatalf("GET %s status=%d want 403", path, rec.Code)
 		}
@@ -200,12 +200,12 @@ func TestOperationsListActivityReturnsSeededLog(t *testing.T) {
 		rec    *httptest.ResponseRecorder
 		body   string
 	)
-	e = setupSecurityApp(t)
-	gdb = openSecurityDB(t)
+	e = setupApp(t)
+	gdb = openDB(t)
 	tok = issueAdminToken(t, gdb, entity.AdminRoleSuperAdmin)
 	logID = seedOpsActivityLog(t, gdb, entity.UserLoginFail, strPtr("203.0.113.55"), time.Now().UTC())
 
-	rec = securityGET(e, "/admin/activity?action=user.login_failed&limit=50", tok)
+	rec = httpGET(e, "/admin/activity?action=user.login_failed&limit=50", tok)
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status=%d want 200", rec.Code)
 	}
@@ -224,14 +224,14 @@ func TestOperationsSecurityEventsCounts(t *testing.T) {
 		m     map[string]any
 		now   time.Time
 	)
-	e = setupSecurityApp(t)
-	gdb = openSecurityDB(t)
+	e = setupApp(t)
+	gdb = openDB(t)
 	tok = issueAdminToken(t, gdb, entity.AdminRoleSupportAdmin)
 	now = time.Now().UTC()
 	seedOpsActivityLog(t, gdb, entity.UserLoginFail, strPtr("203.0.113.1"), now)
 	seedOpsActivityLog(t, gdb, entity.SecRateLimit, strPtr("203.0.113.2"), now)
 
-	rec = securityGET(e, "/admin/security", tok)
+	rec = httpGET(e, "/admin/security", tok)
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status=%d want 200", rec.Code)
 	}
@@ -256,17 +256,17 @@ func TestOperationsSuperAdminListAuditLogs(t *testing.T) {
 		rec     *httptest.ResponseRecorder
 		body    string
 	)
-	e = setupSecurityApp(t)
-	gdb = openSecurityDB(t)
-	admin = seedSecurityUser(t, gdb, seedOpts{
+	e = setupApp(t)
+	gdb = openDB(t)
+	admin = seedUser(t, gdb, seedOpts{
 		Role:        entity.UserRoleAdmin,
 		AdminRole:   adminRolePtr(entity.AdminRoleSuperAdmin),
 		TOTPEnabled: true,
 	})
-	tok, _ = issueSecurityToken(admin, true)
+	tok, _ = issueToken(admin, true)
 	auditID = seedOpsAuditLog(t, gdb, admin.ID, "batch.manual_run")
 
-	rec = securityGET(e, "/admin/audit-logs?action=batch.manual_run", tok)
+	rec = httpGET(e, "/admin/audit-logs?action=batch.manual_run", tok)
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status=%d want 200", rec.Code)
 	}
@@ -283,33 +283,14 @@ func TestOperationsRunBatchInvalidJob(t *testing.T) {
 		tok string
 		rec *httptest.ResponseRecorder
 	)
-	e = setupSecurityApp(t)
-	gdb = openSecurityDB(t)
+	e = setupApp(t)
+	gdb = openDB(t)
 	tok = issueAdminToken(t, gdb, entity.AdminRoleSuperAdmin)
 
-	rec = securityPOST(e, "/admin/batches/not_a_job/run?dry_run=true", tok, "")
+	rec = httpPOST(e, "/admin/batches/not_a_job/run?dry_run=true", tok, "")
 	if rec.Code != http.StatusBadRequest {
 		t.Fatalf("status=%d want 400 body=%s", rec.Code, rec.Body.String())
 	}
-}
-
-func issueAdminToken(t *testing.T, gdb *gorm.DB, role entity.AdminRole) string {
-	var (
-		u   *entity.User
-		tok string
-		err error
-	)
-	t.Helper()
-	u = seedSecurityUser(t, gdb, seedOpts{
-		Role:        entity.UserRoleAdmin,
-		AdminRole:   &role,
-		TOTPEnabled: true,
-	})
-	tok, err = issueSecurityToken(u, true)
-	if err != nil {
-		t.Fatal(err)
-	}
-	return tok
 }
 
 func seedOpsActivityLog(t *testing.T, gdb *gorm.DB, action entity.ActivityAction, ip *string, at time.Time) uuid.UUID {

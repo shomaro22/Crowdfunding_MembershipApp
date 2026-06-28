@@ -1,6 +1,6 @@
 //go:build integration
 
-package main
+package integration
 
 import (
 	"encoding/json"
@@ -24,16 +24,16 @@ func TestAdminCatalogFinanceRBAC(t *testing.T) {
 		tok string
 		rec *httptest.ResponseRecorder
 	)
-	e = setupSecurityApp(t)
-	gdb = openSecurityDB(t)
+	e = setupApp(t)
+	gdb = openDB(t)
 	tok = issueAdminToken(t, gdb, entity.AdminRoleFinanceAdmin)
 
-	rec = securityGET(e, "/admin/purchases", tok)
+	rec = httpGET(e, "/admin/purchases", tok)
 	if rec.Code != http.StatusOK {
 		t.Fatalf("purchases status=%d want 200", rec.Code)
 	}
 
-	rec = securityGET(e, "/admin/stats", tok)
+	rec = httpGET(e, "/admin/stats", tok)
 	if rec.Code != http.StatusForbidden {
 		t.Fatalf("stats status=%d want 403", rec.Code)
 	}
@@ -49,22 +49,22 @@ func TestAdminCatalogSupportUserManagement(t *testing.T) {
 		body  map[string]any
 		name  = "Updated Name"
 	)
-	e = setupSecurityApp(t)
-	gdb = openSecurityDB(t)
-	buyer = seedSecurityUser(t, gdb, seedOpts{Role: entity.UserRoleBuyer})
+	e = setupApp(t)
+	gdb = openDB(t)
+	buyer = seedUser(t, gdb, seedOpts{Role: entity.UserRoleBuyer})
 	tok = issueAdminToken(t, gdb, entity.AdminRoleSupportAdmin)
 
-	rec = securityGET(e, "/admin/stats", tok)
+	rec = httpGET(e, "/admin/stats", tok)
 	if rec.Code != http.StatusOK {
 		t.Fatalf("stats status=%d body=%s", rec.Code, rec.Body.String())
 	}
 
-	rec = securityGET(e, "/admin/users?role=BUYER", tok)
+	rec = httpGET(e, "/admin/users?role=BUYER", tok)
 	if rec.Code != http.StatusOK {
 		t.Fatalf("users status=%d body=%s", rec.Code, rec.Body.String())
 	}
 
-	rec = securityPUT(e, fmt.Sprintf("/admin/users/%s", buyer.ID), tok, fmt.Sprintf(`{"name":%q}`, name))
+	rec = httpPUT(e, fmt.Sprintf("/admin/users/%s", buyer.ID), tok, fmt.Sprintf(`{"name":%q}`, name))
 	if rec.Code != http.StatusOK {
 		t.Fatalf("update status=%d body=%s", rec.Code, rec.Body.String())
 	}
@@ -76,7 +76,7 @@ func TestAdminCatalogSupportUserManagement(t *testing.T) {
 		t.Fatalf("name=%v want %q", body["name"], name)
 	}
 
-	rec = securityGET(e, "/admin/purchases", tok)
+	rec = httpGET(e, "/admin/purchases", tok)
 	if rec.Code != http.StatusForbidden {
 		t.Fatalf("purchases status=%d want 403", rec.Code)
 	}
@@ -95,13 +95,13 @@ func TestAdminCatalogPatchPurchase(t *testing.T) {
 		body     map[string]any
 		now      time.Time
 	)
-	e = setupSecurityApp(t)
-	gdb = openSecurityDB(t)
+	e = setupApp(t)
+	gdb = openDB(t)
 	now = time.Now().UTC()
 	tok = issueAdminToken(t, gdb, entity.AdminRoleSuperAdmin)
-	seller = seedSecurityUser(t, gdb, seedOpts{Role: entity.UserRoleSeller})
-	buyer = seedSecurityUser(t, gdb, seedOpts{Role: entity.UserRoleBuyer})
-	project = seedSecurityProject(t, gdb, seller.ID, entity.ProjectStatusActive)
+	seller = seedUser(t, gdb, seedOpts{Role: entity.UserRoleSeller})
+	buyer = seedUser(t, gdb, seedOpts{Role: entity.UserRoleBuyer})
+	project = seedProject(t, gdb, seller.ID, entity.ProjectStatusActive)
 	purchase = &entity.Purchase{
 		ID:            uuid.New(),
 		ProjectID:     project.ID,
@@ -117,7 +117,7 @@ func TestAdminCatalogPatchPurchase(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	rec = securityPATCH(e, fmt.Sprintf("/admin/purchases/%s", purchase.ID), tok, `{"status":"CANCELLED"}`)
+	rec = httpPATCH(e, fmt.Sprintf("/admin/purchases/%s", purchase.ID), tok, `{"status":"CANCELLED"}`)
 	if rec.Code != http.StatusOK {
 		t.Fatalf("patch status=%d body=%s", rec.Code, rec.Body.String())
 	}
