@@ -29,8 +29,8 @@ func Open(databaseURL string) (*gorm.DB, error) {
 	if err != nil {
 		return nil, err
 	}
-	sqlDB.SetMaxIdleConns(5)
-	sqlDB.SetMaxOpenConns(20)
+	sqlDB.SetMaxIdleConns(2)
+	sqlDB.SetMaxOpenConns(5)
 	sqlDB.SetConnMaxLifetime(time.Hour)
 	return gormDB, nil
 }
