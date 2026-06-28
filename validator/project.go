@@ -21,3 +21,7 @@ func ValidateProject(title, description string, targetAmount int64, duration ent
 func ValidateProjectImages(images []entity.ImageInput) error {
 	return entity.ValidateProjectImages(images)
 }
+
+func ValidateMessage(content string) error {
+	return entity.ValidateMessage(content)
+}
