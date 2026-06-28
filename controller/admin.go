@@ -3,7 +3,6 @@ package controller
 import (
 	"net/http"
 	"strconv"
-	"strings"
 
 	"crowdfund-app/usecase"
 
@@ -75,108 +74,31 @@ func (h *AdminController) ChangeAdminRole(c echo.Context) error {
 	return c.JSON(http.StatusOK, map[string]UserWire{"user": UserWireFrom(u)})
 }
 
-func (h *AdminController) ListProjects(c echo.Context) error {
+func (h *AdminController) DashboardStats(c echo.Context) error {
 	var (
-		status *string
-		s      string
-		limit  int
-		offset int
-		rows   []usecase.ProjectView
-		total  int64
-		err    error
+		stats usecase.AdminStatsView
+		items []UserWire
+		i     int
+		err   error
 	)
-	s = c.QueryParam("status")
-	if s != "" {
-		status = &s
-	}
-	limit, _ = strconv.Atoi(c.QueryParam("limit"))
-	offset, _ = strconv.Atoi(c.QueryParam("offset"))
-	rows, total, err = h.Admin.ListProjects(c.Request().Context(), status, limit, offset)
+	stats, err = h.Admin.DashboardStats(c.Request().Context())
 	if err != nil {
 		return mapUseCaseError(err)
 	}
-	return c.JSON(http.StatusOK, listProjectsJSON(rows, total, limit, offset))
+	items = make([]UserWire, 0, len(stats.RecentUsers))
+	for i = range stats.RecentUsers {
+		items = append(items, UserWireFrom(stats.RecentUsers[i]))
+	}
+	return c.JSON(http.StatusOK, adminStatsWire{
+		TotalUsers:     stats.TotalUsers,
+		TotalProjects:  stats.TotalProjects,
+		TotalPurchases: stats.TotalPurchases,
+		TotalRevenue:   stats.TotalRevenue,
+		RecentUsers:    items,
+	})
 }
 
-func (h *AdminController) PatchProject(c echo.Context) error {
-	var (
-		adminID uuid.UUID
-		id      uuid.UUID
-		body    struct {
-			Status string  `json:"status"`
-			Reason *string `json:"reason"`
-		}
-		view *usecase.ProjectView
-		err  error
-	)
-	adminID, err = CurrentUserID(c)
-	if err != nil {
-		return err
-	}
-	id, err = uuid.Parse(c.Param("projectId"))
-	if err != nil {
-		return echo.NewHTTPError(http.StatusBadRequest, apiError("invalid project id", "BAD_REQUEST"))
-	}
-	if err = c.Bind(&body); err != nil || body.Status == "" {
-		return echo.NewHTTPError(http.StatusBadRequest, apiError("status required", "BAD_REQUEST"))
-	}
-	view, err = h.Admin.PatchProject(c.Request().Context(), adminID, id, body.Status, body.Reason)
-	if err != nil {
-		return mapUseCaseError(err)
-	}
-	return c.JSON(http.StatusOK, projectDetailJSON(view))
-}
-
-func (h *AdminController) DeleteProject(c echo.Context) error {
-	var (
-		adminID uuid.UUID
-		id      uuid.UUID
-		err     error
-	)
-	adminID, err = CurrentUserID(c)
-	if err != nil {
-		return err
-	}
-	id, err = uuid.Parse(c.Param("projectId"))
-	if err != nil {
-		return echo.NewHTTPError(http.StatusBadRequest, apiError("invalid project id", "BAD_REQUEST"))
-	}
-	if err = h.Admin.DeleteProject(c.Request().Context(), adminID, id); err != nil {
-		return mapUseCaseError(err)
-	}
-	return c.NoContent(http.StatusNoContent)
-}
-
-func (h *AdminController) PatchDeleteReq(c echo.Context) error {
-	var (
-		adminID uuid.UUID
-		id      uuid.UUID
-		body    struct {
-			Action string  `json:"action"`
-			Reason *string `json:"reason"`
-		}
-		view *usecase.ProjectView
-		err  error
-	)
-	adminID, err = CurrentUserID(c)
-	if err != nil {
-		return err
-	}
-	id, err = uuid.Parse(c.Param("projectId"))
-	if err != nil {
-		return echo.NewHTTPError(http.StatusBadRequest, apiError("invalid project id", "BAD_REQUEST"))
-	}
-	if err = c.Bind(&body); err != nil || body.Action == "" {
-		return echo.NewHTTPError(http.StatusBadRequest, apiError("action required", "BAD_REQUEST"))
-	}
-	view, err = h.Admin.PatchDeleteReq(c.Request().Context(), adminID, id, body.Action, body.Reason)
-	if err != nil {
-		return mapUseCaseError(err)
-	}
-	return c.JSON(http.StatusOK, projectDetailJSON(view))
-}
-
-func (h *AdminController) ListBuyerPending(c echo.Context) error {
+func (h *AdminController) ListUsers(c echo.Context) error {
 	var (
 		limit  int
 		offset int
@@ -188,48 +110,24 @@ func (h *AdminController) ListBuyerPending(c echo.Context) error {
 	)
 	limit, _ = strconv.Atoi(c.QueryParam("limit"))
 	offset, _ = strconv.Atoi(c.QueryParam("offset"))
-	users, total, err = h.Admin.ListBuyerPending(c.Request().Context(), limit, offset)
+	users, total, err = h.Admin.ListUsers(c.Request().Context(), c.QueryParam("role"), c.QueryParam("search"), limit, offset)
 	if err != nil {
 		return mapUseCaseError(err)
 	}
 	items = make([]UserWire, 0, len(users))
-	for i = 0; i < len(users); i++ {
+	for i = range users {
 		items = append(items, UserWireFrom(users[i]))
 	}
 	return c.JSON(http.StatusOK, usersPageJSON{Users: items, Total: total})
 }
 
-func (h *AdminController) ApproveBuyer(c echo.Context) error {
+func (h *AdminController) UpdateUser(c echo.Context) error {
 	var (
 		adminID uuid.UUID
 		userID  uuid.UUID
+		body    adminUpdateUserJSON
 		u       usecase.UserView
 		err     error
-	)
-	adminID, err = CurrentUserID(c)
-	if err != nil {
-		return err
-	}
-	userID, err = uuid.Parse(c.Param("userId"))
-	if err != nil {
-		return echo.NewHTTPError(http.StatusBadRequest, apiError("invalid user id", "BAD_REQUEST"))
-	}
-	u, err = h.Admin.ApproveBuyer(c.Request().Context(), adminID, userID, nil)
-	if err != nil {
-		return mapUseCaseError(err)
-	}
-	return c.JSON(http.StatusOK, UserWireFrom(u))
-}
-
-func (h *AdminController) RejectBuyer(c echo.Context) error {
-	var (
-		adminID uuid.UUID
-		userID  uuid.UUID
-		body    struct {
-			Reason *string `json:"reason"`
-		}
-		u   usecase.UserView
-		err error
 	)
 	adminID, err = CurrentUserID(c)
 	if err != nil {
@@ -242,104 +140,77 @@ func (h *AdminController) RejectBuyer(c echo.Context) error {
 	if err = c.Bind(&body); err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, apiError("invalid request body", "BAD_REQUEST"))
 	}
-	if body.Reason == nil || strings.TrimSpace(*body.Reason) == "" {
-		return echo.NewHTTPError(http.StatusBadRequest, apiError("reason required", "BAD_REQUEST"))
-	}
-	u, err = h.Admin.RejectBuyer(c.Request().Context(), adminID, userID, body.Reason)
+	u, err = h.Admin.UpdateUser(c.Request().Context(), adminID, userID, usecase.AdminUpdateUserIn{
+		Email:    body.Email,
+		Name:     body.Name,
+		Role:     body.Role,
+		IsActive: body.IsActive,
+	})
 	if err != nil {
 		return mapUseCaseError(err)
 	}
 	return c.JSON(http.StatusOK, UserWireFrom(u))
 }
 
-func (h *AdminController) ListSellerRegs(c echo.Context) error {
-	var (
-		status string
-		limit  int
-		offset int
-		regs   []usecase.SellerRegItemView
-		total  int64
-		items  []sellerRegJSON
-		i      int
-		err    error
-	)
-	status = c.QueryParam("status")
-	limit, _ = strconv.Atoi(c.QueryParam("limit"))
-	offset, _ = strconv.Atoi(c.QueryParam("offset"))
-	regs, total, err = h.Admin.ListSellerRegs(c.Request().Context(), status, limit, offset)
-	if err != nil {
-		return mapUseCaseError(err)
-	}
-	items = make([]sellerRegJSON, 0, len(regs))
-	for i = 0; i < len(regs); i++ {
-		items = append(items, sellerRegToJSON(regs[i]))
-	}
-	return c.JSON(http.StatusOK, sellerRegsPageJSON{Registrations: items, Total: total})
-}
-
-func (h *AdminController) GetSellerReg(c echo.Context) error {
-	var (
-		id     uuid.UUID
-		detail *usecase.SellerRegView
-		err    error
-	)
-	id, err = uuid.Parse(c.Param("registrationId"))
-	if err != nil {
-		return echo.NewHTTPError(http.StatusBadRequest, apiError("invalid registration id", "BAD_REQUEST"))
-	}
-	detail, err = h.Admin.GetSellerReg(c.Request().Context(), id)
-	if err != nil {
-		return mapUseCaseError(err)
-	}
-	return c.JSON(http.StatusOK, sellerRegViewToJSON(h.APIPublicURL, detail))
-}
-
-func (h *AdminController) ApproveSellerReg(c echo.Context) error {
+func (h *AdminController) DeleteUser(c echo.Context) error {
 	var (
 		adminID uuid.UUID
-		id      uuid.UUID
-		reg     usecase.SellerRegItemView
+		userID  uuid.UUID
 		err     error
 	)
 	adminID, err = CurrentUserID(c)
 	if err != nil {
 		return err
 	}
-	id, err = uuid.Parse(c.Param("registrationId"))
+	userID, err = uuid.Parse(c.Param("userId"))
 	if err != nil {
-		return echo.NewHTTPError(http.StatusBadRequest, apiError("invalid registration id", "BAD_REQUEST"))
+		return echo.NewHTTPError(http.StatusBadRequest, apiError("invalid user id", "BAD_REQUEST"))
 	}
-	reg, err = h.Admin.ApproveSellerReg(c.Request().Context(), adminID, id)
+	if err = h.Admin.DeleteUser(c.Request().Context(), adminID, userID); err != nil {
+		return mapUseCaseError(err)
+	}
+	return c.NoContent(http.StatusNoContent)
+}
+
+func (h *AdminController) ListPurchases(c echo.Context) error {
+	var (
+		limit  int
+		offset int
+		rows   []usecase.PurchaseView
+		total  int64
+		err    error
+	)
+	limit, _ = strconv.Atoi(c.QueryParam("limit"))
+	offset, _ = strconv.Atoi(c.QueryParam("offset"))
+	rows, total, err = h.Admin.ListPurchases(c.Request().Context(), c.QueryParam("status"), limit, offset)
 	if err != nil {
 		return mapUseCaseError(err)
 	}
-	return c.JSON(http.StatusOK, sellerRegToJSON(reg))
+	return c.JSON(http.StatusOK, listPurchasesJSON(rows, total))
 }
 
-func (h *AdminController) RejectSellerReg(c echo.Context) error {
+func (h *AdminController) PatchPurchase(c echo.Context) error {
 	var (
-		adminID uuid.UUID
-		id      uuid.UUID
-		body    struct {
-			Reason string `json:"reason"`
-		}
-		reg usecase.SellerRegItemView
-		err error
+		adminID    uuid.UUID
+		purchaseID uuid.UUID
+		body       adminPatchPurchaseJSON
+		view       usecase.PurchaseView
+		err        error
 	)
 	adminID, err = CurrentUserID(c)
 	if err != nil {
 		return err
 	}
-	id, err = uuid.Parse(c.Param("registrationId"))
+	purchaseID, err = uuid.Parse(c.Param("purchaseId"))
 	if err != nil {
-		return echo.NewHTTPError(http.StatusBadRequest, apiError("invalid registration id", "BAD_REQUEST"))
+		return echo.NewHTTPError(http.StatusBadRequest, apiError("invalid purchase id", "BAD_REQUEST"))
 	}
-	if err = c.Bind(&body); err != nil || body.Reason == "" {
-		return echo.NewHTTPError(http.StatusBadRequest, apiError("reason required", "BAD_REQUEST"))
+	if err = c.Bind(&body); err != nil || body.Status == "" {
+		return echo.NewHTTPError(http.StatusBadRequest, apiError("status required", "BAD_REQUEST"))
 	}
-	reg, err = h.Admin.RejectSellerReg(c.Request().Context(), adminID, id, body.Reason)
+	view, err = h.Admin.PatchPurchaseStatus(c.Request().Context(), adminID, purchaseID, body.Status)
 	if err != nil {
 		return mapUseCaseError(err)
 	}
-	return c.JSON(http.StatusOK, sellerRegToJSON(reg))
+	return c.JSON(http.StatusOK, purchaseToJSON(view))
 }

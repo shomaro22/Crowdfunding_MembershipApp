@@ -4,8 +4,65 @@ import (
 	"encoding/json"
 	"time"
 
+	"crowdfund-app/auth"
 	"crowdfund-app/usecase"
 )
+
+type usersPageJSON struct {
+	Users []UserWire `json:"users"`
+	Total int64      `json:"total"`
+}
+
+type sellerRegsPageJSON struct {
+	Registrations []sellerRegJSON `json:"registrations"`
+	Total         int64           `json:"total"`
+}
+
+type sellerRegViewJSON struct {
+	sellerRegJSON
+	User     UserWire `json:"user"`
+	FrontURL *string  `json:"identity_document_front_url,omitempty"`
+	BackURL  *string  `json:"identity_document_back_url,omitempty"`
+}
+
+type adminStatsWire struct {
+	TotalUsers     int64      `json:"total_users"`
+	TotalProjects  int64      `json:"total_projects"`
+	TotalPurchases int64      `json:"total_purchases"`
+	TotalRevenue   int64      `json:"total_revenue"`
+	RecentUsers    []UserWire `json:"recent_users"`
+}
+
+type adminUpdateUserJSON struct {
+	Email    *string `json:"email"`
+	Name     *string `json:"name"`
+	Role     *string `json:"role"`
+	IsActive *bool   `json:"is_active"`
+}
+
+type adminPatchPurchaseJSON struct {
+	Status string `json:"status"`
+}
+
+func sellerRegViewToJSON(apiBase string, d *usecase.SellerRegView) sellerRegViewJSON {
+	var (
+		out sellerRegViewJSON
+		url string
+	)
+	out = sellerRegViewJSON{
+		sellerRegJSON: sellerRegToJSON(d.Registration),
+		User:          UserWireFrom(d.User),
+	}
+	if d.FrontAccessToken != nil {
+		url = auth.KYCAccessURL(apiBase, *d.FrontAccessToken)
+		out.FrontURL = &url
+	}
+	if d.BackAccessToken != nil {
+		url = auth.KYCAccessURL(apiBase, *d.BackAccessToken)
+		out.BackURL = &url
+	}
+	return out
+}
 
 type ActivityLogWire struct {
 	ID         string          `json:"id"`
