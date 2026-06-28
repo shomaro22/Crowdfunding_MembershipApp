@@ -21,6 +21,7 @@ type PurchaseRepo interface {
 	FindPendingBuyerProject(ctx context.Context, buyerID, projectID uuid.UUID) (*entity.Purchase, error)
 	FindStripeInvoiceID(ctx context.Context, invoiceID string) (*entity.Purchase, error)
 	ListByBuyerID(ctx context.Context, buyerID uuid.UUID, limit, offset int) ([]entity.Purchase, int64, error)
+	ListAll(ctx context.Context, status *entity.PurchaseStatus, limit, offset int) ([]entity.Purchase, int64, error)
 	RecordEvent(ctx context.Context, ev *entity.PurchaseEvent) error
 }
 
@@ -152,6 +153,29 @@ func (r *purchaseRepo) ListByBuyerID(ctx context.Context, buyerID uuid.UUID, lim
 		Order("created_at DESC").
 		Limit(limit).Offset(offset).
 		Find(&rows).Error
+	if err != nil {
+		return nil, 0, err
+	}
+	return rows, total, nil
+}
+
+func (r *purchaseRepo) ListAll(ctx context.Context, status *entity.PurchaseStatus, limit, offset int) ([]entity.Purchase, int64, error) {
+	var (
+		q     *gorm.DB
+		total int64
+		rows  []entity.Purchase
+		err   error
+	)
+	q = r.dbCtx(ctx).Model(&entity.Purchase{})
+	if status != nil {
+		q = q.Where("status = ?", *status)
+	}
+	err = q.Count(&total).Error
+	if err != nil {
+		return nil, 0, err
+	}
+	limit, offset = paginate(limit, offset)
+	err = q.Order("created_at DESC").Limit(limit).Offset(offset).Find(&rows).Error
 	if err != nil {
 		return nil, 0, err
 	}
