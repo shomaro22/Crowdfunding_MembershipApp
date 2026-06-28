@@ -19,6 +19,7 @@ type Config struct {
 	WSToken           *controller.WSTokenController
 	WS                *controller.WSController
 	Admin             *controller.AdminController
+	AdminOperations   *controller.AdminOperationsController
 	KYCFiles          *controller.KYCFileController
 	RateLimit         *middleware.RateLimiter
 	Policy2FAChallenge middleware.RatePolicy
@@ -145,25 +146,40 @@ func New(cfg Config) *echo.Echo {
 		e.GET("/admin/kyc-documents", cfg.KYCFiles.Serve)
 	}
 
-	if cfg.Admin != nil {
+	if cfg.Admin != nil || cfg.AdminOperations != nil {
 		var reviewAdmin echo.MiddlewareFunc
 		admin = e.Group("/admin", cfg.AdminOnly...)
-		reviewAdmin = middleware.RequireAdminRole(entity.AdminRoleReviewAdmin, entity.AdminRoleSuperAdmin)
-		admin.GET("/reviews/users", cfg.Admin.ListBuyerPending, reviewAdmin)
-		admin.POST("/reviews/users/:userId/approve", cfg.Admin.ApproveBuyer, reviewAdmin)
-		admin.POST("/reviews/users/:userId/reject", cfg.Admin.RejectBuyer, reviewAdmin)
-		admin.GET("/seller-registrations", cfg.Admin.ListSellerRegs, reviewAdmin)
-		admin.GET("/seller-registrations/:registrationId", cfg.Admin.GetSellerReg, reviewAdmin)
-		admin.POST("/seller-registrations/:registrationId/approve", cfg.Admin.ApproveSellerReg, reviewAdmin)
-		admin.POST("/seller-registrations/:registrationId/reject", cfg.Admin.RejectSellerReg, reviewAdmin)
-		admin.GET("/projects", cfg.Admin.ListProjects, reviewAdmin)
-		admin.PATCH("/projects/:projectId", cfg.Admin.PatchProject, reviewAdmin)
-		admin.DELETE("/projects/:projectId", cfg.Admin.DeleteProject, reviewAdmin)
-		admin.PATCH("/projects/:projectId/delete-request", cfg.Admin.PatchDeleteReq, reviewAdmin)
-		admin.POST("/users/:userId/reset-2fa", cfg.Admin.ResetUser2FA,
-			middleware.RequireAdminRole(entity.AdminRoleSupportAdmin, entity.AdminRoleSuperAdmin))
-		admin.PATCH("/users/:userId/admin-role", cfg.Admin.ChangeAdminRole,
-			middleware.RequireAdminRole(entity.AdminRoleSuperAdmin))
+		if cfg.Admin != nil {
+			reviewAdmin = middleware.RequireAdminRole(entity.AdminRoleReviewAdmin, entity.AdminRoleSuperAdmin)
+			admin.GET("/reviews/users", cfg.Admin.ListBuyerPending, reviewAdmin)
+			admin.POST("/reviews/users/:userId/approve", cfg.Admin.ApproveBuyer, reviewAdmin)
+			admin.POST("/reviews/users/:userId/reject", cfg.Admin.RejectBuyer, reviewAdmin)
+			admin.GET("/seller-registrations", cfg.Admin.ListSellerRegs, reviewAdmin)
+			admin.GET("/seller-registrations/:registrationId", cfg.Admin.GetSellerReg, reviewAdmin)
+			admin.POST("/seller-registrations/:registrationId/approve", cfg.Admin.ApproveSellerReg, reviewAdmin)
+			admin.POST("/seller-registrations/:registrationId/reject", cfg.Admin.RejectSellerReg, reviewAdmin)
+			admin.GET("/projects", cfg.Admin.ListProjects, reviewAdmin)
+			admin.PATCH("/projects/:projectId", cfg.Admin.PatchProject, reviewAdmin)
+			admin.DELETE("/projects/:projectId", cfg.Admin.DeleteProject, reviewAdmin)
+			admin.PATCH("/projects/:projectId/delete-request", cfg.Admin.PatchDeleteReq, reviewAdmin)
+			admin.POST("/users/:userId/reset-2fa", cfg.Admin.ResetUser2FA,
+				middleware.RequireAdminRole(entity.AdminRoleSupportAdmin, entity.AdminRoleSuperAdmin))
+			admin.PATCH("/users/:userId/admin-role", cfg.Admin.ChangeAdminRole,
+				middleware.RequireAdminRole(entity.AdminRoleSuperAdmin))
+		}
+		if cfg.AdminOperations != nil {
+			ops := cfg.AdminOperations
+			admin.GET("/activity", ops.ListActivity,
+				middleware.RequireAdminRole(entity.AdminRoleSuperAdmin, entity.AdminRoleSupportAdmin, entity.AdminRoleFinanceAdmin))
+			admin.GET("/security", ops.GetSecurity,
+				middleware.RequireAdminRole(entity.AdminRoleSuperAdmin, entity.AdminRoleSupportAdmin))
+			admin.GET("/batches", ops.ListBatches,
+				middleware.RequireAdminRole(entity.AdminRoleSuperAdmin, entity.AdminRoleFinanceAdmin))
+			admin.POST("/batches/:jobName/run", ops.RunBatch,
+				middleware.RequireAdminRole(entity.AdminRoleSuperAdmin))
+			admin.GET("/audit-logs", ops.ListAuditLogs,
+				middleware.RequireAdminRole(entity.AdminRoleSuperAdmin))
+		}
 	}
 
 	return e

@@ -2,6 +2,7 @@ package controller
 
 import (
 	"context"
+	"time"
 
 	"crowdfund-app/auth"
 	"crowdfund-app/usecase"
@@ -96,4 +97,12 @@ type MessageProjectAccess interface {
 
 type WSTokenUseCase interface {
 	Issue(ctx context.Context, userID uuid.UUID) (string, error)
+}
+
+type OperationsUseCase interface {
+	ListActivityLogs(ctx context.Context, q usecase.ActivityLogsQuery) (usecase.ActivityLogsResult, error)
+	ListAuditLogs(ctx context.Context, q usecase.AuditLogsQuery) (usecase.AuditLogsResult, error)
+	ListBatchRuns(ctx context.Context, q usecase.BatchRunsQuery) (usecase.BatchRunsResult, error)
+	GetSecurityEvents(ctx context.Context, from, to *time.Time) (usecase.SecurityEventsView, error)
+	RunBatch(ctx context.Context, adminID uuid.UUID, jobName string, dryRun bool) (*usecase.BatchRunView, error)
 }
