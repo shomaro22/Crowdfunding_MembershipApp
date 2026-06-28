@@ -81,6 +81,10 @@ func MapHTTP(err error) (int, Body) {
 		return http.StatusConflict, Payload("CONFLICT", "already supporting")
 	case errors.Is(err, usecase.ErrEmailInUse):
 		return http.StatusConflict, Payload("CONFLICT", "email already in use")
+	case errors.Is(err, usecase.ErrFavoriteExists):
+		return http.StatusConflict, Payload("CONFLICT", "favorite already exists")
+	case errors.Is(err, usecase.ErrReportExists):
+		return http.StatusConflict, Payload("CONFLICT", "report already exists")
 	case errors.Is(err, usecase.Err2FAAlreadyEnabled):
 		return http.StatusConflict, Payload("2FA_ALREADY_ENABLED", "2fa already enabled")
 	case errors.Is(err, usecase.ErrStripeUnavailable):
@@ -93,6 +97,8 @@ func MapHTTP(err error) (int, Body) {
 		return http.StatusUnsupportedMediaType, Payload("UNSUPPORTED_MEDIA", "unsupported media type")
 	case errors.Is(err, usecase.ErrFileTooLarge):
 		return http.StatusRequestEntityTooLarge, Payload("FILE_TOO_LARGE", "file too large")
+	case errors.Is(err, usecase.ErrBatchJobFailed):
+		return http.StatusUnprocessableEntity, Payload("BATCH_JOB_FAILED", "batch job failed")
 	default:
 		return http.StatusInternalServerError, Payload("INTERNAL_ERROR", "internal error")
 	}

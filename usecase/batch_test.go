@@ -39,7 +39,7 @@ func TestIsSupportedBatchJob(t *testing.T) {
 	if !isSupportedBatchJob(entity.PurgeTokens) {
 		t.Fatal("purge_tokens should be supported")
 	}
-	if isSupportedBatchJob(entity.ReconcileStripe) {
-		t.Fatal("reconcile_stripe not in phase 4-9")
+	if isSupportedBatchJob("reconcile_stripe") {
+		t.Fatal("reconcile_stripe is not a supported batch job")
 	}
 }

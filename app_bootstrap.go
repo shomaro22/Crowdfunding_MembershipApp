@@ -4,6 +4,7 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"crowdfund-app/auth"
@@ -31,6 +32,9 @@ func buildApp(opts *bootstrap.Options) (*echo.Echo, string, error) {
 		connectCtl      *controller.ConnectController
 		paymentCtl      *controller.PaymentController
 		supporterCtl    *controller.SupporterController
+		favoriteCtl     *controller.FavoriteController
+		reportCtl       *controller.ReportController
+		mediaCtl        *controller.MediaController
 		messageCtl      *controller.MessageController
 		wsTokenCtl      *controller.WSTokenController
 		wsCtl           *controller.WSController
@@ -78,6 +82,9 @@ func buildApp(opts *bootstrap.Options) (*echo.Echo, string, error) {
 		paymentCtl = controller.NewPaymentController(app.UseCases.Payment, app.UseCases.Purchase, app.Stripe.AppURL())
 	}
 	supporterCtl = controller.NewSupporterController(app.UseCases.Supporter)
+	favoriteCtl = controller.NewFavoriteController(app.UseCases.Favorite)
+	reportCtl = controller.NewReportController(app.UseCases.Report)
+	mediaCtl = controller.NewMediaController(app.UseCases.Media)
 	messageCtl = controller.NewMessageController(app.UseCases.Message)
 	wsTokenCtl = controller.NewWSTokenController(app.UseCases.WSToken)
 	wsCtl = controller.NewWSController(app.Hub, app.UseCases.Message, origins)
@@ -120,6 +127,9 @@ func buildApp(opts *bootstrap.Options) (*echo.Echo, string, error) {
 		Connect:            connectCtl,
 		Payments:           paymentCtl,
 		Supporters:         supporterCtl,
+		Favorites:          favoriteCtl,
+		Reports:            reportCtl,
+		Media:              mediaCtl,
 		Messages:           messageCtl,
 		WSToken:            wsTokenCtl,
 		WS:                 wsCtl,
@@ -136,5 +146,6 @@ func buildApp(opts *bootstrap.Options) (*echo.Echo, string, error) {
 		SellerWrite:        sellerWrite,
 		AdminOnly:          adminOnly,
 	})
+	e.Static("/uploads", filepath.Join(app.Config.PublicRoot, "uploads"))
 	return e, app.Config.ListenAddr(), nil
 }
