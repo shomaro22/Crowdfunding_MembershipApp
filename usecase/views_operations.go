@@ -1,6 +1,7 @@
 package usecase
 
 import (
+	"encoding/json"
 	"time"
 
 	"crowdfund-app/entity"
@@ -17,7 +18,7 @@ type ActivityLogView struct {
 	IPAddress  *string
 	UserAgent  *string
 	RequestID  *string
-	Metadata   entity.JSONMetadata
+	Metadata   json.RawMessage
 	CreatedAt  time.Time
 	User       *UserView
 }
@@ -77,7 +78,7 @@ func ActivityLogViewFrom(row entity.ActivityLog) ActivityLogView {
 		IPAddress:  row.IPAddress,
 		UserAgent:  row.UserAgent,
 		RequestID:  row.RequestID,
-		Metadata:   row.Metadata,
+		Metadata:   json.RawMessage(row.Metadata),
 		CreatedAt:  row.CreatedAt,
 	}
 }
