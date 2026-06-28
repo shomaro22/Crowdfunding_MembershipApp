@@ -81,6 +81,23 @@ func activityMeta(fields map[string]string) entity.JSONMetadata {
 	return entity.JSONMetadata(b)
 }
 
+func ActivityMeta(fields map[string]string) entity.JSONMetadata {
+	return activityMeta(fields)
+}
+
+func LogRateLimitDenied(
+	ctx context.Context,
+	repo repository.ActivityRepo,
+	userID *uuid.UUID,
+	policy, ruleKey string,
+	meta RequestMeta,
+) {
+	LogActivity(ctx, repo, userID, entity.SecRateLimit, "rate_limit", policy, meta, ActivityMeta(map[string]string{
+		"policy": policy,
+		"key":    ruleKey,
+	}))
+}
+
 func purchaseActivityMeta(purchase *entity.Purchase) entity.JSONMetadata {
 	if purchase == nil {
 		return nil
