@@ -10,6 +10,10 @@ import (
 	"github.com/google/uuid"
 )
 
+func (s *SupporterUseCase) EnrichSupporterRows(ctx context.Context, rows []entity.ProjectSupporter) ([]SupporterView, error) {
+	return s.enrichViews(ctx, rows)
+}
+
 func (s *SupporterUseCase) ListMine(ctx context.Context, userID uuid.UUID) ([]SupporterView, error) {
 	var (
 		rows []entity.ProjectSupporter
