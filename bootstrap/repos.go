@@ -28,6 +28,7 @@ type Repositories struct {
 	Favorites       repository.FavoriteRepo
 	Reports         repository.ReportRepo
 	Seller          repository.SellerRepo
+	Admin           repository.AdminRepo
 }
 
 type RedisRepositories struct {
@@ -57,6 +58,7 @@ func NewRepositories(db *gorm.DB) Repositories {
 		Favorites:       repository.NewFavoriteRepo(db),
 		Reports:         repository.NewReportRepo(db),
 		Seller:          repository.NewSellerRepo(db),
+		Admin:           repository.NewAdminRepo(db),
 	}
 }
 
