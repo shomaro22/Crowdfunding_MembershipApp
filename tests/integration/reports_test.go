@@ -1,6 +1,6 @@
 //go:build integration
 
-package main
+package integration
 
 import (
 	"encoding/json"
@@ -21,8 +21,8 @@ func TestReportsUnauthorized(t *testing.T) {
 		e   *echo.Echo
 		rec *httptest.ResponseRecorder
 	)
-	e = setupSecurityApp(t)
-	rec = securityPOST(e, "/reports", "", `{"target_type":"PROJECT","target_id":"`+uuid.New().String()+`","reason":"spam"}`)
+	e = setupApp(t)
+	rec = httpPOST(e, "/reports", "", `{"target_type":"PROJECT","target_id":"`+uuid.New().String()+`","reason":"spam"}`)
 	if rec.Code != http.StatusUnauthorized {
 		t.Fatalf("status=%d want 401", rec.Code)
 	}
@@ -43,21 +43,21 @@ func TestReportsCreateListPatch(t *testing.T) {
 		id      string
 		role    entity.AdminRole
 	)
-	e = setupSecurityApp(t)
-	gdb = openSecurityDB(t)
-	seller = seedSecurityUser(t, gdb, seedOpts{Role: entity.UserRoleSeller})
-	buyer = seedSecurityUser(t, gdb, seedOpts{Role: entity.UserRoleBuyer})
-	project = seedSecurityProject(t, gdb, seller.ID, entity.ProjectStatusActive)
-	buyTok, _ = issueSecurityToken(buyer, true)
+	e = setupApp(t)
+	gdb = openDB(t)
+	seller = seedUser(t, gdb, seedOpts{Role: entity.UserRoleSeller})
+	buyer = seedUser(t, gdb, seedOpts{Role: entity.UserRoleBuyer})
+	project = seedProject(t, gdb, seller.ID, entity.ProjectStatusActive)
+	buyTok, _ = issueToken(buyer, true)
 	role = entity.AdminRoleSupportAdmin
-	admin = seedSecurityUser(t, gdb, seedOpts{
+	admin = seedUser(t, gdb, seedOpts{
 		Role:        entity.UserRoleAdmin,
 		AdminRole:   &role,
 		TOTPEnabled: true,
 	})
-	admTok, _ = issueSecurityToken(admin, true)
+	admTok, _ = issueToken(admin, true)
 
-	rec = securityPOST(e, "/reports", buyTok, fmt.Sprintf(
+	rec = httpPOST(e, "/reports", buyTok, fmt.Sprintf(
 		`{"target_type":"PROJECT","target_id":"%s","reason":"inappropriate content"}`,
 		project.ID,
 	))
@@ -72,7 +72,7 @@ func TestReportsCreateListPatch(t *testing.T) {
 		t.Fatal("missing report id")
 	}
 
-	rec = securityPOST(e, "/reports", buyTok, fmt.Sprintf(
+	rec = httpPOST(e, "/reports", buyTok, fmt.Sprintf(
 		`{"target_type":"PROJECT","target_id":"%s","reason":"duplicate"}`,
 		project.ID,
 	))
@@ -80,12 +80,12 @@ func TestReportsCreateListPatch(t *testing.T) {
 		t.Fatalf("duplicate status=%d want 409", rec.Code)
 	}
 
-	rec = securityGET(e, "/admin/reports", admTok)
+	rec = httpGET(e, "/admin/reports", admTok)
 	if rec.Code != http.StatusOK {
 		t.Fatalf("list status=%d body=%s", rec.Code, rec.Body.String())
 	}
 
-	rec = securityPATCH(e, "/admin/reports/"+id, admTok, `{"status":"RESOLVED","resolution":"reviewed"}`)
+	rec = httpPATCH(e, "/admin/reports/"+id, admTok, `{"status":"RESOLVED","resolution":"reviewed"}`)
 	if rec.Code != http.StatusOK {
 		t.Fatalf("patch status=%d body=%s", rec.Code, rec.Body.String())
 	}
@@ -107,16 +107,16 @@ func TestReportsFinanceAdminForbidden(t *testing.T) {
 		role entity.AdminRole
 		rec  *httptest.ResponseRecorder
 	)
-	e = setupSecurityApp(t)
-	gdb = openSecurityDB(t)
+	e = setupApp(t)
+	gdb = openDB(t)
 	role = entity.AdminRoleFinanceAdmin
-	u = seedSecurityUser(t, gdb, seedOpts{
+	u = seedUser(t, gdb, seedOpts{
 		Role:        entity.UserRoleAdmin,
 		AdminRole:   &role,
 		TOTPEnabled: true,
 	})
-	tok, _ = issueSecurityToken(u, true)
-	rec = securityGET(e, "/admin/reports", tok)
+	tok, _ = issueToken(u, true)
+	rec = httpGET(e, "/admin/reports", tok)
 	if rec.Code != http.StatusForbidden {
 		t.Fatalf("status=%d want 403", rec.Code)
 	}
@@ -130,11 +130,11 @@ func TestReportsSelfUserTargetBadRequest(t *testing.T) {
 		buyTok string
 		rec    *httptest.ResponseRecorder
 	)
-	e = setupSecurityApp(t)
-	gdb = openSecurityDB(t)
-	buyer = seedSecurityUser(t, gdb, seedOpts{Role: entity.UserRoleBuyer})
-	buyTok, _ = issueSecurityToken(buyer, true)
-	rec = securityPOST(e, "/reports", buyTok, fmt.Sprintf(
+	e = setupApp(t)
+	gdb = openDB(t)
+	buyer = seedUser(t, gdb, seedOpts{Role: entity.UserRoleBuyer})
+	buyTok, _ = issueToken(buyer, true)
+	rec = httpPOST(e, "/reports", buyTok, fmt.Sprintf(
 		`{"target_type":"USER","target_id":"%s","reason":"self report"}`,
 		buyer.ID,
 	))

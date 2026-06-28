@@ -1,6 +1,6 @@
 //go:build integration
 
-package main
+package integration
 
 import (
 	"encoding/json"
@@ -21,8 +21,8 @@ func TestFavoritesUnauthorized(t *testing.T) {
 		e   *echo.Echo
 		rec *httptest.ResponseRecorder
 	)
-	e = setupSecurityApp(t)
-	rec = securityGET(e, "/favorites", "")
+	e = setupApp(t)
+	rec = httpGET(e, "/favorites", "")
 	if rec.Code != http.StatusUnauthorized {
 		t.Fatalf("status=%d want 401", rec.Code)
 	}
@@ -39,14 +39,14 @@ func TestFavoritesAddListCheckRemove(t *testing.T) {
 		rec     *httptest.ResponseRecorder
 		body    map[string]any
 	)
-	e = setupSecurityApp(t)
-	gdb = openSecurityDB(t)
-	seller = seedSecurityUser(t, gdb, seedOpts{Role: entity.UserRoleSeller})
-	buyer = seedSecurityUser(t, gdb, seedOpts{Role: entity.UserRoleBuyer})
-	project = seedSecurityProject(t, gdb, seller.ID, entity.ProjectStatusActive)
-	tok, _ = issueSecurityToken(buyer, true)
+	e = setupApp(t)
+	gdb = openDB(t)
+	seller = seedUser(t, gdb, seedOpts{Role: entity.UserRoleSeller})
+	buyer = seedUser(t, gdb, seedOpts{Role: entity.UserRoleBuyer})
+	project = seedProject(t, gdb, seller.ID, entity.ProjectStatusActive)
+	tok, _ = issueToken(buyer, true)
 
-	rec = securityPOST(e, "/favorites", tok, fmt.Sprintf(`{"project_id":"%s","action":"add"}`, project.ID))
+	rec = httpPOST(e, "/favorites", tok, fmt.Sprintf(`{"project_id":"%s","action":"add"}`, project.ID))
 	if rec.Code != http.StatusOK {
 		t.Fatalf("add status=%d body=%s", rec.Code, rec.Body.String())
 	}
@@ -57,17 +57,17 @@ func TestFavoritesAddListCheckRemove(t *testing.T) {
 		t.Fatalf("is_favorited=%v want true", body["is_favorited"])
 	}
 
-	rec = securityPOST(e, "/favorites", tok, fmt.Sprintf(`{"project_id":"%s","action":"add"}`, project.ID))
+	rec = httpPOST(e, "/favorites", tok, fmt.Sprintf(`{"project_id":"%s","action":"add"}`, project.ID))
 	if rec.Code != http.StatusConflict {
 		t.Fatalf("duplicate add status=%d want 409", rec.Code)
 	}
 
-	rec = securityGET(e, "/favorites/check/"+project.ID.String(), tok)
+	rec = httpGET(e, "/favorites/check/"+project.ID.String(), tok)
 	if rec.Code != http.StatusOK {
 		t.Fatalf("check status=%d body=%s", rec.Code, rec.Body.String())
 	}
 
-	rec = securityGET(e, "/favorites", tok)
+	rec = httpGET(e, "/favorites", tok)
 	if rec.Code != http.StatusOK {
 		t.Fatalf("list status=%d body=%s", rec.Code, rec.Body.String())
 	}
@@ -80,12 +80,12 @@ func TestFavoritesAddListCheckRemove(t *testing.T) {
 		t.Fatalf("favorites len=%d want 1", len(favs))
 	}
 
-	rec = securityPOST(e, "/favorites", tok, fmt.Sprintf(`{"project_id":"%s","action":"remove"}`, project.ID))
+	rec = httpPOST(e, "/favorites", tok, fmt.Sprintf(`{"project_id":"%s","action":"remove"}`, project.ID))
 	if rec.Code != http.StatusOK {
 		t.Fatalf("remove status=%d body=%s", rec.Code, rec.Body.String())
 	}
 
-	rec = securityGET(e, "/favorites/check/"+project.ID.String(), tok)
+	rec = httpGET(e, "/favorites/check/"+project.ID.String(), tok)
 	body = nil
 	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
 		t.Fatal(err)
@@ -105,14 +105,14 @@ func TestFavoritesPendingProjectNotFound(t *testing.T) {
 		tok     string
 		rec     *httptest.ResponseRecorder
 	)
-	e = setupSecurityApp(t)
-	gdb = openSecurityDB(t)
-	seller = seedSecurityUser(t, gdb, seedOpts{Role: entity.UserRoleSeller})
-	buyer = seedSecurityUser(t, gdb, seedOpts{Role: entity.UserRoleBuyer})
-	project = seedSecurityProject(t, gdb, seller.ID, entity.ProjectStatusPending)
-	tok, _ = issueSecurityToken(buyer, true)
+	e = setupApp(t)
+	gdb = openDB(t)
+	seller = seedUser(t, gdb, seedOpts{Role: entity.UserRoleSeller})
+	buyer = seedUser(t, gdb, seedOpts{Role: entity.UserRoleBuyer})
+	project = seedProject(t, gdb, seller.ID, entity.ProjectStatusPending)
+	tok, _ = issueToken(buyer, true)
 
-	rec = securityPOST(e, "/favorites", tok, fmt.Sprintf(`{"project_id":"%s","action":"add"}`, project.ID))
+	rec = httpPOST(e, "/favorites", tok, fmt.Sprintf(`{"project_id":"%s","action":"add"}`, project.ID))
 	if rec.Code != http.StatusNotFound {
 		t.Fatalf("status=%d want 404 for pending project", rec.Code)
 	}
@@ -127,13 +127,13 @@ func TestFavoritesRemoveMissing(t *testing.T) {
 		rec    *httptest.ResponseRecorder
 		pid    uuid.UUID
 	)
-	e = setupSecurityApp(t)
-	gdb = openSecurityDB(t)
-	buyer = seedSecurityUser(t, gdb, seedOpts{Role: entity.UserRoleBuyer})
-	tok, _ = issueSecurityToken(buyer, true)
+	e = setupApp(t)
+	gdb = openDB(t)
+	buyer = seedUser(t, gdb, seedOpts{Role: entity.UserRoleBuyer})
+	tok, _ = issueToken(buyer, true)
 	pid = uuid.New()
 
-	rec = securityPOST(e, "/favorites", tok, fmt.Sprintf(`{"project_id":"%s","action":"remove"}`, pid))
+	rec = httpPOST(e, "/favorites", tok, fmt.Sprintf(`{"project_id":"%s","action":"remove"}`, pid))
 	if rec.Code != http.StatusNotFound {
 		t.Fatalf("status=%d want 404", rec.Code)
 	}

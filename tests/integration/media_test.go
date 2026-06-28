@@ -1,12 +1,9 @@
 //go:build integration
 
-package main
+package integration
 
 import (
-	"bytes"
 	"encoding/json"
-	"io"
-	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
 	neturl "net/url"
@@ -23,7 +20,7 @@ func TestMediaUploadUnauthorized(t *testing.T) {
 		e   *echo.Echo
 		rec *httptest.ResponseRecorder
 	)
-	e = setupSecurityApp(t)
+	e = setupApp(t)
 	rec = mediaUploadPOST(e, "", minimalPNGBytes(), "test.png")
 	if rec.Code != http.StatusUnauthorized {
 		t.Fatalf("status=%d want 401", rec.Code)
@@ -42,10 +39,10 @@ func TestMediaUploadAndFetch(t *testing.T) {
 		parsed *neturl.URL
 		err    error
 	)
-	e = setupSecurityApp(t)
-	gdb = openSecurityDB(t)
-	seller = seedSecurityUser(t, gdb, seedOpts{Role: entity.UserRoleSeller})
-	tok, _ = issueSecurityToken(seller, true)
+	e = setupApp(t)
+	gdb = openDB(t)
+	seller = seedUser(t, gdb, seedOpts{Role: entity.UserRoleSeller})
+	tok, _ = issueToken(seller, true)
 
 	rec = mediaUploadPOST(e, tok, minimalPNGBytes(), "test.png")
 	if rec.Code != http.StatusCreated {
@@ -78,40 +75,14 @@ func TestMediaUploadUnsupportedType(t *testing.T) {
 		tok    string
 		rec    *httptest.ResponseRecorder
 	)
-	e = setupSecurityApp(t)
-	gdb = openSecurityDB(t)
-	seller = seedSecurityUser(t, gdb, seedOpts{Role: entity.UserRoleSeller})
-	tok, _ = issueSecurityToken(seller, true)
+	e = setupApp(t)
+	gdb = openDB(t)
+	seller = seedUser(t, gdb, seedOpts{Role: entity.UserRoleSeller})
+	tok, _ = issueToken(seller, true)
 	rec = mediaUploadPOST(e, tok, []byte("not an image"), "test.txt")
 	if rec.Code != http.StatusUnsupportedMediaType {
 		t.Fatalf("status=%d want 415", rec.Code)
 	}
-}
-
-func mediaUploadPOST(e *echo.Echo, token string, data []byte, filename string) *httptest.ResponseRecorder {
-	var (
-		body   bytes.Buffer
-		writer *multipart.Writer
-		part   io.Writer
-		rec    *httptest.ResponseRecorder
-		req    *http.Request
-		err    error
-	)
-	writer = multipart.NewWriter(&body)
-	part, err = writer.CreateFormFile("file", filename)
-	if err != nil {
-		panic(err)
-	}
-	_, _ = part.Write(data)
-	_ = writer.Close()
-	rec = httptest.NewRecorder()
-	req = httptest.NewRequest(http.MethodPost, "/media/images", &body)
-	req.Header.Set("Content-Type", writer.FormDataContentType())
-	if token != "" {
-		req.Header.Set("Authorization", "Bearer "+token)
-	}
-	e.ServeHTTP(rec, req)
-	return rec
 }
 
 func minimalPNGBytes() []byte {
