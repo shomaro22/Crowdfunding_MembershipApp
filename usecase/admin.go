@@ -24,6 +24,9 @@ type AdminUseCase struct {
 	KYC             repository.KYCStore
 	ProjectsUC      *ProjectUseCase
 	KYCAccess       *KYCAccessUseCase
+	AdminStats      repository.AdminRepo
+	Purchases       repository.PurchaseRepo
+	PurchaseViews   PurchaseEnricher
 	DB              *gorm.DB
 }
 

@@ -17,6 +17,7 @@ type UserRepo interface {
 	FindEmail(ctx context.Context, email string) (*entity.User, error)
 	EmailExists(ctx context.Context, email string) (bool, error)
 	ListRoleStatus(ctx context.Context, role entity.UserRole, status entity.AccountStatus, limit, offset int) ([]entity.User, int64, error)
+	ListAdmin(ctx context.Context, f AdminUserListFilter) ([]entity.User, int64, error)
 	BumpTokenVer(ctx context.Context, userID uuid.UUID) (int64, error)
 }
 
@@ -98,6 +99,30 @@ func (r *userRepo) ListRoleStatus(ctx context.Context, role entity.UserRole, sta
 	}
 	err = dbFromCtx(ctx, r.db).Where("role = ? AND account_status = ?", role, status).
 		Order("created_at DESC").Limit(limit).Offset(offset).Find(&rows).Error
+	return rows, total, err
+}
+
+func (r *userRepo) ListAdmin(ctx context.Context, f AdminUserListFilter) ([]entity.User, int64, error) {
+	var (
+		q     *gorm.DB
+		total int64
+		rows  []entity.User
+		err   error
+	)
+	q = dbFromCtx(ctx, r.db).Model(&entity.User{})
+	if f.Role != nil {
+		q = q.Where("role = ?", *f.Role)
+	}
+	if f.Search != "" {
+		like := "%" + f.Search + "%"
+		q = q.Where("email ILIKE ? OR name ILIKE ?", like, like)
+	}
+	err = q.Count(&total).Error
+	if err != nil {
+		return nil, 0, err
+	}
+	limit, offset := paginate(f.Limit, f.Offset)
+	err = q.Order("created_at DESC").Limit(limit).Offset(offset).Find(&rows).Error
 	return rows, total, err
 }
 
