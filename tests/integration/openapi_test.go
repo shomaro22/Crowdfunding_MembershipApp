@@ -1,4 +1,4 @@
-package main
+package integration
 
 import (
 	"os"
@@ -13,7 +13,7 @@ func TestOpenAPIIncludesConnectAndKYCEndpoints(t *testing.T) {
 		doc  string
 		path string
 	)
-	data, err = os.ReadFile("openapi.yaml")
+	data, err = os.ReadFile("../../openapi.yaml")
 	if err != nil {
 		t.Fatal(err)
 	}

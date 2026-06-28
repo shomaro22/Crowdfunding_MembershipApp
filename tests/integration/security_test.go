@@ -1,6 +1,6 @@
 //go:build integration
 
-package main
+package integration
 
 import (
 	"fmt"
@@ -24,7 +24,7 @@ func TestSecurityNoJWT(t *testing.T) {
 		e   *echo.Echo
 		rec *httptest.ResponseRecorder
 	)
-	e = setupSecurityApp(t)
+	e = setupApp(t)
 	rec = httptest.NewRecorder()
 	e.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/me", nil))
 	if rec.Code != http.StatusUnauthorized {
@@ -44,10 +44,10 @@ func TestSecurityTamperedJWT(t *testing.T) {
 		rec   *httptest.ResponseRecorder
 		req   *http.Request
 	)
-	e = setupSecurityApp(t)
-	gdb = openSecurityDB(t)
-	u = seedSecurityUser(t, gdb, seedOpts{Role: entity.UserRoleBuyer})
-	tok, _ = issueSecurityToken(u, true)
+	e = setupApp(t)
+	gdb = openDB(t)
+	u = seedUser(t, gdb, seedOpts{Role: entity.UserRoleBuyer})
+	tok, _ = issueToken(u, true)
 	rec = httptest.NewRecorder()
 	req = httptest.NewRequest(http.MethodGet, "/me", nil)
 	req.Header.Set("Authorization", "Bearer "+tok+"tampered")
@@ -66,10 +66,10 @@ func TestSecurityExpiredJWT(t *testing.T) {
 		rec *httptest.ResponseRecorder
 		req *http.Request
 	)
-	e = setupSecurityApp(t)
-	gdb = openSecurityDB(t)
-	u = seedSecurityUser(t, gdb, seedOpts{Role: entity.UserRoleBuyer})
-	tok = expiredSecurityToken(u.ID)
+	e = setupApp(t)
+	gdb = openDB(t)
+	u = seedUser(t, gdb, seedOpts{Role: entity.UserRoleBuyer})
+	tok = expiredToken(u.ID)
 	rec = httptest.NewRecorder()
 	req = httptest.NewRequest(http.MethodGet, "/me", nil)
 	req.Header.Set("Authorization", "Bearer "+tok)
@@ -88,10 +88,10 @@ func TestSecurityRevokedToken(t *testing.T) {
 		rec *httptest.ResponseRecorder
 		req *http.Request
 	)
-	e = setupSecurityApp(t)
-	gdb = openSecurityDB(t)
-	u = seedSecurityUser(t, gdb, seedOpts{Role: entity.UserRoleBuyer})
-	tok, _ = issueSecurityToken(u, true)
+	e = setupApp(t)
+	gdb = openDB(t)
+	u = seedUser(t, gdb, seedOpts{Role: entity.UserRoleBuyer})
+	tok, _ = issueToken(u, true)
 	if err := gdb.Model(&entity.User{}).Where("id = ?", u.ID).
 		UpdateColumn("token_version", gorm.Expr("token_version + 1")).Error; err != nil {
 		t.Fatal(err)
@@ -116,11 +116,11 @@ func TestSecurityBuyerCannotAccessAdmin(t *testing.T) {
 		tok string
 		rec *httptest.ResponseRecorder
 	)
-	e = setupSecurityApp(t)
-	gdb = openSecurityDB(t)
-	u = seedSecurityUser(t, gdb, seedOpts{Role: entity.UserRoleBuyer})
-	tok, _ = issueSecurityToken(u, true)
-	rec = securityGET(e, "/admin/reviews/users", tok)
+	e = setupApp(t)
+	gdb = openDB(t)
+	u = seedUser(t, gdb, seedOpts{Role: entity.UserRoleBuyer})
+	tok, _ = issueToken(u, true)
+	rec = httpGET(e, "/admin/reviews/users", tok)
 	if rec.Code != http.StatusForbidden {
 		t.Fatalf("status=%d want 403", rec.Code)
 	}
@@ -135,16 +135,16 @@ func TestSecurityAdminRequires2FA(t *testing.T) {
 		role  entity.AdminRole
 		rec   *httptest.ResponseRecorder
 	)
-	e = setupSecurityApp(t)
-	gdb = openSecurityDB(t)
+	e = setupApp(t)
+	gdb = openDB(t)
 	role = entity.AdminRoleReviewAdmin
-	u = seedSecurityUser(t, gdb, seedOpts{
+	u = seedUser(t, gdb, seedOpts{
 		Role:      entity.UserRoleAdmin,
 		AdminRole: &role,
 		TOTPEnabled: true,
 	})
-	tok, _ = issueSecurityToken(u, false)
-	rec = securityGET(e, "/admin/reviews/users", tok)
+	tok, _ = issueToken(u, false)
+	rec = httpGET(e, "/admin/reviews/users", tok)
 	if rec.Code != http.StatusForbidden {
 		t.Fatalf("status=%d want 403", rec.Code)
 	}
@@ -161,14 +161,14 @@ func TestSecuritySellerWriteRequires2FA(t *testing.T) {
 		tok string
 		rec *httptest.ResponseRecorder
 	)
-	e = setupSecurityApp(t)
-	gdb = openSecurityDB(t)
-	u = seedSecurityUser(t, gdb, seedOpts{
+	e = setupApp(t)
+	gdb = openDB(t)
+	u = seedUser(t, gdb, seedOpts{
 		Role:        entity.UserRoleSeller,
 		TOTPEnabled: true,
 	})
-	tok, _ = issueSecurityToken(u, false)
-	rec = securityPOST(e, "/projects", tok, `{"title":"t","description":"d"}`)
+	tok, _ = issueToken(u, false)
+	rec = httpPOST(e, "/projects", tok, `{"title":"t","description":"d"}`)
 	if rec.Code != http.StatusForbidden {
 		t.Fatalf("status=%d want 403", rec.Code)
 	}
@@ -185,14 +185,14 @@ func TestSecurityChangePasswordRequiresTOTP(t *testing.T) {
 		tok string
 		rec *httptest.ResponseRecorder
 	)
-	e = setupSecurityApp(t)
-	gdb = openSecurityDB(t)
-	u = seedSecurityUser(t, gdb, seedOpts{
+	e = setupApp(t)
+	gdb = openDB(t)
+	u = seedUser(t, gdb, seedOpts{
 		Role:        entity.UserRoleSeller,
 		TOTPEnabled: true,
 	})
-	tok, _ = issueSecurityToken(u, true)
-	rec = securityPOST(e, "/me/change-password", tok,
+	tok, _ = issueToken(u, true)
+	rec = httpPOST(e, "/me/change-password", tok,
 		`{"current_password":"password123","new_password":"newpassword123"}`)
 	if rec.Code != http.StatusForbidden {
 		t.Fatalf("status=%d want 403", rec.Code)
@@ -220,16 +220,16 @@ func TestSecurityRateLimitLogin(t *testing.T) {
 	if strings.TrimSpace(os.Getenv("REDIS_ADDR")) == "" {
 		t.Skip("REDIS_ADDR が未設定のためスキップ")
 	}
-	e = setupSecurityApp(t)
+	e = setupApp(t)
 	email = fmt.Sprintf("rl-%s@test.local", uuid.New())
 	for i = 0; i < 5; i++ {
-		rec = securityPOST(e, "/auth/login", "", fmt.Sprintf(
+		rec = httpPOST(e, "/auth/login", "", fmt.Sprintf(
 			`{"email":%q,"password":"wrong"}`, email))
 		if rec.Code == http.StatusTooManyRequests {
 			t.Fatalf("rate limited too early at attempt %d", i+1)
 		}
 	}
-	rec = securityPOST(e, "/auth/login", "", fmt.Sprintf(
+	rec = httpPOST(e, "/auth/login", "", fmt.Sprintf(
 		`{"email":%q,"password":"wrong"}`, email))
 	if rec.Code != http.StatusTooManyRequests {
 		t.Fatalf("status=%d want 429", rec.Code)

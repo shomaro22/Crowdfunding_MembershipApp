@@ -1,6 +1,6 @@
 //go:build integration
 
-package main
+package integration
 
 import (
 	"fmt"
@@ -35,7 +35,7 @@ func TestWSMessageCreatedBroadcast(t *testing.T) {
 		err       error
 	)
 	e, _ = setupPaymentApp(t)
-	gdb = openSecurityDB(t)
+	gdb = openDB(t)
 	fx = seedPaymentFixture(t, gdb)
 	now = time.Now().UTC()
 	err = gdb.Create(&entity.ProjectSupporter{
@@ -54,16 +54,16 @@ func TestWSMessageCreatedBroadcast(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	buyerTok, err = issueSecurityToken(fx.buyer, true)
+	buyerTok, err = issueToken(fx.buyer, true)
 	if err != nil {
 		t.Fatal(err)
 	}
-	sellerTok, err = issueSecurityToken(fx.seller, true)
+	sellerTok, err = issueToken(fx.seller, true)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	rec = securityPOST(e, "/ws/token", buyerTok, "")
+	rec = httpPOST(e, "/ws/token", buyerTok, "")
 	if rec.Code != http.StatusOK {
 		t.Fatalf("ws token status=%d body=%s", rec.Code, rec.Body.String())
 	}
@@ -98,7 +98,7 @@ func TestWSMessageCreatedBroadcast(t *testing.T) {
 		t.Fatalf("subscribed ack: %v", err)
 	}
 
-	rec = securityPOST(e, "/messages", sellerTok, fmt.Sprintf(
+	rec = httpPOST(e, "/messages", sellerTok, fmt.Sprintf(
 		`{"project_id":%q,"receiver_id":%q,"content":"hello ws"}`,
 		fx.project.ID, fx.buyer.ID,
 	))
