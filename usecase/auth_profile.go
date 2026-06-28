@@ -14,6 +14,22 @@ type UpdateProfileIn struct {
 	AvatarURL *string
 }
 
+func (a *AuthUseCase) GetUser(ctx context.Context, userID uuid.UUID) (UserView, error) {
+	var (
+		u   *entity.User
+		err error
+	)
+
+	u, err = a.Users.FindID(ctx, userID)
+	if err != nil {
+		return UserView{}, err
+	}
+	if u == nil {
+		return UserView{}, ErrNotFound
+	}
+	return UserViewFrom(u), nil
+}
+
 func (a *AuthUseCase) UpdateProfile(ctx context.Context, userID uuid.UUID, in UpdateProfileIn) (UserView, error) {
 	var (
 		norm validator.UpdateProfileNormalized
