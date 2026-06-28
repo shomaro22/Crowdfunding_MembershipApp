@@ -4,11 +4,13 @@ package repository_test
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"strings"
 	"testing"
 	"time"
 
+	"crowdfund-app/auth"
 	"crowdfund-app/db"
 	"crowdfund-app/entity"
 	"crowdfund-app/repository"
@@ -33,6 +35,39 @@ func openIntegrationDB(t *testing.T) *gorm.DB {
 	return gdb
 }
 
+func seedIntegrationUser(t *testing.T, gdb *gorm.DB, role entity.UserRole, adminRole *entity.AdminRole) *entity.User {
+	var (
+		hash string
+		now  time.Time
+		u    *entity.User
+		err  error
+	)
+	t.Helper()
+	hash, err = auth.HashPassword("password123")
+	if err != nil {
+		t.Fatal(err)
+	}
+	now = time.Now().UTC()
+	u = &entity.User{
+		ID:            uuid.New(),
+		Email:         fmt.Sprintf("%s-%s@test.local", role, uuid.New()),
+		PasswordHash:  hash,
+		Role:          role,
+		AccountStatus: entity.AccountStatusActive,
+		SellerStatus:  entity.SellerStatusNotApplicable,
+		AdminRole:     adminRole,
+		CreatedAt:     now,
+		UpdatedAt:     now,
+	}
+	if err = gdb.Create(u).Error; err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		_ = gdb.Delete(&entity.User{}, "id = ?", u.ID).Error
+	})
+	return u
+}
+
 func TestActivityRepoList(t *testing.T) {
 	var (
 		gdb      *gorm.DB
@@ -51,7 +86,7 @@ func TestActivityRepoList(t *testing.T) {
 	repo = repository.NewActivityRepo(gdb)
 	ctx = context.Background()
 	rowID = uuid.New()
-	userID = uuid.New()
+	userID = seedIntegrationUser(t, gdb, entity.UserRoleBuyer, nil).ID
 	now = time.Now().UTC()
 	resource = "rate_limit"
 	ip = "203.0.113.10"
@@ -103,7 +138,7 @@ func TestAuditRepoList(t *testing.T) {
 	repo = repository.NewAuditRepo(gdb)
 	ctx = context.Background()
 	rowID = uuid.New()
-	admin = uuid.New()
+	admin = seedIntegrationUser(t, gdb, entity.UserRoleAdmin, adminRolePtr(entity.AdminRoleSuperAdmin)).ID
 	action = "batch.manual_run"
 	err = repo.Create(ctx, &entity.AuditLog{
 		ID:         rowID,
@@ -135,4 +170,8 @@ func TestAuditRepoList(t *testing.T) {
 
 func activityActionPtr(a entity.ActivityAction) *entity.ActivityAction {
 	return &a
+}
+
+func adminRolePtr(r entity.AdminRole) *entity.AdminRole {
+	return &r
 }
