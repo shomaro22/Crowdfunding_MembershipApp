@@ -25,6 +25,7 @@ type Repositories struct {
 	Batch           repository.BatchRepo
 	Messages        repository.MessageRepo
 	WSTokens        repository.WSTokenRepo
+	Favorites       repository.FavoriteRepo
 }
 
 type RedisRepositories struct {
@@ -51,6 +52,7 @@ func NewRepositories(db *gorm.DB) Repositories {
 		Batch:           repository.NewBatchRepo(db),
 		Messages:        repository.NewMessageRepo(db),
 		WSTokens:        repository.NewWSTokenRepo(db),
+		Favorites:       repository.NewFavoriteRepo(db),
 	}
 }
 

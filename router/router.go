@@ -18,6 +18,7 @@ type Config struct {
 	Messages          *controller.MessageController
 	WSToken           *controller.WSTokenController
 	WS                *controller.WSController
+	Favorites         *controller.FavoriteController
 	Admin             *controller.AdminController
 	AdminOperations   *controller.AdminOperationsController
 	KYCFiles          *controller.KYCFileController
@@ -120,6 +121,13 @@ func New(cfg Config) *echo.Echo {
 		e.POST("/supporters/:supporterId/cancel", cfg.Supporters.Cancel, pm...)
 		e.POST("/supporters/:supporterId/rejoin", cfg.Supporters.Rejoin, pm...)
 		e.POST("/supporters/:supporterId/billing/change", cfg.Supporters.ChangeBilling, pm...)
+	}
+
+	if cfg.Favorites != nil {
+		pm = cfg.Protected
+		e.GET("/favorites", cfg.Favorites.List, pm...)
+		e.POST("/favorites", cfg.Favorites.Toggle, pm...)
+		e.GET("/favorites/check/:projectId", cfg.Favorites.Check, pm...)
 	}
 
 	if cfg.Messages != nil {

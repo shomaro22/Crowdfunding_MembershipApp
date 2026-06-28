@@ -31,6 +31,7 @@ var (
 	ErrFileTooLarge       = errors.New("file too large")
 	ErrBadKYC             = errors.New("bad seller kyc")
 	ErrBatchJobFailed     = errors.New("batch job failed")
+	ErrFavoriteExists     = errors.New("favorite already exists")
 )
 
 func mapBuyerRegEntityErr(err error) error {
