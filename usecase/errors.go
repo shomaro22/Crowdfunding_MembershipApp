@@ -32,6 +32,7 @@ var (
 	ErrBadKYC             = errors.New("bad seller kyc")
 	ErrBatchJobFailed     = errors.New("batch job failed")
 	ErrFavoriteExists     = errors.New("favorite already exists")
+	ErrReportExists       = errors.New("report already exists")
 )
 
 func mapBuyerRegEntityErr(err error) error {

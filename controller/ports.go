@@ -105,6 +105,12 @@ type FavoriteUseCase interface {
 	Check(ctx context.Context, userID, projectID uuid.UUID) (usecase.FavoriteStatusView, error)
 }
 
+type ReportUseCase interface {
+	Create(ctx context.Context, reporterID uuid.UUID, in usecase.CreateReportIn) (usecase.ReportView, error)
+	ListAdmin(ctx context.Context, status *string, limit, offset int) (usecase.ReportsResult, error)
+	UpdateAdmin(ctx context.Context, adminID, reportID uuid.UUID, in usecase.UpdateReportIn) (usecase.ReportView, error)
+}
+
 type OperationsUseCase interface {
 	ListActivityLogs(ctx context.Context, q usecase.ActivityLogsQuery) (usecase.ActivityLogsResult, error)
 	ListAuditLogs(ctx context.Context, q usecase.AuditLogsQuery) (usecase.AuditLogsResult, error)

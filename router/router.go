@@ -19,6 +19,7 @@ type Config struct {
 	WSToken           *controller.WSTokenController
 	WS                *controller.WSController
 	Favorites         *controller.FavoriteController
+	Reports           *controller.ReportController
 	Admin             *controller.AdminController
 	AdminOperations   *controller.AdminOperationsController
 	KYCFiles          *controller.KYCFileController
@@ -130,6 +131,11 @@ func New(cfg Config) *echo.Echo {
 		e.GET("/favorites/check/:projectId", cfg.Favorites.Check, pm...)
 	}
 
+	if cfg.Reports != nil {
+		pm = cfg.Protected
+		e.POST("/reports", cfg.Reports.Create, pm...)
+	}
+
 	if cfg.Messages != nil {
 		pm = cfg.Protected
 		e.GET("/messages", cfg.Messages.List, pm...)
@@ -155,8 +161,16 @@ func New(cfg Config) *echo.Echo {
 	}
 
 	if cfg.Admin != nil || cfg.AdminOperations != nil {
-		var reviewAdmin echo.MiddlewareFunc
+		var (
+			reviewAdmin      echo.MiddlewareFunc
+			reportModeration echo.MiddlewareFunc
+		)
 		admin = e.Group("/admin", cfg.AdminOnly...)
+		reportModeration = middleware.RequireAdminRole(
+			entity.AdminRoleSuperAdmin,
+			entity.AdminRoleReviewAdmin,
+			entity.AdminRoleSupportAdmin,
+		)
 		if cfg.Admin != nil {
 			reviewAdmin = middleware.RequireAdminRole(entity.AdminRoleReviewAdmin, entity.AdminRoleSuperAdmin)
 			admin.GET("/reviews/users", cfg.Admin.ListBuyerPending, reviewAdmin)
@@ -187,6 +201,10 @@ func New(cfg Config) *echo.Echo {
 				middleware.RequireAdminRole(entity.AdminRoleSuperAdmin))
 			admin.GET("/audit-logs", ops.ListAuditLogs,
 				middleware.RequireAdminRole(entity.AdminRoleSuperAdmin))
+		}
+		if cfg.Reports != nil {
+			admin.GET("/reports", cfg.Reports.ListAdmin, reportModeration)
+			admin.PATCH("/reports/:reportId", cfg.Reports.PatchAdmin, reportModeration)
 		}
 	}
 
