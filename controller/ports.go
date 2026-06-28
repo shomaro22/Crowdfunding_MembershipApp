@@ -111,6 +111,10 @@ type ReportUseCase interface {
 	UpdateAdmin(ctx context.Context, adminID, reportID uuid.UUID, in usecase.UpdateReportIn) (usecase.ReportView, error)
 }
 
+type MediaUseCase interface {
+	UploadImage(ctx context.Context, userID uuid.UUID, in usecase.MediaUploadIn) (string, error)
+}
+
 type OperationsUseCase interface {
 	ListActivityLogs(ctx context.Context, q usecase.ActivityLogsQuery) (usecase.ActivityLogsResult, error)
 	ListAuditLogs(ctx context.Context, q usecase.AuditLogsQuery) (usecase.AuditLogsResult, error)

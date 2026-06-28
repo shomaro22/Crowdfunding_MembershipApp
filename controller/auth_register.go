@@ -115,10 +115,7 @@ func readKYCFile(fh *multipart.FileHeader) (usecase.KYCUpload, error) {
 		return usecase.KYCUpload{}, err
 	}
 	defer src.Close()
-	contentType = fh.Header.Get("Content-Type")
-	if contentType == "" {
-		contentType = detectImageType(fh.Filename)
-	}
+	contentType = resolveImageContentType(fh.Header.Get("Content-Type"), fh.Filename)
 	return usecase.KYCUpload{
 		Reader:      src,
 		ContentType: contentType,
@@ -138,5 +135,19 @@ func detectImageType(name string) string {
 		return "image/webp"
 	default:
 		return ""
+	}
+}
+
+func resolveImageContentType(headerType, filename string) string {
+	var ct string
+	ct = strings.ToLower(strings.TrimSpace(headerType))
+	if i := strings.Index(ct, ";"); i >= 0 {
+		ct = strings.TrimSpace(ct[:i])
+	}
+	switch ct {
+	case "", "application/octet-stream":
+		return detectImageType(filename)
+	default:
+		return ct
 	}
 }
