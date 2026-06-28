@@ -7,6 +7,7 @@ import (
 
 	"crowdfund-app/entity"
 	"crowdfund-app/repository"
+	"crowdfund-app/validator"
 
 	"github.com/google/uuid"
 )
@@ -40,7 +41,7 @@ func (p *ProjectUseCase) Create(ctx context.Context, sellerID uuid.UUID, in Crea
 			Benefits:       plan.Benefits,
 		}
 	}
-	if err = entity.ValidateProject(in.Title, in.Description, in.TargetAmount, entity.DurationType(in.DurationType), in.StartDate, in.EndDate, planInputs); err != nil {
+	if err = validator.ValidateProject(in.Title, in.Description, in.TargetAmount, entity.DurationType(in.DurationType), in.StartDate, in.EndDate, planInputs); err != nil {
 		return nil, mapProjectEntityErr(err)
 	}
 	now = time.Now().UTC()
@@ -102,7 +103,7 @@ func (p *ProjectUseCase) Update(ctx context.Context, sellerID, projectID uuid.UU
 	}
 	now = time.Now().UTC()
 	if in.Title != nil {
-		if err = entity.ValidateTitle(*in.Title); err != nil {
+		if err = validator.ValidateTitle(*in.Title); err != nil {
 			return nil, mapProjectEntityErr(err)
 		}
 		project.Title = strings.TrimSpace(*in.Title)
@@ -132,7 +133,7 @@ func (p *ProjectUseCase) Update(ctx context.Context, sellerID, projectID uuid.UU
 		end = in.EndDate
 	}
 	if in.DurationType != nil || in.StartDate != nil || in.EndDate != nil {
-		if err = entity.ValidateDuration(dur, start, end); err != nil {
+		if err = validator.ValidateDuration(dur, start, end); err != nil {
 			return nil, mapProjectEntityErr(err)
 		}
 		project.DurationType = dur

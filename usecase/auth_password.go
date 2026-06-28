@@ -7,6 +7,7 @@ import (
 
 	"crowdfund-app/auth"
 	"crowdfund-app/entity"
+	"crowdfund-app/validator"
 
 	"github.com/google/uuid"
 )
@@ -64,7 +65,7 @@ func (a *AuthUseCase) ResetPassword(ctx context.Context, plainToken, newPassword
 		hash  string
 	)
 
-	if err = entity.ValidatePassword(newPassword); err != nil {
+	if err = validator.ValidatePassword(newPassword); err != nil {
 		return ErrWeakPassword
 	}
 	plainToken = strings.TrimSpace(plainToken)
@@ -106,7 +107,7 @@ func (a *AuthUseCase) ChangePassword(ctx context.Context, userID uuid.UUID, curr
 		now  time.Time
 	)
 
-	if err = entity.ValidatePassword(newPassword); err != nil {
+	if err = validator.ValidatePassword(newPassword); err != nil {
 		return ErrWeakPassword
 	}
 	u, err = a.Users.FindID(ctx, userID)

@@ -30,6 +30,7 @@ var (
 	ErrUnsupportedMedia   = errors.New("unsupported media type")
 	ErrFileTooLarge       = errors.New("file too large")
 	ErrBadKYC             = errors.New("bad seller kyc")
+	ErrBatchJobFailed     = errors.New("batch job failed")
 )
 
 func mapBuyerRegEntityErr(err error) error {
