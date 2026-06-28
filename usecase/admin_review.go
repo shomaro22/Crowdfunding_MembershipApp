@@ -53,7 +53,7 @@ func (a *AdminUseCase) ApproveBuyer(ctx context.Context, adminID, userID uuid.UU
 	if err = a.Users.Update(ctx, u); err != nil {
 		return UserView{}, err
 	}
-	a.writeAudit(ctx, adminID, "buyer_registration.approve", "user", u.ID.String(), reason, nil)
+	WriteAudit(ctx, a.Audit, adminID, "buyer_registration.approve", "user", u.ID.String(), reason, nil)
 	a.writeReviewDecision(ctx, adminID, entity.ReviewBuyerRegistration, userID, entity.ReviewApproved, reason)
 	return UserViewFrom(u), nil
 }
@@ -85,7 +85,7 @@ func (a *AdminUseCase) RejectBuyer(ctx context.Context, adminID, userID uuid.UUI
 	if err = a.Users.Update(ctx, u); err != nil {
 		return UserView{}, err
 	}
-	a.writeAudit(ctx, adminID, "buyer_registration.reject", "user", u.ID.String(), reason, nil)
+	WriteAudit(ctx, a.Audit, adminID, "buyer_registration.reject", "user", u.ID.String(), reason, nil)
 	a.writeReviewDecision(ctx, adminID, entity.ReviewBuyerRegistration, userID, entity.ReviewRejected, reason)
 	return UserViewFrom(u), nil
 }
@@ -190,7 +190,7 @@ func (a *AdminUseCase) ApproveSellerReg(ctx context.Context, adminID, regID uuid
 	if err != nil {
 		return SellerRegItemView{}, err
 	}
-	a.writeAudit(ctx, adminID, "seller_registration.approve", "seller_registration", reg.ID.String(), nil, nil)
+	WriteAudit(ctx, a.Audit, adminID, "seller_registration.approve", "seller_registration", reg.ID.String(), nil, nil)
 	a.writeReviewDecision(ctx, adminID, entity.ReviewSellerRegistration, regID, entity.ReviewApproved, nil)
 	return SellerRegItemFrom(reg), nil
 }
@@ -225,7 +225,7 @@ func (a *AdminUseCase) RejectSellerReg(ctx context.Context, adminID, regID uuid.
 	if err = a.SellerRegs.Update(ctx, reg); err != nil {
 		return SellerRegItemView{}, err
 	}
-	a.writeAudit(ctx, adminID, "seller_registration.reject", "seller_registration", reg.ID.String(), &reason, nil)
+	WriteAudit(ctx, a.Audit, adminID, "seller_registration.reject", "seller_registration", reg.ID.String(), &reason, nil)
 	a.writeReviewDecision(ctx, adminID, entity.ReviewSellerRegistration, regID, entity.ReviewRejected, &reason)
 	return SellerRegItemFrom(reg), nil
 }

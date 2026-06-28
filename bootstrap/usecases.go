@@ -21,8 +21,9 @@ type UseCases struct {
 	Purchase  *usecase.PurchaseUseCase
 	RateLimit *usecase.RateLimitUseCase
 	KYCAccess *usecase.KYCAccessUseCase
-	Message   *usecase.MessageUseCase
-	WSToken   *usecase.WSTokenUseCase
+	Message     *usecase.MessageUseCase
+	WSToken     *usecase.WSTokenUseCase
+	Operations  *usecase.OperationsUseCase
 }
 
 func NewUseCases(
@@ -76,6 +77,7 @@ func NewUseCases(
 		Stripe:  stripeClient,
 	}
 	supportUC = NewSupporterUseCase(db, repos, stripeClient)
+	batchUC := NewBatchUseCase(db, repos, stripeClient)
 	paymentUC := &usecase.PaymentUseCase{
 		DB:              db,
 		Users:           repos.Users,
@@ -127,6 +129,13 @@ func NewUseCases(
 			Tokens:   repos.WSTokens,
 			Users:    repos.Users,
 			Activity: repos.Activity,
+		},
+		Operations: &usecase.OperationsUseCase{
+			Activity: repos.Activity,
+			Audit:    repos.Audit,
+			Runs:     repos.Batch,
+			Users:    repos.Users,
+			Batch:    batchUC,
 		},
 	}
 }
