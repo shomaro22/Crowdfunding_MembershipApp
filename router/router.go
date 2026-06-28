@@ -13,6 +13,7 @@ type Config struct {
 	Auth              *controller.AuthController
 	Projects          *controller.ProjectController
 	Connect           *controller.ConnectController
+	Seller            *controller.SellerController
 	Payments          *controller.PaymentController
 	Supporters        *controller.SupporterController
 	Messages          *controller.MessageController
@@ -105,6 +106,13 @@ func New(cfg Config) *echo.Echo {
 	if cfg.Connect != nil {
 		e.GET("/seller/connect", cfg.Connect.GetAccount, cfg.SellerRead...)
 		e.POST("/seller/connect/onboarding", cfg.Connect.CreateOnboarding, cfg.SellerWrite...)
+	}
+
+	if cfg.Seller != nil {
+		e.GET("/seller/dashboard/stats", cfg.Seller.DashboardStats, cfg.SellerRead...)
+		e.GET("/seller/supporters", cfg.Seller.ListSupporters, cfg.SellerRead...)
+		e.GET("/seller/supporters/export", cfg.Seller.ExportSupporters, cfg.SellerRead...)
+		e.GET("/seller/projects/analysis", cfg.Seller.ProjectAnalysis, cfg.SellerRead...)
 	}
 
 	if cfg.Payments != nil {
