@@ -7,17 +7,22 @@ import (
 	"time"
 
 	"crowdfund-app/auth"
-	"crowdfund-app/entity"
+	"crowdfund-app/model"
 
 	"github.com/google/uuid"
 )
 
 const oauthCallbackCodeTTL = 2 * time.Minute
 
+type OAuthRedirectView struct {
+	Code  string
+	From  string
+	Error string
+}
+
 type OAuthCBOut struct {
 	RefreshToken string
-	CallbackCode string
-	From         string
+	Redirect     OAuthRedirectView
 }
 
 func (a *AuthUseCase) GoogleAuthURL(from string) (string, error) {
@@ -39,7 +44,7 @@ func (a *AuthUseCase) GoogleCallback(ctx context.Context, code, state string, me
 		ok      bool
 		err     error
 		profile *auth.GoogleProfile
-		u       *entity.User
+		u       *model.User
 		tokens  *SessionTokens
 		cbCode  string
 	)
@@ -62,7 +67,7 @@ func (a *AuthUseCase) GoogleCallback(ctx context.Context, code, state string, me
 	if err != nil {
 		return nil, err
 	}
-	if u.Role != entity.UserRoleBuyer {
+	if u.Role != model.UserRoleBuyer {
 		return nil, ErrOAuthForbidden
 	}
 	if !u.CanLogin() {
@@ -79,11 +84,13 @@ func (a *AuthUseCase) GoogleCallback(ctx context.Context, code, state string, me
 	if err = a.OAuthCache.SetCallbackCode(ctx, cbCode, u.ID, oauthCallbackCodeTTL); err != nil {
 		return nil, err
 	}
-	a.logActivity(ctx, &u.ID, entity.UserLogin, "user", u.ID.String(), meta, entity.ProviderMeta("google"))
+	a.logActivity(ctx, &u.ID, model.UserLogin, "user", u.ID.String(), meta, model.ProviderMeta("google"))
 	return &OAuthCBOut{
 		RefreshToken: tokens.RefreshToken,
-		CallbackCode: cbCode,
-		From:         from,
+		Redirect: OAuthRedirectView{
+			Code: cbCode,
+			From: from,
+		},
 	}, nil
 }
 
@@ -92,7 +99,7 @@ func (a *AuthUseCase) ExchangeOAuthCode(ctx context.Context, code string, meta R
 		userID    uuid.UUID
 		ok        bool
 		err       error
-		u         *entity.User
+		u         *model.User
 		authToken string
 	)
 
@@ -130,21 +137,21 @@ func (a *AuthUseCase) ExchangeOAuthCode(ctx context.Context, code string, meta R
 	return &LoginResult{User: UserViewFrom(u), AuthToken: authToken}, nil
 }
 
-func (a *AuthUseCase) resolveGoogleUser(ctx context.Context, profile *auth.GoogleProfile) (*entity.User, error) {
+func (a *AuthUseCase) resolveGoogleUser(ctx context.Context, profile *auth.GoogleProfile) (*model.User, error) {
 	var (
-		acc      *entity.OAuthAccount
+		acc      *model.OAuthAccount
 		err      error
-		existing *entity.User
+		existing *model.User
 		now      time.Time
-		link     *entity.OAuthAccount
+		link     *model.OAuthAccount
 		pwPlain  string
 		pwHash   string
 		name     *string
 		n        string
-		u        *entity.User
+		u        *model.User
 	)
 
-	acc, err = a.OAuth.FindSub(ctx, entity.OAuthProviderGoogle, profile.Sub)
+	acc, err = a.OAuth.FindSub(ctx, model.OAuthProviderGoogle, profile.Sub)
 	if isRepoNotFound(err) {
 		acc = nil
 	} else if err != nil {
@@ -165,13 +172,13 @@ func (a *AuthUseCase) resolveGoogleUser(ctx context.Context, profile *auth.Googl
 	}
 	now = time.Now().UTC()
 	if existing != nil {
-		if existing.Role != entity.UserRoleBuyer {
+		if existing.Role != model.UserRoleBuyer {
 			return nil, ErrOAuthForbidden
 		}
-		link = &entity.OAuthAccount{
+		link = &model.OAuthAccount{
 			ID:          uuid.New(),
 			UserID:      existing.ID,
-			Provider:    entity.OAuthProviderGoogle,
+			Provider:    model.OAuthProviderGoogle,
 			ProviderSub: profile.Sub,
 			Email:       profile.Email,
 			CreatedAt:   now,
@@ -193,24 +200,24 @@ func (a *AuthUseCase) resolveGoogleUser(ctx context.Context, profile *auth.Googl
 		n = profile.Name
 		name = &n
 	}
-	u = &entity.User{
+	u = &model.User{
 		ID:            uuid.New(),
 		Email:         profile.Email,
 		Name:          name,
 		PasswordHash:  pwHash,
-		Role:          entity.UserRoleBuyer,
-		AccountStatus: entity.AccountStatusPending,
-		SellerStatus:  entity.SellerStatusNotApplicable,
+		Role:          model.UserRoleBuyer,
+		AccountStatus: model.AccountStatusPending,
+		SellerStatus:  model.SellerStatusNotApplicable,
 		CreatedAt:     now,
 		UpdatedAt:     now,
 	}
 	if err = a.Users.Create(ctx, u); err != nil {
 		return nil, err
 	}
-	link = &entity.OAuthAccount{
+	link = &model.OAuthAccount{
 		ID:          uuid.New(),
 		UserID:      u.ID,
-		Provider:    entity.OAuthProviderGoogle,
+		Provider:    model.OAuthProviderGoogle,
 		ProviderSub: profile.Sub,
 		Email:       profile.Email,
 		CreatedAt:   now,

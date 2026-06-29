@@ -6,7 +6,7 @@ import (
 	"strconv"
 	"time"
 
-	"crowdfund-app/entity"
+	"crowdfund-app/model"
 	"crowdfund-app/repository"
 
 	"github.com/google/uuid"
@@ -22,10 +22,10 @@ func LogActivity(
 	ctx context.Context,
 	repo repository.ActivityRepo,
 	userID *uuid.UUID,
-	action entity.ActivityAction,
+	action model.ActivityAction,
 	resource, resourceID string,
 	meta RequestMeta,
-	extra entity.JSONMetadata,
+	extra model.JSONMetadata,
 ) {
 	var (
 		res   *string
@@ -52,7 +52,7 @@ func LogActivity(
 	if meta.RequestID != "" {
 		reqID = &meta.RequestID
 	}
-	_ = repo.Create(ctx, &entity.ActivityLog{
+	_ = repo.Create(ctx, &model.ActivityLog{
 		ID:         uuid.New(),
 		UserID:     userID,
 		Action:     action,
@@ -66,7 +66,7 @@ func LogActivity(
 	})
 }
 
-func activityMeta(fields map[string]string) entity.JSONMetadata {
+func activityMeta(fields map[string]string) model.JSONMetadata {
 	var (
 		b   []byte
 		err error
@@ -78,10 +78,10 @@ func activityMeta(fields map[string]string) entity.JSONMetadata {
 	if err != nil {
 		return nil
 	}
-	return entity.JSONMetadata(b)
+	return model.JSONMetadata(b)
 }
 
-func ActivityMeta(fields map[string]string) entity.JSONMetadata {
+func ActivityMeta(fields map[string]string) model.JSONMetadata {
 	return activityMeta(fields)
 }
 
@@ -92,13 +92,13 @@ func LogRateLimitDenied(
 	policy, ruleKey string,
 	meta RequestMeta,
 ) {
-	LogActivity(ctx, repo, userID, entity.SecRateLimit, "rate_limit", policy, meta, ActivityMeta(map[string]string{
+	LogActivity(ctx, repo, userID, model.SecRateLimit, "rate_limit", policy, meta, ActivityMeta(map[string]string{
 		"policy": policy,
 		"key":    ruleKey,
 	}))
 }
 
-func purchaseActivityMeta(purchase *entity.Purchase) entity.JSONMetadata {
+func purchaseActivityMeta(purchase *model.Purchase) model.JSONMetadata {
 	if purchase == nil {
 		return nil
 	}
@@ -119,7 +119,7 @@ func WriteAudit(
 	if repo == nil {
 		return
 	}
-	_ = repo.Create(ctx, &entity.AuditLog{
+	_ = repo.Create(ctx, &model.AuditLog{
 		ID:         uuid.New(),
 		AdminID:    adminID,
 		Action:     action,

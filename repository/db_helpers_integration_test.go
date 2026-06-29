@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"crowdfund-app/entity"
+	"crowdfund-app/model"
 	"crowdfund-app/repository"
 
 	"github.com/google/uuid"
@@ -19,7 +19,7 @@ import (
 func TestFirstOneReturnsErrNotFound(t *testing.T) {
 	var (
 		gdb = openIntegrationDB(t)
-		row entity.Purchase
+		row model.Purchase
 		err error
 	)
 
@@ -32,7 +32,7 @@ func TestFirstOneReturnsErrNotFound(t *testing.T) {
 func TestFirstOneForUpdateReturnsErrNotFound(t *testing.T) {
 	var (
 		gdb = openIntegrationDB(t)
-		row entity.Purchase
+		row model.Purchase
 		err error
 	)
 
@@ -48,7 +48,7 @@ func TestGetOneReturnsErrNotFound(t *testing.T) {
 		err error
 	)
 
-	_, err = repository.GetOneForTest[entity.Purchase](gdb.Where("id = ?", uuid.New()))
+	_, err = repository.GetOneForTest[model.Purchase](gdb.Where("id = ?", uuid.New()))
 	if !errors.Is(err, repository.ErrNotFound) {
 		t.Fatalf("expected ErrNotFound, got %v", err)
 	}
@@ -59,7 +59,7 @@ func TestPurchaseFindIDReturnsErrNotFound(t *testing.T) {
 		gdb  = openIntegrationDB(t)
 		repo = repository.NewPurchaseRepo(gdb)
 		ctx  = context.Background()
-		row  *entity.Purchase
+		row  *model.Purchase
 		err  error
 	)
 
@@ -80,11 +80,11 @@ func TestPurchaseFindIDReturnsRow(t *testing.T) {
 		gdb      = openIntegrationDB(t)
 		repo     = repository.NewPurchaseRepo(gdb)
 		ctx      = context.Background()
-		buyer    = seedIntegrationUser(t, gdb, entity.UserRoleBuyer, nil)
-		seller   = seedIntegrationUser(t, gdb, entity.UserRoleSeller, nil)
+		buyer    = seedIntegrationUser(t, gdb, model.UserRoleBuyer, nil)
+		seller   = seedIntegrationUser(t, gdb, model.UserRoleSeller, nil)
 		project  = seedIntegrationProject(t, gdb, seller.ID)
 		purchase = seedIntegrationPurchase(t, gdb, buyer.ID, project.ID)
-		row      *entity.Purchase
+		row      *model.Purchase
 		err      error
 	)
 
@@ -97,23 +97,23 @@ func TestPurchaseFindIDReturnsRow(t *testing.T) {
 	}
 }
 
-func seedIntegrationProject(t *testing.T, gdb *gorm.DB, sellerID uuid.UUID) *entity.Project {
+func seedIntegrationProject(t *testing.T, gdb *gorm.DB, sellerID uuid.UUID) *model.Project {
 	var (
 		now time.Time
-		p   *entity.Project
+		p   *model.Project
 		err error
 	)
 	t.Helper()
 	now = time.Now().UTC()
-	p = &entity.Project{
+	p = &model.Project{
 		ID:             uuid.New(),
 		SellerID:       sellerID,
 		Title:          fmt.Sprintf("project-%s", uuid.New()),
 		Description:    "integration test project",
 		TargetAmount:   10000,
-		DurationType:   entity.DurationUnlimited,
+		DurationType:   model.DurationUnlimited,
 		StartDate:      now,
-		Status:         entity.ProjectStatusActive,
+		Status:         model.ProjectStatusActive,
 		CreatedAt:      now,
 		UpdatedAt:      now,
 	}
@@ -122,27 +122,27 @@ func seedIntegrationProject(t *testing.T, gdb *gorm.DB, sellerID uuid.UUID) *ent
 		t.Fatal(err)
 	}
 	t.Cleanup(func() {
-		_ = gdb.Delete(&entity.Project{}, "id = ?", p.ID).Error
+		_ = gdb.Delete(&model.Project{}, "id = ?", p.ID).Error
 	})
 	return p
 }
 
-func seedIntegrationPurchase(t *testing.T, gdb *gorm.DB, buyerID, projectID uuid.UUID) *entity.Purchase {
+func seedIntegrationPurchase(t *testing.T, gdb *gorm.DB, buyerID, projectID uuid.UUID) *model.Purchase {
 	var (
 		now time.Time
-		p   *entity.Purchase
+		p   *model.Purchase
 		err error
 	)
 	t.Helper()
 	now = time.Now().UTC()
-	p = &entity.Purchase{
+	p = &model.Purchase{
 		ID:            uuid.New(),
 		ProjectID:     projectID,
 		BuyerID:       buyerID,
 		Quantity:      1,
 		TotalPrice:    500,
-		Status:        entity.PurchaseStatusPending,
-		PaymentMethod: entity.PaymentMethodCard,
+		Status:        model.PurchaseStatusPending,
+		PaymentMethod: model.PaymentMethodCard,
 		CreatedAt:     now,
 		UpdatedAt:     now,
 	}
@@ -151,7 +151,7 @@ func seedIntegrationPurchase(t *testing.T, gdb *gorm.DB, buyerID, projectID uuid
 		t.Fatal(err)
 	}
 	t.Cleanup(func() {
-		_ = gdb.Delete(&entity.Purchase{}, "id = ?", p.ID).Error
+		_ = gdb.Delete(&model.Purchase{}, "id = ?", p.ID).Error
 	})
 	return p
 }

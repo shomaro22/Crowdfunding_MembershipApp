@@ -5,7 +5,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"crowdfund-app/entity"
+	"crowdfund-app/model"
 
 	"github.com/labstack/echo/v4"
 )
@@ -22,31 +22,31 @@ func TestRequireAdminRole(t *testing.T) {
 		cases = []struct {
 			name       string
 			adminRole  string
-			allowed    []entity.AdminRole
+			allowed    []model.AdminRole
 			wantStatus int
 		}{
 			{
 				name:       "super admin bypasses review only",
-				adminRole:  string(entity.AdminRoleSuperAdmin),
-				allowed:    []entity.AdminRole{entity.AdminRoleReviewAdmin},
+				adminRole:  string(model.AdminRoleSuperAdmin),
+				allowed:    []model.AdminRole{model.AdminRoleReviewAdmin},
 				wantStatus: http.StatusOK,
 			},
 			{
 				name:       "review admin allowed",
-				adminRole:  string(entity.AdminRoleReviewAdmin),
-				allowed:    []entity.AdminRole{entity.AdminRoleReviewAdmin},
+				adminRole:  string(model.AdminRoleReviewAdmin),
+				allowed:    []model.AdminRole{model.AdminRoleReviewAdmin},
 				wantStatus: http.StatusOK,
 			},
 			{
 				name:       "support admin denied for review",
-				adminRole:  string(entity.AdminRoleSupportAdmin),
-				allowed:    []entity.AdminRole{entity.AdminRoleReviewAdmin},
+				adminRole:  string(model.AdminRoleSupportAdmin),
+				allowed:    []model.AdminRole{model.AdminRoleReviewAdmin},
 				wantStatus: http.StatusForbidden,
 			},
 			{
 				name:       "missing admin role",
 				adminRole:  "",
-				allowed:    []entity.AdminRole{entity.AdminRoleSupportAdmin},
+				allowed:    []model.AdminRole{model.AdminRoleSupportAdmin},
 				wantStatus: http.StatusForbidden,
 			},
 		}
@@ -54,7 +54,7 @@ func TestRequireAdminRole(t *testing.T) {
 		tc struct {
 			name       string
 			adminRole  string
-			allowed    []entity.AdminRole
+			allowed    []model.AdminRole
 			wantStatus int
 		}
 	)
@@ -69,7 +69,7 @@ func TestRequireAdminRole(t *testing.T) {
 			req = httptest.NewRequest(http.MethodGet, "/", nil)
 			rec = httptest.NewRecorder()
 			c = e.NewContext(req, rec)
-			c.Set(CtxUserRole, string(entity.UserRoleAdmin))
+			c.Set(CtxUserRole, string(model.UserRoleAdmin))
 			if tc.adminRole != "" {
 				c.Set(CtxAdminRole, tc.adminRole)
 			}
@@ -105,9 +105,9 @@ func TestRequireAdminRoleNonAdminUser(t *testing.T) {
 	req = httptest.NewRequest(http.MethodGet, "/", nil)
 	rec = httptest.NewRecorder()
 	c = e.NewContext(req, rec)
-	c.Set(CtxUserRole, string(entity.UserRoleBuyer))
-	c.Set(CtxAdminRole, string(entity.AdminRoleSuperAdmin))
-	err = RequireAdminRole(entity.AdminRoleSuperAdmin)(func(c echo.Context) error {
+	c.Set(CtxUserRole, string(model.UserRoleBuyer))
+	c.Set(CtxAdminRole, string(model.AdminRoleSuperAdmin))
+	err = RequireAdminRole(model.AdminRoleSuperAdmin)(func(c echo.Context) error {
 		return c.NoContent(http.StatusOK)
 	})(c)
 	if err == nil {

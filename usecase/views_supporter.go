@@ -3,7 +3,7 @@ package usecase
 import (
 	"time"
 
-	"crowdfund-app/entity"
+	"crowdfund-app/model"
 
 	"github.com/google/uuid"
 )
@@ -21,7 +21,7 @@ type SupporterItemView struct {
 	PlanChangeDate     *time.Time
 }
 
-func SupporterItemFrom(s *entity.ProjectSupporter) SupporterItemView {
+func SupporterItemFrom(s *model.ProjectSupporter) SupporterItemView {
 	if s == nil {
 		return SupporterItemView{}
 	}
@@ -46,7 +46,7 @@ type SupporterView struct {
 	PendingPlan *ProjectPlanView
 }
 
-func ProjectItemPtrFrom(p *entity.Project) *ProjectItemView {
+func ProjectItemPtrFrom(p *model.Project) *ProjectItemView {
 	if p == nil {
 		return nil
 	}
@@ -54,7 +54,7 @@ func ProjectItemPtrFrom(p *entity.Project) *ProjectItemView {
 	return &v
 }
 
-func ProjectPlanPtrFrom(plan *entity.ProjectPlan) *ProjectPlanView {
+func ProjectPlanPtrFrom(plan *model.ProjectPlan) *ProjectPlanView {
 	if plan == nil {
 		return nil
 	}
@@ -74,7 +74,7 @@ type PurchaseItemView struct {
 	CreatedAt     time.Time
 }
 
-func PurchaseItemFrom(p *entity.Purchase) PurchaseItemView {
+func PurchaseItemFrom(p *model.Purchase) PurchaseItemView {
 	if p == nil {
 		return PurchaseItemView{}
 	}

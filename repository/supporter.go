@@ -4,23 +4,23 @@ import (
 	"context"
 	"time"
 
-	"crowdfund-app/entity"
+	"crowdfund-app/model"
 
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 )
 
 type SupporterRepo interface {
-	FindActive(ctx context.Context, projectID, userID uuid.UUID) (*entity.ProjectSupporter, error)
-	FindMembership(ctx context.Context, projectID, userID uuid.UUID) (*entity.ProjectSupporter, error)
-	FindStripeSubscriptionID(ctx context.Context, subscriptionID string) (*entity.ProjectSupporter, error)
-	FindID(ctx context.Context, id uuid.UUID) (*entity.ProjectSupporter, error)
-	FindOwned(ctx context.Context, id, userID uuid.UUID) (*entity.ProjectSupporter, error)
-	ListByUserID(ctx context.Context, userID uuid.UUID) ([]entity.ProjectSupporter, error)
-	ListDuePlanChanges(ctx context.Context, asOf time.Time) ([]entity.ProjectSupporter, error)
-	ListExpirable(ctx context.Context, asOf time.Time) ([]entity.ProjectSupporter, error)
-	Create(ctx context.Context, row *entity.ProjectSupporter) error
-	Update(ctx context.Context, row *entity.ProjectSupporter) error
+	FindActive(ctx context.Context, projectID, userID uuid.UUID) (*model.ProjectSupporter, error)
+	FindMembership(ctx context.Context, projectID, userID uuid.UUID) (*model.ProjectSupporter, error)
+	FindStripeSubscriptionID(ctx context.Context, subscriptionID string) (*model.ProjectSupporter, error)
+	FindID(ctx context.Context, id uuid.UUID) (*model.ProjectSupporter, error)
+	FindOwned(ctx context.Context, id, userID uuid.UUID) (*model.ProjectSupporter, error)
+	ListByUserID(ctx context.Context, userID uuid.UUID) ([]model.ProjectSupporter, error)
+	ListDuePlanChanges(ctx context.Context, asOf time.Time) ([]model.ProjectSupporter, error)
+	ListExpirable(ctx context.Context, asOf time.Time) ([]model.ProjectSupporter, error)
+	Create(ctx context.Context, row *model.ProjectSupporter) error
+	Update(ctx context.Context, row *model.ProjectSupporter) error
 }
 
 type supporterRepo struct {
@@ -35,41 +35,41 @@ func (r *supporterRepo) dbCtx(ctx context.Context) *gorm.DB {
 	return dbFromCtx(ctx, r.db)
 }
 
-func (r *supporterRepo) FindActive(ctx context.Context, projectID, userID uuid.UUID) (*entity.ProjectSupporter, error) {
-	return firstOnePtr[entity.ProjectSupporter](r.dbCtx(ctx).
-		Where("project_id = ? AND user_id = ? AND status = ?", projectID, userID, entity.SupporterStatusActive))
+func (r *supporterRepo) FindActive(ctx context.Context, projectID, userID uuid.UUID) (*model.ProjectSupporter, error) {
+	return firstOnePtr[model.ProjectSupporter](r.dbCtx(ctx).
+		Where("project_id = ? AND user_id = ? AND status = ?", projectID, userID, model.SupporterStatusActive))
 }
 
-func (r *supporterRepo) FindMembership(ctx context.Context, projectID, userID uuid.UUID) (*entity.ProjectSupporter, error) {
-	return firstOnePtr[entity.ProjectSupporter](r.dbCtx(ctx).
+func (r *supporterRepo) FindMembership(ctx context.Context, projectID, userID uuid.UUID) (*model.ProjectSupporter, error) {
+	return firstOnePtr[model.ProjectSupporter](r.dbCtx(ctx).
 		Where("project_id = ? AND user_id = ? AND status IN ?", projectID, userID,
-			[]entity.SupporterStatus{entity.SupporterStatusActive, entity.SupporterStatusPendingRenewal}))
+			[]model.SupporterStatus{model.SupporterStatusActive, model.SupporterStatusPendingRenewal}))
 }
 
-func (r *supporterRepo) FindStripeSubscriptionID(ctx context.Context, subscriptionID string) (*entity.ProjectSupporter, error) {
-	return firstOnePtr[entity.ProjectSupporter](r.dbCtx(ctx).Where("stripe_subscription_id = ?", subscriptionID))
+func (r *supporterRepo) FindStripeSubscriptionID(ctx context.Context, subscriptionID string) (*model.ProjectSupporter, error) {
+	return firstOnePtr[model.ProjectSupporter](r.dbCtx(ctx).Where("stripe_subscription_id = ?", subscriptionID))
 }
 
-func (r *supporterRepo) FindID(ctx context.Context, id uuid.UUID) (*entity.ProjectSupporter, error) {
-	return firstOnePtr[entity.ProjectSupporter](r.dbCtx(ctx).Where("id = ?", id))
+func (r *supporterRepo) FindID(ctx context.Context, id uuid.UUID) (*model.ProjectSupporter, error) {
+	return firstOnePtr[model.ProjectSupporter](r.dbCtx(ctx).Where("id = ?", id))
 }
 
-func (r *supporterRepo) FindOwned(ctx context.Context, id, userID uuid.UUID) (*entity.ProjectSupporter, error) {
-	return firstOnePtr[entity.ProjectSupporter](r.dbCtx(ctx).Where("id = ? AND user_id = ?", id, userID))
+func (r *supporterRepo) FindOwned(ctx context.Context, id, userID uuid.UUID) (*model.ProjectSupporter, error) {
+	return firstOnePtr[model.ProjectSupporter](r.dbCtx(ctx).Where("id = ? AND user_id = ?", id, userID))
 }
 
-func (r *supporterRepo) ListByUserID(ctx context.Context, userID uuid.UUID) ([]entity.ProjectSupporter, error) {
+func (r *supporterRepo) ListByUserID(ctx context.Context, userID uuid.UUID) ([]model.ProjectSupporter, error) {
 	var (
-		rows []entity.ProjectSupporter
+		rows []model.ProjectSupporter
 		err  error
 	)
 	err = r.dbCtx(ctx).Where("user_id = ?", userID).Order("created_at DESC").Find(&rows).Error
 	return rows, err
 }
 
-func (r *supporterRepo) ListDuePlanChanges(ctx context.Context, asOf time.Time) ([]entity.ProjectSupporter, error) {
+func (r *supporterRepo) ListDuePlanChanges(ctx context.Context, asOf time.Time) ([]model.ProjectSupporter, error) {
 	var (
-		rows []entity.ProjectSupporter
+		rows []model.ProjectSupporter
 		err  error
 	)
 	err = r.dbCtx(ctx).
@@ -79,26 +79,26 @@ func (r *supporterRepo) ListDuePlanChanges(ctx context.Context, asOf time.Time) 
 	return rows, err
 }
 
-func (r *supporterRepo) ListExpirable(ctx context.Context, asOf time.Time) ([]entity.ProjectSupporter, error) {
+func (r *supporterRepo) ListExpirable(ctx context.Context, asOf time.Time) ([]model.ProjectSupporter, error) {
 	var (
-		rows []entity.ProjectSupporter
+		rows []model.ProjectSupporter
 		err  error
 	)
 	err = r.dbCtx(ctx).
 		Where("current_period_end < ?", asOf).
-		Where("status IN ?", []entity.SupporterStatus{
-			entity.SupporterStatusActive,
-			entity.SupporterStatusPendingRenewal,
-			entity.SupporterStatusCancelled,
+		Where("status IN ?", []model.SupporterStatus{
+			model.SupporterStatusActive,
+			model.SupporterStatusPendingRenewal,
+			model.SupporterStatusCancelled,
 		}).
 		Find(&rows).Error
 	return rows, err
 }
 
-func (r *supporterRepo) Create(ctx context.Context, row *entity.ProjectSupporter) error {
+func (r *supporterRepo) Create(ctx context.Context, row *model.ProjectSupporter) error {
 	return r.dbCtx(ctx).Create(row).Error
 }
 
-func (r *supporterRepo) Update(ctx context.Context, row *entity.ProjectSupporter) error {
+func (r *supporterRepo) Update(ctx context.Context, row *model.ProjectSupporter) error {
 	return r.dbCtx(ctx).Save(row).Error
 }

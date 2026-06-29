@@ -6,20 +6,20 @@ import (
 	"time"
 
 	"crowdfund-app/auth"
-	"crowdfund-app/entity"
+	"crowdfund-app/model"
 	"crowdfund-app/repository"
 	"crowdfund-app/validator"
 
 	"github.com/google/uuid"
 )
 
-func (a *AuthUseCase) issueSession(ctx context.Context, u *entity.User, verified2FA bool) (*SessionTokens, error) {
+func (a *AuthUseCase) issueSession(ctx context.Context, u *model.User, verified2FA bool) (*SessionTokens, error) {
 	var (
 		authToken string
 		err       error
 		plain     string
 		now       time.Time
-		row       *entity.RefreshToken
+		row       *model.RefreshToken
 	)
 	authToken, err = a.Tokens.Issue(auth.AuthClaims{
 		UserID:        u.ID,
@@ -36,7 +36,7 @@ func (a *AuthUseCase) issueSession(ctx context.Context, u *entity.User, verified
 		return nil, err
 	}
 	now = time.Now().UTC()
-	row = &entity.RefreshToken{
+	row = &model.RefreshToken{
 		ID:        uuid.New(),
 		UserID:    u.ID,
 		TokenHash: auth.OpaqueHash(plain),
@@ -51,7 +51,7 @@ func (a *AuthUseCase) issueSession(ctx context.Context, u *entity.User, verified
 
 func (a *AuthUseCase) ValidateSession(ctx context.Context, claims auth.AuthClaims) (SessionInfo, error) {
 	var (
-		u   *entity.User
+		u   *model.User
 		err error
 	)
 	u, err = a.Users.FindID(ctx, claims.UserID)
@@ -71,17 +71,21 @@ func (a *AuthUseCase) ParseToken(raw string) (auth.AuthClaims, error) {
 	return a.Tokens.Parse(raw)
 }
 
+func (a *AuthUseCase) SigningKey() []byte {
+	return a.TOTPKey
+}
+
 func (a *AuthUseCase) Login(ctx context.Context, email, password string, meta RequestMeta) (*LoginResult, error) {
 	var (
 		normalized string
-		u          *entity.User
+		u          *model.User
 		err        error
 		tokens     *SessionTokens
 	)
 
-	normalized = entity.NormalizeEmail(email)
+	normalized = model.NormalizeEmail(email)
 	if normalized == "" || password == "" {
-		a.logActivity(ctx, nil, entity.UserLoginFail, "user", normalized, meta, nil)
+		a.logActivity(ctx, nil, model.UserLoginFail, "user", normalized, meta, nil)
 		return nil, ErrInvalidCredentials
 	}
 	u, err = a.Users.FindEmail(ctx, normalized)
@@ -89,22 +93,22 @@ func (a *AuthUseCase) Login(ctx context.Context, email, password string, meta Re
 		return nil, mapRepoNotFoundAs(err, ErrInvalidCredentials)
 	}
 	if auth.ComparePassword(u.PasswordHash, password) != nil {
-		a.logActivity(ctx, nil, entity.UserLoginFail, "user", normalized, meta, nil)
+		a.logActivity(ctx, nil, model.UserLoginFail, "user", normalized, meta, nil)
 		return nil, ErrInvalidCredentials
 	}
 	if !u.CanLogin() {
-		a.logActivity(ctx, &u.ID, entity.UserLoginFail, "user", u.ID.String(), meta, nil)
+		a.logActivity(ctx, &u.ID, model.UserLoginFail, "user", u.ID.String(), meta, nil)
 		return nil, ErrInactiveUser
 	}
 	if u.NeedsTOTP() && u.TOTPEnabled {
-		a.logActivity(ctx, &u.ID, entity.UserLogin, "user", u.ID.String(), meta, entity.StepMeta("2fa_pending"))
+		a.logActivity(ctx, &u.ID, model.UserLogin, "user", u.ID.String(), meta, model.StepMeta("2fa_pending"))
 		return &LoginResult{User: UserViewFrom(u), Requires2FA: true}, nil
 	}
 	tokens, err = a.issueSession(ctx, u, twoFAVerified(u))
 	if err != nil {
 		return nil, err
 	}
-	a.logActivity(ctx, &u.ID, entity.UserLogin, "user", u.ID.String(), meta, nil)
+	a.logActivity(ctx, &u.ID, model.UserLogin, "user", u.ID.String(), meta, nil)
 	return &LoginResult{
 		User:         UserViewFrom(u),
 		AuthToken:    tokens.AuthToken,
@@ -117,9 +121,9 @@ func (a *AuthUseCase) Refresh(ctx context.Context, refreshTokenPlain string, met
 		plain  string
 		hash   string
 		now    time.Time
-		row    *entity.RefreshToken
+		row    *model.RefreshToken
 		err    error
-		u      *entity.User
+		u      *model.User
 		tokens *SessionTokens
 	)
 
@@ -158,7 +162,7 @@ func (a *AuthUseCase) Logout(ctx context.Context, refreshTokenPlain string, meta
 		plain string
 		hash  string
 		now   time.Time
-		row   *entity.RefreshToken
+		row   *model.RefreshToken
 		err   error
 	)
 
@@ -175,25 +179,25 @@ func (a *AuthUseCase) Logout(ctx context.Context, refreshTokenPlain string, meta
 	if err = a.RefreshTokens.Revoke(ctx, row.ID, now); err != nil {
 		return err
 	}
-	a.logActivity(ctx, &row.UserID, entity.UserLogout, "user", row.UserID.String(), meta, nil)
+	a.logActivity(ctx, &row.UserID, model.UserLogout, "user", row.UserID.String(), meta, nil)
 	return nil
 }
 
 func (a *AuthUseCase) ForgotPassword(ctx context.Context, email string) error {
 	var (
 		normalized string
-		u          *entity.User
+		u          *model.User
 		err        error
 		plain      string
 		now        time.Time
-		row        *entity.ResetToken
-		mailer     PasswordMailer
+		row        *model.ResetToken
+		mailer     Mailer
 	)
 
 	if a.ResetToks == nil {
 		return nil
 	}
-	normalized = entity.NormalizeEmail(email)
+	normalized = model.NormalizeEmail(email)
 	u, err = a.Users.FindEmail(ctx, normalized)
 	if isRepoNotFound(err) {
 		return nil
@@ -209,7 +213,7 @@ func (a *AuthUseCase) ForgotPassword(ctx context.Context, email string) error {
 		return err
 	}
 	now = time.Now().UTC()
-	row = &entity.ResetToken{
+	row = &model.ResetToken{
 		ID:        uuid.New(),
 		UserID:    u.ID,
 		TokenHash: auth.OpaqueHash(plain),
@@ -230,8 +234,8 @@ func (a *AuthUseCase) ResetPassword(ctx context.Context, plainToken, newPassword
 	var (
 		err  error
 		now  time.Time
-		row  *entity.ResetToken
-		u    *entity.User
+		row  *model.ResetToken
+		u    *model.User
 		hash string
 	)
 
@@ -269,7 +273,7 @@ func (a *AuthUseCase) ResetPassword(ctx context.Context, plainToken, newPassword
 func (a *AuthUseCase) ChangePassword(ctx context.Context, userID uuid.UUID, current, newPassword, totpCode string) error {
 	var (
 		err  error
-		u    *entity.User
+		u    *model.User
 		hash string
 		now  time.Time
 	)

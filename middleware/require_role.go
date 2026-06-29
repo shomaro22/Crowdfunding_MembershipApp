@@ -1,18 +1,18 @@
 package middleware
 
 import (
-	"crowdfund-app/entity"
+	"crowdfund-app/model"
 
 	"github.com/labstack/echo/v4"
 )
 
-func RequireRole(roles ...entity.UserRole) echo.MiddlewareFunc {
+func RequireRole(roles ...model.UserRole) echo.MiddlewareFunc {
 	var (
-		allowed map[entity.UserRole]struct{}
+		allowed map[model.UserRole]struct{}
 		i       int
-		r       entity.UserRole
+		r       model.UserRole
 	)
-	allowed = make(map[entity.UserRole]struct{}, len(roles))
+	allowed = make(map[model.UserRole]struct{}, len(roles))
 	for i = range roles {
 		r = roles[i]
 		allowed[r] = struct{}{}
@@ -20,7 +20,7 @@ func RequireRole(roles ...entity.UserRole) echo.MiddlewareFunc {
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(c echo.Context) error {
 			var (
-				role entity.UserRole
+				role model.UserRole
 				ok   bool
 			)
 			role, ok = AuthUserRole(c)

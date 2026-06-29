@@ -4,14 +4,14 @@ import (
 	"testing"
 	"time"
 
-	"crowdfund-app/entity"
+	"crowdfund-app/model"
 )
 
 func TestIsExpirableStatus(t *testing.T) {
-	if !isExpirableStatus(entity.SupporterStatusActive) {
+	if !isExpirableStatus(model.SupporterStatusActive) {
 		t.Fatal("active should be expirable")
 	}
-	if isExpirableStatus(entity.SupporterStatusExpired) {
+	if isExpirableStatus(model.SupporterStatusExpired) {
 		t.Fatal("already expired should not be expirable")
 	}
 }
@@ -19,8 +19,8 @@ func TestIsExpirableStatus(t *testing.T) {
 func TestExpireSupporterSkipsBeforePeriodEnd(t *testing.T) {
 	var (
 		now = time.Date(2026, 3, 1, 0, 0, 0, 0, time.UTC)
-		s   = &entity.ProjectSupporter{
-			Status:           entity.SupporterStatusActive,
+		s   = &model.ProjectSupporter{
+			Status:           model.SupporterStatusActive,
 			CurrentPeriodEnd: now.Add(24 * time.Hour),
 		}
 	)
@@ -33,10 +33,10 @@ func TestExpireSupporterSkipsBeforePeriodEnd(t *testing.T) {
 }
 
 func TestIsSupportedBatchJob(t *testing.T) {
-	if !isSupportedBatchJob(entity.ApplyPlans) {
+	if !isSupportedBatchJob(model.ApplyPlans) {
 		t.Fatal("apply_plans should be supported")
 	}
-	if !isSupportedBatchJob(entity.PurgeTokens) {
+	if !isSupportedBatchJob(model.PurgeTokens) {
 		t.Fatal("purge_tokens should be supported")
 	}
 	if isSupportedBatchJob("reconcile_stripe") {

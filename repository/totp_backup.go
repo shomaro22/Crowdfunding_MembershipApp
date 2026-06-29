@@ -4,15 +4,15 @@ import (
 	"context"
 	"time"
 
-	"crowdfund-app/entity"
+	"crowdfund-app/model"
 
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 )
 
 type TOTPBackupRepo interface {
-	CreateBatch(ctx context.Context, rows []entity.TOTPBackupCode) error
-	ListUnused(ctx context.Context, userID uuid.UUID) ([]entity.TOTPBackupCode, error)
+	CreateBatch(ctx context.Context, rows []model.TOTPBackupCode) error
+	ListUnused(ctx context.Context, userID uuid.UUID) ([]model.TOTPBackupCode, error)
 	MarkUsed(ctx context.Context, id uuid.UUID, at time.Time) error
 	DeleteUser(ctx context.Context, userID uuid.UUID) error
 }
@@ -25,16 +25,16 @@ func NewTOTPBackupRepo(db *gorm.DB) TOTPBackupRepo {
 	return &totpBackupRepo{db: db}
 }
 
-func (r *totpBackupRepo) CreateBatch(ctx context.Context, rows []entity.TOTPBackupCode) error {
+func (r *totpBackupRepo) CreateBatch(ctx context.Context, rows []model.TOTPBackupCode) error {
 	if len(rows) == 0 {
 		return nil
 	}
 	return dbFromCtx(ctx, r.db).Create(&rows).Error
 }
 
-func (r *totpBackupRepo) ListUnused(ctx context.Context, userID uuid.UUID) ([]entity.TOTPBackupCode, error) {
+func (r *totpBackupRepo) ListUnused(ctx context.Context, userID uuid.UUID) ([]model.TOTPBackupCode, error) {
 	var (
-		rows []entity.TOTPBackupCode
+		rows []model.TOTPBackupCode
 		err  error
 	)
 	err = dbFromCtx(ctx, r.db).
@@ -44,11 +44,11 @@ func (r *totpBackupRepo) ListUnused(ctx context.Context, userID uuid.UUID) ([]en
 }
 
 func (r *totpBackupRepo) MarkUsed(ctx context.Context, id uuid.UUID, at time.Time) error {
-	return dbFromCtx(ctx, r.db).Model(&entity.TOTPBackupCode{}).
+	return dbFromCtx(ctx, r.db).Model(&model.TOTPBackupCode{}).
 		Where("id = ?", id).
 		Update("used_at", at).Error
 }
 
 func (r *totpBackupRepo) DeleteUser(ctx context.Context, userID uuid.UUID) error {
-	return dbFromCtx(ctx, r.db).Where("user_id = ?", userID).Delete(&entity.TOTPBackupCode{}).Error
+	return dbFromCtx(ctx, r.db).Where("user_id = ?", userID).Delete(&model.TOTPBackupCode{}).Error
 }
