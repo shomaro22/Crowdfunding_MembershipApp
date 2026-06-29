@@ -6,20 +6,19 @@ import (
 
 	"crowdfund-app/entity"
 	"crowdfund-app/repository"
-	"crowdfund-app/stripe"
-
+	
 	"github.com/google/uuid"
 )
 
 func (p *PaymentUseCase) HandleWebhook(ctx context.Context, payload []byte, signature string) error {
 	var (
-		event stripe.WebhookEvent
+		event WebhookEvent
 		err   error
 	)
-	if p.Stripe == nil {
+	if p.PaymentGateway == nil {
 		return ErrStripeUnavailable
 	}
-	event, err = p.Stripe.ConstructWebhookEvent(payload, signature)
+	event, err = p.PaymentGateway.ConstructWebhookEvent(payload, signature)
 	if err != nil {
 		return err
 	}
@@ -57,15 +56,15 @@ func (p *PaymentUseCase) HandleWebhook(ctx context.Context, payload []byte, sign
 	return nil
 }
 
-func (p *PaymentUseCase) onAccountUpdated(ctx context.Context, event stripe.WebhookEvent) error {
+func (p *PaymentUseCase) onAccountUpdated(ctx context.Context, event WebhookEvent) error {
 	var (
-		acct stripe.AccountEvent
+		acct AccountEvent
 		err  error
 	)
 	if p.ConnectSync == nil {
 		return nil
 	}
-	acct, err = stripe.ParseWebhookAccount(event)
+	acct, err = p.PaymentGateway.ParseWebhookAccount(event)
 	if err != nil {
 		return err
 	}
@@ -73,71 +72,77 @@ func (p *PaymentUseCase) onAccountUpdated(ctx context.Context, event stripe.Webh
 	return err
 }
 
-func (p *PaymentUseCase) onCheckoutCompleted(ctx context.Context, event stripe.WebhookEvent) error {
+func (p *PaymentUseCase) onCheckoutCompleted(ctx context.Context, event WebhookEvent) error {
 	var (
-		sess stripe.CheckoutSessionSnapshot
+		sess CheckoutSessionSnapshot
 		err  error
 	)
-	sess, err = stripe.ParseWebhookCheckoutSession(event)
+	sess, err = p.PaymentGateway.ParseWebhookCheckoutSession(event)
 	if err != nil {
 		return err
 	}
 	if isKonbiniSession(sess) {
 		return nil
 	}
-	if sess.PaymentStatus != stripe.CheckoutPaymentStatusPaid {
+	if sess.PaymentStatus != CheckoutPaymentStatusPaid {
 		return nil
 	}
 	return p.fulfillCheckoutSession(ctx, sess)
 }
 
-func (p *PaymentUseCase) onCheckoutAsyncPaid(ctx context.Context, event stripe.WebhookEvent) error {
+func (p *PaymentUseCase) onCheckoutAsyncPaid(ctx context.Context, event WebhookEvent) error {
 	var (
-		sess stripe.CheckoutSessionSnapshot
+		sess CheckoutSessionSnapshot
 		err  error
 	)
-	sess, err = stripe.ParseWebhookCheckoutSession(event)
+	sess, err = p.PaymentGateway.ParseWebhookCheckoutSession(event)
 	if err != nil {
 		return err
 	}
 	return p.fulfillCheckoutSession(ctx, sess)
 }
 
-func (p *PaymentUseCase) onCheckoutAsyncFailed(ctx context.Context, event stripe.WebhookEvent) error {
+func (p *PaymentUseCase) onCheckoutAsyncFailed(ctx context.Context, event WebhookEvent) error {
 	var (
-		sess     stripe.CheckoutSessionSnapshot
+		sess     CheckoutSessionSnapshot
 		purchase *entity.Purchase
 		err      error
 	)
-	sess, err = stripe.ParseWebhookCheckoutSession(event)
+	sess, err = p.PaymentGateway.ParseWebhookCheckoutSession(event)
 	if err != nil {
 		return err
 	}
 	purchase, err = p.Purchases.FindSessionID(ctx, sess.ID)
+	if isRepoNotFound(err) {
+		return nil
+	}
 	if err != nil {
 		return err
 	}
 	return p.handleKonbiniCheckoutUnpaid(ctx, purchase, "async payment failed", false)
 }
 
-func (p *PaymentUseCase) onCheckoutExpired(ctx context.Context, event stripe.WebhookEvent) error {
+func (p *PaymentUseCase) onCheckoutExpired(ctx context.Context, event WebhookEvent) error {
 	var (
-		sess     stripe.CheckoutSessionSnapshot
+		sess     CheckoutSessionSnapshot
 		purchase *entity.Purchase
 		err      error
 	)
-	sess, err = stripe.ParseWebhookCheckoutSession(event)
+	sess, err = p.PaymentGateway.ParseWebhookCheckoutSession(event)
 	if err != nil {
 		return err
 	}
 	purchase, err = p.Purchases.FindSessionID(ctx, sess.ID)
+	if isRepoNotFound(err) {
+		return nil
+	}
 	if err != nil {
 		return err
 	}
 	return p.handleKonbiniCheckoutUnpaid(ctx, purchase, "checkout session expired", true)
 }
 
-func isKonbiniSession(sess stripe.CheckoutSessionSnapshot) bool {
+func isKonbiniSession(sess CheckoutSessionSnapshot) bool {
 	var i int
 	for i = range sess.PaymentMethodTypes {
 		if sess.PaymentMethodTypes[i] == "konbini" {
@@ -145,45 +150,47 @@ func isKonbiniSession(sess stripe.CheckoutSessionSnapshot) bool {
 		}
 	}
 	return parseCheckoutPurpose(sess.Metadata) == checkoutKonbiniRenewal ||
-		sess.Metadata[stripe.MetaBillingMode] == string(entity.BillingModeKonbini)
+		sess.Metadata[MetaBillingMode] == string(entity.BillingModeKonbini)
 }
 
-func (p *PaymentUseCase) onPaymentIntentSucceeded(ctx context.Context, event stripe.WebhookEvent) error {
+func (p *PaymentUseCase) onPaymentIntentSucceeded(ctx context.Context, event WebhookEvent) error {
 	var (
-		pi  stripe.PaymentIntentDetail
+		pi  PaymentIntentDetail
 		err error
 	)
-	pi, err = stripe.ParseWebhookPaymentIntent(event)
+	pi, err = p.PaymentGateway.ParseWebhookPaymentIntent(event)
 	if err != nil {
 		return err
 	}
 	return p.fulfillPaymentIntent(ctx, pi)
 }
 
-func (p *PaymentUseCase) onInvoicePaid(ctx context.Context, event stripe.WebhookEvent) error {
+func (p *PaymentUseCase) onInvoicePaid(ctx context.Context, event WebhookEvent) error {
 	var (
-		inv    stripe.InvoiceSnapshot
+		inv    InvoiceSnapshot
 		exists *entity.Purchase
 		err    error
 	)
-	inv, err = stripe.ParseWebhookInvoice(event)
+	inv, err = p.PaymentGateway.ParseWebhookInvoice(event)
 	if err != nil {
 		return err
 	}
 	exists, err = p.Purchases.FindStripeInvoiceID(ctx, inv.ID)
-	if err != nil {
+	if isRepoNotFound(err) {
+		exists = nil
+	} else if err != nil {
 		return err
 	}
 	if exists != nil {
 		return nil
 	}
-	if stripe.IsAutoSubscriptionRenewal(inv.BillingReason) {
+	if IsAutoSubscriptionRenewal(inv.BillingReason) {
 		return p.fulfillAutoRenewal(ctx, inv)
 	}
 	return p.fulfillInvoiceFirstSupport(ctx, inv)
 }
 
-func (p *PaymentUseCase) fulfillAutoRenewal(ctx context.Context, inv stripe.InvoiceSnapshot) error {
+func (p *PaymentUseCase) fulfillAutoRenewal(ctx context.Context, inv InvoiceSnapshot) error {
 	var (
 		subID     string
 		supporter *entity.ProjectSupporter
@@ -195,7 +202,10 @@ func (p *PaymentUseCase) fulfillAutoRenewal(ctx context.Context, inv stripe.Invo
 		return nil
 	}
 	supporter, err = p.Supporters.FindStripeSubscriptionID(ctx, subID)
-	if err != nil || supporter == nil {
+	if isRepoNotFound(err) {
+		return nil
+	}
+	if err != nil {
 		return err
 	}
 	if supporter.BillingMode != entity.BillingModeAuto {
@@ -261,7 +271,7 @@ func (p *PaymentUseCase) fulfillAutoRenewal(ctx context.Context, inv stripe.Invo
 	})
 }
 
-func (p *PaymentUseCase) fulfillInvoiceFirstSupport(ctx context.Context, inv stripe.InvoiceSnapshot) error {
+func (p *PaymentUseCase) fulfillInvoiceFirstSupport(ctx context.Context, inv InvoiceSnapshot) error {
 	var (
 		purchaseIDStr string
 		purchase      *entity.Purchase
@@ -272,7 +282,10 @@ func (p *PaymentUseCase) fulfillInvoiceFirstSupport(ctx context.Context, inv str
 		return nil
 	}
 	purchase, err = p.Purchases.FindID(ctx, uuid.MustParse(purchaseIDStr))
-	if err != nil || purchase == nil {
+	if isRepoNotFound(err) {
+		return nil
+	}
+	if err != nil {
 		return err
 	}
 	if purchase.Status == entity.PurchaseStatusPaid {
@@ -296,7 +309,7 @@ func (p *PaymentUseCase) fulfillInvoiceFirstSupport(ctx context.Context, inv str
 	return p.fulfillFirstSupport(ctx, purchase, uuid.Nil, periodRange{start, end}, cust, sub, invID)
 }
 
-func (p *PaymentUseCase) backfillPaidPurchaseInvoice(ctx context.Context, inv stripe.InvoiceSnapshot, purchase *entity.Purchase) error {
+func (p *PaymentUseCase) backfillPaidPurchaseInvoice(ctx context.Context, inv InvoiceSnapshot, purchase *entity.Purchase) error {
 	var (
 		supporter *entity.ProjectSupporter
 		period    periodRange
@@ -314,7 +327,10 @@ func (p *PaymentUseCase) backfillPaidPurchaseInvoice(ctx context.Context, inv st
 		return nil
 	}
 	supporter, err = p.Supporters.FindID(ctx, *purchase.SupporterID)
-	if err != nil || supporter == nil {
+	if isRepoNotFound(err) {
+		return nil
+	}
+	if err != nil {
 		return err
 	}
 	period = periodRange{

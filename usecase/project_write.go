@@ -26,8 +26,8 @@ func (p *ProjectUseCase) Create(ctx context.Context, sellerID uuid.UUID, in Crea
 	)
 
 	u, err = p.Users.FindID(ctx, sellerID)
-	if err != nil || u == nil {
-		return nil, ErrNotFound
+	if err != nil {
+		return nil, mapRepoNotFound(err)
 	}
 	if u.Role != entity.UserRoleSeller || u.SellerStatus != entity.SellerStatusActive {
 		return nil, ErrForbidden
@@ -95,8 +95,8 @@ func (p *ProjectUseCase) Update(ctx context.Context, sellerID, projectID uuid.UU
 	)
 
 	project, plans, images, err = p.Projects.FindID(ctx, projectID)
-	if err != nil || project == nil {
-		return nil, ErrNotFound
+	if err != nil {
+		return nil, mapRepoNotFound(err)
 	}
 	if project.SellerID != sellerID {
 		return nil, ErrForbidden
@@ -182,8 +182,8 @@ func (p *ProjectUseCase) RequestDelete(ctx context.Context, sellerID, projectID 
 	)
 
 	project, plans, images, err = p.Projects.FindID(ctx, projectID)
-	if err != nil || project == nil {
-		return nil, ErrNotFound
+	if err != nil {
+		return nil, mapRepoNotFound(err)
 	}
 	if project.SellerID != sellerID {
 		return nil, ErrForbidden

@@ -20,7 +20,10 @@ func (p *PaymentUseCase) loadSupportContext(ctx context.Context, buyerID, projec
 	if err != nil {
 		return sc, err
 	}
-	if sc.membership, err = p.Supporters.FindMembership(ctx, projectID, buyerID); err != nil {
+	sc.membership, err = p.Supporters.FindMembership(ctx, projectID, buyerID)
+	if isRepoNotFound(err) {
+		sc.membership = nil
+	} else if err != nil {
 		return sc, err
 	}
 	if sc.membership != nil {
@@ -50,7 +53,9 @@ func (p *PaymentUseCase) loadKonbiniCheckoutContext(ctx context.Context, buyerID
 		return sc, err
 	}
 	sc.membership, err = p.Supporters.FindMembership(ctx, projectID, buyerID)
-	if err != nil {
+	if isRepoNotFound(err) {
+		sc.membership = nil
+	} else if err != nil {
 		return sc, err
 	}
 	if sc.membership == nil {
@@ -81,7 +86,9 @@ func (p *PaymentUseCase) loadCheckoutBase(ctx context.Context, buyerID, projectI
 		return sc, err
 	}
 	pend, err = p.Purchases.FindPendingBuyerProject(ctx, buyerID, projectID)
-	if err != nil {
+	if isRepoNotFound(err) {
+		pend = nil
+	} else if err != nil {
 		return sc, err
 	}
 	if pend != nil {
@@ -110,15 +117,15 @@ func (p *PaymentUseCase) loadBuyerProjectPlan(ctx context.Context, buyerID, proj
 	)
 	sc.now = time.Now().UTC()
 	u, err = p.Users.FindID(ctx, buyerID)
-	if err != nil || u == nil {
-		return sc, ErrNotFound
+	if err != nil {
+		return sc, mapRepoNotFound(err)
 	}
 	if !u.IsActive() || u.Role != entity.UserRoleBuyer {
 		return sc, ErrForbidden
 	}
 	project, plans, _, err = p.Projects.FindID(ctx, projectID)
-	if err != nil || project == nil {
-		return sc, ErrNotFound
+	if err != nil {
+		return sc, mapRepoNotFound(err)
 	}
 	if !project.IsPublic(sc.now) {
 		return sc, ErrForbidden
@@ -136,10 +143,13 @@ func (p *PaymentUseCase) loadBuyerProjectPlan(ctx context.Context, buyerID, proj
 		return sc, ErrNotFound
 	}
 	conn, err = p.Connect.FindUserID(ctx, project.SellerID)
+	if isRepoNotFound(err) {
+		return sc, ErrForbidden
+	}
 	if err != nil {
 		return sc, err
 	}
-	if conn == nil || !conn.CanCharge() {
+	if !conn.CanCharge() {
 		return sc, ErrForbidden
 	}
 	sc.buyer = u

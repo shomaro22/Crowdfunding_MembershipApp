@@ -34,8 +34,8 @@ func (a *AuthUseCase) Setup2FA(ctx context.Context, userID uuid.UUID) (*TOTPSetu
 	)
 
 	u, err = a.Users.FindID(ctx, userID)
-	if err != nil || u == nil {
-		return nil, ErrNotFound
+	if err != nil {
+		return nil, mapRepoNotFound(err)
 	}
 	if u.TOTPEnabled {
 		return nil, Err2FAAlreadyEnabled
@@ -70,8 +70,8 @@ func (a *AuthUseCase) Verify2FASetup(ctx context.Context, userID uuid.UUID, code
 	)
 
 	u, err = a.Users.FindID(ctx, userID)
-	if err != nil || u == nil {
-		return nil, ErrNotFound
+	if err != nil {
+		return nil, mapRepoNotFound(err)
 	}
 	if u.TOTPEnabled {
 		return nil, Err2FAAlreadyEnabled
@@ -107,12 +107,15 @@ func (a *AuthUseCase) Challenge2FA(ctx context.Context, pendingToken, code strin
 		tokens *SessionTokens
 	)
 
-	uid, err = auth.VerifyPending2FA(a.TOTPKey, pendingToken, time.Now().UTC())
+	uid, err = auth.VerifyPending2FA(a.Pending2FAKey, pendingToken, time.Now().UTC())
 	if err != nil {
 		return nil, ErrInvalidToken
 	}
 	u, err = a.Users.FindID(ctx, uid)
-	if err != nil || u == nil || !u.CanLogin() {
+	if err != nil {
+		return nil, mapRepoNotFoundAs(err, ErrInvalidToken)
+	}
+	if !u.CanLogin() {
 		return nil, ErrInvalidToken
 	}
 	if !u.TOTPEnabled {

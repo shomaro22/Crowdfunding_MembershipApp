@@ -14,15 +14,10 @@ import (
 
 const oauthCallbackCodeTTL = 2 * time.Minute
 
-type OAuthRedirectView struct {
-	Code  string
-	From  string
-	Error string
-}
-
 type OAuthCBOut struct {
 	RefreshToken string
-	Redirect     OAuthRedirectView
+	CallbackCode string
+	From         string
 }
 
 func (a *AuthUseCase) GoogleAuthURL(from string) (string, error) {
@@ -87,10 +82,8 @@ func (a *AuthUseCase) GoogleCallback(ctx context.Context, code, state string, me
 	a.logActivity(ctx, &u.ID, entity.UserLogin, "user", u.ID.String(), meta, entity.ProviderMeta("google"))
 	return &OAuthCBOut{
 		RefreshToken: tokens.RefreshToken,
-		Redirect: OAuthRedirectView{
-			Code: cbCode,
-			From: from,
-		},
+		CallbackCode: cbCode,
+		From:         from,
 	}, nil
 }
 
@@ -118,7 +111,10 @@ func (a *AuthUseCase) ExchangeOAuthCode(ctx context.Context, code string, meta R
 		return nil, ErrInvalidToken
 	}
 	u, err = a.Users.FindID(ctx, userID)
-	if err != nil || u == nil || !u.CanLogin() {
+	if err != nil {
+		return nil, mapRepoNotFoundAs(err, ErrInvalidToken)
+	}
+	if !u.CanLogin() {
 		return nil, ErrInvalidToken
 	}
 	authToken, err = a.Tokens.Issue(auth.AuthClaims{
@@ -149,14 +145,22 @@ func (a *AuthUseCase) resolveGoogleUser(ctx context.Context, profile *auth.Googl
 	)
 
 	acc, err = a.OAuth.FindSub(ctx, entity.OAuthProviderGoogle, profile.Sub)
-	if err != nil {
+	if isRepoNotFound(err) {
+		acc = nil
+	} else if err != nil {
 		return nil, err
 	}
 	if acc != nil {
-		return a.Users.FindID(ctx, acc.UserID)
+		u, err = a.Users.FindID(ctx, acc.UserID)
+		if err != nil {
+			return nil, mapRepoNotFound(err)
+		}
+		return u, nil
 	}
 	existing, err = a.Users.FindEmail(ctx, profile.Email)
-	if err != nil {
+	if isRepoNotFound(err) {
+		existing = nil
+	} else if err != nil {
 		return nil, err
 	}
 	now = time.Now().UTC()

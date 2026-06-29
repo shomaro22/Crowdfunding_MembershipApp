@@ -191,7 +191,10 @@ func (p *ProjectUseCase) ListMine(ctx context.Context, sellerID uuid.UUID, limit
 	)
 
 	u, err = p.Users.FindID(ctx, sellerID)
-	if err != nil || u == nil || u.Role != entity.UserRoleSeller {
+	if err != nil {
+		return nil, 0, mapRepoNotFoundAs(err, ErrForbidden)
+	}
+	if u.Role != entity.UserRoleSeller {
 		return nil, 0, ErrForbidden
 	}
 	rows, total, err = p.Projects.ListSeller(ctx, sellerID, limit, offset)
@@ -213,8 +216,8 @@ func (p *ProjectUseCase) FindView(ctx context.Context, id uuid.UUID, viewerID *u
 	)
 
 	project, plans, images, err = p.Projects.FindID(ctx, id)
-	if err != nil || project == nil {
-		return nil, ErrNotFound
+	if err != nil {
+		return nil, mapRepoNotFound(err)
 	}
 	if !canViewProject(project, viewerID, parseUserRole(viewerRole), now) {
 		return nil, ErrNotFound
@@ -237,8 +240,8 @@ func (p *ProjectUseCase) ListPlans(ctx context.Context, projectID uuid.UUID, vie
 	)
 
 	project, plans, _, err = p.Projects.FindID(ctx, projectID)
-	if err != nil || project == nil {
-		return nil, ErrNotFound
+	if err != nil {
+		return nil, mapRepoNotFound(err)
 	}
 	now = time.Now().UTC()
 	if !canViewProject(project, viewerID, parseUserRole(viewerRole), now) {

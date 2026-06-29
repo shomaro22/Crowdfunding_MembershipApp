@@ -59,8 +59,8 @@ func (a *AdminUseCase) PatchProject(ctx context.Context, adminID, projectID uuid
 		return nil, ErrNotFound
 	}
 	project, plans, images, err = a.Projects.FindID(ctx, projectID)
-	if err != nil || project == nil {
-		return nil, ErrNotFound
+	if err != nil {
+		return nil, mapRepoNotFound(err)
 	}
 	switch projectSt {
 	case entity.ProjectStatusActive:
@@ -111,8 +111,8 @@ func (a *AdminUseCase) DeleteProject(ctx context.Context, adminID, projectID uui
 		return ErrNotFound
 	}
 	project, _, _, err = a.Projects.FindID(ctx, projectID)
-	if err != nil || project == nil {
-		return ErrNotFound
+	if err != nil {
+		return mapRepoNotFound(err)
 	}
 	switch project.Status {
 	case entity.ProjectStatusPending, entity.ProjectStatusCancelled, entity.ProjectStatusDeleted:
@@ -143,8 +143,8 @@ func (a *AdminUseCase) PatchDeleteReq(ctx context.Context, adminID, projectID uu
 		return nil, ErrNotFound
 	}
 	project, plans, images, err = a.Projects.FindID(ctx, projectID)
-	if err != nil || project == nil {
-		return nil, ErrNotFound
+	if err != nil {
+		return nil, mapRepoNotFound(err)
 	}
 	if project.Status != entity.ProjectStatusDeleteRequested {
 		return nil, ErrInvalidState
