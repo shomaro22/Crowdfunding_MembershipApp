@@ -12,30 +12,30 @@ import (
 	"github.com/google/uuid"
 )
 
-type stubActivityRepo struct {
+type stubIActivityRepo struct {
 	last *model.ActivityLog
 }
 
-func (s *stubActivityRepo) Create(_ context.Context, row *model.ActivityLog) error {
+func (s *stubIActivityRepo) Create(_ context.Context, row *model.ActivityLog) error {
 	s.last = row
 	return nil
 }
 
-func (s *stubActivityRepo) List(_ context.Context, _ repository.ActivityListFilter) ([]model.ActivityLog, int64, error) {
+func (s *stubIActivityRepo) List(_ context.Context, _ repository.ActivityListFilter) ([]model.ActivityLog, int64, error) {
 	return nil, 0, nil
 }
 
-func (s *stubActivityRepo) CountByActionBetween(_ context.Context, _ model.ActivityAction, _, _ time.Time) (int64, error) {
+func (s *stubIActivityRepo) CountByActionBetween(_ context.Context, _ model.ActivityAction, _, _ time.Time) (int64, error) {
 	return 0, nil
 }
 
-func (s *stubActivityRepo) TopIPsBetween(_ context.Context, _, _ time.Time, _ int) ([]repository.ActivityIPCount, error) {
+func (s *stubIActivityRepo) TopIPsBetween(_ context.Context, _, _ time.Time, _ int) ([]repository.ActivityIPCount, error) {
 	return nil, nil
 }
 
 func TestLogRateLimitDenied(t *testing.T) {
 	var (
-		repo   stubActivityRepo
+		repo   stubIActivityRepo
 		uid    uuid.UUID
 		ctx    context.Context
 	)

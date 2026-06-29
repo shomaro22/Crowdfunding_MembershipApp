@@ -92,10 +92,10 @@ func seedIntegrationUser(t *testing.T, gdb *gorm.DB, role model.UserRole, adminR
 	return u
 }
 
-func TestActivityRepoList(t *testing.T) {
+func TestIActivityRepoList(t *testing.T) {
 	var (
 		gdb      *gorm.DB
-		repo     repository.ActivityRepo
+		repo     repository.IActivityRepo
 		ctx      context.Context
 		rowID    uuid.UUID
 		userID   uuid.UUID
@@ -146,10 +146,10 @@ func TestActivityRepoList(t *testing.T) {
 	}
 }
 
-func TestAuditRepoList(t *testing.T) {
+func TestIAuditRepoList(t *testing.T) {
 	var (
 		gdb    *gorm.DB
-		repo   repository.AuditRepo
+		repo   repository.IAuditRepo
 		ctx    context.Context
 		rowID  uuid.UUID
 		admin  uuid.UUID

@@ -21,10 +21,7 @@ type SupporterItemView struct {
 	PlanChangeDate     *time.Time
 }
 
-func SupporterItemFrom(s *model.ProjectSupporter) SupporterItemView {
-	if s == nil {
-		return SupporterItemView{}
-	}
+func SupporterItemFrom(s model.ProjectSupporter) SupporterItemView {
 	return SupporterItemView{
 		ID:                 s.ID,
 		ProjectID:          s.ProjectID,
@@ -46,19 +43,13 @@ type SupporterView struct {
 	PendingPlan *ProjectPlanView
 }
 
-func ProjectItemPtrFrom(p *model.Project) *ProjectItemView {
-	if p == nil {
-		return nil
-	}
+func ProjectItemPtrFrom(p model.Project) *ProjectItemView {
 	v := ProjectItemFrom(p)
 	return &v
 }
 
-func ProjectPlanPtrFrom(plan *model.ProjectPlan) *ProjectPlanView {
-	if plan == nil {
-		return nil
-	}
-	v := ProjectPlanFrom(*plan)
+func ProjectPlanPtrFrom(plan model.ProjectPlan) *ProjectPlanView {
+	v := ProjectPlanFrom(plan)
 	return &v
 }
 
@@ -74,10 +65,7 @@ type PurchaseItemView struct {
 	CreatedAt     time.Time
 }
 
-func PurchaseItemFrom(p *model.Purchase) PurchaseItemView {
-	if p == nil {
-		return PurchaseItemView{}
-	}
+func PurchaseItemFrom(p model.Purchase) PurchaseItemView {
 	return PurchaseItemView{
 		ID:            p.ID,
 		ProjectID:     p.ProjectID,

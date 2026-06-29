@@ -54,28 +54,28 @@ func TestGetOneReturnsErrNotFound(t *testing.T) {
 	}
 }
 
-func TestPurchaseFindIDReturnsErrNotFound(t *testing.T) {
+func TestPurchaseGetIDReturnsErrNotFound(t *testing.T) {
 	var (
 		gdb  = openIntegrationDB(t)
 		repo = repository.NewPurchaseRepo(gdb)
 		ctx  = context.Background()
-		row  *model.Purchase
+		row  model.Purchase
 		err  error
 	)
 
-	row, err = repo.FindID(ctx, uuid.New())
+	row, err = repo.GetID(ctx, uuid.New())
 	if err == nil {
 		t.Fatal("expected error for missing purchase")
 	}
 	if !errors.Is(err, repository.ErrNotFound) {
 		t.Fatalf("expected ErrNotFound, got %v", err)
 	}
-	if row != nil {
+	if row.ID != uuid.Nil {
 		t.Fatalf("expected nil purchase, got %+v", row)
 	}
 }
 
-func TestPurchaseFindIDReturnsRow(t *testing.T) {
+func TestPurchaseGetIDReturnsRow(t *testing.T) {
 	var (
 		gdb      = openIntegrationDB(t)
 		repo     = repository.NewPurchaseRepo(gdb)
@@ -84,15 +84,15 @@ func TestPurchaseFindIDReturnsRow(t *testing.T) {
 		seller   = seedIntegrationUser(t, gdb, model.UserRoleSeller, nil)
 		project  = seedIntegrationProject(t, gdb, seller.ID)
 		purchase = seedIntegrationPurchase(t, gdb, buyer.ID, project.ID)
-		row      *model.Purchase
+		row      model.Purchase
 		err      error
 	)
 
-	row, err = repo.FindID(ctx, purchase.ID)
+	row, err = repo.GetID(ctx, purchase.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if row == nil || row.ID != purchase.ID {
+	if row.ID != purchase.ID {
 		t.Fatalf("unexpected purchase: %+v", row)
 	}
 }

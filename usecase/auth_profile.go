@@ -16,11 +16,11 @@ type UpdateProfileIn struct {
 
 func (a *AuthUseCase) GetUser(ctx context.Context, userID uuid.UUID) (UserView, error) {
 	var (
-		u   *model.User
+		u   model.User
 		err error
 	)
 
-	u, err = a.Users.FindID(ctx, userID)
+	u, err = a.Users.GetID(ctx, userID)
 	if err != nil {
 		return UserView{}, mapRepoNotFound(err)
 	}
@@ -30,7 +30,7 @@ func (a *AuthUseCase) GetUser(ctx context.Context, userID uuid.UUID) (UserView, 
 func (a *AuthUseCase) UpdateProfile(ctx context.Context, userID uuid.UUID, in UpdateProfileIn) (UserView, error) {
 	var (
 		norm validator.UpdateProfileNormalized
-		u    *model.User
+		u    model.User
 		err  error
 	)
 
@@ -39,9 +39,9 @@ func (a *AuthUseCase) UpdateProfile(ctx context.Context, userID uuid.UUID, in Up
 		AvatarURL: in.AvatarURL,
 	})
 	if err != nil {
-		return UserView{}, mapProfileEntityErr(err)
+		return UserView{}, mapProfileModelErr(err)
 	}
-	u, err = a.Users.FindID(ctx, userID)
+	u, err = a.Users.GetID(ctx, userID)
 	if err != nil {
 		return UserView{}, mapRepoNotFound(err)
 	}
@@ -51,7 +51,7 @@ func (a *AuthUseCase) UpdateProfile(ctx context.Context, userID uuid.UUID, in Up
 	if norm.AvatarURLSet {
 		u.AvatarURL = norm.AvatarURL
 	}
-	if err = a.Users.Update(ctx, u); err != nil {
+	if err = a.Users.Update(ctx, &u); err != nil {
 		return UserView{}, err
 	}
 	return UserViewFrom(u), nil

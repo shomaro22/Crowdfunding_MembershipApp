@@ -16,13 +16,13 @@ const supportPeriodDays = 30
 
 type PaymentUseCase struct {
 	DB              *gorm.DB
-	Users           repository.UserRepo
-	Projects        repository.ProjectRepo
-	Purchases       repository.PurchaseRepo
-	Supporters      repository.SupporterRepo
-	Connect         repository.ConnectRepo
-	Webhooks        repository.WebhookEventRepo
-	Activity        repository.ActivityRepo
+	Users           repository.IUserRepo
+	Projects        repository.IProjectRepo
+	Purchases       repository.IPurchaseRepo
+	Supporters      repository.ISupporterRepo
+	Connect         repository.IConnectRepo
+	Webhooks        repository.IWebhookEventRepo
+	Activity        repository.IActivityRepo
 	Stripe          stripe.Client
 	ConnectSync     ConnectSyncer
 	SupporterViewer SupporterViewer
@@ -58,13 +58,14 @@ type IntentOut struct {
 }
 
 type supportContext struct {
-	buyer      *model.User
-	project    *model.Project
-	plan       *model.ProjectPlan
-	connect    *model.ConnectAccount
-	membership *model.ProjectSupporter
-	purpose    checkoutPurpose
-	now        time.Time
+	buyer         model.User
+	project       model.Project
+	plan          model.ProjectPlan
+	connect       model.ConnectAccount
+	membership    model.ProjectSupporter
+	hasMembership bool
+	purpose       checkoutPurpose
+	now           time.Time
 }
 
 type checkoutPurpose string
@@ -79,31 +80,22 @@ type periodRange struct {
 	end   time.Time
 }
 
-func (p *PaymentUseCase) logPurchaseCreated(ctx context.Context, purchase *model.Purchase, meta RequestMeta) {
-	var uid *uuid.UUID
-	if purchase != nil {
-		uid = &purchase.BuyerID
-	}
+func (p *PaymentUseCase) logPurchaseCreated(ctx context.Context, purchase model.Purchase, meta RequestMeta) {
+	uid := &purchase.BuyerID
 	LogActivity(ctx, p.Activity, uid, model.PurchaseCreated, "purchase", purchase.ID.String(), meta, purchaseActivityMeta(purchase))
 }
 
-func (p *PaymentUseCase) logPaymentCheckoutStarted(ctx context.Context, purchase *model.Purchase, meta RequestMeta, flow string) {
-	var uid *uuid.UUID
-	if purchase != nil {
-		uid = &purchase.BuyerID
-	}
-	fields := map[string]string{"flow": flow}
-	if purchase != nil {
-		fields["project_id"] = purchase.ProjectID.String()
+func (p *PaymentUseCase) logPaymentCheckoutStarted(ctx context.Context, purchase model.Purchase, meta RequestMeta, flow string) {
+	uid := &purchase.BuyerID
+	fields := map[string]string{
+		"flow":       flow,
+		"project_id": purchase.ProjectID.String(),
 	}
 	LogActivity(ctx, p.Activity, uid, model.PaymentCheckout, "purchase", purchase.ID.String(), meta, activityMeta(fields))
 }
 
-func (p *PaymentUseCase) logPurchaseCancelled(ctx context.Context, purchase *model.Purchase, reason string, to model.PurchaseStatus) {
-	var uid *uuid.UUID
-	if purchase != nil {
-		uid = &purchase.BuyerID
-	}
+func (p *PaymentUseCase) logPurchaseCancelled(ctx context.Context, purchase model.Purchase, reason string, to model.PurchaseStatus) {
+	uid := &purchase.BuyerID
 	LogActivity(ctx, p.Activity, uid, model.PurchaseCancelled, "purchase", purchase.ID.String(), RequestMeta{}, activityMeta(map[string]string{
 		"reason":    reason,
 		"to_status": string(to),
@@ -120,7 +112,7 @@ func (p *PaymentUseCase) newPendingPurchase(
 	sc supportContext,
 	pm model.PaymentMethod,
 	checkoutID, intentID *string,
-) *model.Purchase {
+) model.Purchase {
 	var (
 		row model.Purchase
 		key string
@@ -140,15 +132,15 @@ func (p *PaymentUseCase) newPendingPurchase(
 		CreatedAt:        sc.now,
 		UpdatedAt:        sc.now,
 	}
-	if sc.purpose == checkoutKonbiniRenewal && sc.membership != nil {
+	if sc.purpose == checkoutKonbiniRenewal && sc.hasMembership {
 		row.SupporterID = &sc.membership.ID
 	}
-	return &row
+	return row
 }
 
-func (p *PaymentUseCase) savePendingAfterStripe(ctx context.Context, purchase *model.Purchase) error {
+func (p *PaymentUseCase) savePendingAfterStripe(ctx context.Context, purchase model.Purchase) error {
 	return repository.WithTx(ctx, p.DB, func(txCtx context.Context) error {
-		return p.Purchases.Create(txCtx, purchase)
+		return p.Purchases.Create(txCtx, &purchase)
 	})
 }
 
@@ -167,7 +159,7 @@ func checkoutMetadata(sc supportContext, purchaseID uuid.UUID, pm model.PaymentM
 		mode,
 	)
 	meta[stripe.MetaCheckoutPurpose] = string(sc.purpose)
-	if sc.membership != nil {
+	if sc.hasMembership {
 		meta[stripe.MetaSupporterID] = sc.membership.ID.String()
 	}
 	return meta
@@ -202,6 +194,6 @@ func parseCheckoutPurpose(meta map[string]string) checkoutPurpose {
 	}
 }
 
-func isKonbiniPurchase(purchase *model.Purchase) bool {
+func isKonbiniPurchase(purchase model.Purchase) bool {
 	return purchase.PaymentMethod == model.PaymentMethodKonbini
 }

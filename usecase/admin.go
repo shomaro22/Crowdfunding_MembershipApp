@@ -14,18 +14,18 @@ import (
 )
 
 type AdminUseCase struct {
-	Users           repository.UserRepo
-	SellerRegs      repository.SellerRegRepo
-	Projects        repository.ProjectRepo
-	Audit           repository.AuditRepo
-	ReviewDecisions repository.ReviewDecisionRepo
-	RefreshTokens   repository.RefreshTokenRepo
-	TOTPBackup      repository.TOTPBackupRepo
-	KYC             repository.KYCStore
+	Users           repository.IUserRepo
+	SellerRegs      repository.ISellerRegRepo
+	Projects        repository.IProjectRepo
+	Audit           repository.IAuditRepo
+	ReviewDecisions repository.IReviewDecisionRepo
+	RefreshTokens   repository.IRefreshTokenRepo
+	TOTPBackup      repository.ITOTPBackupRepo
+	KYC             repository.IKYCStore
 	ProjectsUC      *ProjectUseCase
 	KYCAccess       *KYCAccessUseCase
-	AdminStats      repository.AdminRepo
-	Purchases       repository.PurchaseRepo
+	AdminStats      repository.IAdminRepo
+	Purchases       repository.IPurchaseRepo
 	PurchaseViews   PurchaseEnricher
 	DB              *gorm.DB
 }
@@ -39,11 +39,11 @@ type SellerRegView struct {
 
 func (a *AdminUseCase) requireReviewAdmin(ctx context.Context, adminID uuid.UUID) error {
 	var (
-		admin *model.User
+		admin model.User
 		err   error
 	)
 
-	admin, err = a.Users.FindID(ctx, adminID)
+	admin, err = a.Users.GetID(ctx, adminID)
 	if err != nil {
 		return mapRepoNotFoundAs(err, ErrForbidden)
 	}
@@ -82,12 +82,12 @@ func normalizeReviewReason(reason *string) *string {
 
 func (a *AdminUseCase) ResetUser2FA(ctx context.Context, adminID, targetUserID uuid.UUID, reason *string) (UserView, error) {
 	var (
-		u   *model.User
+		u   model.User
 		err error
 		now time.Time
 	)
 
-	u, err = a.Users.FindID(ctx, targetUserID)
+	u, err = a.Users.GetID(ctx, targetUserID)
 	if err != nil {
 		return UserView{}, mapRepoNotFound(err)
 	}
@@ -98,7 +98,7 @@ func (a *AdminUseCase) ResetUser2FA(ctx context.Context, adminID, targetUserID u
 	u.TOTPEnabled = false
 	u.TOTPSecret = nil
 	u.UpdatedAt = now
-	if err = a.Users.Update(ctx, u); err != nil {
+	if err = a.Users.Update(ctx, &u); err != nil {
 		return UserView{}, err
 	}
 	if a.TOTPBackup != nil {
@@ -115,8 +115,8 @@ func (a *AdminUseCase) ResetUser2FA(ctx context.Context, adminID, targetUserID u
 
 func (a *AdminUseCase) ChangeAdminRole(ctx context.Context, actorID, targetUserID uuid.UUID, newRole string, reason *string) (UserView, error) {
 	var (
-		actor   *model.User
-		u       *model.User
+		actor   model.User
+		u       model.User
 		err     error
 		now     time.Time
 		oldRole string
@@ -128,7 +128,7 @@ func (a *AdminUseCase) ChangeAdminRole(ctx context.Context, actorID, targetUserI
 	if !role.Valid() {
 		return UserView{}, ErrBadRequest
 	}
-	actor, err = a.Users.FindID(ctx, actorID)
+	actor, err = a.Users.GetID(ctx, actorID)
 	if err != nil {
 		return UserView{}, mapRepoNotFoundAs(err, ErrForbidden)
 	}
@@ -136,7 +136,7 @@ func (a *AdminUseCase) ChangeAdminRole(ctx context.Context, actorID, targetUserI
 		actor.AdminRole == nil || *actor.AdminRole != model.AdminRoleSuperAdmin {
 		return UserView{}, ErrForbidden
 	}
-	u, err = a.Users.FindID(ctx, targetUserID)
+	u, err = a.Users.GetID(ctx, targetUserID)
 	if err != nil {
 		return UserView{}, mapRepoNotFound(err)
 	}
@@ -153,7 +153,7 @@ func (a *AdminUseCase) ChangeAdminRole(ctx context.Context, actorID, targetUserI
 	roleCopy := role
 	u.AdminRole = &roleCopy
 	u.UpdatedAt = now
-	if err = a.Users.Update(ctx, u); err != nil {
+	if err = a.Users.Update(ctx, &u); err != nil {
 		return UserView{}, err
 	}
 	if err = InvalidateUserSessions(ctx, a.DB, a.Users, a.RefreshTokens, targetUserID); err != nil {

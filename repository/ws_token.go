@@ -9,7 +9,7 @@ import (
 	"gorm.io/gorm"
 )
 
-type WSTokenRepo interface {
+type IWSTokenRepo interface {
 	Create(ctx context.Context, row *model.WSToken) error
 	ConsumeValidHash(ctx context.Context, hash string, now time.Time) (*model.WSToken, error)
 	PurgeBefore(ctx context.Context, before time.Time) (int64, error)
@@ -19,7 +19,7 @@ type wsTokenRepo struct {
 	db *gorm.DB
 }
 
-func NewWSTokenRepo(db *gorm.DB) WSTokenRepo {
+func NewWSTokenRepo(db *gorm.DB) IWSTokenRepo {
 	return &wsTokenRepo{db: db}
 }
 
