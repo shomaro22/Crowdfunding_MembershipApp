@@ -2,7 +2,6 @@ package controller
 
 import (
 	"net/http"
-	"strconv"
 	"time"
 
 	"crowdfund-app/usecase"
@@ -12,10 +11,10 @@ import (
 )
 
 type ReportController struct {
-	Reports ReportUseCase
+	Reports IReportUseCase
 }
 
-func NewReportController(reports ReportUseCase) *ReportController {
+func NewReportController(reports IReportUseCase) *ReportController {
 	return &ReportController{Reports: reports}
 }
 
@@ -26,18 +25,18 @@ func (h *ReportController) Create(c echo.Context) error {
 		view   usecase.ReportView
 		err    error
 	)
-	userID, err = CurrentUserID(c)
+	userID, err = requireUserID(c)
 	if err != nil {
 		return err
 	}
-	if err = c.Bind(&body); err != nil {
-		return echo.NewHTTPError(http.StatusBadRequest, apiError("invalid request body", "BAD_REQUEST"))
+	if err = bindBody(c, &body); err != nil {
+		return err
 	}
 	targetID, err := uuid.Parse(body.TargetID)
 	if err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, apiError("invalid target_id", "BAD_REQUEST"))
 	}
-	view, err = h.Reports.Create(c.Request().Context(), userID, usecase.CreateReportIn{
+	view, err = h.Reports.Create(reqCtx(c), userID, usecase.CreateReportIn{
 		TargetType: body.TargetType,
 		TargetID:   targetID,
 		Reason:     body.Reason,
@@ -47,7 +46,7 @@ func (h *ReportController) Create(c echo.Context) error {
 	if err != nil {
 		return mapUseCaseError(err)
 	}
-	return c.JSON(http.StatusCreated, reportWireFrom(view))
+	return jsonCreated(c, reportWireFrom(view))
 }
 
 func (h *ReportController) ListAdmin(c echo.Context) error {
@@ -63,13 +62,12 @@ func (h *ReportController) ListAdmin(c echo.Context) error {
 	if s != "" {
 		status = &s
 	}
-	limit, _ = strconv.Atoi(c.QueryParam("limit"))
-	offset, _ = strconv.Atoi(c.QueryParam("offset"))
-	result, err = h.Reports.ListAdmin(c.Request().Context(), status, limit, offset)
+	limit, offset = queryPage(c)
+	result, err = h.Reports.ListAdmin(reqCtx(c), status, limit, offset)
 	if err != nil {
 		return mapUseCaseError(err)
 	}
-	return c.JSON(http.StatusOK, listReportsWireFrom(result))
+	return jsonOK(c, listReportsWireFrom(result))
 }
 
 func (h *ReportController) PatchAdmin(c echo.Context) error {
@@ -80,18 +78,18 @@ func (h *ReportController) PatchAdmin(c echo.Context) error {
 		view     usecase.ReportView
 		err      error
 	)
-	adminID, err = CurrentUserID(c)
+	adminID, err = requireUserID(c)
 	if err != nil {
 		return err
 	}
-	reportID, err = uuid.Parse(c.Param("reportId"))
+	reportID, err = pathUUID(c, "reportId", "invalid report id")
 	if err != nil {
-		return echo.NewHTTPError(http.StatusBadRequest, apiError("invalid report id", "BAD_REQUEST"))
+		return err
 	}
 	if err = c.Bind(&body); err != nil || body.Status == "" {
 		return echo.NewHTTPError(http.StatusBadRequest, apiError("status required", "BAD_REQUEST"))
 	}
-	view, err = h.Reports.UpdateAdmin(c.Request().Context(), adminID, reportID, usecase.UpdateReportIn{
+	view, err = h.Reports.UpdateAdmin(reqCtx(c), adminID, reportID, usecase.UpdateReportIn{
 		Status:     body.Status,
 		Resolution: body.Resolution,
 		Reason:     body.Reason,
@@ -99,7 +97,7 @@ func (h *ReportController) PatchAdmin(c echo.Context) error {
 	if err != nil {
 		return mapUseCaseError(err)
 	}
-	return c.JSON(http.StatusOK, reportWireFrom(view))
+	return jsonOK(c, reportWireFrom(view))
 }
 
 type createReportJSON struct {
