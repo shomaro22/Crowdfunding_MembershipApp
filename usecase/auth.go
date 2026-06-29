@@ -2,7 +2,6 @@ package usecase
 
 import (
 	"context"
-	"log/slog"
 	"time"
 
 	"crowdfund-app/auth"
@@ -20,15 +19,6 @@ const (
 
 type Mailer interface {
 	SendPasswordReset(ctx context.Context, email, plainToken string) error
-}
-
-type LogMailer struct {
-	AppPublicURL string
-}
-
-func (m LogMailer) SendPasswordReset(_ context.Context, email, plainToken string) error {
-	slog.Info("password_reset_email", "to", email, "url", auth.PasswordResetURL(m.AppPublicURL, plainToken))
-	return nil
 }
 
 type SessionTokens struct {
