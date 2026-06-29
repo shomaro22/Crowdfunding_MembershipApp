@@ -2,7 +2,6 @@ package repository
 
 import (
 	"context"
-	"errors"
 	"time"
 
 	"crowdfund-app/entity"
@@ -45,18 +44,7 @@ func (r *messageRepo) Create(ctx context.Context, row *entity.Message) error {
 }
 
 func (r *messageRepo) FindID(ctx context.Context, id uuid.UUID) (*entity.Message, error) {
-	var (
-		row entity.Message
-		err error
-	)
-	err = r.dbCtx(ctx).Where("id = ?", id).First(&row).Error
-	if errors.Is(err, gorm.ErrRecordNotFound) {
-		return nil, nil
-	}
-	if err != nil {
-		return nil, err
-	}
-	return &row, nil
+	return firstOnePtr[entity.Message](r.dbCtx(ctx).Where("id = ?", id))
 }
 
 func (r *messageRepo) ListForUser(ctx context.Context, userID uuid.UUID) ([]entity.Message, error) {

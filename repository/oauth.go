@@ -32,33 +32,15 @@ func (r *oauthRepo) Create(ctx context.Context, row *entity.OAuthAccount) error 
 }
 
 func (r *oauthRepo) FindSub(ctx context.Context, provider entity.OAuthProvider, sub string) (*entity.OAuthAccount, error) {
-	var (
-		m   entity.OAuthAccount
-		err error
+	return firstOnePtr[entity.OAuthAccount](
+		dbFromCtx(ctx, r.db).Where("provider = ? AND provider_sub = ?", provider, sub),
 	)
-	err = dbFromCtx(ctx, r.db).Where("provider = ? AND provider_sub = ?", provider, sub).First(&m).Error
-	if errors.Is(err, gorm.ErrRecordNotFound) {
-		return nil, nil
-	}
-	if err != nil {
-		return nil, err
-	}
-	return &m, nil
 }
 
 func (r *oauthRepo) FindUserID(ctx context.Context, userID uuid.UUID, provider entity.OAuthProvider) (*entity.OAuthAccount, error) {
-	var (
-		m   entity.OAuthAccount
-		err error
+	return firstOnePtr[entity.OAuthAccount](
+		dbFromCtx(ctx, r.db).Where("user_id = ? AND provider = ?", userID, provider),
 	)
-	err = dbFromCtx(ctx, r.db).Where("user_id = ? AND provider = ?", userID, provider).First(&m).Error
-	if errors.Is(err, gorm.ErrRecordNotFound) {
-		return nil, nil
-	}
-	if err != nil {
-		return nil, err
-	}
-	return &m, nil
 }
 
 type OAuthCache interface {

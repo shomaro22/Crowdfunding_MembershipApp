@@ -2,7 +2,6 @@ package repository
 
 import (
 	"context"
-	"errors"
 	"time"
 
 	"crowdfund-app/entity"
@@ -30,20 +29,8 @@ func (r *resetRepo) Create(ctx context.Context, row *entity.ResetToken) error {
 }
 
 func (r *resetRepo) FindValidHash(ctx context.Context, hash string, now time.Time) (*entity.ResetToken, error) {
-	var (
-		m   entity.ResetToken
-		err error
-	)
-	err = dbFromCtx(ctx, r.db).
-		Where("token_hash = ? AND used_at IS NULL AND expires_at > ?", hash, now).
-		First(&m).Error
-	if errors.Is(err, gorm.ErrRecordNotFound) {
-		return nil, nil
-	}
-	if err != nil {
-		return nil, err
-	}
-	return &m, nil
+	return firstOnePtr[entity.ResetToken](dbFromCtx(ctx, r.db).
+		Where("token_hash = ? AND used_at IS NULL AND expires_at > ?", hash, now))
 }
 
 func (r *resetRepo) MarkUsed(ctx context.Context, id uuid.UUID, at time.Time) error {
