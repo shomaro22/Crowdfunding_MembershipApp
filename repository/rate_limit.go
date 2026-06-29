@@ -45,23 +45,23 @@ redis.call('EXPIRE', KEYS[1], period_sec * 2)
 return {1, 0}
 `
 
-type RateLimitRepo interface {
+type IRateLimitRepo interface {
 	Allow(ctx context.Context, key string, limit int, period time.Duration) (allowed bool, retryAfterSec int, err error)
 }
 
-type redisRateLimitRepo struct {
+type redisIRateLimitRepo struct {
 	rdb    *redis.Client
 	script *redis.Script
 }
 
-func NewRateLimitRepo(rdb *redis.Client) RateLimitRepo {
-	return &redisRateLimitRepo{
+func NewRateLimitRepo(rdb *redis.Client) IRateLimitRepo {
+	return &redisIRateLimitRepo{
 		rdb:    rdb,
 		script: redis.NewScript(tokenBucketLua),
 	}
 }
 
-func (r *redisRateLimitRepo) Allow(ctx context.Context, key string, limit int, period time.Duration) (bool, int, error) {
+func (r *redisIRateLimitRepo) Allow(ctx context.Context, key string, limit int, period time.Duration) (bool, int, error) {
 	var (
 		fullKey   string
 		periodSec int64

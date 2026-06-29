@@ -49,12 +49,12 @@ type UpdateReportIn struct {
 }
 
 type ReportUseCase struct {
-	Reports  repository.ReportRepo
-	Users    repository.UserRepo
-	Projects repository.ProjectRepo
-	Messages repository.MessageRepo
-	Activity repository.ActivityRepo
-	Audit    repository.AuditRepo
+	Reports  repository.IReportRepo
+	Users    repository.IUserRepo
+	Projects repository.IProjectRepo
+	Messages repository.IMessageRepo
+	Activity repository.IActivityRepo
+	Audit    repository.IAuditRepo
 }
 
 func ReportViewFrom(row model.Report) ReportView {
@@ -131,7 +131,7 @@ func (r *ReportUseCase) Create(ctx context.Context, reporterID uuid.UUID, in Cre
 
 func (r *ReportUseCase) ListAdmin(ctx context.Context, status *string, limit, offset int) (ReportsResult, error) {
 	var (
-		norm   validator.AdminReportListNormalized
+		norm   validator.IAdminReportListNormalized
 		rows   []model.Report
 		total  int64
 		out    ReportsResult
@@ -141,7 +141,7 @@ func (r *ReportUseCase) ListAdmin(ctx context.Context, status *string, limit, of
 	if r == nil || r.Reports == nil {
 		return ReportsResult{}, ErrBadRequest
 	}
-	norm, err = validator.ValidateAdminReportList(validator.AdminReportListInput{
+	norm, err = validator.ValidateIAdminReportList(validator.IAdminReportListInput{
 		Status: status,
 		Limit:  limit,
 		Offset: offset,
@@ -167,7 +167,7 @@ func (r *ReportUseCase) ListAdmin(ctx context.Context, status *string, limit, of
 
 func (r *ReportUseCase) UpdateAdmin(ctx context.Context, adminID, reportID uuid.UUID, in UpdateReportIn) (ReportView, error) {
 	var (
-		row        *model.Report
+		row        model.Report
 		status     model.ReportStatus
 		resolution *string
 		now        time.Time
@@ -177,11 +177,11 @@ func (r *ReportUseCase) UpdateAdmin(ctx context.Context, adminID, reportID uuid.
 	if r == nil || r.Reports == nil {
 		return ReportView{}, ErrBadRequest
 	}
-	row, err = r.Reports.FindID(ctx, reportID)
+	row, err = r.Reports.GetID(ctx, reportID)
 	if err != nil {
 		return ReportView{}, mapRepoNotFound(err)
 	}
-	status, resolution, err = validator.ValidateAdminReportUpdate(validator.AdminReportUpdateInput{
+	status, resolution, err = validator.ValidateIAdminReportUpdate(validator.IAdminReportUpdateInput{
 		Status:     in.Status,
 		Resolution: in.Resolution,
 	})
@@ -194,19 +194,19 @@ func (r *ReportUseCase) UpdateAdmin(ctx context.Context, adminID, reportID uuid.
 	row.ReviewedBy = &adminID
 	row.ReviewedAt = &now
 	row.UpdatedAt = now
-	if err = r.Reports.Update(ctx, row); err != nil {
+	if err = r.Reports.Update(ctx, &row); err != nil {
 		return ReportView{}, err
 	}
 	details = fmt.Sprintf("status=%s report_id=%s", status, reportID)
 	WriteAudit(ctx, r.Audit, adminID, "report.update", "report", reportID.String(), in.Reason, &details)
-	return ReportViewFrom(*row), nil
+	return ReportViewFrom(row), nil
 }
 
 func (r *ReportUseCase) validateTarget(ctx context.Context, reporterID uuid.UUID, targetType model.ReportTargetType, targetID uuid.UUID) error {
 	var err error
 	switch targetType {
 	case model.ReportTargetProject:
-		_, _, _, err = r.Projects.FindID(ctx, targetID)
+		_, _, _, err = r.Projects.GetID(ctx, targetID)
 		if err != nil {
 			return mapRepoNotFound(err)
 		}
@@ -214,7 +214,7 @@ func (r *ReportUseCase) validateTarget(ctx context.Context, reporterID uuid.UUID
 		if r.Messages == nil {
 			return ErrBadRequest
 		}
-		_, err = r.Messages.FindID(ctx, targetID)
+		_, err = r.Messages.GetID(ctx, targetID)
 		if err != nil {
 			return mapRepoNotFound(err)
 		}
@@ -222,7 +222,7 @@ func (r *ReportUseCase) validateTarget(ctx context.Context, reporterID uuid.UUID
 		if targetID == reporterID {
 			return ErrBadRequest
 		}
-		_, err = r.Users.FindID(ctx, targetID)
+		_, err = r.Users.GetID(ctx, targetID)
 		if err != nil {
 			return mapRepoNotFound(err)
 		}

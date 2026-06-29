@@ -10,9 +10,9 @@ import (
 	"gorm.io/gorm"
 )
 
-type ReportRepo interface {
+type IReportRepo interface {
 	Create(ctx context.Context, row *model.Report) error
-	FindID(ctx context.Context, id uuid.UUID) (*model.Report, error)
+	GetID(ctx context.Context, id uuid.UUID) (model.Report, error)
 	List(ctx context.Context, status *model.ReportStatus, limit, offset int) ([]model.Report, int64, error)
 	Update(ctx context.Context, row *model.Report) error
 	HasOpenByReporterTarget(ctx context.Context, reporterID uuid.UUID, targetType model.ReportTargetType, targetID uuid.UUID) (bool, error)
@@ -22,7 +22,7 @@ type reportRepo struct {
 	db *gorm.DB
 }
 
-func NewReportRepo(db *gorm.DB) ReportRepo {
+func NewReportRepo(db *gorm.DB) IReportRepo {
 	return &reportRepo{db: db}
 }
 
@@ -34,8 +34,8 @@ func (r *reportRepo) Create(ctx context.Context, row *model.Report) error {
 	return r.dbCtx(ctx).Create(row).Error
 }
 
-func (r *reportRepo) FindID(ctx context.Context, id uuid.UUID) (*model.Report, error) {
-	return firstOnePtr[model.Report](r.dbCtx(ctx).Where("id = ?", id))
+func (r *reportRepo) GetID(ctx context.Context, id uuid.UUID) (model.Report, error) {
+	return getOne[model.Report](r.dbCtx(ctx).Where("id = ?", id))
 }
 
 func (r *reportRepo) List(ctx context.Context, status *model.ReportStatus, limit, offset int) ([]model.Report, int64, error) {

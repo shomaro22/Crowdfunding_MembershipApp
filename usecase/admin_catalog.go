@@ -29,7 +29,7 @@ type AdminUpdateUserIn struct {
 }
 
 type PurchaseEnricher interface {
-	EnrichPurchase(ctx context.Context, row *model.Purchase) (PurchaseView, error)
+	EnrichPurchase(ctx context.Context, row model.Purchase) (PurchaseView, error)
 }
 
 func (a *AdminUseCase) DashboardStats(ctx context.Context) (AdminStatsView, error) {
@@ -59,7 +59,7 @@ func (a *AdminUseCase) DashboardStats(ctx context.Context) (AdminStatsView, erro
 		RecentUsers:    make([]UserView, 0, len(recent)),
 	}
 	for i = range recent {
-		out.RecentUsers = append(out.RecentUsers, UserViewFrom(&recent[i]))
+		out.RecentUsers = append(out.RecentUsers, UserViewFrom(recent[i]))
 	}
 	return out, nil
 }
@@ -87,7 +87,7 @@ func (a *AdminUseCase) ListUsers(ctx context.Context, role, search string, limit
 	}
 	out = make([]UserView, len(rows))
 	for i = range rows {
-		out[i] = UserViewFrom(&rows[i])
+		out[i] = UserViewFrom(rows[i])
 	}
 	return out, total, nil
 }
@@ -95,7 +95,7 @@ func (a *AdminUseCase) ListUsers(ctx context.Context, role, search string, limit
 func (a *AdminUseCase) UpdateUser(ctx context.Context, adminID, userID uuid.UUID, in AdminUpdateUserIn) (UserView, error) {
 	var (
 		norm validator.AdminUpdateUserNormalized
-		u    *model.User
+		u    model.User
 		err  error
 	)
 	norm, err = validator.ValidateAdminUpdateUser(validator.AdminUpdateUserInput{
@@ -104,7 +104,7 @@ func (a *AdminUseCase) UpdateUser(ctx context.Context, adminID, userID uuid.UUID
 	if err != nil {
 		return UserView{}, mapAdminCatalogErr(err)
 	}
-	u, err = a.Users.FindID(ctx, userID)
+	u, err = a.Users.GetID(ctx, userID)
 	if err != nil {
 		return UserView{}, mapRepoNotFound(err)
 	}
@@ -142,7 +142,7 @@ func (a *AdminUseCase) UpdateUser(ctx context.Context, adminID, userID uuid.UUID
 		}
 	}
 	u.UpdatedAt = time.Now().UTC()
-	if err = a.Users.Update(ctx, u); err != nil {
+	if err = a.Users.Update(ctx, &u); err != nil {
 		return UserView{}, err
 	}
 	WriteAudit(ctx, a.Audit, adminID, "user.update", "user", u.ID.String(), nil, nil)
@@ -151,10 +151,10 @@ func (a *AdminUseCase) UpdateUser(ctx context.Context, adminID, userID uuid.UUID
 
 func (a *AdminUseCase) DeleteUser(ctx context.Context, adminID, userID uuid.UUID) error {
 	var (
-		u   *model.User
+		u   model.User
 		err error
 	)
-	u, err = a.Users.FindID(ctx, userID)
+	u, err = a.Users.GetID(ctx, userID)
 	if err != nil {
 		return mapRepoNotFound(err)
 	}
@@ -163,7 +163,7 @@ func (a *AdminUseCase) DeleteUser(ctx context.Context, adminID, userID uuid.UUID
 	}
 	u.AccountStatus = model.AccountStatusBanned
 	u.UpdatedAt = time.Now().UTC()
-	if err = a.Users.Update(ctx, u); err != nil {
+	if err = a.Users.Update(ctx, &u); err != nil {
 		return err
 	}
 	if err = InvalidateUserSessions(ctx, a.DB, a.Users, a.RefreshTokens, userID); err != nil {
@@ -198,7 +198,7 @@ func (a *AdminUseCase) ListPurchases(ctx context.Context, status string, limit, 
 	}
 	out = make([]PurchaseView, 0, len(rows))
 	for i = range rows {
-		v, err = a.PurchaseViews.EnrichPurchase(ctx, &rows[i])
+		v, err = a.PurchaseViews.EnrichPurchase(ctx, rows[i])
 		if err != nil {
 			return nil, 0, err
 		}
@@ -210,7 +210,7 @@ func (a *AdminUseCase) ListPurchases(ctx context.Context, status string, limit, 
 func (a *AdminUseCase) PatchPurchaseStatus(ctx context.Context, adminID, purchaseID uuid.UUID, status string) (PurchaseView, error) {
 	var (
 		to       model.PurchaseStatus
-		purchase *model.Purchase
+		purchase model.Purchase
 		from     model.PurchaseStatus
 		details  string
 		view     PurchaseView
@@ -223,7 +223,7 @@ func (a *AdminUseCase) PatchPurchaseStatus(ctx context.Context, adminID, purchas
 	if err != nil {
 		return PurchaseView{}, mapAdminCatalogErr(err)
 	}
-	purchase, err = a.Purchases.FindID(ctx, purchaseID)
+	purchase, err = a.Purchases.GetID(ctx, purchaseID)
 	if err != nil {
 		return PurchaseView{}, mapRepoNotFound(err)
 	}
@@ -233,7 +233,7 @@ func (a *AdminUseCase) PatchPurchaseStatus(ctx context.Context, adminID, purchas
 	from = purchase.Status
 	purchase.Status = to
 	purchase.UpdatedAt = time.Now().UTC()
-	if err = a.Purchases.Update(ctx, purchase); err != nil {
+	if err = a.Purchases.Update(ctx, &purchase); err != nil {
 		return PurchaseView{}, err
 	}
 	if err = a.Purchases.RecordEvent(ctx, &model.PurchaseEvent{

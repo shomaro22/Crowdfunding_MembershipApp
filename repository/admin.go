@@ -17,7 +17,7 @@ type AdminDashboardStats struct {
 	TotalRevenue   int64
 }
 
-type AdminRepo interface {
+type IAdminRepo interface {
 	DashboardStats(ctx context.Context) (AdminDashboardStats, error)
 	RecentUsers(ctx context.Context, limit int) ([]model.User, error)
 }
@@ -26,7 +26,7 @@ type adminRepo struct {
 	db *gorm.DB
 }
 
-func NewAdminRepo(db *gorm.DB) AdminRepo {
+func NewAdminRepo(db *gorm.DB) IAdminRepo {
 	return &adminRepo{db: db}
 }
 

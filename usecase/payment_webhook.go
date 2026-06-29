@@ -106,14 +106,14 @@ func (p *PaymentUseCase) onCheckoutAsyncPaid(ctx context.Context, event stripe.W
 func (p *PaymentUseCase) onCheckoutAsyncFailed(ctx context.Context, event stripe.WebhookEvent) error {
 	var (
 		sess     stripe.CheckoutSessionSnapshot
-		purchase *model.Purchase
+		purchase model.Purchase
 		err      error
 	)
 	sess, err = stripe.ParseWebhookCheckoutSession(event)
 	if err != nil {
 		return err
 	}
-	purchase, err = p.Purchases.FindSessionID(ctx, sess.ID)
+	purchase, err = p.Purchases.GetSessionID(ctx, sess.ID)
 	if isRepoNotFound(err) {
 		return nil
 	}
@@ -126,14 +126,14 @@ func (p *PaymentUseCase) onCheckoutAsyncFailed(ctx context.Context, event stripe
 func (p *PaymentUseCase) onCheckoutExpired(ctx context.Context, event stripe.WebhookEvent) error {
 	var (
 		sess     stripe.CheckoutSessionSnapshot
-		purchase *model.Purchase
+		purchase model.Purchase
 		err      error
 	)
 	sess, err = stripe.ParseWebhookCheckoutSession(event)
 	if err != nil {
 		return err
 	}
-	purchase, err = p.Purchases.FindSessionID(ctx, sess.ID)
+	purchase, err = p.Purchases.GetSessionID(ctx, sess.ID)
 	if isRepoNotFound(err) {
 		return nil
 	}
@@ -169,20 +169,19 @@ func (p *PaymentUseCase) onPaymentIntentSucceeded(ctx context.Context, event str
 func (p *PaymentUseCase) onInvoicePaid(ctx context.Context, event stripe.WebhookEvent) error {
 	var (
 		inv    stripe.InvoiceSnapshot
-		exists *model.Purchase
+		exists model.Purchase
 		err    error
 	)
 	inv, err = stripe.ParseWebhookInvoice(event)
 	if err != nil {
 		return err
 	}
-	exists, err = p.Purchases.FindStripeInvoiceID(ctx, inv.ID)
+	exists, err = p.Purchases.GetStripeInvoiceID(ctx, inv.ID)
 	if isRepoNotFound(err) {
-		exists = nil
+		// new invoice
 	} else if err != nil {
 		return err
-	}
-	if exists != nil {
+	} else if exists.ID != uuid.Nil {
 		return nil
 	}
 	if stripe.IsAutoSubscriptionRenewal(inv.BillingReason) {
@@ -194,7 +193,7 @@ func (p *PaymentUseCase) onInvoicePaid(ctx context.Context, event stripe.Webhook
 func (p *PaymentUseCase) fulfillAutoRenewal(ctx context.Context, inv stripe.InvoiceSnapshot) error {
 	var (
 		subID     string
-		supporter *model.ProjectSupporter
+		supporter model.ProjectSupporter
 		period    periodRange
 		err       error
 	)
@@ -202,7 +201,7 @@ func (p *PaymentUseCase) fulfillAutoRenewal(ctx context.Context, inv stripe.Invo
 	if subID == "" {
 		return nil
 	}
-	supporter, err = p.Supporters.FindStripeSubscriptionID(ctx, subID)
+	supporter, err = p.Supporters.GetStripeSubscriptionID(ctx, subID)
 	if isRepoNotFound(err) {
 		return nil
 	}
@@ -268,21 +267,21 @@ func (p *PaymentUseCase) fulfillAutoRenewal(ctx context.Context, inv stripe.Invo
 		sub := subID
 		supporter.StripeSubscriptionID = &sub
 		supporter.UpdatedAt = now
-		return p.Supporters.Update(txCtx, supporter)
+		return p.Supporters.Update(txCtx, &supporter)
 	})
 }
 
 func (p *PaymentUseCase) fulfillInvoiceFirstSupport(ctx context.Context, inv stripe.InvoiceSnapshot) error {
 	var (
 		purchaseIDStr string
-		purchase      *model.Purchase
+		purchase      model.Purchase
 		err           error
 	)
 	purchaseIDStr = inv.PurchaseID()
 	if purchaseIDStr == "" {
 		return nil
 	}
-	purchase, err = p.Purchases.FindID(ctx, uuid.MustParse(purchaseIDStr))
+	purchase, err = p.Purchases.GetID(ctx, uuid.MustParse(purchaseIDStr))
 	if isRepoNotFound(err) {
 		return nil
 	}
@@ -310,9 +309,9 @@ func (p *PaymentUseCase) fulfillInvoiceFirstSupport(ctx context.Context, inv str
 	return p.fulfillFirstSupport(ctx, purchase, uuid.Nil, periodRange{start, end}, cust, sub, invID)
 }
 
-func (p *PaymentUseCase) backfillPaidPurchaseInvoice(ctx context.Context, inv stripe.InvoiceSnapshot, purchase *model.Purchase) error {
+func (p *PaymentUseCase) backfillPaidPurchaseInvoice(ctx context.Context, inv stripe.InvoiceSnapshot, purchase model.Purchase) error {
 	var (
-		supporter *model.ProjectSupporter
+		supporter model.ProjectSupporter
 		period    periodRange
 		err       error
 	)
@@ -320,14 +319,14 @@ func (p *PaymentUseCase) backfillPaidPurchaseInvoice(ctx context.Context, inv st
 		invID := inv.ID
 		purchase.StripeInvoiceID = &invID
 		purchase.UpdatedAt = time.Now().UTC()
-		if err = p.Purchases.Update(ctx, purchase); err != nil {
+		if err = p.Purchases.Update(ctx, &purchase); err != nil {
 			return err
 		}
 	}
 	if purchase.SupporterID == nil {
 		return nil
 	}
-	supporter, err = p.Supporters.FindID(ctx, *purchase.SupporterID)
+	supporter, err = p.Supporters.GetID(ctx, *purchase.SupporterID)
 	if isRepoNotFound(err) {
 		return nil
 	}
@@ -347,5 +346,5 @@ func (p *PaymentUseCase) backfillPaidPurchaseInvoice(ctx context.Context, inv st
 		supporter.StripeSubscriptionID = &inv.SubscriptionID
 	}
 	supporter.UpdatedAt = time.Now().UTC()
-	return p.Supporters.Update(ctx, supporter)
+	return p.Supporters.Update(ctx, &supporter)
 }
