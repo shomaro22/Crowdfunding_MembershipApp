@@ -4,7 +4,7 @@ import (
 	"strings"
 	"time"
 
-	"crowdfund-app/entity"
+	"crowdfund-app/model"
 
 	"github.com/google/uuid"
 	validation "github.com/go-ozzo/ozzo-validation/v4"
@@ -24,7 +24,7 @@ type ActivityLogsInput struct {
 
 type ActivityLogsNormalized struct {
 	UserID     *uuid.UUID
-	Action     *entity.ActivityAction
+	Action     *model.ActivityAction
 	Resource   *string
 	ResourceID *string
 	IP         *string
@@ -58,14 +58,14 @@ type BatchRunsInput struct {
 
 type BatchRunsNormalized struct {
 	JobName *string
-	Status  *entity.BatchStatus
+	Status  *model.BatchStatus
 	Limit   int
 }
 
 func ValidateActivityLogs(in ActivityLogsInput) (ActivityLogsNormalized, error) {
 	var (
 		out    ActivityLogsNormalized
-		action *entity.ActivityAction
+		action *model.ActivityAction
 		ipRaw  string
 		err    error
 	)
@@ -131,7 +131,7 @@ func ValidateAuditLogs(in AuditLogsInput) (AuditLogsNormalized, error) {
 func ValidateBatchRuns(in BatchRunsInput) (BatchRunsNormalized, error) {
 	var (
 		out    BatchRunsNormalized
-		status *entity.BatchStatus
+		status *model.BatchStatus
 		jobRaw string
 		err    error
 	)

@@ -4,19 +4,19 @@ import (
 	"context"
 	"time"
 
-	"crowdfund-app/entity"
+	"crowdfund-app/model"
 	"crowdfund-app/repository"
 
 	"github.com/google/uuid"
 )
 
-func (s *SupporterUseCase) EnrichSupporterRows(ctx context.Context, rows []entity.ProjectSupporter) ([]SupporterView, error) {
+func (s *SupporterUseCase) EnrichSupporterRows(ctx context.Context, rows []model.ProjectSupporter) ([]SupporterView, error) {
 	return s.enrichViews(ctx, rows)
 }
 
 func (s *SupporterUseCase) ListMine(ctx context.Context, userID uuid.UUID) ([]SupporterView, error) {
 	var (
-		rows []entity.ProjectSupporter
+		rows []model.ProjectSupporter
 		err  error
 	)
 	rows, err = s.Supporters.ListByUserID(ctx, userID)
@@ -28,7 +28,7 @@ func (s *SupporterUseCase) ListMine(ctx context.Context, userID uuid.UUID) ([]Su
 
 func (s *SupporterUseCase) RunApplyPlans(ctx context.Context, dryRun bool) (processed, failed int, err error) {
 	var (
-		rows []entity.ProjectSupporter
+		rows []model.ProjectSupporter
 		now  time.Time
 		i    int
 		ok   bool
@@ -55,7 +55,7 @@ func (s *SupporterUseCase) RunApplyPlans(ctx context.Context, dryRun bool) (proc
 	return processed, failed, nil
 }
 
-func (s *SupporterUseCase) applyPendingChanges(ctx context.Context, supporter *entity.ProjectSupporter) (bool, error) {
+func (s *SupporterUseCase) applyPendingChanges(ctx context.Context, supporter *model.ProjectSupporter) (bool, error) {
 	var (
 		now time.Time
 		due bool
@@ -76,7 +76,7 @@ func (s *SupporterUseCase) applyPendingChanges(ctx context.Context, supporter *e
 		return false, nil
 	}
 	err = repository.WithTx(ctx, s.DB, func(txCtx context.Context) error {
-		var locked *entity.ProjectSupporter
+		var locked *model.ProjectSupporter
 		locked, err = s.Supporters.FindID(txCtx, supporter.ID)
 		if err != nil {
 			return mapRepoNotFound(err)
@@ -115,7 +115,7 @@ func (s *SupporterUseCase) applyPendingChanges(ctx context.Context, supporter *e
 	return due, nil
 }
 
-func (s *SupporterUseCase) enrichViews(ctx context.Context, rows []entity.ProjectSupporter) ([]SupporterView, error) {
+func (s *SupporterUseCase) enrichViews(ctx context.Context, rows []model.ProjectSupporter) ([]SupporterView, error) {
 	var (
 		out []SupporterView
 		i   int
@@ -133,11 +133,11 @@ func (s *SupporterUseCase) enrichViews(ctx context.Context, rows []entity.Projec
 	return out, nil
 }
 
-func (s *SupporterUseCase) enrichView(ctx context.Context, supporter *entity.ProjectSupporter) (SupporterView, error) {
+func (s *SupporterUseCase) enrichView(ctx context.Context, supporter *model.ProjectSupporter) (SupporterView, error) {
 	var (
 		v       SupporterView
-		project *entity.Project
-		plan    *entity.ProjectPlan
+		project *model.Project
+		plan    *model.ProjectPlan
 		err     error
 	)
 	if supporter == nil {
@@ -164,9 +164,9 @@ func (s *SupporterUseCase) enrichView(ctx context.Context, supporter *entity.Pro
 	return v, nil
 }
 
-func (s *SupporterUseCase) loadOwned(ctx context.Context, userID, supporterID uuid.UUID) (*entity.ProjectSupporter, error) {
+func (s *SupporterUseCase) loadOwned(ctx context.Context, userID, supporterID uuid.UUID) (*model.ProjectSupporter, error) {
 	var (
-		row *entity.ProjectSupporter
+		row *model.ProjectSupporter
 		err error
 	)
 	row, err = s.Supporters.FindOwned(ctx, supporterID, userID)
@@ -178,14 +178,14 @@ func (s *SupporterUseCase) loadOwned(ctx context.Context, userID, supporterID uu
 
 func (s *SupporterUseCase) commitPendingPlan(
 	ctx context.Context,
-	locked *entity.ProjectSupporter,
+	locked *model.ProjectSupporter,
 	newPlanID uuid.UUID,
 	validatePlan bool,
 ) error {
 	var (
 		oldPlanID uuid.UUID
-		newPlan   *entity.ProjectPlan
-		plan      *entity.ProjectPlan
+		newPlan   *model.ProjectPlan
+		plan      *model.ProjectPlan
 		err       error
 	)
 	if validatePlan {
@@ -201,7 +201,7 @@ func (s *SupporterUseCase) commitPendingPlan(
 		return err
 	}
 	oldPlanID = locked.PlanID
-	if locked.BillingMode == entity.BillingModeAuto && locked.StripeSubscriptionID != nil && s.Stripe != nil {
+	if locked.BillingMode == model.BillingModeAuto && locked.StripeSubscriptionID != nil && s.Stripe != nil {
 		plan, err = s.Projects.FindPlan(ctx, locked.ProjectID, newPlanID)
 		if err != nil {
 			return mapRepoNotFound(err)
@@ -213,7 +213,7 @@ func (s *SupporterUseCase) commitPendingPlan(
 	locked.PlanID = newPlanID
 	locked.PendingPlanID = nil
 	if newPlanID != oldPlanID {
-		LogActivity(ctx, s.Activity, &locked.UserID, entity.PurchasePlanChange, "supporter", locked.ID.String(), RequestMeta{}, activityMeta(map[string]string{
+		LogActivity(ctx, s.Activity, &locked.UserID, model.PurchasePlanChange, "supporter", locked.ID.String(), RequestMeta{}, activityMeta(map[string]string{
 			"from_plan_id": oldPlanID.String(),
 			"to_plan_id":   newPlanID.String(),
 		}))

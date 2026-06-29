@@ -4,21 +4,21 @@ import (
 	"testing"
 	"time"
 
-	"crowdfund-app/entity"
+	"crowdfund-app/model"
 )
 
 func TestCanMessageActiveSupporter(t *testing.T) {
 	var (
-		s   entity.ProjectSupporter
+		s   model.ProjectSupporter
 		err error
 		now time.Time
 	)
 	now = time.Now().UTC()
-	s = entity.ProjectSupporter{
-		Status:           entity.SupporterStatusActive,
+	s = model.ProjectSupporter{
+		Status:           model.SupporterStatusActive,
 		CurrentPeriodEnd: now.Add(24 * time.Hour),
 	}
-	err = entity.CanMessage(s, now)
+	err = model.CanMessage(s, now)
 	if err != nil {
 		t.Fatalf("expected nil, got %v", err)
 	}
@@ -26,16 +26,16 @@ func TestCanMessageActiveSupporter(t *testing.T) {
 
 func TestCanMessageExpiredBenefits(t *testing.T) {
 	var (
-		s   entity.ProjectSupporter
+		s   model.ProjectSupporter
 		err error
 		now time.Time
 	)
 	now = time.Now().UTC()
-	s = entity.ProjectSupporter{
-		Status:           entity.SupporterStatusExpired,
+	s = model.ProjectSupporter{
+		Status:           model.SupporterStatusExpired,
 		CurrentPeriodEnd: now.Add(-time.Hour),
 	}
-	err = entity.CanMessage(s, now)
+	err = model.CanMessage(s, now)
 	if err == nil {
 		t.Fatal("expected error for expired supporter")
 	}

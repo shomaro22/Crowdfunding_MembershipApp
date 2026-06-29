@@ -13,7 +13,7 @@ import (
 
 	"crowdfund-app/auth"
 	"crowdfund-app/db"
-	"crowdfund-app/entity"
+	"crowdfund-app/model"
 	"crowdfund-app/repository"
 
 	"github.com/google/uuid"
@@ -59,11 +59,11 @@ func openIntegrationDB(t *testing.T) *gorm.DB {
 	return gdb
 }
 
-func seedIntegrationUser(t *testing.T, gdb *gorm.DB, role entity.UserRole, adminRole *entity.AdminRole) *entity.User {
+func seedIntegrationUser(t *testing.T, gdb *gorm.DB, role model.UserRole, adminRole *model.AdminRole) *model.User {
 	var (
 		hash string
 		now  time.Time
-		u    *entity.User
+		u    *model.User
 		err  error
 	)
 	t.Helper()
@@ -72,13 +72,13 @@ func seedIntegrationUser(t *testing.T, gdb *gorm.DB, role entity.UserRole, admin
 		t.Fatal(err)
 	}
 	now = time.Now().UTC()
-	u = &entity.User{
+	u = &model.User{
 		ID:            uuid.New(),
 		Email:         fmt.Sprintf("%s-%s@test.local", role, uuid.New()),
 		PasswordHash:  hash,
 		Role:          role,
-		AccountStatus: entity.AccountStatusActive,
-		SellerStatus:  entity.SellerStatusNotApplicable,
+		AccountStatus: model.AccountStatusActive,
+		SellerStatus:  model.SellerStatusNotApplicable,
 		AdminRole:     adminRole,
 		CreatedAt:     now,
 		UpdatedAt:     now,
@@ -87,7 +87,7 @@ func seedIntegrationUser(t *testing.T, gdb *gorm.DB, role entity.UserRole, admin
 		t.Fatal(err)
 	}
 	t.Cleanup(func() {
-		_ = gdb.Delete(&entity.User{}, "id = ?", u.ID).Error
+		_ = gdb.Delete(&model.User{}, "id = ?", u.ID).Error
 	})
 	return u
 }
@@ -102,7 +102,7 @@ func TestActivityRepoList(t *testing.T) {
 		now      time.Time
 		resource string
 		ip       string
-		rows     []entity.ActivityLog
+		rows     []model.ActivityLog
 		total    int64
 		err      error
 	)
@@ -110,14 +110,14 @@ func TestActivityRepoList(t *testing.T) {
 	repo = repository.NewActivityRepo(gdb)
 	ctx = context.Background()
 	rowID = uuid.New()
-	userID = seedIntegrationUser(t, gdb, entity.UserRoleBuyer, nil).ID
+	userID = seedIntegrationUser(t, gdb, model.UserRoleBuyer, nil).ID
 	now = time.Now().UTC()
 	resource = "rate_limit"
 	ip = "203.0.113.10"
-	err = repo.Create(ctx, &entity.ActivityLog{
+	err = repo.Create(ctx, &model.ActivityLog{
 		ID:         rowID,
 		UserID:     &userID,
-		Action:     entity.SecRateLimit,
+		Action:     model.SecRateLimit,
 		Resource:   &resource,
 		IPAddress:  &ip,
 		CreatedAt:  now,
@@ -126,12 +126,12 @@ func TestActivityRepoList(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() {
-		_ = gdb.Delete(&entity.ActivityLog{}, "id = ?", rowID).Error
+		_ = gdb.Delete(&model.ActivityLog{}, "id = ?", rowID).Error
 	})
 
 	rows, total, err = repo.List(ctx, repository.ActivityListFilter{
 		UserID: &userID,
-		Action: activityActionPtr(entity.SecRateLimit),
+		Action: activityActionPtr(model.SecRateLimit),
 		IP:     &ip,
 		Limit:  10,
 	})
@@ -154,7 +154,7 @@ func TestAuditRepoList(t *testing.T) {
 		rowID  uuid.UUID
 		admin  uuid.UUID
 		action string
-		rows   []entity.AuditLog
+		rows   []model.AuditLog
 		total  int64
 		err    error
 	)
@@ -162,9 +162,9 @@ func TestAuditRepoList(t *testing.T) {
 	repo = repository.NewAuditRepo(gdb)
 	ctx = context.Background()
 	rowID = uuid.New()
-	admin = seedIntegrationUser(t, gdb, entity.UserRoleAdmin, adminRolePtr(entity.AdminRoleSuperAdmin)).ID
+	admin = seedIntegrationUser(t, gdb, model.UserRoleAdmin, adminRolePtr(model.AdminRoleSuperAdmin)).ID
 	action = "batch.manual_run"
-	err = repo.Create(ctx, &entity.AuditLog{
+	err = repo.Create(ctx, &model.AuditLog{
 		ID:         rowID,
 		AdminID:    admin,
 		Action:     action,
@@ -176,7 +176,7 @@ func TestAuditRepoList(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() {
-		_ = gdb.Delete(&entity.AuditLog{}, "id = ?", rowID).Error
+		_ = gdb.Delete(&model.AuditLog{}, "id = ?", rowID).Error
 	})
 
 	rows, total, err = repo.List(ctx, repository.AuditListFilter{
@@ -192,10 +192,10 @@ func TestAuditRepoList(t *testing.T) {
 	}
 }
 
-func activityActionPtr(a entity.ActivityAction) *entity.ActivityAction {
+func activityActionPtr(a model.ActivityAction) *model.ActivityAction {
 	return &a
 }
 
-func adminRolePtr(r entity.AdminRole) *entity.AdminRole {
+func adminRolePtr(r model.AdminRole) *model.AdminRole {
 	return &r
 }

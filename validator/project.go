@@ -3,25 +3,25 @@ package validator
 import (
 	"time"
 
-	"crowdfund-app/entity"
+	"crowdfund-app/model"
 )
 
 func ValidateTitle(title string) error {
-	return entity.ValidateTitle(title)
+	return model.ValidateTitle(title)
 }
 
-func ValidateDuration(duration entity.DurationType, start time.Time, end *time.Time) error {
-	return entity.ValidateDuration(duration, start, end)
+func ValidateDuration(duration model.DurationType, start time.Time, end *time.Time) error {
+	return model.ValidateDuration(duration, start, end)
 }
 
-func ValidateProject(title, description string, targetAmount int64, duration entity.DurationType, start time.Time, end *time.Time, plans []entity.PlanInput) error {
-	return entity.ValidateProject(title, description, targetAmount, duration, start, end, plans)
+func ValidateProject(title, description string, targetAmount int64, duration model.DurationType, start time.Time, end *time.Time, plans []model.PlanInput) error {
+	return model.ValidateProject(title, description, targetAmount, duration, start, end, plans)
 }
 
-func ValidateProjectImages(images []entity.ImageInput) error {
-	return entity.ValidateProjectImages(images)
+func ValidateProjectImages(images []model.ImageInput) error {
+	return model.ValidateProjectImages(images)
 }
 
 func ValidateMessage(content string) error {
-	return entity.ValidateMessage(content)
+	return model.ValidateMessage(content)
 }

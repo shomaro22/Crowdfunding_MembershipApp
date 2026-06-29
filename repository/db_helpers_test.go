@@ -4,7 +4,7 @@ import (
 	"errors"
 	"testing"
 
-	"crowdfund-app/entity"
+	"crowdfund-app/model"
 
 	"gorm.io/gorm"
 )
@@ -38,5 +38,5 @@ func TestErrNotFoundDistinct(t *testing.T) {
 }
 
 func TestTableModelConstraint(t *testing.T) {
-	var _ tableModel = entity.Purchase{}
+	var _ tableModel = model.Purchase{}
 }

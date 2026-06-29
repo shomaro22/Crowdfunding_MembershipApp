@@ -5,7 +5,7 @@ import (
 	"strings"
 	"time"
 
-	"crowdfund-app/entity"
+	"crowdfund-app/model"
 	"crowdfund-app/repository"
 	"crowdfund-app/validator"
 
@@ -72,7 +72,7 @@ func (m *MessageUseCase) ListThreads(ctx context.Context, userID uuid.UUID, q Li
 		summaries []repository.MessageThreadSummary
 		total    int64
 		offset   int
-		rows     []entity.Message
+		rows     []model.Message
 		out      ListThreadsResult
 		i        int
 		s        repository.MessageThreadSummary
@@ -119,8 +119,8 @@ func (m *MessageUseCase) ListThreads(ctx context.Context, userID uuid.UUID, q Li
 
 func (m *MessageUseCase) enrichThread(ctx context.Context, t *MessageThreadView) error {
 	var (
-		project *entity.Project
-		u       *entity.User
+		project *model.Project
+		u       *model.User
 		err     error
 	)
 	if t == nil {
@@ -152,9 +152,9 @@ func reverseMessageItems(items []MessageItemView) {
 
 func (m *MessageUseCase) Send(ctx context.Context, senderID uuid.UUID, in SendMessageIn) (MessageItemView, error) {
 	var (
-		sender   *entity.User
-		receiver *entity.User
-		row      *entity.Message
+		sender   *model.User
+		receiver *model.User
+		row      *model.Message
 		now      time.Time
 		out      MessageItemView
 		err      error
@@ -167,7 +167,7 @@ func (m *MessageUseCase) Send(ctx context.Context, senderID uuid.UUID, in SendMe
 		return MessageItemView{}, err
 	}
 	now = time.Now().UTC()
-	row = &entity.Message{
+	row = &model.Message{
 		ID:         uuid.New(),
 		ProjectID:  in.ProjectID,
 		SenderID:   senderID,
@@ -179,7 +179,7 @@ func (m *MessageUseCase) Send(ctx context.Context, senderID uuid.UUID, in SendMe
 	if err = m.Messages.Create(ctx, row); err != nil {
 		return MessageItemView{}, err
 	}
-	LogActivity(ctx, m.Activity, &senderID, entity.MessageSent, "message", row.ID.String(), in.Meta, activityMeta(map[string]string{
+	LogActivity(ctx, m.Activity, &senderID, model.MessageSent, "message", row.ID.String(), in.Meta, activityMeta(map[string]string{
 		"project_id":  in.ProjectID.String(),
 		"receiver_id": in.ReceiverID.String(),
 	}))
@@ -194,7 +194,7 @@ func (m *MessageUseCase) Send(ctx context.Context, senderID uuid.UUID, in SendMe
 
 func (m *MessageUseCase) MarkRead(ctx context.Context, userID, messageID uuid.UUID, meta RequestMeta) error {
 	var (
-		msg *entity.Message
+		msg *model.Message
 		now time.Time
 		err error
 	)
@@ -218,7 +218,7 @@ func (m *MessageUseCase) MarkRead(ctx context.Context, userID, messageID uuid.UU
 	if err = m.Messages.MarkRead(ctx, messageID, now); err != nil {
 		return err
 	}
-	LogActivity(ctx, m.Activity, &userID, entity.MessageRead, "message", msg.ID.String(), meta, activityMeta(map[string]string{
+	LogActivity(ctx, m.Activity, &userID, model.MessageRead, "message", msg.ID.String(), meta, activityMeta(map[string]string{
 		"project_id": msg.ProjectID.String(),
 	}))
 	if m.events != nil {
@@ -243,6 +243,6 @@ func (m *MessageUseCase) ConfirmWSSubscribe(ctx context.Context, userID, project
 	if err := m.CanSubscribeProject(ctx, projectID, userID); err != nil {
 		return err
 	}
-	LogActivity(ctx, m.Activity, &userID, entity.SecWSSubscribe, "project", projectID.String(), meta, nil)
+	LogActivity(ctx, m.Activity, &userID, model.SecWSSubscribe, "project", projectID.String(), meta, nil)
 	return nil
 }

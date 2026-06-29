@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	"crowdfund-app/entity"
+	"crowdfund-app/model"
 	"crowdfund-app/repository"
 	"crowdfund-app/validator"
 
@@ -22,7 +22,7 @@ type BatchUseCase struct {
 
 func (b *BatchUseCase) Run(ctx context.Context, jobName, triggeredBy string, dryRun bool) (*BatchRunView, error) {
 	var (
-		run       *entity.BatchRun
+		run       *model.BatchRun
 		processed int
 		failed    int
 		runErr    error
@@ -32,10 +32,10 @@ func (b *BatchUseCase) Run(ctx context.Context, jobName, triggeredBy string, dry
 	if !isSupportedBatchJob(jobName) {
 		return nil, ErrBadRequest
 	}
-	run = &entity.BatchRun{
+	run = &model.BatchRun{
 		ID:          uuid.New(),
 		JobName:     jobName,
-		Status:      entity.BatchRunning,
+		Status:      model.BatchRunning,
 		StartedAt:   time.Now().UTC(),
 		TriggeredBy: triggeredBy,
 		DryRun:      dryRun,
@@ -44,11 +44,11 @@ func (b *BatchUseCase) Run(ctx context.Context, jobName, triggeredBy string, dry
 		return nil, err
 	}
 	switch jobName {
-	case entity.ApplyPlans:
+	case model.ApplyPlans:
 		processed, failed, runErr = b.Supporters.RunApplyPlans(ctx, dryRun)
-	case entity.ExpireSupporters:
+	case model.ExpireSupporters:
 		processed, failed, runErr = b.Supporters.RunExpireSupporters(ctx, dryRun)
-	case entity.PurgeTokens:
+	case model.PurgeTokens:
 		processed, failed, runErr = b.runPurgeTokens(ctx, dryRun)
 	default:
 		runErr = ErrBadRequest
@@ -58,11 +58,11 @@ func (b *BatchUseCase) Run(ctx context.Context, jobName, triggeredBy string, dry
 	run.Processed = processed
 	run.Failed = failed
 	if runErr != nil {
-		run.Status = entity.BatchFailed
+		run.Status = model.BatchFailed
 		msg := runErr.Error()
 		run.ErrorMessage = &msg
 	} else {
-		run.Status = entity.BatchSuccess
+		run.Status = model.BatchSuccess
 		if failed > 0 {
 			msg := fmt.Sprintf("%d records failed", failed)
 			run.ErrorMessage = &msg

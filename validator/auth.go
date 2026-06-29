@@ -6,23 +6,23 @@ import (
 	"time"
 	"unicode/utf8"
 
-	"crowdfund-app/entity"
+	"crowdfund-app/model"
 )
 
 func ValidateEmail(email string) (string, error) {
-	return entity.ValidateEmail(email)
+	return model.ValidateEmail(email)
 }
 
 func ValidatePassword(password string) error {
-	return entity.ValidatePassword(password)
+	return model.ValidatePassword(password)
 }
 
 func ValidateBuyerReg(email, password string) (string, error) {
-	return entity.ValidateBuyerReg(email, password)
+	return model.ValidateBuyerReg(email, password)
 }
 
 func ValidateSellerKYC(fullName string, birthDate time.Time, address string, photoPresent bool) error {
-	return entity.ValidateSellerKYC(fullName, birthDate, address, photoPresent)
+	return model.ValidateSellerKYC(fullName, birthDate, address, photoPresent)
 }
 
 const (
@@ -48,7 +48,7 @@ func ValidateUpdateProfile(in UpdateProfileInput) (UpdateProfileNormalized, erro
 		err error
 	)
 	if in.Name == nil && in.AvatarURL == nil {
-		return UpdateProfileNormalized{}, entity.ErrBadProfile
+		return UpdateProfileNormalized{}, model.ErrBadProfile
 	}
 	if in.Name != nil {
 		out.Name, err = normalizeProfileName(*in.Name)
@@ -78,7 +78,7 @@ func normalizeProfileName(raw string) (*string, error) {
 	}
 	n = utf8.RuneCountInString(trimmed)
 	if n < 1 || n > MaxUserNameLen {
-		return nil, entity.ErrBadProfile
+		return nil, model.ErrBadProfile
 	}
 	return &trimmed, nil
 }
@@ -94,16 +94,16 @@ func normalizeAvatarURL(raw string) (*string, error) {
 		return nil, nil
 	}
 	if utf8.RuneCountInString(trimmed) > MaxAvatarURLLen {
-		return nil, entity.ErrBadProfile
+		return nil, model.ErrBadProfile
 	}
 	parsed, err = url.Parse(trimmed)
 	if err != nil || parsed.Scheme == "" || parsed.Host == "" {
-		return nil, entity.ErrBadProfile
+		return nil, model.ErrBadProfile
 	}
 	switch strings.ToLower(parsed.Scheme) {
 	case "http", "https":
 	default:
-		return nil, entity.ErrBadProfile
+		return nil, model.ErrBadProfile
 	}
 	return &trimmed, nil
 }

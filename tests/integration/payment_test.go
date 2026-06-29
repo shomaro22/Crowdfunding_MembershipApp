@@ -11,7 +11,7 @@ import (
 	"testing"
 	"time"
 
-	"crowdfund-app/entity"
+	"crowdfund-app/model"
 	"crowdfund-app/stripe"
 
 	"github.com/google/uuid"
@@ -22,34 +22,34 @@ import (
 // §5.3 決済統合テスト。DATABASE_URL 必須。Stripe は StubClient を注入する。
 
 type paymentFixture struct {
-	seller  *entity.User
-	buyer   *entity.User
-	project *entity.Project
-	plan    *entity.ProjectPlan
+	seller  *model.User
+	buyer   *model.User
+	project *model.Project
+	plan    *model.ProjectPlan
 }
 
 func seedPaymentFixture(t *testing.T, gdb *gorm.DB) paymentFixture {
 	var (
 		now    time.Time
-		seller *entity.User
-		buyer  *entity.User
-		project   *entity.Project
-		plan   *entity.ProjectPlan
-		conn   *entity.ConnectAccount
+		seller *model.User
+		buyer  *model.User
+		project   *model.Project
+		plan   *model.ProjectPlan
+		conn   *model.ConnectAccount
 		err    error
 	)
 	t.Helper()
 	now = time.Now().UTC()
 	seller = seedUser(t, gdb, seedOpts{
-		Role:        entity.UserRoleSeller,
+		Role:        model.UserRoleSeller,
 		TOTPEnabled: true,
 	})
-	buyer = seedUser(t, gdb, seedOpts{Role: entity.UserRoleBuyer})
-	project = seedProject(t, gdb, seller.ID, entity.ProjectStatusActive)
-	plan = &entity.ProjectPlan{
+	buyer = seedUser(t, gdb, seedOpts{Role: model.UserRoleBuyer})
+	project = seedProject(t, gdb, seller.ID, model.ProjectStatusActive)
+	plan = &model.ProjectPlan{
 		ID:             uuid.New(),
 		ProjectID:      project.ID,
-		MembershipType: entity.MembershipBronze,
+		MembershipType: model.MembershipBronze,
 		Price:          1000,
 		Benefits:       "test benefits",
 		IsActive:       true,
@@ -59,7 +59,7 @@ func seedPaymentFixture(t *testing.T, gdb *gorm.DB) paymentFixture {
 	if err = gdb.Create(plan).Error; err != nil {
 		t.Fatal(err)
 	}
-	conn = &entity.ConnectAccount{
+	conn = &model.ConnectAccount{
 		ID:               uuid.New(),
 		UserID:           seller.ID,
 		StripeAccountID:  fmt.Sprintf("acct_test_%s", uuid.New()),
@@ -85,9 +85,9 @@ func TestPaymentKonbiniCheckoutAsyncWebhook(t *testing.T) {
 		rec       *httptest.ResponseRecorder
 		sessionID string
 		meta      map[string]string
-		purchase  entity.Purchase
-		supporter entity.ProjectSupporter
-		project      entity.Project
+		purchase  model.Purchase
+		supporter model.ProjectSupporter
+		project      model.Project
 		err       error
 	)
 	e, stub = setupPaymentApp(t)
@@ -111,17 +111,17 @@ func TestPaymentKonbiniCheckoutAsyncWebhook(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if purchase.Status != entity.PurchaseStatusPaid {
+	if purchase.Status != model.PurchaseStatusPaid {
 		t.Fatalf("purchase status=%s want PAID", purchase.Status)
 	}
 	err = gdb.Where("project_id = ? AND user_id = ?", fx.project.ID, fx.buyer.ID).First(&supporter).Error
 	if err != nil {
 		t.Fatal(err)
 	}
-	if supporter.Status != entity.SupporterStatusActive {
+	if supporter.Status != model.SupporterStatusActive {
 		t.Fatalf("supporter status=%s want ACTIVE", supporter.Status)
 	}
-	if supporter.BillingMode != entity.BillingModeKonbini {
+	if supporter.BillingMode != model.BillingModeKonbini {
 		t.Fatalf("billing mode=%s want KONBINI", supporter.BillingMode)
 	}
 	err = gdb.Where("id = ?", fx.project.ID).First(&project).Error
@@ -143,8 +143,8 @@ func TestPaymentAutoIntentWebhook(t *testing.T) {
 		rec       *httptest.ResponseRecorder
 		intentID  string
 		meta      map[string]string
-		purchase  entity.Purchase
-		supporter entity.ProjectSupporter
+		purchase  model.Purchase
+		supporter model.ProjectSupporter
 		err       error
 	)
 	e, stub = setupPaymentApp(t)
@@ -168,14 +168,14 @@ func TestPaymentAutoIntentWebhook(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if purchase.Status != entity.PurchaseStatusPaid {
+	if purchase.Status != model.PurchaseStatusPaid {
 		t.Fatalf("purchase status=%s want PAID", purchase.Status)
 	}
 	err = gdb.Where("project_id = ? AND user_id = ?", fx.project.ID, fx.buyer.ID).First(&supporter).Error
 	if err != nil {
 		t.Fatal(err)
 	}
-	if supporter.BillingMode != entity.BillingModeAuto {
+	if supporter.BillingMode != model.BillingModeAuto {
 		t.Fatalf("billing mode=%s want AUTO", supporter.BillingMode)
 	}
 }
@@ -189,7 +189,7 @@ func TestPaymentVerifyCheckoutFallback(t *testing.T) {
 		tok       string
 		rec       *httptest.ResponseRecorder
 		sessionID string
-		purchase  entity.Purchase
+		purchase  model.Purchase
 		err       error
 	)
 	e, stub = setupPaymentApp(t)
@@ -213,7 +213,7 @@ func TestPaymentVerifyCheckoutFallback(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if purchase.Status != entity.PurchaseStatusPaid {
+	if purchase.Status != model.PurchaseStatusPaid {
 		t.Fatalf("purchase status=%s want PAID", purchase.Status)
 	}
 }
@@ -254,7 +254,7 @@ func TestPaymentWebhookIdempotent(t *testing.T) {
 	if rec.Code != http.StatusOK && rec.Code != http.StatusNoContent {
 		t.Fatalf("duplicate webhook status=%d", rec.Code)
 	}
-	err = gdb.Model(&entity.ProjectSupporter{}).
+	err = gdb.Model(&model.ProjectSupporter{}).
 		Where("project_id = ? AND user_id = ?", fx.project.ID, fx.buyer.ID).
 		Count(&count).Error
 	if err != nil {
@@ -274,7 +274,7 @@ func TestPaymentKonbiniCheckoutExpired(t *testing.T) {
 		rec       *httptest.ResponseRecorder
 		sessionID string
 		meta      map[string]string
-		purchase  entity.Purchase
+		purchase  model.Purchase
 		err       error
 	)
 	e, _ = setupPaymentApp(t)
@@ -301,7 +301,7 @@ func TestPaymentKonbiniCheckoutExpired(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if purchase.Status != entity.PurchaseStatusCancelled {
+	if purchase.Status != model.PurchaseStatusCancelled {
 		t.Fatalf("purchase status=%s want CANCELLED", purchase.Status)
 	}
 }
@@ -320,13 +320,13 @@ func TestPaymentAlreadySupportingConflict(t *testing.T) {
 	gdb = openDB(t)
 	fx = seedPaymentFixture(t, gdb)
 	now = time.Now().UTC()
-	err = gdb.Create(&entity.ProjectSupporter{
+	err = gdb.Create(&model.ProjectSupporter{
 		ID:                 uuid.New(),
 		ProjectID:          fx.project.ID,
 		UserID:             fx.buyer.ID,
 		PlanID:             fx.plan.ID,
-		Status:             entity.SupporterStatusActive,
-		BillingMode:        entity.BillingModeKonbini,
+		Status:             model.SupporterStatusActive,
+		BillingMode:        model.BillingModeKonbini,
 		CurrentPeriodStart: now,
 		CurrentPeriodEnd:   now.AddDate(0, 0, 30),
 		CreatedAt:          now,

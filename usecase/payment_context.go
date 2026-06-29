@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	"crowdfund-app/entity"
+	"crowdfund-app/model"
 
 	"github.com/google/uuid"
 )
@@ -36,8 +36,8 @@ func (p *PaymentUseCase) loadSupportContext(ctx context.Context, buyerID, projec
 	return sc, nil
 }
 
-func (p *PaymentUseCase) loadCheckoutContext(ctx context.Context, buyerID, projectID, planID uuid.UUID, pm entity.PaymentMethod) (supportContext, error) {
-	if pm == entity.PaymentMethodKonbini {
+func (p *PaymentUseCase) loadCheckoutContext(ctx context.Context, buyerID, projectID, planID uuid.UUID, pm model.PaymentMethod) (supportContext, error) {
+	if pm == model.PaymentMethodKonbini {
 		return p.loadKonbiniCheckoutContext(ctx, buyerID, projectID, planID)
 	}
 	return p.loadSupportContext(ctx, buyerID, projectID, planID)
@@ -65,7 +65,7 @@ func (p *PaymentUseCase) loadKonbiniCheckoutContext(ctx context.Context, buyerID
 		sc.purpose = checkoutFirstSupport
 		return sc, nil
 	}
-	if sc.membership.BillingMode != entity.BillingModeKonbini {
+	if sc.membership.BillingMode != model.BillingModeKonbini {
 		return sc, ErrBadRequest
 	}
 	if !canIssueKonbiniRenewal(sc.membership, sc.now) {
@@ -78,7 +78,7 @@ func (p *PaymentUseCase) loadKonbiniCheckoutContext(ctx context.Context, buyerID
 func (p *PaymentUseCase) loadCheckoutBase(ctx context.Context, buyerID, projectID, planID uuid.UUID) (supportContext, error) {
 	var (
 		sc   supportContext
-		pend *entity.Purchase
+		pend *model.Purchase
 		err  error
 	)
 	sc, err = p.loadBuyerProjectPlan(ctx, buyerID, projectID, planID)
@@ -97,7 +97,7 @@ func (p *PaymentUseCase) loadCheckoutBase(ctx context.Context, buyerID, projectI
 	return sc, nil
 }
 
-func checkPlanCapacity(plan *entity.ProjectPlan) error {
+func checkPlanCapacity(plan *model.ProjectPlan) error {
 	if plan.MaxSupporters != nil && plan.SupporterCount >= *plan.MaxSupporters {
 		return ErrForbidden
 	}
@@ -107,11 +107,11 @@ func checkPlanCapacity(plan *entity.ProjectPlan) error {
 func (p *PaymentUseCase) loadBuyerProjectPlan(ctx context.Context, buyerID, projectID, planID uuid.UUID) (supportContext, error) {
 	var (
 		sc      supportContext
-		u       *entity.User
-		project *entity.Project
-		plans   []entity.ProjectPlan
-		plan    *entity.ProjectPlan
-		conn    *entity.ConnectAccount
+		u       *model.User
+		project *model.Project
+		plans   []model.ProjectPlan
+		plan    *model.ProjectPlan
+		conn    *model.ConnectAccount
 		i       int
 		err     error
 	)
@@ -120,7 +120,7 @@ func (p *PaymentUseCase) loadBuyerProjectPlan(ctx context.Context, buyerID, proj
 	if err != nil {
 		return sc, mapRepoNotFound(err)
 	}
-	if !u.IsActive() || u.Role != entity.UserRoleBuyer {
+	if !u.IsActive() || u.Role != model.UserRoleBuyer {
 		return sc, ErrForbidden
 	}
 	project, plans, _, err = p.Projects.FindID(ctx, projectID)
@@ -159,15 +159,15 @@ func (p *PaymentUseCase) loadBuyerProjectPlan(ctx context.Context, buyerID, proj
 	return sc, nil
 }
 
-func canIssueKonbiniRenewal(s *entity.ProjectSupporter, now time.Time) bool {
+func canIssueKonbiniRenewal(s *model.ProjectSupporter, now time.Time) bool {
 	var windowStart time.Time
 	if s == nil {
 		return false
 	}
-	if s.Status == entity.SupporterStatusPendingRenewal {
+	if s.Status == model.SupporterStatusPendingRenewal {
 		return true
 	}
-	if s.Status != entity.SupporterStatusActive || s.BillingMode != entity.BillingModeKonbini {
+	if s.Status != model.SupporterStatusActive || s.BillingMode != model.BillingModeKonbini {
 		return false
 	}
 	windowStart = s.CurrentPeriodEnd.AddDate(0, 0, -konbiniRenewalWindowDays)
