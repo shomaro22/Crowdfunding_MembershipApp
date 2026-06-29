@@ -1,0 +1,54 @@
+name: crowdfund-app
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: crowdfund
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d crowdfund"]
+      interval: 3s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    # ホストへ 6379 を公開しない（他プロジェクトと競合しやすい）。backend は redis:6379 で接続する
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 3s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: backend-runtime
+    ports:
+      - "8080:8080"
+    environment:
+      DATABASE_URL: postgres://postgres:postgres@postgres:5432/crowdfund?sslmode=disable
+      REDIS_ADDR: redis:6379
+      JWT_SECRET: dev-only-change-me-32-chars-min!!
+      PUBLIC_ROOT: /app/data/public
+      PORT: "8080"
+      CORS_ALLOW_ORIGINS: http://localhost:5173,http://127.0.0.1:5173
+      PUBLIC_APP_URL: http://localhost:5173
+    volumes:
+      - uploads:/app/data/public
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+volumes:
+  pgdata:
+  uploads:
