@@ -12,10 +12,10 @@ import (
 )
 
 type MediaController struct {
-	Media MediaUseCase
+	Media IMediaUseCase
 }
 
-func NewMediaController(media MediaUseCase) *MediaController {
+func NewMediaController(media IMediaUseCase) *MediaController {
 	return &MediaController{Media: media}
 }
 
@@ -27,7 +27,7 @@ func (h *MediaController) UploadImage(c echo.Context) error {
 		url    string
 		err    error
 	)
-	userID, err = CurrentUserID(c)
+	userID, err = requireUserID(c)
 	if err != nil {
 		return err
 	}
@@ -42,11 +42,11 @@ func (h *MediaController) UploadImage(c echo.Context) error {
 	if closer, ok := upload.Reader.(io.Closer); ok {
 		defer closer.Close()
 	}
-	url, err = h.Media.UploadImage(c.Request().Context(), userID, upload)
+	url, err = h.Media.UploadImage(reqCtx(c), userID, upload)
 	if err != nil {
 		return mapUseCaseError(err)
 	}
-	return c.JSON(http.StatusCreated, mediaUploadJSON{URL: url})
+	return jsonCreated(c, mediaUploadJSON{URL: url})
 }
 
 type mediaUploadJSON struct {

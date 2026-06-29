@@ -1,17 +1,15 @@
 package controller
 
 import (
-	"net/http"
-
 	"github.com/google/uuid"
 	"github.com/labstack/echo/v4"
 )
 
 type WSTokenController struct {
-	Tokens WSTokenUseCase
+	Tokens IWSTokenUseCase
 }
 
-func NewWSTokenController(tokens WSTokenUseCase) *WSTokenController {
+func NewWSTokenController(tokens IWSTokenUseCase) *WSTokenController {
 	return &WSTokenController{Tokens: tokens}
 }
 
@@ -26,15 +24,15 @@ func (h *WSTokenController) Issue(c echo.Context) error {
 		token  string
 		err    error
 	)
-	userID, err = CurrentUserID(c)
+	userID, err = requireUserID(c)
 	if err != nil {
 		return err
 	}
-	token, err = h.Tokens.Issue(c.Request().Context(), userID)
+	token, err = h.Tokens.Issue(reqCtx(c), userID)
 	if err != nil {
 		return mapUseCaseError(err)
 	}
-	return c.JSON(http.StatusOK, wsTokenResponseJSON{
+	return jsonOK(c, wsTokenResponseJSON{
 		Token:     token,
 		ExpiresIn: 60,
 	})

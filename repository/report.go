@@ -4,18 +4,18 @@ import (
 	"context"
 	"errors"
 
-	"crowdfund-app/entity"
+	"crowdfund-app/model"
 
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 )
 
 type ReportRepo interface {
-	Create(ctx context.Context, row *entity.Report) error
-	FindID(ctx context.Context, id uuid.UUID) (*entity.Report, error)
-	List(ctx context.Context, status *entity.ReportStatus, limit, offset int) ([]entity.Report, int64, error)
-	Update(ctx context.Context, row *entity.Report) error
-	HasOpenByReporterTarget(ctx context.Context, reporterID uuid.UUID, targetType entity.ReportTargetType, targetID uuid.UUID) (bool, error)
+	Create(ctx context.Context, row *model.Report) error
+	FindID(ctx context.Context, id uuid.UUID) (*model.Report, error)
+	List(ctx context.Context, status *model.ReportStatus, limit, offset int) ([]model.Report, int64, error)
+	Update(ctx context.Context, row *model.Report) error
+	HasOpenByReporterTarget(ctx context.Context, reporterID uuid.UUID, targetType model.ReportTargetType, targetID uuid.UUID) (bool, error)
 }
 
 type reportRepo struct {
@@ -30,33 +30,22 @@ func (r *reportRepo) dbCtx(ctx context.Context) *gorm.DB {
 	return dbFromCtx(ctx, r.db)
 }
 
-func (r *reportRepo) Create(ctx context.Context, row *entity.Report) error {
+func (r *reportRepo) Create(ctx context.Context, row *model.Report) error {
 	return r.dbCtx(ctx).Create(row).Error
 }
 
-func (r *reportRepo) FindID(ctx context.Context, id uuid.UUID) (*entity.Report, error) {
-	var (
-		row entity.Report
-		err error
-	)
-	err = r.dbCtx(ctx).Where("id = ?", id).First(&row).Error
-	if errors.Is(err, gorm.ErrRecordNotFound) {
-		return nil, nil
-	}
-	if err != nil {
-		return nil, err
-	}
-	return &row, nil
+func (r *reportRepo) FindID(ctx context.Context, id uuid.UUID) (*model.Report, error) {
+	return firstOnePtr[model.Report](r.dbCtx(ctx).Where("id = ?", id))
 }
 
-func (r *reportRepo) List(ctx context.Context, status *entity.ReportStatus, limit, offset int) ([]entity.Report, int64, error) {
+func (r *reportRepo) List(ctx context.Context, status *model.ReportStatus, limit, offset int) ([]model.Report, int64, error) {
 	var (
 		q     *gorm.DB
-		rows  []entity.Report
+		rows  []model.Report
 		total int64
 		err   error
 	)
-	q = r.dbCtx(ctx).Model(&entity.Report{})
+	q = r.dbCtx(ctx).Model(&model.Report{})
 	if status != nil {
 		q = q.Where("status = ?", *status)
 	}
@@ -79,19 +68,19 @@ func (r *reportRepo) List(ctx context.Context, status *entity.ReportStatus, limi
 	return rows, total, nil
 }
 
-func (r *reportRepo) Update(ctx context.Context, row *entity.Report) error {
+func (r *reportRepo) Update(ctx context.Context, row *model.Report) error {
 	return r.dbCtx(ctx).Save(row).Error
 }
 
-func (r *reportRepo) HasOpenByReporterTarget(ctx context.Context, reporterID uuid.UUID, targetType entity.ReportTargetType, targetID uuid.UUID) (bool, error) {
+func (r *reportRepo) HasOpenByReporterTarget(ctx context.Context, reporterID uuid.UUID, targetType model.ReportTargetType, targetID uuid.UUID) (bool, error) {
 	var (
 		n   int64
 		err error
 	)
-	err = r.dbCtx(ctx).Model(&entity.Report{}).
+	err = r.dbCtx(ctx).Model(&model.Report{}).
 		Where("reporter_id = ? AND target_type = ? AND target_id = ? AND status IN ?",
 			reporterID, targetType, targetID,
-			[]entity.ReportStatus{entity.ReportStatusPending, entity.ReportStatusInReview}).
+			[]model.ReportStatus{model.ReportStatusPending, model.ReportStatusInReview}).
 		Count(&n).Error
 	if err != nil {
 		return false, err

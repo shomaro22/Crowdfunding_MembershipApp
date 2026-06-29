@@ -33,14 +33,14 @@ func (h *AuthController) Register(c echo.Context) error {
 		u    usecase.UserView
 		err  error
 	)
-	if err = c.Bind(&body); err != nil {
-		return echo.NewHTTPError(http.StatusBadRequest, apiError("invalid request body", "BAD_REQUEST"))
+	if err = bindBody(c, &body); err != nil {
+		return err
 	}
-	u, err = h.Auth.RegisterBuyer(c.Request().Context(), body.Email, body.Password, body.Name, requestMeta(c))
+	u, err = h.Auth.RegisterBuyer(reqCtx(c), body.Email, body.Password, body.Name, requestMeta(c))
 	if err != nil {
 		return mapUseCaseError(err)
 	}
-	return c.JSON(http.StatusCreated, registerResponse{
+	return jsonCreated(c, registerResponse{
 		User:    UserWireFrom(u),
 		Message: "Registration pending admin approval",
 	})
@@ -85,7 +85,7 @@ func (h *AuthController) RegisterSeller(c echo.Context) error {
 	if err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, apiError("invalid birth_date", "BAD_REQUEST"))
 	}
-	res, err = h.Auth.RegisterSeller(c.Request().Context(), usecase.SellerRegIn{
+	res, err = h.Auth.RegisterSeller(reqCtx(c), usecase.SellerRegIn{
 		Email:        payload.Email,
 		Password:     payload.Password,
 		FullName:     payload.FullName,
@@ -98,7 +98,7 @@ func (h *AuthController) RegisterSeller(c echo.Context) error {
 	if err != nil {
 		return mapUseCaseError(err)
 	}
-	return c.JSON(http.StatusCreated, sellerCreateJSON{
+	return jsonCreated(c, sellerCreateJSON{
 		User:         UserWireFrom(res.User),
 		Registration: sellerRegToJSON(res.Registration),
 	})

@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"crowdfund-app/auth"
-	"crowdfund-app/entity"
+	"crowdfund-app/model"
 
 	"github.com/google/uuid"
 )
@@ -26,7 +26,7 @@ type TOTPVerifyResult struct {
 
 func (a *AuthUseCase) Setup2FA(ctx context.Context, userID uuid.UUID) (*TOTPSetupResult, error) {
 	var (
-		u      *entity.User
+		u      *model.User
 		err    error
 		issuer string
 		setup  *auth.TOTPSetup
@@ -34,8 +34,8 @@ func (a *AuthUseCase) Setup2FA(ctx context.Context, userID uuid.UUID) (*TOTPSetu
 	)
 
 	u, err = a.Users.FindID(ctx, userID)
-	if err != nil || u == nil {
-		return nil, ErrNotFound
+	if err != nil {
+		return nil, mapRepoNotFound(err)
 	}
 	if u.TOTPEnabled {
 		return nil, Err2FAAlreadyEnabled
@@ -62,7 +62,7 @@ func (a *AuthUseCase) Setup2FA(ctx context.Context, userID uuid.UUID) (*TOTPSetu
 
 func (a *AuthUseCase) Verify2FASetup(ctx context.Context, userID uuid.UUID, code string) (*TOTPVerifyResult, error) {
 	var (
-		u      *entity.User
+		u      *model.User
 		err    error
 		secret string
 		now    time.Time
@@ -70,8 +70,8 @@ func (a *AuthUseCase) Verify2FASetup(ctx context.Context, userID uuid.UUID, code
 	)
 
 	u, err = a.Users.FindID(ctx, userID)
-	if err != nil || u == nil {
-		return nil, ErrNotFound
+	if err != nil {
+		return nil, mapRepoNotFound(err)
 	}
 	if u.TOTPEnabled {
 		return nil, Err2FAAlreadyEnabled
@@ -103,7 +103,7 @@ func (a *AuthUseCase) Challenge2FA(ctx context.Context, pendingToken, code strin
 	var (
 		uid    uuid.UUID
 		err    error
-		u      *entity.User
+		u      *model.User
 		tokens *SessionTokens
 	)
 
@@ -112,21 +112,24 @@ func (a *AuthUseCase) Challenge2FA(ctx context.Context, pendingToken, code strin
 		return nil, ErrInvalidToken
 	}
 	u, err = a.Users.FindID(ctx, uid)
-	if err != nil || u == nil || !u.CanLogin() {
+	if err != nil {
+		return nil, mapRepoNotFoundAs(err, ErrInvalidToken)
+	}
+	if !u.CanLogin() {
 		return nil, ErrInvalidToken
 	}
 	if !u.TOTPEnabled {
 		return nil, Err2FANotConfigured
 	}
 	if !a.verifyTOTPOrBackup(ctx, u, code) {
-		a.logActivity(ctx, &u.ID, entity.UserLoginFail, "user", u.ID.String(), meta, entity.StepMeta("2fa_fail"))
+		a.logActivity(ctx, &u.ID, model.UserLoginFail, "user", u.ID.String(), meta, model.StepMeta("2fa_fail"))
 		return nil, ErrInvalid2FACode
 	}
 	tokens, err = a.issueSession(ctx, u, true)
 	if err != nil {
 		return nil, err
 	}
-	a.logActivity(ctx, &u.ID, entity.UserLogin, "user", u.ID.String(), meta, entity.StepMeta("2fa_ok"))
+	a.logActivity(ctx, &u.ID, model.UserLogin, "user", u.ID.String(), meta, model.StepMeta("2fa_ok"))
 	return &LoginResult{
 		User:         UserViewFrom(u),
 		AuthToken:    tokens.AuthToken,
@@ -134,16 +137,16 @@ func (a *AuthUseCase) Challenge2FA(ctx context.Context, pendingToken, code strin
 	}, nil
 }
 
-func (a *AuthUseCase) verifyTOTPOrBackup(ctx context.Context, u *entity.User, code string) bool {
+func (a *AuthUseCase) verifyTOTPOrBackup(ctx context.Context, u *model.User, code string) bool {
 	var (
 		secret string
 		err    error
 		norm   string
-		rows   []entity.TOTPBackupCode
+		rows   []model.TOTPBackupCode
 		hash   string
 		now    time.Time
 		i      int
-		row    entity.TOTPBackupCode
+		row    model.TOTPBackupCode
 	)
 
 	secret, err = a.decryptTOTP(u)
@@ -173,7 +176,7 @@ func (a *AuthUseCase) verifyTOTPOrBackup(ctx context.Context, u *entity.User, co
 	return false
 }
 
-func (a *AuthUseCase) decryptTOTP(u *entity.User) (string, error) {
+func (a *AuthUseCase) decryptTOTP(u *model.User) (string, error) {
 	if u.TOTPSecret == nil || strings.TrimSpace(*u.TOTPSecret) == "" {
 		return "", Err2FANotConfigured
 	}
@@ -184,7 +187,7 @@ func (a *AuthUseCase) genBackupCodes(ctx context.Context, userID uuid.UUID) ([]s
 	var (
 		now   time.Time
 		plain []string
-		rows  []entity.TOTPBackupCode
+		rows  []model.TOTPBackupCode
 		i     int
 		code  string
 		err   error
@@ -196,14 +199,14 @@ func (a *AuthUseCase) genBackupCodes(ctx context.Context, userID uuid.UUID) ([]s
 	_ = a.TOTPBackup.DeleteUser(ctx, userID)
 	now = time.Now().UTC()
 	plain = make([]string, 0, backupCodeCount)
-	rows = make([]entity.TOTPBackupCode, 0, backupCodeCount)
+	rows = make([]model.TOTPBackupCode, 0, backupCodeCount)
 	for i = 0; i < backupCodeCount; i++ {
 		code, err = randBackupCode()
 		if err != nil {
 			return nil, err
 		}
 		plain = append(plain, code)
-		rows = append(rows, entity.TOTPBackupCode{
+		rows = append(rows, model.TOTPBackupCode{
 			ID:        uuid.New(),
 			UserID:    userID,
 			CodeHash:  auth.OpaqueHash(code),

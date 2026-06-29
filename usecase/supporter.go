@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	"crowdfund-app/entity"
+	"crowdfund-app/model"
 	"crowdfund-app/repository"
 	"crowdfund-app/stripe"
 
@@ -35,7 +35,7 @@ type ChangeBillingIn struct {
 
 func (s *SupporterUseCase) Cancel(ctx context.Context, userID, supporterID uuid.UUID) (SupporterView, error) {
 	var (
-		supporter *entity.ProjectSupporter
+		supporter *model.ProjectSupporter
 		now       time.Time
 		err       error
 	)
@@ -44,17 +44,17 @@ func (s *SupporterUseCase) Cancel(ctx context.Context, userID, supporterID uuid.
 	if err != nil {
 		return SupporterView{}, err
 	}
-	if !supporterCanManage(supporter, now) || supporter.Status == entity.SupporterStatusCancelled {
+	if !supporterCanManage(supporter, now) || supporter.Status == model.SupporterStatusCancelled {
 		return SupporterView{}, ErrForbidden
 	}
-	if supporter.BillingMode == entity.BillingModeAuto &&
+	if supporter.BillingMode == model.BillingModeAuto &&
 		supporter.StripeSubscriptionID != nil &&
 		s.Stripe != nil {
 		if err = s.Stripe.CancelSubscriptionAtPeriodEnd(ctx, *supporter.StripeSubscriptionID); err != nil {
 			return SupporterView{}, err
 		}
 	}
-	supporter.Status = entity.SupporterStatusCancelled
+	supporter.Status = model.SupporterStatusCancelled
 	supporter.UpdatedAt = now
 	if err = s.Supporters.Update(ctx, supporter); err != nil {
 		return SupporterView{}, err
@@ -64,7 +64,7 @@ func (s *SupporterUseCase) Cancel(ctx context.Context, userID, supporterID uuid.
 
 func (s *SupporterUseCase) Rejoin(ctx context.Context, userID, supporterID uuid.UUID) (SupporterView, error) {
 	var (
-		supporter *entity.ProjectSupporter
+		supporter *model.ProjectSupporter
 		now       time.Time
 		err       error
 	)
@@ -73,20 +73,20 @@ func (s *SupporterUseCase) Rejoin(ctx context.Context, userID, supporterID uuid.
 	if err != nil {
 		return SupporterView{}, err
 	}
-	if supporter.Status != entity.SupporterStatusCancelled {
+	if supporter.Status != model.SupporterStatusCancelled {
 		return SupporterView{}, ErrBadRequest
 	}
 	if now.After(supporter.CurrentPeriodEnd) {
 		return SupporterView{}, ErrBadRequest
 	}
-	if supporter.BillingMode == entity.BillingModeAuto &&
+	if supporter.BillingMode == model.BillingModeAuto &&
 		supporter.StripeSubscriptionID != nil &&
 		s.Stripe != nil {
 		if err = s.Stripe.ResumeSubscription(ctx, *supporter.StripeSubscriptionID); err != nil {
 			return SupporterView{}, err
 		}
 	}
-	supporter.Status = entity.SupporterStatusActive
+	supporter.Status = model.SupporterStatusActive
 	supporter.UpdatedAt = now
 	if err = s.Supporters.Update(ctx, supporter); err != nil {
 		return SupporterView{}, err
@@ -96,12 +96,12 @@ func (s *SupporterUseCase) Rejoin(ctx context.Context, userID, supporterID uuid.
 
 func (s *SupporterUseCase) ChangeBilling(ctx context.Context, userID, supporterID uuid.UUID, in ChangeBillingIn) (SupporterView, error) {
 	var (
-		supporter *entity.ProjectSupporter
-		mode      entity.BillingMode
+		supporter *model.ProjectSupporter
+		mode      model.BillingMode
 		now       time.Time
 		err       error
 	)
-	mode = entity.BillingMode(in.BillingMode)
+	mode = model.BillingMode(in.BillingMode)
 	if !mode.Valid() {
 		return SupporterView{}, ErrBadRequest
 	}
@@ -110,7 +110,7 @@ func (s *SupporterUseCase) ChangeBilling(ctx context.Context, userID, supporterI
 	if err != nil {
 		return SupporterView{}, err
 	}
-	if !supporterCanManage(supporter, now) || supporter.Status == entity.SupporterStatusCancelled {
+	if !supporterCanManage(supporter, now) || supporter.Status == model.SupporterStatusCancelled {
 		return SupporterView{}, ErrForbidden
 	}
 	if supporter.PendingBillingMode != nil {
@@ -123,8 +123,8 @@ func (s *SupporterUseCase) ChangeBilling(ctx context.Context, userID, supporterI
 	supporter.PendingBillingMode = &mode
 	supporter.PlanChangeDate = &changeAt
 	supporter.UpdatedAt = now
-	if mode == entity.BillingModeKonbini &&
-		supporter.BillingMode == entity.BillingModeAuto &&
+	if mode == model.BillingModeKonbini &&
+		supporter.BillingMode == model.BillingModeAuto &&
 		supporter.StripeSubscriptionID != nil &&
 		s.Stripe != nil {
 		if err = s.Stripe.CancelSubscriptionAtPeriodEnd(ctx, *supporter.StripeSubscriptionID); err != nil {
@@ -137,12 +137,12 @@ func (s *SupporterUseCase) ChangeBilling(ctx context.Context, userID, supporterI
 	return s.enrichView(ctx, supporter)
 }
 
-func (s *SupporterUseCase) applyBillingMode(ctx context.Context, supporter *entity.ProjectSupporter, mode entity.BillingMode) error {
+func (s *SupporterUseCase) applyBillingMode(ctx context.Context, supporter *model.ProjectSupporter, mode model.BillingMode) error {
 	switch mode {
-	case entity.BillingModeKonbini:
+	case model.BillingModeKonbini:
 		supporter.StripeSubscriptionID = nil
 		return nil
-	case entity.BillingModeAuto:
+	case model.BillingModeAuto:
 		if supporter.StripeSubscriptionID == nil {
 			return ErrBadRequest
 		}
@@ -155,18 +155,18 @@ func (s *SupporterUseCase) applyBillingMode(ctx context.Context, supporter *enti
 	}
 }
 
-func supporterCanManage(s *entity.ProjectSupporter, now time.Time) bool {
+func supporterCanManage(s *model.ProjectSupporter, now time.Time) bool {
 	if s == nil {
 		return false
 	}
 	switch s.Status {
-	case entity.SupporterStatusActive, entity.SupporterStatusPendingRenewal, entity.SupporterStatusCancelled:
+	case model.SupporterStatusActive, model.SupporterStatusPendingRenewal, model.SupporterStatusCancelled:
 		return s.HasBenefits(now)
 	default:
 		return false
 	}
 }
 
-func (s *SupporterUseCase) ViewForSupporter(ctx context.Context, supporter *entity.ProjectSupporter) (SupporterView, error) {
+func (s *SupporterUseCase) ViewForSupporter(ctx context.Context, supporter *model.ProjectSupporter) (SupporterView, error) {
 	return s.enrichView(ctx, supporter)
 }

@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"crowdfund-app/entity"
+	"crowdfund-app/model"
 
 	"github.com/google/uuid"
 	"github.com/labstack/echo/v4"
@@ -33,13 +33,13 @@ func TestOperationsBuyerCannotAccessActivity(t *testing.T) {
 	var (
 		e   *echo.Echo
 		gdb *gorm.DB
-		u   *entity.User
+		u   *model.User
 		tok string
 		rec *httptest.ResponseRecorder
 	)
 	e = setupApp(t)
 	gdb = openDB(t)
-	u = seedUser(t, gdb, seedOpts{Role: entity.UserRoleBuyer})
+	u = seedUser(t, gdb, seedOpts{Role: model.UserRoleBuyer})
 	tok, _ = issueToken(u, true)
 	rec = httpGET(e, "/admin/activity", tok)
 	if rec.Code != http.StatusForbidden {
@@ -51,16 +51,16 @@ func TestOperationsRequires2FA(t *testing.T) {
 	var (
 		e    *echo.Echo
 		gdb  *gorm.DB
-		u    *entity.User
+		u    *model.User
 		tok  string
-		role entity.AdminRole
+		role model.AdminRole
 		rec  *httptest.ResponseRecorder
 	)
 	e = setupApp(t)
 	gdb = openDB(t)
-	role = entity.AdminRoleSuperAdmin
+	role = model.AdminRoleSuperAdmin
 	u = seedUser(t, gdb, seedOpts{
-		Role:        entity.UserRoleAdmin,
+		Role:        model.UserRoleAdmin,
 		AdminRole:   &role,
 		TOTPEnabled: true,
 	})
@@ -84,7 +84,7 @@ func TestOperationsSuperAdminCanAccessAll(t *testing.T) {
 	)
 	e = setupApp(t)
 	gdb = openDB(t)
-	tok = issueAdminToken(t, gdb, entity.AdminRoleSuperAdmin)
+	tok = issueAdminToken(t, gdb, model.AdminRoleSuperAdmin)
 
 	for _, path = range []string{
 		"/admin/activity",
@@ -113,7 +113,7 @@ func TestOperationsFinanceAdminRBAC(t *testing.T) {
 	)
 	e = setupApp(t)
 	gdb = openDB(t)
-	tok = issueAdminToken(t, gdb, entity.AdminRoleFinanceAdmin)
+	tok = issueAdminToken(t, gdb, model.AdminRoleFinanceAdmin)
 
 	for _, path := range []string{"/admin/activity", "/admin/batches"} {
 		rec = httpGET(e, path, tok)
@@ -144,7 +144,7 @@ func TestOperationsSupportAdminRBAC(t *testing.T) {
 	)
 	e = setupApp(t)
 	gdb = openDB(t)
-	tok = issueAdminToken(t, gdb, entity.AdminRoleSupportAdmin)
+	tok = issueAdminToken(t, gdb, model.AdminRoleSupportAdmin)
 
 	for _, path := range []string{"/admin/activity", "/admin/security"} {
 		rec = httpGET(e, path, tok)
@@ -176,7 +176,7 @@ func TestOperationsReviewAdminDenied(t *testing.T) {
 	)
 	e = setupApp(t)
 	gdb = openDB(t)
-	tok = issueAdminToken(t, gdb, entity.AdminRoleReviewAdmin)
+	tok = issueAdminToken(t, gdb, model.AdminRoleReviewAdmin)
 
 	for _, path = range []string{
 		"/admin/activity",
@@ -202,8 +202,8 @@ func TestOperationsListActivityReturnsSeededLog(t *testing.T) {
 	)
 	e = setupApp(t)
 	gdb = openDB(t)
-	tok = issueAdminToken(t, gdb, entity.AdminRoleSuperAdmin)
-	logID = seedOpsActivityLog(t, gdb, entity.UserLoginFail, strPtr("203.0.113.55"), time.Now().UTC())
+	tok = issueAdminToken(t, gdb, model.AdminRoleSuperAdmin)
+	logID = seedOpsActivityLog(t, gdb, model.UserLoginFail, strPtr("203.0.113.55"), time.Now().UTC())
 
 	rec = httpGET(e, "/admin/activity?action=user.login_failed&limit=50", tok)
 	if rec.Code != http.StatusOK {
@@ -221,28 +221,28 @@ func TestOperationsSecurityEventsCounts(t *testing.T) {
 		gdb   *gorm.DB
 		tok   string
 		rec   *httptest.ResponseRecorder
-		m     map[string]any
+		body  securityEventsBody
 		now   time.Time
 	)
 	e = setupApp(t)
 	gdb = openDB(t)
-	tok = issueAdminToken(t, gdb, entity.AdminRoleSupportAdmin)
+	tok = issueAdminToken(t, gdb, model.AdminRoleSupportAdmin)
 	now = time.Now().UTC()
-	seedOpsActivityLog(t, gdb, entity.UserLoginFail, strPtr("203.0.113.1"), now)
-	seedOpsActivityLog(t, gdb, entity.SecRateLimit, strPtr("203.0.113.2"), now)
+	seedOpsActivityLog(t, gdb, model.UserLoginFail, strPtr("203.0.113.1"), now)
+	seedOpsActivityLog(t, gdb, model.SecRateLimit, strPtr("203.0.113.2"), now)
 
 	rec = httpGET(e, "/admin/security", tok)
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status=%d want 200", rec.Code)
 	}
-	if err := json.Unmarshal(rec.Body.Bytes(), &m); err != nil {
+	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
 		t.Fatal(err)
 	}
-	if n, _ := m["login_failed_count"].(float64); n < 1 {
-		t.Fatalf("login_failed_count=%v want >= 1", m["login_failed_count"])
+	if body.LoginFailedCount < 1 {
+		t.Fatalf("login_failed_count=%d want >= 1", body.LoginFailedCount)
 	}
-	if n, _ := m["rate_limited_count"].(float64); n < 1 {
-		t.Fatalf("rate_limited_count=%v want >= 1", m["rate_limited_count"])
+	if body.RateLimitedCount < 1 {
+		t.Fatalf("rate_limited_count=%d want >= 1", body.RateLimitedCount)
 	}
 }
 
@@ -250,7 +250,7 @@ func TestOperationsSuperAdminListAuditLogs(t *testing.T) {
 	var (
 		e       *echo.Echo
 		gdb     *gorm.DB
-		admin   *entity.User
+		admin   *model.User
 		tok     string
 		auditID uuid.UUID
 		rec     *httptest.ResponseRecorder
@@ -259,8 +259,8 @@ func TestOperationsSuperAdminListAuditLogs(t *testing.T) {
 	e = setupApp(t)
 	gdb = openDB(t)
 	admin = seedUser(t, gdb, seedOpts{
-		Role:        entity.UserRoleAdmin,
-		AdminRole:   adminRolePtr(entity.AdminRoleSuperAdmin),
+		Role:        model.UserRoleAdmin,
+		AdminRole:   adminRolePtr(model.AdminRoleSuperAdmin),
 		TOTPEnabled: true,
 	})
 	tok, _ = issueToken(admin, true)
@@ -285,7 +285,7 @@ func TestOperationsRunBatchInvalidJob(t *testing.T) {
 	)
 	e = setupApp(t)
 	gdb = openDB(t)
-	tok = issueAdminToken(t, gdb, entity.AdminRoleSuperAdmin)
+	tok = issueAdminToken(t, gdb, model.AdminRoleSuperAdmin)
 
 	rec = httpPOST(e, "/admin/batches/not_a_job/run?dry_run=true", tok, "")
 	if rec.Code != http.StatusBadRequest {
@@ -293,15 +293,15 @@ func TestOperationsRunBatchInvalidJob(t *testing.T) {
 	}
 }
 
-func seedOpsActivityLog(t *testing.T, gdb *gorm.DB, action entity.ActivityAction, ip *string, at time.Time) uuid.UUID {
+func seedOpsActivityLog(t *testing.T, gdb *gorm.DB, action model.ActivityAction, ip *string, at time.Time) uuid.UUID {
 	var (
 		id  uuid.UUID
-		row *entity.ActivityLog
+		row *model.ActivityLog
 		err error
 	)
 	t.Helper()
 	id = uuid.New()
-	row = &entity.ActivityLog{
+	row = &model.ActivityLog{
 		ID:        id,
 		Action:    action,
 		IPAddress: ip,
@@ -311,7 +311,7 @@ func seedOpsActivityLog(t *testing.T, gdb *gorm.DB, action entity.ActivityAction
 		t.Fatal(err)
 	}
 	t.Cleanup(func() {
-		_ = gdb.Delete(&entity.ActivityLog{}, "id = ?", id).Error
+		_ = gdb.Delete(&model.ActivityLog{}, "id = ?", id).Error
 	})
 	return id
 }
@@ -319,12 +319,12 @@ func seedOpsActivityLog(t *testing.T, gdb *gorm.DB, action entity.ActivityAction
 func seedOpsAuditLog(t *testing.T, gdb *gorm.DB, adminID uuid.UUID, action string) uuid.UUID {
 	var (
 		id  uuid.UUID
-		row *entity.AuditLog
+		row *model.AuditLog
 		err error
 	)
 	t.Helper()
 	id = uuid.New()
-	row = &entity.AuditLog{
+	row = &model.AuditLog{
 		ID:         id,
 		AdminID:    adminID,
 		Action:     action,
@@ -336,12 +336,12 @@ func seedOpsAuditLog(t *testing.T, gdb *gorm.DB, adminID uuid.UUID, action strin
 		t.Fatal(err)
 	}
 	t.Cleanup(func() {
-		_ = gdb.Delete(&entity.AuditLog{}, "id = ?", id).Error
+		_ = gdb.Delete(&model.AuditLog{}, "id = ?", id).Error
 	})
 	return id
 }
 
-func adminRolePtr(r entity.AdminRole) *entity.AdminRole {
+func adminRolePtr(r model.AdminRole) *model.AdminRole {
 	return &r
 }
 

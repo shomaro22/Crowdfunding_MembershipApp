@@ -3,7 +3,7 @@ package usecase
 import (
 	"time"
 
-	"crowdfund-app/entity"
+	"crowdfund-app/model"
 
 	"github.com/google/uuid"
 )
@@ -23,10 +23,10 @@ type UserView struct {
 }
 
 func (v UserView) IsActive() bool {
-	return v.AccountStatus == string(entity.AccountStatusActive)
+	return v.AccountStatus == string(model.AccountStatusActive)
 }
 
-func adminRoleString(r *entity.AdminRole) *string {
+func adminRoleString(r *model.AdminRole) *string {
 	if r == nil {
 		return nil
 	}
@@ -34,7 +34,7 @@ func adminRoleString(r *entity.AdminRole) *string {
 	return &s
 }
 
-func UserViewFrom(u *entity.User) UserView {
+func UserViewFrom(u *model.User) UserView {
 	if u == nil {
 		return UserView{}
 	}
@@ -53,7 +53,7 @@ func UserViewFrom(u *entity.User) UserView {
 	}
 }
 
-func UserViewPtr(u *entity.User) *UserView {
+func UserViewPtr(u *model.User) *UserView {
 	if u == nil {
 		return nil
 	}
@@ -68,7 +68,7 @@ type ConnectAccountView struct {
 	DetailsSubmitted bool
 }
 
-func ConnectAccountViewFrom(row *entity.ConnectAccount) *ConnectAccountView {
+func ConnectAccountViewFrom(row *model.ConnectAccount) *ConnectAccountView {
 	if row == nil {
 		return nil
 	}
@@ -93,7 +93,7 @@ type BatchRunView struct {
 	DryRun       bool
 }
 
-func BatchRunViewFrom(r *entity.BatchRun) *BatchRunView {
+func BatchRunViewFrom(r *model.BatchRun) *BatchRunView {
 	if r == nil {
 		return nil
 	}
@@ -126,7 +126,7 @@ type SellerRegItemView struct {
 	UpdatedAt    time.Time
 }
 
-func SellerRegItemFrom(r *entity.SellerReg) SellerRegItemView {
+func SellerRegItemFrom(r *model.SellerReg) SellerRegItemView {
 	if r == nil {
 		return SellerRegItemView{}
 	}
@@ -164,7 +164,7 @@ type ProjectItemView struct {
 	UpdatedAt       time.Time
 }
 
-func ProjectItemFrom(p *entity.Project) ProjectItemView {
+func ProjectItemFrom(p *model.Project) ProjectItemView {
 	if p == nil {
 		return ProjectItemView{}
 	}
@@ -200,7 +200,7 @@ type ProjectPlanView struct {
 	UpdatedAt      time.Time
 }
 
-func ProjectPlanFrom(plan entity.ProjectPlan) ProjectPlanView {
+func ProjectPlanFrom(plan model.ProjectPlan) ProjectPlanView {
 	return ProjectPlanView{
 		ID:             plan.ID,
 		ProjectID:      plan.ProjectID,
@@ -215,7 +215,7 @@ func ProjectPlanFrom(plan entity.ProjectPlan) ProjectPlanView {
 	}
 }
 
-func ProjectPlansFrom(plans []entity.ProjectPlan) []ProjectPlanView {
+func ProjectPlansFrom(plans []model.ProjectPlan) []ProjectPlanView {
 	var (
 		out = make([]ProjectPlanView, len(plans))
 		i   int
@@ -235,7 +235,7 @@ type ProjectImageView struct {
 	CreatedAt time.Time
 }
 
-func ProjectImageFrom(img entity.ProjectImage) ProjectImageView {
+func ProjectImageFrom(img model.ProjectImage) ProjectImageView {
 	return ProjectImageView{
 		ID:        img.ID,
 		ProjectID: img.ProjectID,
@@ -246,7 +246,7 @@ func ProjectImageFrom(img entity.ProjectImage) ProjectImageView {
 	}
 }
 
-func ProjectImagesFrom(images []entity.ProjectImage) []ProjectImageView {
+func ProjectImagesFrom(images []model.ProjectImage) []ProjectImageView {
 	var (
 		out = make([]ProjectImageView, len(images))
 		i   int
@@ -264,7 +264,7 @@ type ProjectView struct {
 	Seller  *UserView
 }
 
-func AssembleProjectView(project *entity.Project, plans []entity.ProjectPlan, images []entity.ProjectImage, seller *UserView) ProjectView {
+func AssembleProjectView(project *model.Project, plans []model.ProjectPlan, images []model.ProjectImage, seller *UserView) ProjectView {
 	return ProjectView{
 		Project: ProjectItemFrom(project),
 		Plans:   ProjectPlansFrom(plans),
@@ -273,7 +273,7 @@ func AssembleProjectView(project *entity.Project, plans []entity.ProjectPlan, im
 	}
 }
 
-func AssembleProjectViewPtr(project *entity.Project, plans []entity.ProjectPlan, images []entity.ProjectImage, seller *UserView) *ProjectView {
+func AssembleProjectViewPtr(project *model.Project, plans []model.ProjectPlan, images []model.ProjectImage, seller *UserView) *ProjectView {
 	v := AssembleProjectView(project, plans, images, seller)
 	return &v
 }

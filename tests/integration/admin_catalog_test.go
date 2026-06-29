@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"crowdfund-app/entity"
+	"crowdfund-app/model"
 
 	"github.com/google/uuid"
 	"github.com/labstack/echo/v4"
@@ -26,7 +26,7 @@ func TestAdminCatalogFinanceRBAC(t *testing.T) {
 	)
 	e = setupApp(t)
 	gdb = openDB(t)
-	tok = issueAdminToken(t, gdb, entity.AdminRoleFinanceAdmin)
+	tok = issueAdminToken(t, gdb, model.AdminRoleFinanceAdmin)
 
 	rec = httpGET(e, "/admin/purchases", tok)
 	if rec.Code != http.StatusOK {
@@ -44,15 +44,15 @@ func TestAdminCatalogSupportUserManagement(t *testing.T) {
 		e     *echo.Echo
 		gdb   *gorm.DB
 		tok   string
-		buyer *entity.User
+		buyer *model.User
 		rec   *httptest.ResponseRecorder
-		body  map[string]any
+		body  userProfileBody
 		name  = "Updated Name"
 	)
 	e = setupApp(t)
 	gdb = openDB(t)
-	buyer = seedUser(t, gdb, seedOpts{Role: entity.UserRoleBuyer})
-	tok = issueAdminToken(t, gdb, entity.AdminRoleSupportAdmin)
+	buyer = seedUser(t, gdb, seedOpts{Role: model.UserRoleBuyer})
+	tok = issueAdminToken(t, gdb, model.AdminRoleSupportAdmin)
 
 	rec = httpGET(e, "/admin/stats", tok)
 	if rec.Code != http.StatusOK {
@@ -68,12 +68,12 @@ func TestAdminCatalogSupportUserManagement(t *testing.T) {
 	if rec.Code != http.StatusOK {
 		t.Fatalf("update status=%d body=%s", rec.Code, rec.Body.String())
 	}
-	body = nil
+	body = userProfileBody{}
 	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
 		t.Fatal(err)
 	}
-	if body["name"] != name {
-		t.Fatalf("name=%v want %q", body["name"], name)
+	if body.Name != name {
+		t.Fatalf("name=%q want %q", body.Name, name)
 	}
 
 	rec = httpGET(e, "/admin/purchases", tok)
@@ -87,29 +87,29 @@ func TestAdminCatalogPatchPurchase(t *testing.T) {
 		e        *echo.Echo
 		gdb      *gorm.DB
 		tok      string
-		seller   *entity.User
-		buyer    *entity.User
-		project  *entity.Project
-		purchase *entity.Purchase
+		seller   *model.User
+		buyer    *model.User
+		project  *model.Project
+		purchase *model.Purchase
 		rec      *httptest.ResponseRecorder
-		body     map[string]any
+		body     purchaseStatusBody
 		now      time.Time
 	)
 	e = setupApp(t)
 	gdb = openDB(t)
 	now = time.Now().UTC()
-	tok = issueAdminToken(t, gdb, entity.AdminRoleSuperAdmin)
-	seller = seedUser(t, gdb, seedOpts{Role: entity.UserRoleSeller})
-	buyer = seedUser(t, gdb, seedOpts{Role: entity.UserRoleBuyer})
-	project = seedProject(t, gdb, seller.ID, entity.ProjectStatusActive)
-	purchase = &entity.Purchase{
+	tok = issueAdminToken(t, gdb, model.AdminRoleSuperAdmin)
+	seller = seedUser(t, gdb, seedOpts{Role: model.UserRoleSeller})
+	buyer = seedUser(t, gdb, seedOpts{Role: model.UserRoleBuyer})
+	project = seedProject(t, gdb, seller.ID, model.ProjectStatusActive)
+	purchase = &model.Purchase{
 		ID:            uuid.New(),
 		ProjectID:     project.ID,
 		BuyerID:       buyer.ID,
 		Quantity:      1,
 		TotalPrice:    500,
-		Status:        entity.PurchaseStatusPending,
-		PaymentMethod: entity.PaymentMethodCard,
+		Status:        model.PurchaseStatusPending,
+		PaymentMethod: model.PaymentMethodCard,
 		CreatedAt:     now,
 		UpdatedAt:     now,
 	}
@@ -124,7 +124,7 @@ func TestAdminCatalogPatchPurchase(t *testing.T) {
 	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
 		t.Fatal(err)
 	}
-	if body["status"] != "CANCELLED" {
-		t.Fatalf("status=%v want CANCELLED", body["status"])
+	if body.Status != "CANCELLED" {
+		t.Fatalf("status=%q want CANCELLED", body.Status)
 	}
 }

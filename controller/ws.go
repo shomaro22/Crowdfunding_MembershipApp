@@ -17,11 +17,11 @@ import (
 
 type WSController struct {
 	Hub            wshub.Hub
-	Messages       MessageProjectAccess
+	Messages       IMessageProjectAccess
 	allowedOrigins map[string]struct{}
 }
 
-func NewWSController(hub wshub.Hub, messages MessageProjectAccess, allowedOrigins []string) *WSController {
+func NewWSController(hub wshub.Hub, messages IMessageProjectAccess, allowedOrigins []string) *WSController {
 	var allowed map[string]struct{}
 	if len(allowedOrigins) > 0 {
 		allowed = make(map[string]struct{}, len(allowedOrigins))
@@ -46,7 +46,7 @@ func (w *WSController) Handle(c echo.Context) error {
 	if w.Hub == nil {
 		return echo.NewHTTPError(http.StatusInternalServerError, apiError("websocket hub not configured", "INTERNAL_ERROR"))
 	}
-	userID, err = CurrentUserID(c)
+	userID, err = requireUserID(c)
 	if err != nil {
 		return err
 	}
@@ -168,7 +168,7 @@ func (w *WSController) handleSubscribe(c echo.Context, connID, userID, projectID
 		internal bool
 		err      error
 	)
-	ctx, cancel = context.WithTimeout(c.Request().Context(), wsDBOpTimeout)
+	ctx, cancel = context.WithTimeout(reqCtx(c), wsDBOpTimeout)
 	err = w.Messages.ConfirmWSSubscribe(ctx, userID, projectID, requestMeta(c))
 	cancel()
 	if err != nil {
@@ -280,7 +280,11 @@ func (w *WSController) writeWSError(connID uuid.UUID, code, msg string, projectI
 	})
 }
 
-func writeWSFrame[T any](hub wshub.Hub, connID uuid.UUID, v T) {
+type outboundWSFrame interface {
+	wshub.SessionReadyOutbound | wshub.PongOutbound | wshub.ProjectAckOutbound | wshub.ErrorOutbound
+}
+
+func writeWSFrame[T outboundWSFrame](hub wshub.Hub, connID uuid.UUID, v T) {
 	var (
 		b   []byte
 		err error

@@ -9,7 +9,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"crowdfund-app/entity"
+	"crowdfund-app/model"
 
 	"github.com/google/uuid"
 	"github.com/labstack/echo/v4"
@@ -32,26 +32,26 @@ func TestReportsCreateListPatch(t *testing.T) {
 	var (
 		e       *echo.Echo
 		gdb     *gorm.DB
-		seller  *entity.User
-		buyer   *entity.User
-		admin   *entity.User
-		project *entity.Project
+		seller  *model.User
+		buyer   *model.User
+		admin   *model.User
+		project *model.Project
 		buyTok  string
 		admTok  string
 		rec     *httptest.ResponseRecorder
-		body    map[string]any
+		body    reportBody
 		id      string
-		role    entity.AdminRole
+		role    model.AdminRole
 	)
 	e = setupApp(t)
 	gdb = openDB(t)
-	seller = seedUser(t, gdb, seedOpts{Role: entity.UserRoleSeller})
-	buyer = seedUser(t, gdb, seedOpts{Role: entity.UserRoleBuyer})
-	project = seedProject(t, gdb, seller.ID, entity.ProjectStatusActive)
+	seller = seedUser(t, gdb, seedOpts{Role: model.UserRoleSeller})
+	buyer = seedUser(t, gdb, seedOpts{Role: model.UserRoleBuyer})
+	project = seedProject(t, gdb, seller.ID, model.ProjectStatusActive)
 	buyTok, _ = issueToken(buyer, true)
-	role = entity.AdminRoleSupportAdmin
+	role = model.AdminRoleSupportAdmin
 	admin = seedUser(t, gdb, seedOpts{
-		Role:        entity.UserRoleAdmin,
+		Role:        model.UserRoleAdmin,
 		AdminRole:   &role,
 		TOTPEnabled: true,
 	})
@@ -67,7 +67,7 @@ func TestReportsCreateListPatch(t *testing.T) {
 	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
 		t.Fatal(err)
 	}
-	id, _ = body["id"].(string)
+	id = body.ID
 	if id == "" {
 		t.Fatal("missing report id")
 	}
@@ -89,12 +89,12 @@ func TestReportsCreateListPatch(t *testing.T) {
 	if rec.Code != http.StatusOK {
 		t.Fatalf("patch status=%d body=%s", rec.Code, rec.Body.String())
 	}
-	body = nil
+	body = reportBody{}
 	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
 		t.Fatal(err)
 	}
-	if body["status"] != "RESOLVED" {
-		t.Fatalf("status=%v", body["status"])
+	if body.Status != "RESOLVED" {
+		t.Fatalf("status=%q", body.Status)
 	}
 }
 
@@ -102,16 +102,16 @@ func TestReportsFinanceAdminForbidden(t *testing.T) {
 	var (
 		e    *echo.Echo
 		gdb  *gorm.DB
-		u    *entity.User
+		u    *model.User
 		tok  string
-		role entity.AdminRole
+		role model.AdminRole
 		rec  *httptest.ResponseRecorder
 	)
 	e = setupApp(t)
 	gdb = openDB(t)
-	role = entity.AdminRoleFinanceAdmin
+	role = model.AdminRoleFinanceAdmin
 	u = seedUser(t, gdb, seedOpts{
-		Role:        entity.UserRoleAdmin,
+		Role:        model.UserRoleAdmin,
 		AdminRole:   &role,
 		TOTPEnabled: true,
 	})
@@ -126,13 +126,13 @@ func TestReportsSelfUserTargetBadRequest(t *testing.T) {
 	var (
 		e      *echo.Echo
 		gdb    *gorm.DB
-		buyer  *entity.User
+		buyer  *model.User
 		buyTok string
 		rec    *httptest.ResponseRecorder
 	)
 	e = setupApp(t)
 	gdb = openDB(t)
-	buyer = seedUser(t, gdb, seedOpts{Role: entity.UserRoleBuyer})
+	buyer = seedUser(t, gdb, seedOpts{Role: model.UserRoleBuyer})
 	buyTok, _ = issueToken(buyer, true)
 	rec = httpPOST(e, "/reports", buyTok, fmt.Sprintf(
 		`{"target_type":"USER","target_id":"%s","reason":"self report"}`,

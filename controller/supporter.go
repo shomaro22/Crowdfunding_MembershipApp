@@ -11,10 +11,10 @@ import (
 )
 
 type SupporterController struct {
-	Supporters SupporterUseCase
+	Supporters ISupporterUseCase
 }
 
-func NewSupporterController(uc SupporterUseCase) *SupporterController {
+func NewSupporterController(uc ISupporterUseCase) *SupporterController {
 	return &SupporterController{Supporters: uc}
 }
 
@@ -24,15 +24,15 @@ func (h *SupporterController) List(c echo.Context) error {
 		rows   []usecase.SupporterView
 		err    error
 	)
-	userID, err = CurrentUserID(c)
+	userID, err = requireUserID(c)
 	if err != nil {
 		return err
 	}
-	rows, err = h.Supporters.ListMine(c.Request().Context(), userID)
+	rows, err = h.Supporters.ListMine(reqCtx(c), userID)
 	if err != nil {
 		return mapUseCaseError(err)
 	}
-	return c.JSON(http.StatusOK, listSupportersJSON(rows))
+	return jsonOK(c, listSupportersJSON(rows))
 }
 
 func (h *SupporterController) Upgrade(c echo.Context) error {
@@ -43,26 +43,26 @@ func (h *SupporterController) Upgrade(c echo.Context) error {
 		out         usecase.UpgradeOut
 		err         error
 	)
-	userID, err = CurrentUserID(c)
+	userID, err = requireUserID(c)
 	if err != nil {
 		return err
 	}
-	supporterID, err = uuid.Parse(c.Param("supporterId"))
+	supporterID, err = pathUUID(c, "supporterId", "invalid supporter id")
 	if err != nil {
-		return echo.NewHTTPError(http.StatusBadRequest, apiError("invalid supporter id", "BAD_REQUEST"))
+		return err
 	}
-	if err = c.Bind(&body); err != nil {
-		return echo.NewHTTPError(http.StatusBadRequest, apiError("invalid request body", "BAD_REQUEST"))
+	if err = bindBody(c, &body); err != nil {
+		return err
 	}
 	planID, err := uuid.Parse(body.PlanID)
 	if err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, apiError("invalid plan id", "BAD_REQUEST"))
 	}
-	out, err = h.Supporters.Upgrade(c.Request().Context(), userID, supporterID, planID)
+	out, err = h.Supporters.Upgrade(reqCtx(c), userID, supporterID, planID)
 	if err != nil {
 		return mapUseCaseError(err)
 	}
-	return c.JSON(http.StatusOK, upgradePlanJSONResponse(out))
+	return jsonOK(c, upgradePlanJSONResponse(out))
 }
 
 func (h *SupporterController) UpgradeConfirm(c echo.Context) error {
@@ -73,22 +73,22 @@ func (h *SupporterController) UpgradeConfirm(c echo.Context) error {
 		view        usecase.SupporterView
 		err         error
 	)
-	userID, err = CurrentUserID(c)
+	userID, err = requireUserID(c)
 	if err != nil {
 		return err
 	}
-	supporterID, err = uuid.Parse(c.Param("supporterId"))
+	supporterID, err = pathUUID(c, "supporterId", "invalid supporter id")
 	if err != nil {
-		return echo.NewHTTPError(http.StatusBadRequest, apiError("invalid supporter id", "BAD_REQUEST"))
+		return err
 	}
-	if err = c.Bind(&body); err != nil {
-		return echo.NewHTTPError(http.StatusBadRequest, apiError("invalid request body", "BAD_REQUEST"))
+	if err = bindBody(c, &body); err != nil {
+		return err
 	}
-	view, err = h.Supporters.UpgradeConfirm(c.Request().Context(), userID, supporterID, body.PaymentIntentID)
+	view, err = h.Supporters.UpgradeConfirm(reqCtx(c), userID, supporterID, body.PaymentIntentID)
 	if err != nil {
 		return mapUseCaseError(err)
 	}
-	return c.JSON(http.StatusOK, supporterToJSON(view))
+	return jsonOK(c, supporterToJSON(view))
 }
 
 func (h *SupporterController) Cancel(c echo.Context) error {
@@ -98,19 +98,19 @@ func (h *SupporterController) Cancel(c echo.Context) error {
 		view        usecase.SupporterView
 		err         error
 	)
-	userID, err = CurrentUserID(c)
+	userID, err = requireUserID(c)
 	if err != nil {
 		return err
 	}
-	supporterID, err = uuid.Parse(c.Param("supporterId"))
+	supporterID, err = pathUUID(c, "supporterId", "invalid supporter id")
 	if err != nil {
-		return echo.NewHTTPError(http.StatusBadRequest, apiError("invalid supporter id", "BAD_REQUEST"))
+		return err
 	}
-	view, err = h.Supporters.Cancel(c.Request().Context(), userID, supporterID)
+	view, err = h.Supporters.Cancel(reqCtx(c), userID, supporterID)
 	if err != nil {
 		return mapUseCaseError(err)
 	}
-	return c.JSON(http.StatusOK, supporterToJSON(view))
+	return jsonOK(c, supporterToJSON(view))
 }
 
 func (h *SupporterController) Rejoin(c echo.Context) error {
@@ -120,19 +120,19 @@ func (h *SupporterController) Rejoin(c echo.Context) error {
 		view        usecase.SupporterView
 		err         error
 	)
-	userID, err = CurrentUserID(c)
+	userID, err = requireUserID(c)
 	if err != nil {
 		return err
 	}
-	supporterID, err = uuid.Parse(c.Param("supporterId"))
+	supporterID, err = pathUUID(c, "supporterId", "invalid supporter id")
 	if err != nil {
-		return echo.NewHTTPError(http.StatusBadRequest, apiError("invalid supporter id", "BAD_REQUEST"))
+		return err
 	}
-	view, err = h.Supporters.Rejoin(c.Request().Context(), userID, supporterID)
+	view, err = h.Supporters.Rejoin(reqCtx(c), userID, supporterID)
 	if err != nil {
 		return mapUseCaseError(err)
 	}
-	return c.JSON(http.StatusOK, supporterToJSON(view))
+	return jsonOK(c, supporterToJSON(view))
 }
 
 func (h *SupporterController) ChangeBilling(c echo.Context) error {
@@ -143,25 +143,25 @@ func (h *SupporterController) ChangeBilling(c echo.Context) error {
 		view        usecase.SupporterView
 		err         error
 	)
-	userID, err = CurrentUserID(c)
+	userID, err = requireUserID(c)
 	if err != nil {
 		return err
 	}
-	supporterID, err = uuid.Parse(c.Param("supporterId"))
+	supporterID, err = pathUUID(c, "supporterId", "invalid supporter id")
 	if err != nil {
-		return echo.NewHTTPError(http.StatusBadRequest, apiError("invalid supporter id", "BAD_REQUEST"))
+		return err
 	}
-	if err = c.Bind(&body); err != nil {
-		return echo.NewHTTPError(http.StatusBadRequest, apiError("invalid request body", "BAD_REQUEST"))
+	if err = bindBody(c, &body); err != nil {
+		return err
 	}
-	view, err = h.Supporters.ChangeBilling(c.Request().Context(), userID, supporterID, usecase.ChangeBillingIn{
+	view, err = h.Supporters.ChangeBilling(reqCtx(c), userID, supporterID, usecase.ChangeBillingIn{
 		BillingMode:   body.BillingMode,
 		PaymentMethod: body.PaymentMethod,
 	})
 	if err != nil {
 		return mapUseCaseError(err)
 	}
-	return c.JSON(http.StatusOK, supporterToJSON(view))
+	return jsonOK(c, supporterToJSON(view))
 }
 
 type upgradePlanJSON struct {

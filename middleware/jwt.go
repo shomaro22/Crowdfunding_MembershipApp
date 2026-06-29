@@ -4,7 +4,7 @@ import (
 	"strings"
 
 	"crowdfund-app/auth"
-	"crowdfund-app/entity"
+	"crowdfund-app/model"
 
 	"github.com/google/uuid"
 	"github.com/labstack/echo/v4"
@@ -56,7 +56,7 @@ func AuthUserID(c echo.Context) (uuid.UUID, bool) {
 	}
 }
 
-func AuthUserRole(c echo.Context) (entity.UserRole, bool) {
+func AuthUserRole(c echo.Context) (model.UserRole, bool) {
 	var (
 		r  string
 		ok bool
@@ -65,7 +65,7 @@ func AuthUserRole(c echo.Context) (entity.UserRole, bool) {
 	if !ok || r == "" {
 		return "", false
 	}
-	return entity.UserRole(r), true
+	return model.UserRole(r), true
 }
 
 func JWTAuth(parse TokenParser, validate SessionValidator) echo.MiddlewareFunc {

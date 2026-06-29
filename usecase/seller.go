@@ -3,7 +3,7 @@ package usecase
 import (
 	"context"
 
-	"crowdfund-app/entity"
+	"crowdfund-app/model"
 	"crowdfund-app/repository"
 	"crowdfund-app/validator"
 
@@ -35,7 +35,7 @@ type ProjectAnalysisResult struct {
 }
 
 type SupporterEnricher interface {
-	EnrichSupporterRows(ctx context.Context, rows []entity.ProjectSupporter) ([]SupporterView, error)
+	EnrichSupporterRows(ctx context.Context, rows []model.ProjectSupporter) ([]SupporterView, error)
 }
 
 type SellerUseCase struct {
@@ -67,7 +67,7 @@ func (s *SellerUseCase) DashboardStats(ctx context.Context, sellerID uuid.UUID) 
 func (s *SellerUseCase) ListSupporters(ctx context.Context, sellerID uuid.UUID, projectID *uuid.UUID, limit, offset int) (SellerSupportersResult, error) {
 	var (
 		norm  validator.SellerSupporterListNormalized
-		rows  []entity.ProjectSupporter
+		rows  []model.ProjectSupporter
 		views []SupporterView
 		total int64
 		err   error
@@ -101,7 +101,7 @@ func (s *SellerUseCase) ListSupporters(ctx context.Context, sellerID uuid.UUID, 
 
 func (s *SellerUseCase) ExportSupporters(ctx context.Context, sellerID uuid.UUID, projectID *uuid.UUID) ([]SupporterView, error) {
 	var (
-		rows  []entity.ProjectSupporter
+		rows  []model.ProjectSupporter
 		total int64
 		err   error
 	)
@@ -166,7 +166,7 @@ func (s *SellerUseCase) ProjectAnalysis(ctx context.Context, sellerID uuid.UUID)
 
 func (s *SellerUseCase) ensureSellerProject(ctx context.Context, sellerID, projectID uuid.UUID) error {
 	var (
-		project *entity.Project
+		project *model.Project
 		err     error
 	)
 	if s.Projects == nil {
@@ -174,9 +174,9 @@ func (s *SellerUseCase) ensureSellerProject(ctx context.Context, sellerID, proje
 	}
 	project, _, _, err = s.Projects.FindID(ctx, projectID)
 	if err != nil {
-		return err
+		return mapRepoNotFoundAs(err, ErrForbidden)
 	}
-	if project == nil || project.SellerID != sellerID {
+	if project.SellerID != sellerID {
 		return ErrForbidden
 	}
 	return nil

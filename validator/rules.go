@@ -5,7 +5,7 @@ import (
 	"strings"
 	"time"
 
-	"crowdfund-app/entity"
+	"crowdfund-app/model"
 
 	validation "github.com/go-ozzo/ozzo-validation/v4"
 )
@@ -80,17 +80,17 @@ func TrimStringPtr(s *string) *string {
 }
 
 func activityActionRule() validation.Rule {
-	return validation.By(func(value any) error {
+	return validation.By(func(value interface{}) error {
 		var (
 			raw string
-			a   entity.ActivityAction
+			a   model.ActivityAction
 		)
 		raw, _ = value.(string)
 		raw = strings.TrimSpace(raw)
 		if raw == "" {
 			return nil
 		}
-		a = entity.ActivityAction(raw)
+		a = model.ActivityAction(raw)
 		if !a.Valid() {
 			return validation.NewError("action", "invalid activity action")
 		}
@@ -99,17 +99,17 @@ func activityActionRule() validation.Rule {
 }
 
 func batchStatusRule() validation.Rule {
-	return validation.By(func(value any) error {
+	return validation.By(func(value interface{}) error {
 		var (
 			raw string
-			s   entity.BatchStatus
+			s   model.BatchStatus
 		)
 		raw, _ = value.(string)
 		raw = strings.TrimSpace(raw)
 		if raw == "" {
 			return nil
 		}
-		s = entity.BatchStatus(raw)
+		s = model.BatchStatus(raw)
 		if !s.Valid() {
 			return validation.NewError("status", "invalid batch status")
 		}
@@ -118,7 +118,7 @@ func batchStatusRule() validation.Rule {
 }
 
 func batchJobNameRule() validation.Rule {
-	return validation.By(func(value any) error {
+	return validation.By(func(value interface{}) error {
 		var (
 			raw string
 			ok  bool
@@ -137,7 +137,7 @@ func batchJobNameRule() validation.Rule {
 }
 
 func optionalBatchJobNameRule() validation.Rule {
-	return validation.By(func(value any) error {
+	return validation.By(func(value interface{}) error {
 		var (
 			raw string
 			ok  bool
@@ -156,7 +156,7 @@ func optionalBatchJobNameRule() validation.Rule {
 }
 
 func ipAddressRule() validation.Rule {
-	return validation.By(func(value any) error {
+	return validation.By(func(value interface{}) error {
 		var (
 			raw string
 		)
@@ -174,17 +174,17 @@ func ipAddressRule() validation.Rule {
 
 func IsSupportedBatchJob(name string) bool {
 	switch strings.TrimSpace(name) {
-	case entity.ApplyPlans, entity.ExpireSupporters, entity.PurgeTokens:
+	case model.ApplyPlans, model.ExpireSupporters, model.PurgeTokens:
 		return true
 	default:
 		return false
 	}
 }
 
-func parseActivityAction(raw *string) (*entity.ActivityAction, error) {
+func parseActivityAction(raw *string) (*model.ActivityAction, error) {
 	var (
 		s string
-		a entity.ActivityAction
+		a model.ActivityAction
 	)
 	if raw == nil {
 		return nil, nil
@@ -196,14 +196,14 @@ func parseActivityAction(raw *string) (*entity.ActivityAction, error) {
 	if err := activityActionRule().Validate(s); err != nil {
 		return nil, err
 	}
-	a = entity.ActivityAction(s)
+	a = model.ActivityAction(s)
 	return &a, nil
 }
 
-func parseBatchStatus(raw *string) (*entity.BatchStatus, error) {
+func parseBatchStatus(raw *string) (*model.BatchStatus, error) {
 	var (
 		s string
-		st entity.BatchStatus
+		st model.BatchStatus
 	)
 	if raw == nil {
 		return nil, nil
@@ -215,6 +215,6 @@ func parseBatchStatus(raw *string) (*entity.BatchStatus, error) {
 	if err := batchStatusRule().Validate(s); err != nil {
 		return nil, err
 	}
-	st = entity.BatchStatus(s)
+	st = model.BatchStatus(s)
 	return &st, nil
 }

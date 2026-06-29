@@ -6,20 +6,20 @@ import (
 	"time"
 
 	"crowdfund-app/auth"
-	"crowdfund-app/entity"
+	"crowdfund-app/model"
 	"crowdfund-app/repository"
 	"crowdfund-app/validator"
 
 	"github.com/google/uuid"
 )
 
-func (a *AuthUseCase) issueSession(ctx context.Context, u *entity.User, verified2FA bool) (*SessionTokens, error) {
+func (a *AuthUseCase) issueSession(ctx context.Context, u *model.User, verified2FA bool) (*SessionTokens, error) {
 	var (
 		authToken string
 		err       error
 		plain     string
 		now       time.Time
-		row       *entity.RefreshToken
+		row       *model.RefreshToken
 	)
 	authToken, err = a.Tokens.Issue(auth.AuthClaims{
 		UserID:        u.ID,
@@ -36,7 +36,7 @@ func (a *AuthUseCase) issueSession(ctx context.Context, u *entity.User, verified
 		return nil, err
 	}
 	now = time.Now().UTC()
-	row = &entity.RefreshToken{
+	row = &model.RefreshToken{
 		ID:        uuid.New(),
 		UserID:    u.ID,
 		TokenHash: auth.OpaqueHash(plain),
@@ -51,14 +51,14 @@ func (a *AuthUseCase) issueSession(ctx context.Context, u *entity.User, verified
 
 func (a *AuthUseCase) ValidateSession(ctx context.Context, claims auth.AuthClaims) (SessionInfo, error) {
 	var (
-		u   *entity.User
+		u   *model.User
 		err error
 	)
 	u, err = a.Users.FindID(ctx, claims.UserID)
 	if err != nil {
-		return SessionInfo{}, err
+		return SessionInfo{}, mapRepoNotFound(err)
 	}
-	if u == nil || !u.IsActive() {
+	if !u.IsActive() {
 		return SessionInfo{}, ErrInactiveUser
 	}
 	if claims.TokenVersion != u.TokenVersion {
@@ -78,37 +78,37 @@ func (a *AuthUseCase) SigningKey() []byte {
 func (a *AuthUseCase) Login(ctx context.Context, email, password string, meta RequestMeta) (*LoginResult, error) {
 	var (
 		normalized string
-		u          *entity.User
+		u          *model.User
 		err        error
 		tokens     *SessionTokens
 	)
 
-	normalized = entity.NormalizeEmail(email)
+	normalized = model.NormalizeEmail(email)
 	if normalized == "" || password == "" {
-		a.logActivity(ctx, nil, entity.UserLoginFail, "user", normalized, meta, nil)
+		a.logActivity(ctx, nil, model.UserLoginFail, "user", normalized, meta, nil)
 		return nil, ErrInvalidCredentials
 	}
 	u, err = a.Users.FindEmail(ctx, normalized)
 	if err != nil {
-		return nil, err
+		return nil, mapRepoNotFoundAs(err, ErrInvalidCredentials)
 	}
-	if u == nil || auth.ComparePassword(u.PasswordHash, password) != nil {
-		a.logActivity(ctx, nil, entity.UserLoginFail, "user", normalized, meta, nil)
+	if auth.ComparePassword(u.PasswordHash, password) != nil {
+		a.logActivity(ctx, nil, model.UserLoginFail, "user", normalized, meta, nil)
 		return nil, ErrInvalidCredentials
 	}
 	if !u.CanLogin() {
-		a.logActivity(ctx, &u.ID, entity.UserLoginFail, "user", u.ID.String(), meta, nil)
+		a.logActivity(ctx, &u.ID, model.UserLoginFail, "user", u.ID.String(), meta, nil)
 		return nil, ErrInactiveUser
 	}
 	if u.NeedsTOTP() && u.TOTPEnabled {
-		a.logActivity(ctx, &u.ID, entity.UserLogin, "user", u.ID.String(), meta, entity.StepMeta("2fa_pending"))
+		a.logActivity(ctx, &u.ID, model.UserLogin, "user", u.ID.String(), meta, model.StepMeta("2fa_pending"))
 		return &LoginResult{User: UserViewFrom(u), Requires2FA: true}, nil
 	}
 	tokens, err = a.issueSession(ctx, u, twoFAVerified(u))
 	if err != nil {
 		return nil, err
 	}
-	a.logActivity(ctx, &u.ID, entity.UserLogin, "user", u.ID.String(), meta, nil)
+	a.logActivity(ctx, &u.ID, model.UserLogin, "user", u.ID.String(), meta, nil)
 	return &LoginResult{
 		User:         UserViewFrom(u),
 		AuthToken:    tokens.AuthToken,
@@ -121,9 +121,9 @@ func (a *AuthUseCase) Refresh(ctx context.Context, refreshTokenPlain string, met
 		plain  string
 		hash   string
 		now    time.Time
-		row    *entity.RefreshToken
+		row    *model.RefreshToken
 		err    error
-		u      *entity.User
+		u      *model.User
 		tokens *SessionTokens
 	)
 
@@ -134,11 +134,14 @@ func (a *AuthUseCase) Refresh(ctx context.Context, refreshTokenPlain string, met
 	hash = auth.OpaqueHash(plain)
 	now = time.Now().UTC()
 	row, err = a.RefreshTokens.FindValidHash(ctx, hash, now)
-	if err != nil || row == nil {
-		return "", "", ErrInvalidToken
+	if err != nil {
+		return "", "", mapRepoNotFoundAs(err, ErrInvalidToken)
 	}
 	u, err = a.Users.FindID(ctx, row.UserID)
-	if err != nil || u == nil || !u.CanLogin() {
+	if err != nil {
+		return "", "", mapRepoNotFoundAs(err, ErrInvalidToken)
+	}
+	if !u.CanLogin() {
 		return "", "", ErrInvalidToken
 	}
 	err = repository.WithTx(ctx, a.DB, func(txCtx context.Context) error {
@@ -159,7 +162,7 @@ func (a *AuthUseCase) Logout(ctx context.Context, refreshTokenPlain string, meta
 		plain string
 		hash  string
 		now   time.Time
-		row   *entity.RefreshToken
+		row   *model.RefreshToken
 		err   error
 	)
 
@@ -171,38 +174,38 @@ func (a *AuthUseCase) Logout(ctx context.Context, refreshTokenPlain string, meta
 	now = time.Now().UTC()
 	row, err = a.RefreshTokens.FindValidHash(ctx, hash, now)
 	if err != nil {
-		return err
-	}
-	if row == nil {
-		return ErrInvalidToken
+		return mapRepoNotFoundAs(err, ErrInvalidToken)
 	}
 	if err = a.RefreshTokens.Revoke(ctx, row.ID, now); err != nil {
 		return err
 	}
-	a.logActivity(ctx, &row.UserID, entity.UserLogout, "user", row.UserID.String(), meta, nil)
+	a.logActivity(ctx, &row.UserID, model.UserLogout, "user", row.UserID.String(), meta, nil)
 	return nil
 }
 
 func (a *AuthUseCase) ForgotPassword(ctx context.Context, email string) error {
 	var (
 		normalized string
-		u          *entity.User
+		u          *model.User
 		err        error
 		plain      string
 		now        time.Time
-		row        *entity.ResetToken
+		row        *model.ResetToken
 		mailer     Mailer
 	)
 
 	if a.ResetToks == nil {
 		return nil
 	}
-	normalized = entity.NormalizeEmail(email)
+	normalized = model.NormalizeEmail(email)
 	u, err = a.Users.FindEmail(ctx, normalized)
+	if isRepoNotFound(err) {
+		return nil
+	}
 	if err != nil {
 		return err
 	}
-	if u == nil || !u.IsActive() {
+	if !u.IsActive() {
 		return nil
 	}
 	plain, err = auth.OpaqueHex()
@@ -210,7 +213,7 @@ func (a *AuthUseCase) ForgotPassword(ctx context.Context, email string) error {
 		return err
 	}
 	now = time.Now().UTC()
-	row = &entity.ResetToken{
+	row = &model.ResetToken{
 		ID:        uuid.New(),
 		UserID:    u.ID,
 		TokenHash: auth.OpaqueHash(plain),
@@ -222,7 +225,7 @@ func (a *AuthUseCase) ForgotPassword(ctx context.Context, email string) error {
 	}
 	mailer = a.Mailer
 	if mailer == nil {
-		mailer = LogMailer{AppPublicURL: a.AppPublicURL}
+		return nil
 	}
 	return mailer.SendPasswordReset(ctx, u.Email, plain)
 }
@@ -231,8 +234,8 @@ func (a *AuthUseCase) ResetPassword(ctx context.Context, plainToken, newPassword
 	var (
 		err  error
 		now  time.Time
-		row  *entity.ResetToken
-		u    *entity.User
+		row  *model.ResetToken
+		u    *model.User
 		hash string
 	)
 
@@ -245,12 +248,12 @@ func (a *AuthUseCase) ResetPassword(ctx context.Context, plainToken, newPassword
 	}
 	now = time.Now().UTC()
 	row, err = a.ResetToks.FindValidHash(ctx, auth.OpaqueHash(plainToken), now)
-	if err != nil || row == nil {
-		return ErrInvalidToken
+	if err != nil {
+		return mapRepoNotFoundAs(err, ErrInvalidToken)
 	}
 	u, err = a.Users.FindID(ctx, row.UserID)
-	if err != nil || u == nil {
-		return ErrInvalidToken
+	if err != nil {
+		return mapRepoNotFoundAs(err, ErrInvalidToken)
 	}
 	hash, err = auth.HashPassword(newPassword)
 	if err != nil {
@@ -270,7 +273,7 @@ func (a *AuthUseCase) ResetPassword(ctx context.Context, plainToken, newPassword
 func (a *AuthUseCase) ChangePassword(ctx context.Context, userID uuid.UUID, current, newPassword, totpCode string) error {
 	var (
 		err  error
-		u    *entity.User
+		u    *model.User
 		hash string
 		now  time.Time
 	)
@@ -279,8 +282,8 @@ func (a *AuthUseCase) ChangePassword(ctx context.Context, userID uuid.UUID, curr
 		return ErrWeakPassword
 	}
 	u, err = a.Users.FindID(ctx, userID)
-	if err != nil || u == nil {
-		return ErrNotFound
+	if err != nil {
+		return mapRepoNotFound(err)
 	}
 	if u.MustSetup2FA() {
 		if strings.TrimSpace(totpCode) == "" {

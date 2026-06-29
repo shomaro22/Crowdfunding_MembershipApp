@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	"crowdfund-app/entity"
+	"crowdfund-app/model"
 	"crowdfund-app/repository"
 	"crowdfund-app/stripe"
 
@@ -19,22 +19,24 @@ type ConnectUseCase struct {
 
 func (c *ConnectUseCase) GetAccount(ctx context.Context, sellerID uuid.UUID) (*ConnectAccountView, error) {
 	var (
-		u   *entity.User
-		row *entity.ConnectAccount
+		u   *model.User
+		row *model.ConnectAccount
 		err error
 	)
 	if c.Stripe == nil {
 		return nil, ErrStripeUnavailable
 	}
 	u, err = c.Users.FindID(ctx, sellerID)
-	if err != nil || u == nil {
-		return nil, ErrNotFound
+	if err != nil {
+		return nil, mapRepoNotFound(err)
 	}
-	if u.Role != entity.UserRoleSeller {
+	if u.Role != model.UserRoleSeller {
 		return nil, ErrForbidden
 	}
 	row, err = c.Connect.FindUserID(ctx, sellerID)
-	if err != nil {
+	if isRepoNotFound(err) {
+		row = nil
+	} else if err != nil {
 		return nil, err
 	}
 	return ConnectAccountViewFrom(row), nil
@@ -42,8 +44,8 @@ func (c *ConnectUseCase) GetAccount(ctx context.Context, sellerID uuid.UUID) (*C
 
 func (c *ConnectUseCase) CreateOnboardingLink(ctx context.Context, sellerID uuid.UUID) (string, error) {
 	var (
-		u    *entity.User
-		row  *entity.ConnectAccount
+		u    *model.User
+		row  *model.ConnectAccount
 		url  string
 		now  time.Time
 		err  error
@@ -54,14 +56,16 @@ func (c *ConnectUseCase) CreateOnboardingLink(ctx context.Context, sellerID uuid
 		return "", ErrStripeUnavailable
 	}
 	u, err = c.Users.FindID(ctx, sellerID)
-	if err != nil || u == nil {
-		return "", ErrNotFound
+	if err != nil {
+		return "", mapRepoNotFound(err)
 	}
-	if u.Role != entity.UserRoleSeller || u.SellerStatus != entity.SellerStatusActive {
+	if u.Role != model.UserRoleSeller || u.SellerStatus != model.SellerStatusActive {
 		return "", ErrForbidden
 	}
 	row, err = c.Connect.FindUserID(ctx, sellerID)
-	if err != nil {
+	if isRepoNotFound(err) {
+		row = nil
+	} else if err != nil {
 		return "", err
 	}
 	now = time.Now().UTC()
@@ -71,7 +75,7 @@ func (c *ConnectUseCase) CreateOnboardingLink(ctx context.Context, sellerID uuid
 		if err != nil {
 			return "", err
 		}
-		row = &entity.ConnectAccount{
+		row = &model.ConnectAccount{
 			ID:              uuid.New(),
 			UserID:          sellerID,
 			StripeAccountID: accountID,
@@ -99,7 +103,7 @@ func (c *ConnectUseCase) CreateOnboardingLink(ctx context.Context, sellerID uuid
 
 func (c *ConnectUseCase) SyncFromStripeAccountID(ctx context.Context, stripeAccountID string) (*ConnectAccountView, error) {
 	var (
-		row  *entity.ConnectAccount
+		row  *model.ConnectAccount
 		snap stripe.AccountSnapshot
 		now  time.Time
 		err  error
@@ -108,8 +112,8 @@ func (c *ConnectUseCase) SyncFromStripeAccountID(ctx context.Context, stripeAcco
 		return nil, ErrStripeUnavailable
 	}
 	row, err = c.Connect.FindStripeAccountID(ctx, stripeAccountID)
-	if err != nil || row == nil {
-		return nil, ErrNotFound
+	if err != nil {
+		return nil, mapRepoNotFound(err)
 	}
 	snap, err = c.Stripe.GetAccount(ctx, stripeAccountID)
 	if err != nil {
@@ -131,5 +135,5 @@ type ConnectSyncer interface {
 }
 
 type SupporterViewer interface {
-	ViewForSupporter(ctx context.Context, supporter *entity.ProjectSupporter) (SupporterView, error)
+	ViewForSupporter(ctx context.Context, supporter *model.ProjectSupporter) (SupporterView, error)
 }

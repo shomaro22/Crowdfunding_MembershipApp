@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	"crowdfund-app/entity"
+	"crowdfund-app/model"
 	"crowdfund-app/repository"
 	"crowdfund-app/stripe"
 
@@ -13,11 +13,11 @@ import (
 
 func (s *SupporterUseCase) Upgrade(ctx context.Context, userID, supporterID, planID uuid.UUID) (UpgradeOut, error) {
 	var (
-		supporter *entity.ProjectSupporter
-		current   *entity.ProjectPlan
-		target    *entity.ProjectPlan
-		project      *entity.Project
-		conn      *entity.ConnectAccount
+		supporter *model.ProjectSupporter
+		current   *model.ProjectPlan
+		target    *model.ProjectPlan
+		project      *model.Project
+		conn      *model.ConnectAccount
 		now       time.Time
 		err       error
 	)
@@ -26,22 +26,25 @@ func (s *SupporterUseCase) Upgrade(ctx context.Context, userID, supporterID, pla
 	if err != nil {
 		return UpgradeOut{}, err
 	}
-	if !supporterCanManage(supporter, now) || supporter.Status == entity.SupporterStatusCancelled {
+	if !supporterCanManage(supporter, now) || supporter.Status == model.SupporterStatusCancelled {
 		return UpgradeOut{}, ErrForbidden
 	}
 	if supporter.PendingPlanID != nil {
 		return UpgradeOut{}, ErrBadRequest
 	}
 	target, err = s.Projects.FindPlan(ctx, supporter.ProjectID, planID)
-	if err != nil || target == nil || !target.IsActive {
+	if err != nil {
+		return UpgradeOut{}, mapRepoNotFound(err)
+	}
+	if !target.IsActive {
 		return UpgradeOut{}, ErrNotFound
 	}
 	if target.ID == supporter.PlanID {
 		return UpgradeOut{}, ErrBadRequest
 	}
 	current, err = s.Projects.FindPlan(ctx, supporter.ProjectID, supporter.PlanID)
-	if err != nil || current == nil {
-		return UpgradeOut{}, ErrNotFound
+	if err != nil {
+		return UpgradeOut{}, mapRepoNotFound(err)
 	}
 	if target.MembershipType.Rank() <= current.MembershipType.Rank() {
 		return s.scheduleDowngrade(ctx, supporter, target, now)
@@ -50,17 +53,23 @@ func (s *SupporterUseCase) Upgrade(ctx context.Context, userID, supporterID, pla
 		return UpgradeOut{}, ErrStripeUnavailable
 	}
 	project, _, _, err = s.Projects.FindID(ctx, supporter.ProjectID)
-	if err != nil || project == nil {
-		return UpgradeOut{}, ErrNotFound
+	if err != nil {
+		return UpgradeOut{}, mapRepoNotFound(err)
 	}
 	conn, err = s.Connect.FindUserID(ctx, project.SellerID)
-	if err != nil || conn == nil || !conn.CanCharge() {
+	if isRepoNotFound(err) {
+		return UpgradeOut{}, ErrForbidden
+	}
+	if err != nil {
+		return UpgradeOut{}, err
+	}
+	if !conn.CanCharge() {
 		return UpgradeOut{}, ErrForbidden
 	}
 	return s.startPaidUpgrade(ctx, supporter, current, target, conn, now)
 }
 
-func (s *SupporterUseCase) scheduleDowngrade(ctx context.Context, supporter *entity.ProjectSupporter, target *entity.ProjectPlan, now time.Time) (UpgradeOut, error) {
+func (s *SupporterUseCase) scheduleDowngrade(ctx context.Context, supporter *model.ProjectSupporter, target *model.ProjectPlan, now time.Time) (UpgradeOut, error) {
 	var (
 		changeAt time.Time
 		out      UpgradeOut
@@ -79,16 +88,16 @@ func (s *SupporterUseCase) scheduleDowngrade(ctx context.Context, supporter *ent
 
 func (s *SupporterUseCase) startPaidUpgrade(
 	ctx context.Context,
-	supporter *entity.ProjectSupporter,
-	current, target *entity.ProjectPlan,
-	conn *entity.ConnectAccount,
+	supporter *model.ProjectSupporter,
+	current, target *model.ProjectPlan,
+	conn *model.ConnectAccount,
 	now time.Time,
 ) (UpgradeOut, error) {
 	var (
 		diff     int64
 		meta     map[string]string
 		pi       stripe.UpgradePaymentOut
-		purchase entity.Purchase
+		purchase model.Purchase
 		key      string
 		client   *string
 		out      UpgradeOut
@@ -99,12 +108,12 @@ func (s *SupporterUseCase) startPaidUpgrade(
 		return UpgradeOut{}, ErrBadRequest
 	}
 	meta = map[string]string{
-		stripe.MetaSupporterID:      supporter.ID.String(),
-		stripe.MetaPlanID:           target.ID.String(),
-		stripe.MetaProjectID:        supporter.ProjectID.String(),
-		stripe.MetaBuyerID:          supporter.UserID.String(),
-		stripe.MetaCheckoutPurpose:  stripe.PurposePlanUpgrade,
-		stripe.MetaBillingMode:      string(supporter.BillingMode),
+		stripe.MetaSupporterID:     supporter.ID.String(),
+		stripe.MetaPlanID:          target.ID.String(),
+		stripe.MetaProjectID:       supporter.ProjectID.String(),
+		stripe.MetaBuyerID:         supporter.UserID.String(),
+		stripe.MetaCheckoutPurpose: stripe.PurposePlanUpgrade,
+		stripe.MetaBillingMode:     string(supporter.BillingMode),
 	}
 	custID := ""
 	if supporter.StripeCustomerID != nil {
@@ -120,15 +129,15 @@ func (s *SupporterUseCase) startPaidUpgrade(
 		return UpgradeOut{}, err
 	}
 	key = uuid.New().String()
-	purchase = entity.Purchase{
+	purchase = model.Purchase{
 		ID:             uuid.New(),
 		ProjectID:      supporter.ProjectID,
 		SupporterID:    &supporter.ID,
 		BuyerID:        supporter.UserID,
 		Quantity:       1,
 		TotalPrice:     int(diff),
-		Status:         entity.PurchaseStatusPending,
-		PaymentMethod:  entity.PaymentMethodCard,
+		Status:         model.PurchaseStatusPending,
+		PaymentMethod:  model.PaymentMethodCard,
 		StripeIntentID: &pi.PaymentIntentID,
 		IdempotencyKey: &key,
 		CreatedAt:      now,
@@ -137,7 +146,7 @@ func (s *SupporterUseCase) startPaidUpgrade(
 	if err = s.Purchases.Create(ctx, &purchase); err != nil {
 		return UpgradeOut{}, err
 	}
-	LogActivity(ctx, s.Activity, &supporter.UserID, entity.PurchaseCreated, "purchase", purchase.ID.String(), RequestMeta{}, activityMeta(map[string]string{
+	LogActivity(ctx, s.Activity, &supporter.UserID, model.PurchaseCreated, "purchase", purchase.ID.String(), RequestMeta{}, activityMeta(map[string]string{
 		"project_id": supporter.ProjectID.String(),
 		"purpose":    "plan_upgrade",
 	}))
@@ -156,8 +165,8 @@ func (s *SupporterUseCase) startPaidUpgrade(
 
 func (s *SupporterUseCase) UpgradeConfirm(ctx context.Context, userID, supporterID uuid.UUID, intentID string) (SupporterView, error) {
 	var (
-		supporter *entity.ProjectSupporter
-		purchase  *entity.Purchase
+		supporter *model.ProjectSupporter
+		purchase  *model.Purchase
 		pi        stripe.PaymentIntentSnapshot
 		now       time.Time
 		err       error
@@ -174,7 +183,10 @@ func (s *SupporterUseCase) UpgradeConfirm(ctx context.Context, userID, supporter
 		return SupporterView{}, ErrBadRequest
 	}
 	purchase, err = s.Purchases.FindIntentID(ctx, intentID)
-	if err != nil || purchase == nil || purchase.SupporterID == nil || *purchase.SupporterID != supporter.ID {
+	if err != nil {
+		return SupporterView{}, mapRepoNotFound(err)
+	}
+	if purchase.SupporterID == nil || *purchase.SupporterID != supporter.ID {
 		return SupporterView{}, ErrNotFound
 	}
 	pi, err = s.Stripe.GetPaymentIntent(ctx, intentID)
@@ -187,19 +199,22 @@ func (s *SupporterUseCase) UpgradeConfirm(ctx context.Context, userID, supporter
 	return s.finalizePaidUpgrade(ctx, supporter, purchase, now)
 }
 
-func (s *SupporterUseCase) finalizePaidUpgrade(ctx context.Context, supporter *entity.ProjectSupporter, purchase *entity.Purchase, now time.Time) (SupporterView, error) {
+func (s *SupporterUseCase) finalizePaidUpgrade(ctx context.Context, supporter *model.ProjectSupporter, purchase *model.Purchase, now time.Time) (SupporterView, error) {
 	var err error
 	err = repository.WithTx(ctx, s.DB, func(txCtx context.Context) error {
 		var (
-			locked    *entity.ProjectSupporter
+			locked    *model.ProjectSupporter
 			newPlanID uuid.UUID
 		)
 		locked, err = s.Supporters.FindID(txCtx, supporter.ID)
-		if err != nil || locked == nil || locked.PendingPlanID == nil {
+		if err != nil {
+			return mapRepoNotFound(err)
+		}
+		if locked.PendingPlanID == nil {
 			return ErrNotFound
 		}
 		newPlanID = *locked.PendingPlanID
-		if purchase.Status != entity.PurchaseStatusPaid {
+		if purchase.Status != model.PurchaseStatusPaid {
 			if err = markPurchasePaidSimple(txCtx, s.Purchases, purchase); err != nil {
 				return err
 			}

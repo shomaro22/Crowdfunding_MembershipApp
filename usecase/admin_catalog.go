@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"time"
 
-	"crowdfund-app/entity"
+	"crowdfund-app/model"
 	"crowdfund-app/repository"
 	"crowdfund-app/validator"
 
@@ -29,13 +29,13 @@ type AdminUpdateUserIn struct {
 }
 
 type PurchaseEnricher interface {
-	EnrichPurchase(ctx context.Context, row *entity.Purchase) (PurchaseView, error)
+	EnrichPurchase(ctx context.Context, row *model.Purchase) (PurchaseView, error)
 }
 
 func (a *AdminUseCase) DashboardStats(ctx context.Context) (AdminStatsView, error) {
 	var (
 		stats  repository.AdminDashboardStats
-		recent []entity.User
+		recent []model.User
 		out    AdminStatsView
 		i      int
 		err    error
@@ -67,7 +67,7 @@ func (a *AdminUseCase) DashboardStats(ctx context.Context) (AdminStatsView, erro
 func (a *AdminUseCase) ListUsers(ctx context.Context, role, search string, limit, offset int) ([]UserView, int64, error) {
 	var (
 		norm  validator.AdminUserListNormalized
-		rows  []entity.User
+		rows  []model.User
 		total int64
 		out   []UserView
 		i     int
@@ -95,7 +95,7 @@ func (a *AdminUseCase) ListUsers(ctx context.Context, role, search string, limit
 func (a *AdminUseCase) UpdateUser(ctx context.Context, adminID, userID uuid.UUID, in AdminUpdateUserIn) (UserView, error) {
 	var (
 		norm validator.AdminUpdateUserNormalized
-		u    *entity.User
+		u    *model.User
 		err  error
 	)
 	norm, err = validator.ValidateAdminUpdateUser(validator.AdminUpdateUserInput{
@@ -105,8 +105,8 @@ func (a *AdminUseCase) UpdateUser(ctx context.Context, adminID, userID uuid.UUID
 		return UserView{}, mapAdminCatalogErr(err)
 	}
 	u, err = a.Users.FindID(ctx, userID)
-	if err != nil || u == nil {
-		return UserView{}, ErrNotFound
+	if err != nil {
+		return UserView{}, mapRepoNotFound(err)
 	}
 	if norm.Email != nil && *norm.Email != u.Email {
 		var exists bool
@@ -124,21 +124,21 @@ func (a *AdminUseCase) UpdateUser(ctx context.Context, adminID, userID uuid.UUID
 	}
 	if norm.RoleSet && norm.Role != nil {
 		u.Role = *norm.Role
-		if u.Role == entity.UserRoleSeller && u.SellerStatus == entity.SellerStatusNotApplicable {
-			u.SellerStatus = entity.SellerStatusPending
+		if u.Role == model.UserRoleSeller && u.SellerStatus == model.SellerStatusNotApplicable {
+			u.SellerStatus = model.SellerStatusPending
 		}
-		if u.Role != entity.UserRoleSeller {
-			u.SellerStatus = entity.SellerStatusNotApplicable
+		if u.Role != model.UserRoleSeller {
+			u.SellerStatus = model.SellerStatusNotApplicable
 		}
-		if u.Role != entity.UserRoleAdmin {
+		if u.Role != model.UserRoleAdmin {
 			u.AdminRole = nil
 		}
 	}
 	if norm.IsActiveSet && norm.IsActive != nil {
 		if *norm.IsActive {
-			u.AccountStatus = entity.AccountStatusActive
+			u.AccountStatus = model.AccountStatusActive
 		} else {
-			u.AccountStatus = entity.AccountStatusSuspended
+			u.AccountStatus = model.AccountStatusSuspended
 		}
 	}
 	u.UpdatedAt = time.Now().UTC()
@@ -151,17 +151,17 @@ func (a *AdminUseCase) UpdateUser(ctx context.Context, adminID, userID uuid.UUID
 
 func (a *AdminUseCase) DeleteUser(ctx context.Context, adminID, userID uuid.UUID) error {
 	var (
-		u   *entity.User
+		u   *model.User
 		err error
 	)
 	u, err = a.Users.FindID(ctx, userID)
-	if err != nil || u == nil {
-		return ErrNotFound
+	if err != nil {
+		return mapRepoNotFound(err)
 	}
-	if u.Role == entity.UserRoleAdmin {
+	if u.Role == model.UserRoleAdmin {
 		return ErrForbidden
 	}
-	u.AccountStatus = entity.AccountStatusBanned
+	u.AccountStatus = model.AccountStatusBanned
 	u.UpdatedAt = time.Now().UTC()
 	if err = a.Users.Update(ctx, u); err != nil {
 		return err
@@ -176,7 +176,7 @@ func (a *AdminUseCase) DeleteUser(ctx context.Context, adminID, userID uuid.UUID
 func (a *AdminUseCase) ListPurchases(ctx context.Context, status string, limit, offset int) ([]PurchaseView, int64, error) {
 	var (
 		norm  validator.AdminPurchaseListNormalized
-		rows  []entity.Purchase
+		rows  []model.Purchase
 		total int64
 		out   []PurchaseView
 		i     int
@@ -209,9 +209,9 @@ func (a *AdminUseCase) ListPurchases(ctx context.Context, status string, limit, 
 
 func (a *AdminUseCase) PatchPurchaseStatus(ctx context.Context, adminID, purchaseID uuid.UUID, status string) (PurchaseView, error) {
 	var (
-		to       entity.PurchaseStatus
-		purchase *entity.Purchase
-		from     entity.PurchaseStatus
+		to       model.PurchaseStatus
+		purchase *model.Purchase
+		from     model.PurchaseStatus
 		details  string
 		view     PurchaseView
 		err      error
@@ -224,8 +224,8 @@ func (a *AdminUseCase) PatchPurchaseStatus(ctx context.Context, adminID, purchas
 		return PurchaseView{}, mapAdminCatalogErr(err)
 	}
 	purchase, err = a.Purchases.FindID(ctx, purchaseID)
-	if err != nil || purchase == nil {
-		return PurchaseView{}, ErrNotFound
+	if err != nil {
+		return PurchaseView{}, mapRepoNotFound(err)
 	}
 	if purchase.Status == to {
 		return a.PurchaseViews.EnrichPurchase(ctx, purchase)
@@ -236,7 +236,7 @@ func (a *AdminUseCase) PatchPurchaseStatus(ctx context.Context, adminID, purchas
 	if err = a.Purchases.Update(ctx, purchase); err != nil {
 		return PurchaseView{}, err
 	}
-	if err = a.Purchases.RecordEvent(ctx, &entity.PurchaseEvent{
+	if err = a.Purchases.RecordEvent(ctx, &model.PurchaseEvent{
 		ID:         uuid.New(),
 		PurchaseID: purchase.ID,
 		FromStatus: &from,
@@ -254,10 +254,10 @@ func (a *AdminUseCase) PatchPurchaseStatus(ctx context.Context, adminID, purchas
 
 func mapAdminCatalogErr(err error) error {
 	switch {
-	case errors.Is(err, entity.ErrBadRole),
-		errors.Is(err, entity.ErrBadPurchase),
-		errors.Is(err, entity.ErrBadAccount),
-		errors.Is(err, entity.ErrBadEmail):
+	case errors.Is(err, model.ErrBadRole),
+		errors.Is(err, model.ErrBadPurchase),
+		errors.Is(err, model.ErrBadAccount),
+		errors.Is(err, model.ErrBadEmail):
 		return ErrBadRequest
 	default:
 		return err

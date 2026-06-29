@@ -14,10 +14,10 @@ import (
 )
 
 type AdminOperationsController struct {
-	Operations OperationsUseCase
+	Operations IOperationsUseCase
 }
 
-func NewAdminOperationsController(ops OperationsUseCase) *AdminOperationsController {
+func NewAdminOperationsController(ops IOperationsUseCase) *AdminOperationsController {
 	return &AdminOperationsController{Operations: ops}
 }
 
@@ -31,11 +31,11 @@ func (h *AdminOperationsController) ListActivity(c echo.Context) error {
 	if err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, apiError("invalid query", "BAD_REQUEST"))
 	}
-	result, err = h.Operations.ListActivityLogs(c.Request().Context(), q)
+	result, err = h.Operations.ListActivityLogs(reqCtx(c), q)
 	if err != nil {
 		return mapUseCaseError(err)
 	}
-	return c.JSON(http.StatusOK, ListActivityLogsWireFrom(result))
+	return jsonOK(c, ListActivityLogsWireFrom(result))
 }
 
 func (h *AdminOperationsController) ListAuditLogs(c echo.Context) error {
@@ -48,11 +48,11 @@ func (h *AdminOperationsController) ListAuditLogs(c echo.Context) error {
 	if err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, apiError("invalid query", "BAD_REQUEST"))
 	}
-	result, err = h.Operations.ListAuditLogs(c.Request().Context(), q)
+	result, err = h.Operations.ListAuditLogs(reqCtx(c), q)
 	if err != nil {
 		return mapUseCaseError(err)
 	}
-	return c.JSON(http.StatusOK, ListAuditLogsWireFrom(result))
+	return jsonOK(c, ListAuditLogsWireFrom(result))
 }
 
 func (h *AdminOperationsController) ListBatches(c echo.Context) error {
@@ -62,11 +62,11 @@ func (h *AdminOperationsController) ListBatches(c echo.Context) error {
 		err    error
 	)
 	q = batchRunsQueryFrom(c)
-	result, err = h.Operations.ListBatchRuns(c.Request().Context(), q)
+	result, err = h.Operations.ListBatchRuns(reqCtx(c), q)
 	if err != nil {
 		return mapUseCaseError(err)
 	}
-	return c.JSON(http.StatusOK, ListBatchJobRunsWireFrom(result))
+	return jsonOK(c, ListBatchJobRunsWireFrom(result))
 }
 
 func (h *AdminOperationsController) RunBatch(c echo.Context) error {
@@ -77,7 +77,7 @@ func (h *AdminOperationsController) RunBatch(c echo.Context) error {
 		run     *usecase.BatchRunView
 		err     error
 	)
-	adminID, err = CurrentUserID(c)
+	adminID, err = requireUserID(c)
 	if err != nil {
 		return err
 	}
@@ -86,14 +86,14 @@ func (h *AdminOperationsController) RunBatch(c echo.Context) error {
 	if err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, apiError("invalid dry_run", "BAD_REQUEST"))
 	}
-	run, err = h.Operations.RunBatch(c.Request().Context(), adminID, jobName, dryRun)
+	run, err = h.Operations.RunBatch(reqCtx(c), adminID, jobName, dryRun)
 	if err != nil {
 		if run != nil && errors.Is(err, usecase.ErrBatchJobFailed) {
 			return c.JSON(http.StatusUnprocessableEntity, BatchJobRunWireFrom(*run))
 		}
 		return mapUseCaseError(err)
 	}
-	return c.JSON(http.StatusOK, BatchJobRunWireFrom(*run))
+	return jsonOK(c, BatchJobRunWireFrom(*run))
 }
 
 func (h *AdminOperationsController) GetSecurity(c echo.Context) error {
@@ -111,11 +111,11 @@ func (h *AdminOperationsController) GetSecurity(c echo.Context) error {
 	if err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, apiError("invalid to", "BAD_REQUEST"))
 	}
-	view, err = h.Operations.GetSecurityEvents(c.Request().Context(), from, to)
+	view, err = h.Operations.GetSecurityEvents(reqCtx(c), from, to)
 	if err != nil {
 		return mapUseCaseError(err)
 	}
-	return c.JSON(http.StatusOK, SecurityEventsWireFrom(view))
+	return jsonOK(c, SecurityEventsWireFrom(view))
 }
 
 func activityLogsQueryFrom(c echo.Context) (usecase.ActivityLogsQuery, error) {
@@ -149,8 +149,7 @@ func activityLogsQueryFrom(c echo.Context) (usecase.ActivityLogsQuery, error) {
 	if err != nil {
 		return usecase.ActivityLogsQuery{}, err
 	}
-	limit, _ = strconv.Atoi(c.QueryParam("limit"))
-	offset, _ = strconv.Atoi(c.QueryParam("offset"))
+	limit, offset = queryPage(c)
 	q.Limit = limit
 	q.Offset = offset
 	return q, nil
@@ -173,8 +172,7 @@ func auditLogsQueryFrom(c echo.Context) (usecase.AuditLogsQuery, error) {
 	if s := strings.TrimSpace(c.QueryParam("resource")); s != "" {
 		q.Resource = &s
 	}
-	limit, _ = strconv.Atoi(c.QueryParam("limit"))
-	offset, _ = strconv.Atoi(c.QueryParam("offset"))
+	limit, offset = queryPage(c)
 	q.Limit = limit
 	q.Offset = offset
 	return q, nil

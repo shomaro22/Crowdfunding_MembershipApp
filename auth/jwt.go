@@ -3,7 +3,7 @@ package auth
 import (
 	"time"
 
-	"crowdfund-app/entity"
+	"crowdfund-app/model"
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
@@ -13,9 +13,9 @@ const DefaultAuthTTL = 15 * time.Minute
 
 type AuthClaims struct {
 	UserID        uuid.UUID
-	Role          entity.UserRole
+	Role          model.UserRole
 	TwoFAVerified bool
-	AdminRole     *entity.AdminRole
+	AdminRole     *model.AdminRole
 	TokenVersion  int64
 }
 
@@ -49,7 +49,7 @@ func (s *TokenService) Issue(claims AuthClaims) (string, error) {
 		"exp":          now.Add(s.ttl).Unix(),
 		"iat":          now.Unix(),
 	}
-	if claims.Role == entity.UserRoleAdmin && claims.AdminRole != nil {
+	if claims.Role == model.UserRoleAdmin && claims.AdminRole != nil {
 		mc["admin_role"] = string(*claims.AdminRole)
 	}
 	t = jwt.NewWithClaims(jwt.SigningMethodHS256, mc)
@@ -69,7 +69,7 @@ func (s *TokenService) Parse(raw string) (AuthClaims, error) {
 		v       bool
 		tv      float64
 		ar      string
-		r       entity.AdminRole
+		r       model.AdminRole
 		err     error
 	)
 	if len(s.secret) == 0 || raw == "" {
@@ -96,7 +96,7 @@ func (s *TokenService) Parse(raw string) (AuthClaims, error) {
 	}
 	roleStr, _ = mc["role"].(string)
 	out.UserID = uid
-	out.Role = entity.UserRole(roleStr)
+	out.Role = model.UserRole(roleStr)
 	if v, ok = mc["2fa_verified"].(bool); ok {
 		out.TwoFAVerified = v
 	}
@@ -104,7 +104,7 @@ func (s *TokenService) Parse(raw string) (AuthClaims, error) {
 		out.TokenVersion = int64(tv)
 	}
 	if ar, ok = mc["admin_role"].(string); ok && ar != "" {
-		r = entity.AdminRole(ar)
+		r = model.AdminRole(ar)
 		out.AdminRole = &r
 	}
 	return out, nil

@@ -11,7 +11,7 @@ import (
 	"testing"
 	"time"
 
-	"crowdfund-app/entity"
+	"crowdfund-app/model"
 
 	"github.com/google/uuid"
 	"github.com/labstack/echo/v4"
@@ -22,13 +22,13 @@ func TestSellerDashboardForbiddenForBuyer(t *testing.T) {
 	var (
 		e     *echo.Echo
 		gdb   *gorm.DB
-		buyer *entity.User
+		buyer *model.User
 		tok   string
 		rec   *httptest.ResponseRecorder
 	)
 	e = setupApp(t)
 	gdb = openDB(t)
-	buyer = seedUser(t, gdb, seedOpts{Role: entity.UserRoleBuyer})
+	buyer = seedUser(t, gdb, seedOpts{Role: model.UserRoleBuyer})
 	tok, _ = issueToken(buyer, true)
 	rec = httpGET(e, "/seller/dashboard/stats", tok)
 	if rec.Code != http.StatusForbidden {
@@ -38,12 +38,14 @@ func TestSellerDashboardForbiddenForBuyer(t *testing.T) {
 
 func TestSellerDashboardStatsAndSupporters(t *testing.T) {
 	var (
-		e         *echo.Echo
-		gdb       *gorm.DB
-		fx        sellerFixture
-		tok       string
-		rec       *httptest.ResponseRecorder
-		body      map[string]any
+		e        *echo.Echo
+		gdb      *gorm.DB
+		fx       sellerFixture
+		tok      string
+		rec      *httptest.ResponseRecorder
+		stats    sellerStatsBody
+		supports sellerSupportersBody
+		analysis sellerProjectsAnalysisBody
 	)
 	e = setupApp(t)
 	gdb = openDB(t)
@@ -54,30 +56,28 @@ func TestSellerDashboardStatsAndSupporters(t *testing.T) {
 	if rec.Code != http.StatusOK {
 		t.Fatalf("stats status=%d body=%s", rec.Code, rec.Body.String())
 	}
-	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
+	if err := json.Unmarshal(rec.Body.Bytes(), &stats); err != nil {
 		t.Fatal(err)
 	}
-	if int64(body["total_projects"].(float64)) != 1 {
-		t.Fatalf("total_projects=%v", body["total_projects"])
+	if stats.TotalProjects != 1 {
+		t.Fatalf("total_projects=%d", stats.TotalProjects)
 	}
-	if int64(body["total_supporters"].(float64)) != 1 {
-		t.Fatalf("total_supporters=%v", body["total_supporters"])
+	if stats.TotalSupporters != 1 {
+		t.Fatalf("total_supporters=%d", stats.TotalSupporters)
 	}
-	if int64(body["total_revenue"].(float64)) != 1000 {
-		t.Fatalf("total_revenue=%v", body["total_revenue"])
+	if stats.TotalRevenue != 1000 {
+		t.Fatalf("total_revenue=%d", stats.TotalRevenue)
 	}
 
 	rec = httpGET(e, fmt.Sprintf("/seller/supporters?project_id=%s", fx.project.ID), tok)
 	if rec.Code != http.StatusOK {
 		t.Fatalf("list status=%d body=%s", rec.Code, rec.Body.String())
 	}
-	body = nil
-	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
+	if err := json.Unmarshal(rec.Body.Bytes(), &supports); err != nil {
 		t.Fatal(err)
 	}
-	supporters, _ := body["supporters"].([]any)
-	if len(supporters) != 1 {
-		t.Fatalf("supporters len=%d want 1", len(supporters))
+	if len(supports.Supporters) != 1 {
+		t.Fatalf("supporters len=%d want 1", len(supports.Supporters))
 	}
 
 	rec = httpGET(e, "/seller/supporters/export", tok)
@@ -95,45 +95,43 @@ func TestSellerDashboardStatsAndSupporters(t *testing.T) {
 	if rec.Code != http.StatusOK {
 		t.Fatalf("analysis status=%d body=%s", rec.Code, rec.Body.String())
 	}
-	body = nil
-	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
+	if err := json.Unmarshal(rec.Body.Bytes(), &analysis); err != nil {
 		t.Fatal(err)
 	}
-	projects, _ := body["projects"].([]any)
-	if len(projects) != 1 {
-		t.Fatalf("projects len=%d want 1", len(projects))
+	if len(analysis.Projects) != 1 {
+		t.Fatalf("projects len=%d want 1", len(analysis.Projects))
 	}
 }
 
 type sellerFixture struct {
-	seller  *entity.User
-	buyer   *entity.User
-	project *entity.Project
-	plan    *entity.ProjectPlan
+	seller  *model.User
+	buyer   *model.User
+	project *model.Project
+	plan    *model.ProjectPlan
 }
 
 func seedSellerFixture(t *testing.T, gdb *gorm.DB) sellerFixture {
 	var (
-		now    time.Time
-		seller *entity.User
-		buyer  *entity.User
-		project *entity.Project
-		plan   *entity.ProjectPlan
-		err    error
+		now     time.Time
+		seller  *model.User
+		buyer   *model.User
+		project *model.Project
+		plan    *model.ProjectPlan
+		err     error
 	)
 	t.Helper()
 	now = time.Now().UTC()
-	seller = seedUser(t, gdb, seedOpts{Role: entity.UserRoleSeller, TOTPEnabled: true})
-	buyer = seedUser(t, gdb, seedOpts{Role: entity.UserRoleBuyer})
-	project = seedProject(t, gdb, seller.ID, entity.ProjectStatusActive)
-	err = gdb.Model(project).Updates(map[string]any{"supporter_count": 1}).Error
+	seller = seedUser(t, gdb, seedOpts{Role: model.UserRoleSeller, TOTPEnabled: true})
+	buyer = seedUser(t, gdb, seedOpts{Role: model.UserRoleBuyer})
+	project = seedProject(t, gdb, seller.ID, model.ProjectStatusActive)
+	err = gdb.Model(project).Update("supporter_count", 1).Error
 	if err != nil {
 		t.Fatal(err)
 	}
-	plan = &entity.ProjectPlan{
+	plan = &model.ProjectPlan{
 		ID:             uuid.New(),
 		ProjectID:      project.ID,
-		MembershipType: entity.MembershipBronze,
+		MembershipType: model.MembershipBronze,
 		Price:          1000,
 		Benefits:       "benefits",
 		IsActive:       true,
@@ -144,13 +142,13 @@ func seedSellerFixture(t *testing.T, gdb *gorm.DB) sellerFixture {
 	if err = gdb.Create(plan).Error; err != nil {
 		t.Fatal(err)
 	}
-	err = gdb.Create(&entity.ProjectSupporter{
+	err = gdb.Create(&model.ProjectSupporter{
 		ID:                 uuid.New(),
 		ProjectID:          project.ID,
 		UserID:             buyer.ID,
 		PlanID:             plan.ID,
-		Status:             entity.SupporterStatusActive,
-		BillingMode:        entity.BillingModeKonbini,
+		Status:             model.SupporterStatusActive,
+		BillingMode:        model.BillingModeKonbini,
 		CurrentPeriodStart: now,
 		CurrentPeriodEnd:   now.AddDate(0, 0, 30),
 		CreatedAt:          now,
@@ -159,14 +157,14 @@ func seedSellerFixture(t *testing.T, gdb *gorm.DB) sellerFixture {
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = gdb.Create(&entity.Purchase{
+	err = gdb.Create(&model.Purchase{
 		ID:            uuid.New(),
 		ProjectID:     project.ID,
 		BuyerID:       buyer.ID,
 		Quantity:      1,
 		TotalPrice:    1000,
-		Status:        entity.PurchaseStatusPaid,
-		PaymentMethod: entity.PaymentMethodKonbini,
+		Status:        model.PurchaseStatusPaid,
+		PaymentMethod: model.PaymentMethodKonbini,
 		CreatedAt:     now,
 		UpdatedAt:     now,
 	}).Error

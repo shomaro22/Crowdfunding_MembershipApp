@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	"crowdfund-app/entity"
+	"crowdfund-app/model"
 	"crowdfund-app/repository"
 	"crowdfund-app/validator"
 
@@ -57,7 +57,7 @@ type ReportUseCase struct {
 	Audit    repository.AuditRepo
 }
 
-func ReportViewFrom(row entity.Report) ReportView {
+func ReportViewFrom(row model.Report) ReportView {
 	return ReportView{
 		ID:         row.ID,
 		ReporterID: row.ReporterID,
@@ -79,7 +79,7 @@ func (r *ReportUseCase) Create(ctx context.Context, reporterID uuid.UUID, in Cre
 		norm   validator.CreateReportNormalized
 		open   bool
 		now    time.Time
-		row    *entity.Report
+		row    *model.Report
 		err    error
 	)
 	if r == nil || r.Reports == nil {
@@ -105,14 +105,14 @@ func (r *ReportUseCase) Create(ctx context.Context, reporterID uuid.UUID, in Cre
 		return ReportView{}, ErrReportExists
 	}
 	now = time.Now().UTC()
-	row = &entity.Report{
+	row = &model.Report{
 		ID:         uuid.New(),
 		ReporterID: reporterID,
 		TargetType: norm.TargetType,
 		TargetID:   norm.TargetID,
 		Reason:     norm.Reason,
 		Detail:     norm.Detail,
-		Status:     entity.ReportStatusPending,
+		Status:     model.ReportStatusPending,
 		CreatedAt:  now,
 		UpdatedAt:  now,
 	}
@@ -122,7 +122,7 @@ func (r *ReportUseCase) Create(ctx context.Context, reporterID uuid.UUID, in Cre
 		}
 		return ReportView{}, err
 	}
-	LogActivity(ctx, r.Activity, &reporterID, entity.ReportCreated, "report", row.ID.String(), in.Meta, ActivityMeta(map[string]string{
+	LogActivity(ctx, r.Activity, &reporterID, model.ReportCreated, "report", row.ID.String(), in.Meta, ActivityMeta(map[string]string{
 		"target_type": string(norm.TargetType),
 		"target_id":   norm.TargetID.String(),
 	}))
@@ -132,7 +132,7 @@ func (r *ReportUseCase) Create(ctx context.Context, reporterID uuid.UUID, in Cre
 func (r *ReportUseCase) ListAdmin(ctx context.Context, status *string, limit, offset int) (ReportsResult, error) {
 	var (
 		norm   validator.AdminReportListNormalized
-		rows   []entity.Report
+		rows   []model.Report
 		total  int64
 		out    ReportsResult
 		i      int
@@ -167,8 +167,8 @@ func (r *ReportUseCase) ListAdmin(ctx context.Context, status *string, limit, of
 
 func (r *ReportUseCase) UpdateAdmin(ctx context.Context, adminID, reportID uuid.UUID, in UpdateReportIn) (ReportView, error) {
 	var (
-		row        *entity.Report
-		status     entity.ReportStatus
+		row        *model.Report
+		status     model.ReportStatus
 		resolution *string
 		now        time.Time
 		details    string
@@ -178,8 +178,8 @@ func (r *ReportUseCase) UpdateAdmin(ctx context.Context, adminID, reportID uuid.
 		return ReportView{}, ErrBadRequest
 	}
 	row, err = r.Reports.FindID(ctx, reportID)
-	if err != nil || row == nil {
-		return ReportView{}, ErrNotFound
+	if err != nil {
+		return ReportView{}, mapRepoNotFound(err)
 	}
 	status, resolution, err = validator.ValidateAdminReportUpdate(validator.AdminReportUpdateInput{
 		Status:     in.Status,
@@ -202,43 +202,29 @@ func (r *ReportUseCase) UpdateAdmin(ctx context.Context, adminID, reportID uuid.
 	return ReportViewFrom(*row), nil
 }
 
-func (r *ReportUseCase) validateTarget(ctx context.Context, reporterID uuid.UUID, targetType entity.ReportTargetType, targetID uuid.UUID) error {
-	var (
-		project *entity.Project
-		message *entity.Message
-		user    *entity.User
-		err     error
-	)
+func (r *ReportUseCase) validateTarget(ctx context.Context, reporterID uuid.UUID, targetType model.ReportTargetType, targetID uuid.UUID) error {
+	var err error
 	switch targetType {
-	case entity.ReportTargetProject:
-		project, _, _, err = r.Projects.FindID(ctx, targetID)
+	case model.ReportTargetProject:
+		_, _, _, err = r.Projects.FindID(ctx, targetID)
 		if err != nil {
-			return err
+			return mapRepoNotFound(err)
 		}
-		if project == nil {
-			return ErrNotFound
-		}
-	case entity.ReportTargetMessage:
+	case model.ReportTargetMessage:
 		if r.Messages == nil {
 			return ErrBadRequest
 		}
-		message, err = r.Messages.FindID(ctx, targetID)
+		_, err = r.Messages.FindID(ctx, targetID)
 		if err != nil {
-			return err
+			return mapRepoNotFound(err)
 		}
-		if message == nil {
-			return ErrNotFound
-		}
-	case entity.ReportTargetUser:
+	case model.ReportTargetUser:
 		if targetID == reporterID {
 			return ErrBadRequest
 		}
-		user, err = r.Users.FindID(ctx, targetID)
+		_, err = r.Users.FindID(ctx, targetID)
 		if err != nil {
-			return err
-		}
-		if user == nil {
-			return ErrNotFound
+			return mapRepoNotFound(err)
 		}
 	default:
 		return ErrBadRequest

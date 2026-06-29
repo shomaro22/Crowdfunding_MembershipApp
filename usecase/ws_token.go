@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"crowdfund-app/auth"
-	"crowdfund-app/entity"
+	"crowdfund-app/model"
 	"crowdfund-app/repository"
 
 	"github.com/google/uuid"
@@ -22,14 +22,17 @@ type WSTokenUseCase struct {
 
 func (w *WSTokenUseCase) Issue(ctx context.Context, userID uuid.UUID) (string, error) {
 	var (
-		u     *entity.User
+		u     *model.User
 		plain string
 		now   time.Time
-		row   *entity.WSToken
+		row   *model.WSToken
 		err   error
 	)
 	u, err = w.Users.FindID(ctx, userID)
-	if err != nil || u == nil || !u.IsActive() {
+	if err != nil {
+		return "", mapRepoNotFoundAs(err, ErrForbidden)
+	}
+	if !u.IsActive() {
 		return "", ErrForbidden
 	}
 	plain, err = auth.OpaqueHex()
@@ -37,7 +40,7 @@ func (w *WSTokenUseCase) Issue(ctx context.Context, userID uuid.UUID) (string, e
 		return "", err
 	}
 	now = time.Now().UTC()
-	row = &entity.WSToken{
+	row = &model.WSToken{
 		ID:        uuid.New(),
 		UserID:    userID,
 		TokenHash: auth.OpaqueHash(plain),
@@ -52,8 +55,8 @@ func (w *WSTokenUseCase) Issue(ctx context.Context, userID uuid.UUID) (string, e
 
 func (w *WSTokenUseCase) Consume(ctx context.Context, plain string, meta RequestMeta) (uuid.UUID, error) {
 	var (
-		row   *entity.WSToken
-		u     *entity.User
+		row   *model.WSToken
+		u     *model.User
 		now   time.Time
 		err   error
 	)
@@ -64,15 +67,15 @@ func (w *WSTokenUseCase) Consume(ctx context.Context, plain string, meta Request
 	now = time.Now().UTC()
 	row, err = w.Tokens.ConsumeValidHash(ctx, auth.OpaqueHash(plain), now)
 	if err != nil {
-		return uuid.Nil, err
-	}
-	if row == nil {
-		return uuid.Nil, ErrInvalidToken
+		return uuid.Nil, mapRepoNotFoundAs(err, ErrInvalidToken)
 	}
 	u, err = w.Users.FindID(ctx, row.UserID)
-	if err != nil || u == nil || !u.IsActive() {
+	if err != nil {
+		return uuid.Nil, mapRepoNotFoundAs(err, ErrInvalidToken)
+	}
+	if !u.IsActive() {
 		return uuid.Nil, ErrInvalidToken
 	}
-	LogActivity(ctx, w.Activity, &row.UserID, entity.SecWSConnect, "ws_token", row.ID.String(), meta, nil)
+	LogActivity(ctx, w.Activity, &row.UserID, model.SecWSConnect, "ws_token", row.ID.String(), meta, nil)
 	return row.UserID, nil
 }
