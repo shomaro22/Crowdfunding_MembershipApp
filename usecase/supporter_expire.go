@@ -49,8 +49,8 @@ func (s *SupporterUseCase) expireSupporter(ctx context.Context, supporter *entit
 		return ErrNotFound
 	}
 	row, err = s.Supporters.FindID(ctx, supporter.ID)
-	if err != nil || row == nil {
-		return ErrNotFound
+	if err != nil {
+		return mapRepoNotFound(err)
 	}
 	if row.Status == entity.SupporterStatusExpired {
 		return nil

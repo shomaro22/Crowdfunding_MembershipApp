@@ -56,9 +56,9 @@ func (a *AuthUseCase) ValidateSession(ctx context.Context, claims auth.AuthClaim
 	)
 	u, err = a.Users.FindID(ctx, claims.UserID)
 	if err != nil {
-		return SessionInfo{}, err
+		return SessionInfo{}, mapRepoNotFound(err)
 	}
-	if u == nil || !u.IsActive() {
+	if !u.IsActive() {
 		return SessionInfo{}, ErrInactiveUser
 	}
 	if claims.TokenVersion != u.TokenVersion {
@@ -69,10 +69,6 @@ func (a *AuthUseCase) ValidateSession(ctx context.Context, claims auth.AuthClaim
 
 func (a *AuthUseCase) ParseToken(raw string) (auth.AuthClaims, error) {
 	return a.Tokens.Parse(raw)
-}
-
-func (a *AuthUseCase) SigningKey() []byte {
-	return a.TOTPKey
 }
 
 func (a *AuthUseCase) Login(ctx context.Context, email, password string, meta RequestMeta) (*LoginResult, error) {
@@ -90,9 +86,9 @@ func (a *AuthUseCase) Login(ctx context.Context, email, password string, meta Re
 	}
 	u, err = a.Users.FindEmail(ctx, normalized)
 	if err != nil {
-		return nil, err
+		return nil, mapRepoNotFoundAs(err, ErrInvalidCredentials)
 	}
-	if u == nil || auth.ComparePassword(u.PasswordHash, password) != nil {
+	if auth.ComparePassword(u.PasswordHash, password) != nil {
 		a.logActivity(ctx, nil, entity.UserLoginFail, "user", normalized, meta, nil)
 		return nil, ErrInvalidCredentials
 	}
@@ -134,11 +130,14 @@ func (a *AuthUseCase) Refresh(ctx context.Context, refreshTokenPlain string, met
 	hash = auth.OpaqueHash(plain)
 	now = time.Now().UTC()
 	row, err = a.RefreshTokens.FindValidHash(ctx, hash, now)
-	if err != nil || row == nil {
-		return "", "", ErrInvalidToken
+	if err != nil {
+		return "", "", mapRepoNotFoundAs(err, ErrInvalidToken)
 	}
 	u, err = a.Users.FindID(ctx, row.UserID)
-	if err != nil || u == nil || !u.CanLogin() {
+	if err != nil {
+		return "", "", mapRepoNotFoundAs(err, ErrInvalidToken)
+	}
+	if !u.CanLogin() {
 		return "", "", ErrInvalidToken
 	}
 	err = repository.WithTx(ctx, a.DB, func(txCtx context.Context) error {
@@ -171,10 +170,7 @@ func (a *AuthUseCase) Logout(ctx context.Context, refreshTokenPlain string, meta
 	now = time.Now().UTC()
 	row, err = a.RefreshTokens.FindValidHash(ctx, hash, now)
 	if err != nil {
-		return err
-	}
-	if row == nil {
-		return ErrInvalidToken
+		return mapRepoNotFoundAs(err, ErrInvalidToken)
 	}
 	if err = a.RefreshTokens.Revoke(ctx, row.ID, now); err != nil {
 		return err
@@ -191,7 +187,7 @@ func (a *AuthUseCase) ForgotPassword(ctx context.Context, email string) error {
 		plain      string
 		now        time.Time
 		row        *entity.ResetToken
-		mailer     Mailer
+		mailer     PasswordMailer
 	)
 
 	if a.ResetToks == nil {
@@ -199,10 +195,13 @@ func (a *AuthUseCase) ForgotPassword(ctx context.Context, email string) error {
 	}
 	normalized = entity.NormalizeEmail(email)
 	u, err = a.Users.FindEmail(ctx, normalized)
+	if isRepoNotFound(err) {
+		return nil
+	}
 	if err != nil {
 		return err
 	}
-	if u == nil || !u.IsActive() {
+	if !u.IsActive() {
 		return nil
 	}
 	plain, err = auth.OpaqueHex()
@@ -222,7 +221,7 @@ func (a *AuthUseCase) ForgotPassword(ctx context.Context, email string) error {
 	}
 	mailer = a.Mailer
 	if mailer == nil {
-		mailer = LogMailer{AppPublicURL: a.AppPublicURL}
+		return nil
 	}
 	return mailer.SendPasswordReset(ctx, u.Email, plain)
 }
@@ -245,12 +244,12 @@ func (a *AuthUseCase) ResetPassword(ctx context.Context, plainToken, newPassword
 	}
 	now = time.Now().UTC()
 	row, err = a.ResetToks.FindValidHash(ctx, auth.OpaqueHash(plainToken), now)
-	if err != nil || row == nil {
-		return ErrInvalidToken
+	if err != nil {
+		return mapRepoNotFoundAs(err, ErrInvalidToken)
 	}
 	u, err = a.Users.FindID(ctx, row.UserID)
-	if err != nil || u == nil {
-		return ErrInvalidToken
+	if err != nil {
+		return mapRepoNotFoundAs(err, ErrInvalidToken)
 	}
 	hash, err = auth.HashPassword(newPassword)
 	if err != nil {
@@ -279,8 +278,8 @@ func (a *AuthUseCase) ChangePassword(ctx context.Context, userID uuid.UUID, curr
 		return ErrWeakPassword
 	}
 	u, err = a.Users.FindID(ctx, userID)
-	if err != nil || u == nil {
-		return ErrNotFound
+	if err != nil {
+		return mapRepoNotFound(err)
 	}
 	if u.MustSetup2FA() {
 		if strings.TrimSpace(totpCode) == "" {

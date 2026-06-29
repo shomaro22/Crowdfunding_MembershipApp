@@ -44,7 +44,10 @@ func (a *AdminUseCase) requireReviewAdmin(ctx context.Context, adminID uuid.UUID
 	)
 
 	admin, err = a.Users.FindID(ctx, adminID)
-	if err != nil || admin == nil || admin.Role != entity.UserRoleAdmin {
+	if err != nil {
+		return mapRepoNotFoundAs(err, ErrForbidden)
+	}
+	if admin.Role != entity.UserRoleAdmin {
 		return ErrForbidden
 	}
 	if admin.AdminRole == nil {
@@ -85,8 +88,8 @@ func (a *AdminUseCase) ResetUser2FA(ctx context.Context, adminID, targetUserID u
 	)
 
 	u, err = a.Users.FindID(ctx, targetUserID)
-	if err != nil || u == nil {
-		return UserView{}, ErrNotFound
+	if err != nil {
+		return UserView{}, mapRepoNotFound(err)
 	}
 	if !u.TOTPEnabled {
 		return UserView{}, ErrInvalidState
@@ -126,13 +129,16 @@ func (a *AdminUseCase) ChangeAdminRole(ctx context.Context, actorID, targetUserI
 		return UserView{}, ErrBadRequest
 	}
 	actor, err = a.Users.FindID(ctx, actorID)
-	if err != nil || actor == nil || actor.Role != entity.UserRoleAdmin ||
+	if err != nil {
+		return UserView{}, mapRepoNotFoundAs(err, ErrForbidden)
+	}
+	if actor.Role != entity.UserRoleAdmin ||
 		actor.AdminRole == nil || *actor.AdminRole != entity.AdminRoleSuperAdmin {
 		return UserView{}, ErrForbidden
 	}
 	u, err = a.Users.FindID(ctx, targetUserID)
-	if err != nil || u == nil {
-		return UserView{}, ErrNotFound
+	if err != nil {
+		return UserView{}, mapRepoNotFound(err)
 	}
 	if u.Role != entity.UserRoleAdmin {
 		return UserView{}, ErrInvalidState

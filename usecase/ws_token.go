@@ -29,7 +29,10 @@ func (w *WSTokenUseCase) Issue(ctx context.Context, userID uuid.UUID) (string, e
 		err   error
 	)
 	u, err = w.Users.FindID(ctx, userID)
-	if err != nil || u == nil || !u.IsActive() {
+	if err != nil {
+		return "", mapRepoNotFoundAs(err, ErrForbidden)
+	}
+	if !u.IsActive() {
 		return "", ErrForbidden
 	}
 	plain, err = auth.OpaqueHex()
@@ -64,13 +67,13 @@ func (w *WSTokenUseCase) Consume(ctx context.Context, plain string, meta Request
 	now = time.Now().UTC()
 	row, err = w.Tokens.ConsumeValidHash(ctx, auth.OpaqueHash(plain), now)
 	if err != nil {
-		return uuid.Nil, err
-	}
-	if row == nil {
-		return uuid.Nil, ErrInvalidToken
+		return uuid.Nil, mapRepoNotFoundAs(err, ErrInvalidToken)
 	}
 	u, err = w.Users.FindID(ctx, row.UserID)
-	if err != nil || u == nil || !u.IsActive() {
+	if err != nil {
+		return uuid.Nil, mapRepoNotFoundAs(err, ErrInvalidToken)
+	}
+	if !u.IsActive() {
 		return uuid.Nil, ErrInvalidToken
 	}
 	LogActivity(ctx, w.Activity, &row.UserID, entity.SecWSConnect, "ws_token", row.ID.String(), meta, nil)
