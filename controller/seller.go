@@ -3,7 +3,6 @@ package controller
 import (
 	"encoding/csv"
 	"net/http"
-	"strconv"
 	"time"
 
 	"crowdfund-app/usecase"
@@ -13,10 +12,10 @@ import (
 )
 
 type SellerController struct {
-	Seller SellerUseCase
+	Seller ISellerUseCase
 }
 
-func NewSellerController(seller SellerUseCase) *SellerController {
+func NewSellerController(seller ISellerUseCase) *SellerController {
 	return &SellerController{Seller: seller}
 }
 
@@ -26,15 +25,15 @@ func (h *SellerController) DashboardStats(c echo.Context) error {
 		stats    usecase.SellerDashboardStatsView
 		err      error
 	)
-	sellerID, err = CurrentUserID(c)
+	sellerID, err = requireUserID(c)
 	if err != nil {
 		return err
 	}
-	stats, err = h.Seller.DashboardStats(c.Request().Context(), sellerID)
+	stats, err = h.Seller.DashboardStats(reqCtx(c), sellerID)
 	if err != nil {
 		return mapUseCaseError(err)
 	}
-	return c.JSON(http.StatusOK, sellerDashboardStatsJSON(stats))
+	return jsonOK(c, sellerDashboardStatsJSON(stats))
 }
 
 func (h *SellerController) ListSupporters(c echo.Context) error {
@@ -46,7 +45,7 @@ func (h *SellerController) ListSupporters(c echo.Context) error {
 		result    usecase.SellerSupportersResult
 		err       error
 	)
-	sellerID, err = CurrentUserID(c)
+	sellerID, err = requireUserID(c)
 	if err != nil {
 		return err
 	}
@@ -54,13 +53,12 @@ func (h *SellerController) ListSupporters(c echo.Context) error {
 	if err != nil {
 		return err
 	}
-	limit, _ = strconv.Atoi(c.QueryParam("limit"))
-	offset, _ = strconv.Atoi(c.QueryParam("offset"))
-	result, err = h.Seller.ListSupporters(c.Request().Context(), sellerID, projectID, limit, offset)
+	limit, offset = queryPage(c)
+	result, err = h.Seller.ListSupporters(reqCtx(c), sellerID, projectID, limit, offset)
 	if err != nil {
 		return mapUseCaseError(err)
 	}
-	return c.JSON(http.StatusOK, sellerListSupportersJSON(result))
+	return jsonOK(c, sellerListSupportersJSON(result))
 }
 
 func (h *SellerController) ExportSupporters(c echo.Context) error {
@@ -70,7 +68,7 @@ func (h *SellerController) ExportSupporters(c echo.Context) error {
 		rows      []usecase.SupporterView
 		err       error
 	)
-	sellerID, err = CurrentUserID(c)
+	sellerID, err = requireUserID(c)
 	if err != nil {
 		return err
 	}
@@ -78,7 +76,7 @@ func (h *SellerController) ExportSupporters(c echo.Context) error {
 	if err != nil {
 		return err
 	}
-	rows, err = h.Seller.ExportSupporters(c.Request().Context(), sellerID, projectID)
+	rows, err = h.Seller.ExportSupporters(reqCtx(c), sellerID, projectID)
 	if err != nil {
 		return mapUseCaseError(err)
 	}
@@ -93,15 +91,15 @@ func (h *SellerController) ProjectAnalysis(c echo.Context) error {
 		result   usecase.ProjectAnalysisResult
 		err      error
 	)
-	sellerID, err = CurrentUserID(c)
+	sellerID, err = requireUserID(c)
 	if err != nil {
 		return err
 	}
-	result, err = h.Seller.ProjectAnalysis(c.Request().Context(), sellerID)
+	result, err = h.Seller.ProjectAnalysis(reqCtx(c), sellerID)
 	if err != nil {
 		return mapUseCaseError(err)
 	}
-	return c.JSON(http.StatusOK, projectAnalysisJSON(result))
+	return jsonOK(c, projectAnalysisJSON(result))
 }
 
 func optionalProjectIDQuery(c echo.Context) (*uuid.UUID, error) {

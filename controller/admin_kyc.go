@@ -28,7 +28,7 @@ func (h *KYCFileController) Serve(c echo.Context) error {
 		err   error
 	)
 	token = c.QueryParam("token")
-	f, ct, err = h.KYC.OpenWithToken(c.Request().Context(), token)
+	f, ct, err = h.KYC.OpenWithToken(reqCtx(c), token)
 	if err != nil {
 		return mapUseCaseError(err)
 	}
