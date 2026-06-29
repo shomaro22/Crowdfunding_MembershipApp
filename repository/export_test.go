@@ -13,7 +13,3 @@ func FirstOneForUpdateForTest[T tableModel](db *gorm.DB, dest *T) error {
 func GetOneForTest[T tableModel](db *gorm.DB) (T, error) {
 	return getOne[T](db)
 }
-
-func GetOneForUpdateForTest[T tableModel](db *gorm.DB) (T, error) {
-	return getOneForUpdate[T](db)
-}
