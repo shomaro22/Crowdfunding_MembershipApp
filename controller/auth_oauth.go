@@ -39,7 +39,7 @@ func (h *AuthController) GoogleCallback(c echo.Context) error {
 	}
 	code = c.QueryParam("code")
 	state = c.QueryParam("state")
-	res, err = h.Auth.GoogleCallback(c.Request().Context(), code, state, requestMeta(c))
+	res, err = h.Auth.GoogleCallback(reqCtx(c), code, state, requestMeta(c))
 	if err != nil {
 		return c.Redirect(http.StatusFound, oauthCallbackURL(h.AppPublicURL, usecase.OAuthRedirectView{Error: oauthErrCode(err)}))
 	}
@@ -58,11 +58,11 @@ func (h *AuthController) OAuthExchange(c echo.Context) error {
 	if err = c.Bind(&body); err != nil || body.Code == "" {
 		return echo.NewHTTPError(http.StatusBadRequest, apiError("code required", "BAD_REQUEST"))
 	}
-	res, err = h.Auth.ExchangeOAuthCode(c.Request().Context(), body.Code, requestMeta(c))
+	res, err = h.Auth.ExchangeOAuthCode(reqCtx(c), body.Code, requestMeta(c))
 	if err != nil {
 		return mapUseCaseError(err)
 	}
-	return c.JSON(http.StatusOK, authTokenResponse{
+	return jsonOK(c, authTokenResponse{
 		AuthToken: res.AuthToken,
 		User:      UserWireFrom(res.User),
 	})
@@ -85,15 +85,15 @@ func (h *AuthController) Setup2FA(c echo.Context) error {
 		res *usecase.TOTPSetupResult
 		err error
 	)
-	uid, err = CurrentUserID(c)
+	uid, err = requireUserID(c)
 	if err != nil {
 		return err
 	}
-	res, err = h.Auth.Setup2FA(c.Request().Context(), uid)
+	res, err = h.Auth.Setup2FA(reqCtx(c), uid)
 	if err != nil {
 		return mapUseCaseError(err)
 	}
-	return c.JSON(http.StatusOK, map[string]string{
+	return jsonOK(c, map[string]string{
 		"secret":      res.Secret,
 		"otpauth_url": res.OTPAuthURL,
 	})
@@ -108,18 +108,18 @@ func (h *AuthController) Verify2FA(c echo.Context) error {
 		res *usecase.TOTPVerifyResult
 		err error
 	)
-	uid, err = CurrentUserID(c)
+	uid, err = requireUserID(c)
 	if err != nil {
 		return err
 	}
 	if err = c.Bind(&body); err != nil || body.Code == "" {
 		return echo.NewHTTPError(http.StatusBadRequest, apiError("code required", "BAD_REQUEST"))
 	}
-	res, err = h.Auth.Verify2FASetup(c.Request().Context(), uid, body.Code)
+	res, err = h.Auth.Verify2FASetup(reqCtx(c), uid, body.Code)
 	if err != nil {
 		return mapUseCaseError(err)
 	}
-	return c.JSON(http.StatusOK, verify2FAResponse{
+	return jsonOK(c, verify2FAResponse{
 		Enabled:     true,
 		BackupCodes: res.BackupCodes,
 	})
@@ -141,13 +141,13 @@ func (h *AuthController) Challenge2FA(c echo.Context) error {
 	if err = c.Bind(&body); err != nil || body.Code == "" {
 		return echo.NewHTTPError(http.StatusBadRequest, apiError("code required", "BAD_REQUEST"))
 	}
-	res, err = h.Auth.Challenge2FA(c.Request().Context(), pending, body.Code, requestMeta(c))
+	res, err = h.Auth.Challenge2FA(reqCtx(c), pending, body.Code, requestMeta(c))
 	if err != nil {
 		return mapUseCaseError(err)
 	}
 	auth.ClearPending2FA(c, h.CookieCfg)
 	auth.SetRefreshCookie(c, h.CookieCfg, res.RefreshToken)
-	return c.JSON(http.StatusOK, authTokenResponse{
+	return jsonOK(c, authTokenResponse{
 		AuthToken: res.AuthToken,
 		User:      UserWireFrom(res.User),
 	})

@@ -11,10 +11,10 @@ import (
 )
 
 type MessageController struct {
-	Messages MessageUseCase
+	Messages IMessageUseCase
 }
 
-func NewMessageController(messages MessageUseCase) *MessageController {
+func NewMessageController(messages IMessageUseCase) *MessageController {
 	return &MessageController{Messages: messages}
 }
 
@@ -24,15 +24,15 @@ func (h *MessageController) List(c echo.Context) error {
 		result usecase.ListThreadsResult
 		err    error
 	)
-	userID, err = CurrentUserID(c)
+	userID, err = requireUserID(c)
 	if err != nil {
 		return err
 	}
-	result, err = h.Messages.ListThreads(c.Request().Context(), userID, listThreadsQueryFrom(c))
+	result, err = h.Messages.ListThreads(reqCtx(c), userID, listThreadsQueryFrom(c))
 	if err != nil {
 		return mapUseCaseError(err)
 	}
-	return c.JSON(http.StatusOK, ListMessageThreadsWireFrom(result))
+	return jsonOK(c, ListMessageThreadsWireFrom(result))
 }
 
 func listThreadsQueryFrom(c echo.Context) usecase.ListThreadsQuery {
@@ -69,23 +69,23 @@ func (h *MessageController) Send(c echo.Context) error {
 		out    usecase.MessageItemView
 		err    error
 	)
-	userID, err = CurrentUserID(c)
+	userID, err = requireUserID(c)
 	if err != nil {
 		return err
 	}
-	if err = c.Bind(&body); err != nil {
-		return echo.NewHTTPError(http.StatusBadRequest, apiError("invalid request body", "BAD_REQUEST"))
+	if err = bindBody(c, &body); err != nil {
+		return err
 	}
 	in, err = body.toInput()
 	if err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, apiError("invalid request body", "BAD_REQUEST"))
 	}
 	in.Meta = requestMeta(c)
-	out, err = h.Messages.Send(c.Request().Context(), userID, in)
+	out, err = h.Messages.Send(reqCtx(c), userID, in)
 	if err != nil {
 		return mapUseCaseError(err)
 	}
-	return c.JSON(http.StatusCreated, MessageItemWireFrom(out))
+	return jsonCreated(c, MessageItemWireFrom(out))
 }
 
 func (h *MessageController) MarkRead(c echo.Context) error {
@@ -94,19 +94,19 @@ func (h *MessageController) MarkRead(c echo.Context) error {
 		messageID uuid.UUID
 		err       error
 	)
-	userID, err = CurrentUserID(c)
+	userID, err = requireUserID(c)
 	if err != nil {
 		return err
 	}
-	messageID, err = uuid.Parse(c.Param("messageId"))
+	messageID, err = pathUUID(c, "messageId", "invalid message id")
 	if err != nil {
-		return echo.NewHTTPError(http.StatusBadRequest, apiError("invalid message id", "BAD_REQUEST"))
+		return err
 	}
-	err = h.Messages.MarkRead(c.Request().Context(), userID, messageID, requestMeta(c))
+	err = h.Messages.MarkRead(reqCtx(c), userID, messageID, requestMeta(c))
 	if err != nil {
 		return mapUseCaseError(err)
 	}
-	return c.NoContent(http.StatusOK)
+	return noContent(c)
 }
 
 func (h *MessageController) Notifications(c echo.Context) error {
@@ -115,15 +115,15 @@ func (h *MessageController) Notifications(c echo.Context) error {
 		view   usecase.NotificationsView
 		err    error
 	)
-	userID, err = CurrentUserID(c)
+	userID, err = requireUserID(c)
 	if err != nil {
 		return err
 	}
-	view, err = h.Messages.GetNotifications(c.Request().Context(), userID)
+	view, err = h.Messages.GetNotifications(reqCtx(c), userID)
 	if err != nil {
 		return mapUseCaseError(err)
 	}
-	return c.JSON(http.StatusOK, NotificationsWire{UnreadMessages: view.UnreadMessages})
+	return jsonOK(c, NotificationsWire{UnreadMessages: view.UnreadMessages})
 }
 
 func (body sendMessageRequestJSON) toInput() (usecase.SendMessageIn, error) {

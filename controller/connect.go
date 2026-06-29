@@ -1,8 +1,6 @@
 package controller
 
 import (
-	"net/http"
-
 	"crowdfund-app/usecase"
 
 	"github.com/google/uuid"
@@ -10,31 +8,37 @@ import (
 )
 
 type ConnectController struct {
-	Connect ConnectUseCase
+	Connect IConnectUseCase
 }
 
-func NewConnectController(uc ConnectUseCase) *ConnectController {
+func NewConnectController(uc IConnectUseCase) *ConnectController {
 	return &ConnectController{Connect: uc}
+}
+
+type connectAccountResponse struct {
+	Account *connectAccountResp `json:"account"`
 }
 
 func (h *ConnectController) GetAccount(c echo.Context) error {
 	var (
 		sellerID uuid.UUID
 		row      *usecase.ConnectAccountView
+		resp     connectAccountResponse
 		err      error
 	)
-	sellerID, err = CurrentUserID(c)
+	sellerID, err = requireUserID(c)
 	if err != nil {
 		return err
 	}
-	row, err = h.Connect.GetAccount(c.Request().Context(), sellerID)
+	row, err = h.Connect.GetAccount(reqCtx(c), sellerID)
 	if err != nil {
 		return mapUseCaseError(err)
 	}
-	if row == nil {
-		return c.JSON(http.StatusOK, map[string]any{"account": nil})
+	if row != nil {
+		acct := toConnectAccountJSON(row)
+		resp.Account = &acct
 	}
-	return c.JSON(http.StatusOK, map[string]any{"account": toConnectAccountJSON(row)})
+	return jsonOK(c, resp)
 }
 
 func (h *ConnectController) CreateOnboarding(c echo.Context) error {
@@ -43,15 +47,15 @@ func (h *ConnectController) CreateOnboarding(c echo.Context) error {
 		url      string
 		err      error
 	)
-	sellerID, err = CurrentUserID(c)
+	sellerID, err = requireUserID(c)
 	if err != nil {
 		return err
 	}
-	url, err = h.Connect.CreateOnboardingLink(c.Request().Context(), sellerID)
+	url, err = h.Connect.CreateOnboardingLink(reqCtx(c), sellerID)
 	if err != nil {
 		return mapUseCaseError(err)
 	}
-	return c.JSON(http.StatusOK, map[string]string{"url": url})
+	return jsonOK(c, map[string]string{"url": url})
 }
 
 type connectAccountResp struct {
@@ -62,9 +66,6 @@ type connectAccountResp struct {
 }
 
 func toConnectAccountJSON(row *usecase.ConnectAccountView) connectAccountResp {
-	if row == nil {
-		return connectAccountResp{}
-	}
 	return connectAccountResp{
 		StripeAccountID:  row.StripeAccountID,
 		ChargesEnabled:   row.ChargesEnabled,
