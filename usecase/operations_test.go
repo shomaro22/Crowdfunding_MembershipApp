@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"crowdfund-app/entity"
+	"crowdfund-app/model"
 	"crowdfund-app/repository"
 )
 
@@ -43,15 +43,15 @@ func TestListActivityLogsRejectsInvalidIPViaValidator(t *testing.T) {
 
 type stubActivityRepoForOps struct{}
 
-func (stubActivityRepoForOps) Create(_ context.Context, _ *entity.ActivityLog) error {
+func (stubActivityRepoForOps) Create(_ context.Context, _ *model.ActivityLog) error {
 	return nil
 }
 
-func (stubActivityRepoForOps) List(_ context.Context, _ repository.ActivityListFilter) ([]entity.ActivityLog, int64, error) {
+func (stubActivityRepoForOps) List(_ context.Context, _ repository.ActivityListFilter) ([]model.ActivityLog, int64, error) {
 	return nil, 0, nil
 }
 
-func (stubActivityRepoForOps) CountByActionBetween(_ context.Context, _ entity.ActivityAction, _, _ time.Time) (int64, error) {
+func (stubActivityRepoForOps) CountByActionBetween(_ context.Context, _ model.ActivityAction, _, _ time.Time) (int64, error) {
 	return 0, nil
 }
 

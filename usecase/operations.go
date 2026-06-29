@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	"crowdfund-app/entity"
+	"crowdfund-app/model"
 	"crowdfund-app/repository"
 	"crowdfund-app/validator"
 
@@ -49,13 +49,13 @@ type OperationsUseCase struct {
 func (o *OperationsUseCase) ListActivityLogs(ctx context.Context, q ActivityLogsQuery) (ActivityLogsResult, error) {
 	var (
 		norm   validator.ActivityLogsNormalized
-		rows   []entity.ActivityLog
+		rows   []model.ActivityLog
 		total  int64
 		out    ActivityLogsResult
 		i      int
-		row    entity.ActivityLog
+		row    model.ActivityLog
 		view   ActivityLogView
-		u      *entity.User
+		u      *model.User
 		err    error
 	)
 	if o == nil || o.Activity == nil {
@@ -113,13 +113,13 @@ func (o *OperationsUseCase) ListActivityLogs(ctx context.Context, q ActivityLogs
 func (o *OperationsUseCase) ListAuditLogs(ctx context.Context, q AuditLogsQuery) (AuditLogsResult, error) {
 	var (
 		norm   validator.AuditLogsNormalized
-		rows   []entity.AuditLog
+		rows   []model.AuditLog
 		total  int64
 		out    AuditLogsResult
 		i      int
-		row    entity.AuditLog
+		row    model.AuditLog
 		email  string
-		u      *entity.User
+		u      *model.User
 		err    error
 	)
 	if o == nil || o.Audit == nil {
@@ -168,7 +168,7 @@ func (o *OperationsUseCase) ListAuditLogs(ctx context.Context, q AuditLogsQuery)
 func (o *OperationsUseCase) ListBatchRuns(ctx context.Context, q BatchRunsQuery) (BatchRunsResult, error) {
 	var (
 		norm   validator.BatchRunsNormalized
-		rows   []entity.BatchRun
+		rows   []model.BatchRun
 		total  int64
 		out    BatchRunsResult
 		i      int
@@ -217,11 +217,11 @@ func (o *OperationsUseCase) GetSecurityEvents(ctx context.Context, from, to *tim
 	if err != nil {
 		return SecurityEventsView{}, ErrBadRequest
 	}
-	loginFail, err = o.Activity.CountByActionBetween(ctx, entity.UserLoginFail, start, end)
+	loginFail, err = o.Activity.CountByActionBetween(ctx, model.UserLoginFail, start, end)
 	if err != nil {
 		return SecurityEventsView{}, err
 	}
-	rateLimit, err = o.Activity.CountByActionBetween(ctx, entity.SecRateLimit, start, end)
+	rateLimit, err = o.Activity.CountByActionBetween(ctx, model.SecRateLimit, start, end)
 	if err != nil {
 		return SecurityEventsView{}, err
 	}

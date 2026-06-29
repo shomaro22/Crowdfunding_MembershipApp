@@ -1,31 +1,31 @@
 package middleware
 
 import (
-	"crowdfund-app/entity"
+	"crowdfund-app/model"
 
 	"github.com/labstack/echo/v4"
 )
 
 const CtxAdminRole = "admin_role"
 
-func AuthAdminRole(c echo.Context) (entity.AdminRole, bool) {
+func AuthAdminRole(c echo.Context) (model.AdminRole, bool) {
 	var (
 		r  string
-		ar entity.AdminRole
+		ar model.AdminRole
 		ok bool
 	)
 	r, ok = c.Get(CtxAdminRole).(string)
 	if !ok || r == "" {
 		return "", false
 	}
-	ar = entity.AdminRole(r)
+	ar = model.AdminRole(r)
 	if !ar.Valid() {
 		return "", false
 	}
 	return ar, true
 }
 
-func setAdminRoleCtx(c echo.Context, role *entity.AdminRole) {
+func setAdminRoleCtx(c echo.Context, role *model.AdminRole) {
 	if role == nil {
 		return
 	}
@@ -33,8 +33,8 @@ func setAdminRoleCtx(c echo.Context, role *entity.AdminRole) {
 }
 
 // SetAdminRoleFromSession sets admin_role when the validated session belongs to an admin.
-func SetAdminRoleFromSession(c echo.Context, role entity.UserRole, adminRole *entity.AdminRole) {
-	if role != entity.UserRoleAdmin {
+func SetAdminRoleFromSession(c echo.Context, role model.UserRole, adminRole *model.AdminRole) {
+	if role != model.UserRoleAdmin {
 		return
 	}
 	setAdminRoleCtx(c, adminRole)
@@ -42,13 +42,13 @@ func SetAdminRoleFromSession(c echo.Context, role entity.UserRole, adminRole *en
 
 // RequireAdminRole checks JWT admin_role against allowed roles (§8.6).
 // SUPER_ADMIN is always permitted.
-func RequireAdminRole(roles ...entity.AdminRole) echo.MiddlewareFunc {
+func RequireAdminRole(roles ...model.AdminRole) echo.MiddlewareFunc {
 	var (
-		allowed map[entity.AdminRole]struct{}
+		allowed map[model.AdminRole]struct{}
 		i       int
-		r       entity.AdminRole
+		r       model.AdminRole
 	)
-	allowed = make(map[entity.AdminRole]struct{}, len(roles))
+	allowed = make(map[model.AdminRole]struct{}, len(roles))
 	for i = range roles {
 		r = roles[i]
 		if r.Valid() {
@@ -58,19 +58,19 @@ func RequireAdminRole(roles ...entity.AdminRole) echo.MiddlewareFunc {
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(c echo.Context) error {
 			var (
-				role entity.UserRole
-				ar   entity.AdminRole
+				role model.UserRole
+				ar   model.AdminRole
 				ok   bool
 			)
 			role, ok = AuthUserRole(c)
-			if !ok || role != entity.UserRoleAdmin {
+			if !ok || role != model.UserRoleAdmin {
 				return echo.NewHTTPError(403, map[string]string{"error": "forbidden", "code": "FORBIDDEN"})
 			}
 			ar, ok = AuthAdminRole(c)
 			if !ok {
 				return echo.NewHTTPError(403, map[string]string{"error": "forbidden", "code": "FORBIDDEN"})
 			}
-			if ar == entity.AdminRoleSuperAdmin {
+			if ar == model.AdminRoleSuperAdmin {
 				return next(c)
 			}
 			if _, ok = allowed[ar]; !ok {

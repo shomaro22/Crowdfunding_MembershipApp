@@ -5,25 +5,25 @@ import (
 	"strings"
 	"time"
 
-	"crowdfund-app/entity"
+	"crowdfund-app/model"
 
 	"github.com/google/uuid"
 )
 
 func (a *AdminUseCase) ListProjects(ctx context.Context, status *string, limit, offset int) ([]ProjectView, int64, error) {
 	var (
-		rows   []entity.Project
+		rows   []model.Project
 		total  int64
 		err    error
-		filter *entity.ProjectStatus
-		st     entity.ProjectStatus
+		filter *model.ProjectStatus
+		st     model.ProjectStatus
 	)
 
 	if a.Projects == nil || a.ProjectsUC == nil {
 		return nil, 0, ErrNotFound
 	}
 	if status != nil && *status != "" {
-		st = entity.ProjectStatus(*status)
+		st = model.ProjectStatus(*status)
 		if !st.Valid() {
 			return nil, 0, ErrBadRequest
 		}
@@ -38,17 +38,17 @@ func (a *AdminUseCase) ListProjects(ctx context.Context, status *string, limit, 
 
 func (a *AdminUseCase) PatchProject(ctx context.Context, adminID, projectID uuid.UUID, status string, reason *string) (*ProjectView, error) {
 	var (
-		project   *entity.Project
-		plans     []entity.ProjectPlan
-		images    []entity.ProjectImage
+		project   *model.Project
+		plans     []model.ProjectPlan
+		images    []model.ProjectImage
 		err       error
 		now       time.Time
 		action    string
-		seller    *entity.User
-		projectSt entity.ProjectStatus
+		seller    *model.User
+		projectSt model.ProjectStatus
 	)
 
-	projectSt = entity.ProjectStatus(status)
+	projectSt = model.ProjectStatus(status)
 	if !projectSt.Valid() {
 		return nil, ErrBadRequest
 	}
@@ -63,12 +63,12 @@ func (a *AdminUseCase) PatchProject(ctx context.Context, adminID, projectID uuid
 		return nil, mapRepoNotFound(err)
 	}
 	switch projectSt {
-	case entity.ProjectStatusActive:
-		if project.Status != entity.ProjectStatusPending {
+	case model.ProjectStatusActive:
+		if project.Status != model.ProjectStatusPending {
 			return nil, ErrInvalidState
 		}
-	case entity.ProjectStatusCancelled:
-		if project.Status != entity.ProjectStatusPending {
+	case model.ProjectStatusCancelled:
+		if project.Status != model.ProjectStatusPending {
 			return nil, ErrInvalidState
 		}
 		if err = requireReviewReason(reason); err != nil {
@@ -85,14 +85,14 @@ func (a *AdminUseCase) PatchProject(ctx context.Context, adminID, projectID uuid
 		return nil, err
 	}
 	action = "project.approve"
-	if projectSt == entity.ProjectStatusCancelled {
+	if projectSt == model.ProjectStatusCancelled {
 		action = "project.reject"
 	}
 	WriteAudit(ctx, a.Audit, adminID, action, "project", project.ID.String(), reason, nil)
-	if projectSt == entity.ProjectStatusActive {
-		a.writeReviewDecision(ctx, adminID, entity.ReviewProject, projectID, entity.ReviewApproved, reason)
+	if projectSt == model.ProjectStatusActive {
+		a.writeReviewDecision(ctx, adminID, model.ReviewProject, projectID, model.ReviewApproved, reason)
 	} else {
-		a.writeReviewDecision(ctx, adminID, entity.ReviewProject, projectID, entity.ReviewRejected, reason)
+		a.writeReviewDecision(ctx, adminID, model.ReviewProject, projectID, model.ReviewRejected, reason)
 	}
 	seller, _ = a.Users.FindID(ctx, project.SellerID)
 	return AssembleProjectViewPtr(project, plans, images, UserViewPtr(seller)), nil
@@ -100,7 +100,7 @@ func (a *AdminUseCase) PatchProject(ctx context.Context, adminID, projectID uuid
 
 func (a *AdminUseCase) DeleteProject(ctx context.Context, adminID, projectID uuid.UUID) error {
 	var (
-		project *entity.Project
+		project *model.Project
 		err  error
 	)
 
@@ -115,7 +115,7 @@ func (a *AdminUseCase) DeleteProject(ctx context.Context, adminID, projectID uui
 		return mapRepoNotFound(err)
 	}
 	switch project.Status {
-	case entity.ProjectStatusPending, entity.ProjectStatusCancelled, entity.ProjectStatusDeleted:
+	case model.ProjectStatusPending, model.ProjectStatusCancelled, model.ProjectStatusDeleted:
 	default:
 		return ErrInvalidState
 	}
@@ -128,12 +128,12 @@ func (a *AdminUseCase) DeleteProject(ctx context.Context, adminID, projectID uui
 
 func (a *AdminUseCase) PatchDeleteReq(ctx context.Context, adminID, projectID uuid.UUID, action string, reason *string) (*ProjectView, error) {
 	var (
-		project   *entity.Project
-		plans  []entity.ProjectPlan
-		images []entity.ProjectImage
+		project   *model.Project
+		plans  []model.ProjectPlan
+		images []model.ProjectImage
 		err    error
 		now    time.Time
-		seller *entity.User
+		seller *model.User
 	)
 
 	if err = a.requireReviewAdmin(ctx, adminID); err != nil {
@@ -146,29 +146,29 @@ func (a *AdminUseCase) PatchDeleteReq(ctx context.Context, adminID, projectID uu
 	if err != nil {
 		return nil, mapRepoNotFound(err)
 	}
-	if project.Status != entity.ProjectStatusDeleteRequested {
+	if project.Status != model.ProjectStatusDeleteRequested {
 		return nil, ErrInvalidState
 	}
 	now = time.Now().UTC()
 	switch strings.ToLower(strings.TrimSpace(action)) {
 	case "approve":
-		project.Status = entity.ProjectStatusDeleted
+		project.Status = model.ProjectStatusDeleted
 		project.DeleteRequested = false
 		project.UpdatedAt = now
 		if err = a.Projects.Update(ctx, project); err != nil {
 			return nil, err
 		}
 		WriteAudit(ctx, a.Audit, adminID, "project.delete_request.approve", "project", project.ID.String(), reason, nil)
-		a.writeReviewDecision(ctx, adminID, entity.ReviewProjectDelete, projectID, entity.ReviewApproved, reason)
+		a.writeReviewDecision(ctx, adminID, model.ReviewProjectDelete, projectID, model.ReviewApproved, reason)
 	case "reject":
-		project.Status = entity.ProjectStatusActive
+		project.Status = model.ProjectStatusActive
 		project.DeleteRequested = false
 		project.UpdatedAt = now
 		if err = a.Projects.Update(ctx, project); err != nil {
 			return nil, err
 		}
 		WriteAudit(ctx, a.Audit, adminID, "project.delete_request.reject", "project", project.ID.String(), reason, nil)
-		a.writeReviewDecision(ctx, adminID, entity.ReviewProjectDelete, projectID, entity.ReviewRejected, reason)
+		a.writeReviewDecision(ctx, adminID, model.ReviewProjectDelete, projectID, model.ReviewRejected, reason)
 	default:
 		return nil, ErrBadRequest
 	}

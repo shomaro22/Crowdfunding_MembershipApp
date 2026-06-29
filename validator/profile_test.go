@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"crowdfund-app/entity"
+	"crowdfund-app/model"
 )
 
 func TestValidateUpdateProfile(t *testing.T) {
@@ -37,7 +37,7 @@ func TestValidateUpdateProfile(t *testing.T) {
 
 	longName := strings.Repeat("a", MaxUserNameLen+1)
 	_, err = ValidateUpdateProfile(UpdateProfileInput{Name: &longName})
-	if err != entity.ErrBadProfile {
+	if err != model.ErrBadProfile {
 		t.Fatalf("long name err=%v", err)
 	}
 

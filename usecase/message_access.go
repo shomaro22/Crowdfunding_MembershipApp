@@ -4,15 +4,15 @@ import (
 	"context"
 	"time"
 
-	"crowdfund-app/entity"
+	"crowdfund-app/model"
 
 	"github.com/google/uuid"
 )
 
 
-func (m *MessageUseCase) loadProject(ctx context.Context, projectID uuid.UUID) (*entity.Project, error) {
+func (m *MessageUseCase) loadProject(ctx context.Context, projectID uuid.UUID) (*model.Project, error) {
 	var (
-		project *entity.Project
+		project *model.Project
 		err     error
 	)
 	project, _, _, err = m.Projects.FindID(ctx, projectID)
@@ -24,14 +24,14 @@ func (m *MessageUseCase) loadProject(ctx context.Context, projectID uuid.UUID) (
 
 func (m *MessageUseCase) requireActiveMember(ctx context.Context, projectID, userID uuid.UUID) error {
 	var (
-		supporter *entity.ProjectSupporter
+		supporter *model.ProjectSupporter
 		err       error
 	)
 	supporter, err = m.Supporters.FindMembership(ctx, projectID, userID)
 	if err != nil {
 		return mapRepoNotFoundAs(err, ErrForbidden)
 	}
-	if err = entity.CanMessage(*supporter, time.Now().UTC()); err != nil {
+	if err = model.CanMessage(*supporter, time.Now().UTC()); err != nil {
 		return ErrForbidden
 	}
 	return nil
@@ -39,7 +39,7 @@ func (m *MessageUseCase) requireActiveMember(ctx context.Context, projectID, use
 
 func (m *MessageUseCase) CanSubscribeProject(ctx context.Context, projectID, userID uuid.UUID) error {
 	var (
-		project *entity.Project
+		project *model.Project
 		err     error
 	)
 	project, err = m.loadProject(ctx, projectID)
@@ -55,9 +55,9 @@ func (m *MessageUseCase) CanSubscribeProject(ctx context.Context, projectID, use
 func (m *MessageUseCase) authorizeSend(
 	ctx context.Context,
 	senderID, projectID, receiverID uuid.UUID,
-) (*entity.Project, error) {
+) (*model.Project, error) {
 	var (
-		project   *entity.Project
+		project   *model.Project
 		err       error
 	)
 	project, err = m.loadProject(ctx, projectID)
@@ -82,7 +82,7 @@ func (m *MessageUseCase) authorizeSend(
 	return project, nil
 }
 
-func (m *MessageUseCase) authorizeReadParticipant(msg *entity.Message, userID uuid.UUID) error {
+func (m *MessageUseCase) authorizeReadParticipant(msg *model.Message, userID uuid.UUID) error {
 	if msg == nil {
 		return ErrNotFound
 	}

@@ -3,7 +3,7 @@ package usecase
 import (
 	"context"
 
-	"crowdfund-app/entity"
+	"crowdfund-app/model"
 	"crowdfund-app/validator"
 
 	"github.com/google/uuid"
@@ -16,7 +16,7 @@ type UpdateProfileIn struct {
 
 func (a *AuthUseCase) GetUser(ctx context.Context, userID uuid.UUID) (UserView, error) {
 	var (
-		u   *entity.User
+		u   *model.User
 		err error
 	)
 
@@ -30,7 +30,7 @@ func (a *AuthUseCase) GetUser(ctx context.Context, userID uuid.UUID) (UserView, 
 func (a *AuthUseCase) UpdateProfile(ctx context.Context, userID uuid.UUID, in UpdateProfileIn) (UserView, error) {
 	var (
 		norm validator.UpdateProfileNormalized
-		u    *entity.User
+		u    *model.User
 		err  error
 	)
 

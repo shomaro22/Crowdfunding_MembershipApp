@@ -3,7 +3,7 @@ package usecase
 import (
 	"context"
 
-	"crowdfund-app/entity"
+	"crowdfund-app/model"
 	"crowdfund-app/repository"
 
 	"github.com/google/uuid"
@@ -15,13 +15,13 @@ type PurchaseUseCase struct {
 	Purchases repository.PurchaseRepo
 }
 
-func (p *PurchaseUseCase) EnrichPurchase(ctx context.Context, row *entity.Purchase) (PurchaseView, error) {
+func (p *PurchaseUseCase) EnrichPurchase(ctx context.Context, row *model.Purchase) (PurchaseView, error) {
 	return p.enrichPurchase(ctx, row)
 }
 
 func (p *PurchaseUseCase) ListMine(ctx context.Context, buyerID uuid.UUID, limit, offset int) ([]PurchaseView, int64, error) {
 	var (
-		rows  []entity.Purchase
+		rows  []model.Purchase
 		total int64
 		out   []PurchaseView
 		err   error
@@ -43,11 +43,11 @@ func (p *PurchaseUseCase) ListMine(ctx context.Context, buyerID uuid.UUID, limit
 	return out, total, nil
 }
 
-func (p *PurchaseUseCase) enrichPurchase(ctx context.Context, row *entity.Purchase) (PurchaseView, error) {
+func (p *PurchaseUseCase) enrichPurchase(ctx context.Context, row *model.Purchase) (PurchaseView, error) {
 	var (
 		v       PurchaseView
-		project *entity.Project
-		buyer   *entity.User
+		project *model.Project
+		buyer   *model.User
 		err     error
 	)
 	if row == nil {

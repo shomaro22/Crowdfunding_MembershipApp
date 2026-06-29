@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	"crowdfund-app/entity"
+	"crowdfund-app/model"
 
 	"github.com/google/uuid"
 	"gorm.io/gorm"
@@ -31,10 +31,10 @@ func (r *webhookEventRepo) dbCtx(ctx context.Context) *gorm.DB {
 // Claim inserts a webhook event row. Returns true when this caller won deduplication.
 func (r *webhookEventRepo) Claim(ctx context.Context, stripeEventID, eventType string) (bool, error) {
 	var (
-		row entity.WebhookEvent
+		row model.WebhookEvent
 		res *gorm.DB
 	)
-	row = entity.WebhookEvent{
+	row = model.WebhookEvent{
 		ID:            uuid.New(),
 		StripeEventID: stripeEventID,
 		EventType:     eventType,
@@ -52,5 +52,5 @@ func (r *webhookEventRepo) Claim(ctx context.Context, stripeEventID, eventType s
 
 // Release removes a claimed row so Stripe can retry after handler failure.
 func (r *webhookEventRepo) Release(ctx context.Context, stripeEventID string) error {
-	return r.dbCtx(ctx).Where("stripe_event_id = ?", stripeEventID).Delete(&entity.WebhookEvent{}).Error
+	return r.dbCtx(ctx).Where("stripe_event_id = ?", stripeEventID).Delete(&model.WebhookEvent{}).Error
 }

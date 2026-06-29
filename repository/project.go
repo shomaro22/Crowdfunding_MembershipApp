@@ -5,22 +5,22 @@ import (
 	"strings"
 	"time"
 
-	"crowdfund-app/entity"
+	"crowdfund-app/model"
 
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 )
 
 type ProjectRepo interface {
-	Create(ctx context.Context, p *entity.Project, plans []entity.ProjectPlan, images []entity.ProjectImage) error
-	FindID(ctx context.Context, id uuid.UUID) (*entity.Project, []entity.ProjectPlan, []entity.ProjectImage, error)
-	ListPublic(ctx context.Context, f ProjectListFilter) ([]entity.Project, int64, error)
-	ListSeller(ctx context.Context, sellerID uuid.UUID, limit, offset int) ([]entity.Project, int64, error)
-	ListAll(ctx context.Context, status *entity.ProjectStatus, limit, offset int) ([]entity.Project, int64, error)
-	Update(ctx context.Context, p *entity.Project) error
-	ReplaceImages(ctx context.Context, projectID uuid.UUID, images []entity.ProjectImage) error
+	Create(ctx context.Context, p *model.Project, plans []model.ProjectPlan, images []model.ProjectImage) error
+	FindID(ctx context.Context, id uuid.UUID) (*model.Project, []model.ProjectPlan, []model.ProjectImage, error)
+	ListPublic(ctx context.Context, f ProjectListFilter) ([]model.Project, int64, error)
+	ListSeller(ctx context.Context, sellerID uuid.UUID, limit, offset int) ([]model.Project, int64, error)
+	ListAll(ctx context.Context, status *model.ProjectStatus, limit, offset int) ([]model.Project, int64, error)
+	Update(ctx context.Context, p *model.Project) error
+	ReplaceImages(ctx context.Context, projectID uuid.UUID, images []model.ProjectImage) error
 	Delete(ctx context.Context, id uuid.UUID) error
-	FindPlan(ctx context.Context, projectID, planID uuid.UUID) (*entity.ProjectPlan, error)
+	FindPlan(ctx context.Context, projectID, planID uuid.UUID) (*model.ProjectPlan, error)
 	IncrementSupportCounts(ctx context.Context, projectID, planID uuid.UUID) error
 	TransferPlanSupportCount(ctx context.Context, projectID, fromPlanID, toPlanID uuid.UUID) error
 	AddCurrentAmount(ctx context.Context, projectID uuid.UUID, amount int64) error
@@ -38,7 +38,7 @@ func (r *projectRepo) dbCtx(ctx context.Context) *gorm.DB {
 	return dbFromCtx(ctx, r.db)
 }
 
-func (r *projectRepo) Create(ctx context.Context, p *entity.Project, plans []entity.ProjectPlan, images []entity.ProjectImage) error {
+func (r *projectRepo) Create(ctx context.Context, p *model.Project, plans []model.ProjectPlan, images []model.ProjectImage) error {
 	return r.dbCtx(ctx).Transaction(func(tx *gorm.DB) error {
 		var (
 			txCtx context.Context
@@ -72,11 +72,11 @@ func (r *projectRepo) Create(ctx context.Context, p *entity.Project, plans []ent
 	})
 }
 
-func (r *projectRepo) Update(ctx context.Context, p *entity.Project) error {
+func (r *projectRepo) Update(ctx context.Context, p *model.Project) error {
 	return r.dbCtx(ctx).Save(p).Error
 }
 
-func (r *projectRepo) ReplaceImages(ctx context.Context, projectID uuid.UUID, images []entity.ProjectImage) error {
+func (r *projectRepo) ReplaceImages(ctx context.Context, projectID uuid.UUID, images []model.ProjectImage) error {
 	return r.dbCtx(ctx).Transaction(func(tx *gorm.DB) error {
 		var (
 			txCtx context.Context
@@ -84,7 +84,7 @@ func (r *projectRepo) ReplaceImages(ctx context.Context, projectID uuid.UUID, im
 			i     int
 		)
 		txCtx = context.WithValue(ctx, txKey{}, tx)
-		err = r.dbCtx(txCtx).Where("project_id = ?", projectID).Delete(&entity.ProjectImage{}).Error
+		err = r.dbCtx(txCtx).Where("project_id = ?", projectID).Delete(&model.ProjectImage{}).Error
 		if err != nil {
 			return err
 		}
@@ -105,26 +105,26 @@ func (r *projectRepo) Delete(ctx context.Context, id uuid.UUID) error {
 			err   error
 		)
 		txCtx = context.WithValue(ctx, txKey{}, tx)
-		err = r.dbCtx(txCtx).Where("project_id = ?", id).Delete(&entity.ProjectImage{}).Error
+		err = r.dbCtx(txCtx).Where("project_id = ?", id).Delete(&model.ProjectImage{}).Error
 		if err != nil {
 			return err
 		}
-		err = r.dbCtx(txCtx).Where("project_id = ?", id).Delete(&entity.ProjectPlan{}).Error
+		err = r.dbCtx(txCtx).Where("project_id = ?", id).Delete(&model.ProjectPlan{}).Error
 		if err != nil {
 			return err
 		}
-		return r.dbCtx(txCtx).Where("id = ?", id).Delete(&entity.Project{}).Error
+		return r.dbCtx(txCtx).Where("id = ?", id).Delete(&model.Project{}).Error
 	})
 }
 
 func (r *projectRepo) IncrementSupportCounts(ctx context.Context, projectID, planID uuid.UUID) error {
 	var err error
-	err = r.dbCtx(ctx).Model(&entity.Project{}).Where("id = ?", projectID).
+	err = r.dbCtx(ctx).Model(&model.Project{}).Where("id = ?", projectID).
 		UpdateColumn("supporter_count", gorm.Expr("supporter_count + 1")).Error
 	if err != nil {
 		return err
 	}
-	return r.dbCtx(ctx).Model(&entity.ProjectPlan{}).Where("id = ? AND project_id = ?", planID, projectID).
+	return r.dbCtx(ctx).Model(&model.ProjectPlan{}).Where("id = ? AND project_id = ?", planID, projectID).
 		UpdateColumn("supporter_count", gorm.Expr("supporter_count + 1")).Error
 }
 
@@ -133,13 +133,13 @@ func (r *projectRepo) TransferPlanSupportCount(ctx context.Context, projectID, f
 	if fromPlanID == toPlanID {
 		return nil
 	}
-	err = r.dbCtx(ctx).Model(&entity.ProjectPlan{}).
+	err = r.dbCtx(ctx).Model(&model.ProjectPlan{}).
 		Where("id = ? AND project_id = ? AND supporter_count > 0", fromPlanID, projectID).
 		UpdateColumn("supporter_count", gorm.Expr("supporter_count - 1")).Error
 	if err != nil {
 		return err
 	}
-	return r.dbCtx(ctx).Model(&entity.ProjectPlan{}).Where("id = ? AND project_id = ?", toPlanID, projectID).
+	return r.dbCtx(ctx).Model(&model.ProjectPlan{}).Where("id = ? AND project_id = ?", toPlanID, projectID).
 		UpdateColumn("supporter_count", gorm.Expr("supporter_count + 1")).Error
 }
 
@@ -147,7 +147,7 @@ func (r *projectRepo) AddCurrentAmount(ctx context.Context, projectID uuid.UUID,
 	if amount <= 0 {
 		return nil
 	}
-	return r.dbCtx(ctx).Model(&entity.Project{}).Where("id = ?", projectID).
+	return r.dbCtx(ctx).Model(&model.Project{}).Where("id = ?", projectID).
 		UpdateColumn("current_amount", gorm.Expr("current_amount + ?", amount)).Error
 }
 
@@ -159,11 +159,11 @@ type ProjectListFilter struct {
 	AsOf   time.Time
 }
 
-func (r *projectRepo) FindID(ctx context.Context, id uuid.UUID) (*entity.Project, []entity.ProjectPlan, []entity.ProjectImage, error) {
+func (r *projectRepo) FindID(ctx context.Context, id uuid.UUID) (*model.Project, []model.ProjectPlan, []model.ProjectImage, error) {
 	var (
-		p      entity.Project
-		plans  []entity.ProjectPlan
-		images []entity.ProjectImage
+		p      model.Project
+		plans  []model.ProjectPlan
+		images []model.ProjectImage
 		err    error
 	)
 
@@ -180,7 +180,7 @@ func (r *projectRepo) FindID(ctx context.Context, id uuid.UUID) (*entity.Project
 	return &p, plans, images, nil
 }
 
-func (r *projectRepo) ListPublic(ctx context.Context, f ProjectListFilter) ([]entity.Project, int64, error) {
+func (r *projectRepo) ListPublic(ctx context.Context, f ProjectListFilter) ([]model.Project, int64, error) {
 	var (
 		asOf   time.Time
 		q      *gorm.DB
@@ -188,7 +188,7 @@ func (r *projectRepo) ListPublic(ctx context.Context, f ProjectListFilter) ([]en
 		limit  int
 		offset int
 		order  string
-		rows   []entity.Project
+		rows   []model.Project
 		s      string
 		like   string
 		err    error
@@ -198,10 +198,10 @@ func (r *projectRepo) ListPublic(ctx context.Context, f ProjectListFilter) ([]en
 	if asOf.IsZero() {
 		asOf = time.Now().UTC()
 	}
-	q = r.dbCtx(ctx).Model(&entity.Project{}).
-		Where("status = ?", entity.ProjectStatusActive).
+	q = r.dbCtx(ctx).Model(&model.Project{}).
+		Where("status = ?", model.ProjectStatusActive).
 		Where("(duration_type = ? OR (duration_type = ? AND end_date >= ?))",
-			entity.DurationUnlimited, entity.DurationLimited, asOf)
+			model.DurationUnlimited, model.DurationLimited, asOf)
 	if s = strings.TrimSpace(f.Search); s != "" {
 		like = "%" + s + "%"
 		q = q.Where("(title ILIKE ? OR description ILIKE ?)", like, like)
@@ -226,14 +226,14 @@ func publicSort(sort string) string {
 	}
 }
 
-func (r *projectRepo) ListSeller(ctx context.Context, sellerID uuid.UUID, limit, offset int) ([]entity.Project, int64, error) {
+func (r *projectRepo) ListSeller(ctx context.Context, sellerID uuid.UUID, limit, offset int) ([]model.Project, int64, error) {
 	var (
 		q     *gorm.DB
 		total int64
-		rows  []entity.Project
+		rows  []model.Project
 		err   error
 	)
-	q = r.dbCtx(ctx).Model(&entity.Project{}).Where("seller_id = ?", sellerID)
+	q = r.dbCtx(ctx).Model(&model.Project{}).Where("seller_id = ?", sellerID)
 	err = q.Count(&total).Error
 	if err != nil {
 		return nil, 0, err
@@ -244,15 +244,15 @@ func (r *projectRepo) ListSeller(ctx context.Context, sellerID uuid.UUID, limit,
 	return rows, total, err
 }
 
-func (r *projectRepo) ListAll(ctx context.Context, status *entity.ProjectStatus, limit, offset int) ([]entity.Project, int64, error) {
+func (r *projectRepo) ListAll(ctx context.Context, status *model.ProjectStatus, limit, offset int) ([]model.Project, int64, error) {
 	var (
 		q     *gorm.DB
 		total int64
-		rows  []entity.Project
+		rows  []model.Project
 		db    *gorm.DB
 		err   error
 	)
-	q = r.dbCtx(ctx).Model(&entity.Project{})
+	q = r.dbCtx(ctx).Model(&model.Project{})
 	if status != nil && status.Valid() {
 		q = q.Where("status = ?", *status)
 	}
@@ -269,8 +269,8 @@ func (r *projectRepo) ListAll(ctx context.Context, status *entity.ProjectStatus,
 	return rows, total, err
 }
 
-func (r *projectRepo) FindPlan(ctx context.Context, projectID, planID uuid.UUID) (*entity.ProjectPlan, error) {
-	return firstOnePtr[entity.ProjectPlan](
+func (r *projectRepo) FindPlan(ctx context.Context, projectID, planID uuid.UUID) (*model.ProjectPlan, error) {
+	return firstOnePtr[model.ProjectPlan](
 		r.dbCtx(ctx).Where("id = ? AND project_id = ?", planID, projectID),
 	)
 }
