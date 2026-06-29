@@ -1,11 +1,19 @@
 .env
-data/
+backend/.env
+backend/data/
 *.exe
 *.test
-
-# OS
+frontend/node_modules/
+frontend/dist/
+frontend/.env
 .DS_Store
 
-# フロント（将来）
-node_modules/
-dist/
+# Cursor IDE（ローカル設定・ルールは Git 管理外）
+.cursor/
+
+# ドキュメント・設計ファイル（必要なら個別に add）
+*.pdf
+*.drawio
+*.drawio.bkp
+.$*.bkp
+
