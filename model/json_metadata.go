@@ -1,4 +1,4 @@
-package entity
+package model
 
 import (
 	"database/sql/driver"
@@ -58,7 +58,7 @@ func (m *JSONMetadata) Scan(value interface{}) error {
 	case string:
 		raw = []byte(value.(string))
 	default:
-		return fmt.Errorf("entity.JSONMetadata: unsupported type %T", value)
+		return fmt.Errorf("model.JSONMetadata: unsupported type %T", value)
 	}
 	if len(raw) == 0 {
 		*m = nil

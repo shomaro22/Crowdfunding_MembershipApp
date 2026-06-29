@@ -3,7 +3,7 @@ package validator
 import (
 	"strings"
 
-	"crowdfund-app/entity"
+	"crowdfund-app/model"
 
 	"github.com/google/uuid"
 	validation "github.com/go-ozzo/ozzo-validation/v4"
@@ -17,7 +17,7 @@ type AdminUserListInput struct {
 }
 
 type AdminUserListNormalized struct {
-	Role   *entity.UserRole
+	Role   *model.UserRole
 	Search string
 	Limit  int
 	Offset int
@@ -34,7 +34,7 @@ type AdminUpdateUserNormalized struct {
 	Email       *string
 	Name        *string
 	NameSet     bool
-	Role        *entity.UserRole
+	Role        *model.UserRole
 	RoleSet     bool
 	IsActive    *bool
 	IsActiveSet bool
@@ -47,7 +47,7 @@ type AdminPurchaseListInput struct {
 }
 
 type AdminPurchaseListNormalized struct {
-	Status *entity.PurchaseStatus
+	Status *model.PurchaseStatus
 	Limit  int
 	Offset int
 }
@@ -55,7 +55,7 @@ type AdminPurchaseListNormalized struct {
 func ValidateAdminUserList(in AdminUserListInput) (AdminUserListNormalized, error) {
 	var (
 		out  AdminUserListNormalized
-		role entity.UserRole
+		role model.UserRole
 		err  error
 	)
 	out.Limit, out.Offset, err = Paginate(in.Limit, in.Offset)
@@ -64,9 +64,9 @@ func ValidateAdminUserList(in AdminUserListInput) (AdminUserListNormalized, erro
 	}
 	out.Search = strings.TrimSpace(in.Search)
 	if in.Role != "" {
-		role = entity.UserRole(strings.TrimSpace(strings.ToUpper(in.Role)))
+		role = model.UserRole(strings.TrimSpace(strings.ToUpper(in.Role)))
 		if !role.Valid() {
-			return AdminUserListNormalized{}, entity.ErrBadRole
+			return AdminUserListNormalized{}, model.ErrBadRole
 		}
 		out.Role = &role
 	}
@@ -76,13 +76,13 @@ func ValidateAdminUserList(in AdminUserListInput) (AdminUserListNormalized, erro
 func ValidateAdminUpdateUser(in AdminUpdateUserInput) (AdminUpdateUserNormalized, error) {
 	var (
 		out  AdminUpdateUserNormalized
-		role entity.UserRole
+		role model.UserRole
 	)
 	if in.Email == nil && in.Name == nil && in.Role == nil && in.IsActive == nil {
-		return AdminUpdateUserNormalized{}, entity.ErrBadAccount
+		return AdminUpdateUserNormalized{}, model.ErrBadAccount
 	}
 	if in.Email != nil {
-		normalized, err := entity.ValidateEmail(*in.Email)
+		normalized, err := model.ValidateEmail(*in.Email)
 		if err != nil {
 			return AdminUpdateUserNormalized{}, err
 		}
@@ -98,9 +98,9 @@ func ValidateAdminUpdateUser(in AdminUpdateUserInput) (AdminUpdateUserNormalized
 		out.NameSet = true
 	}
 	if in.Role != nil {
-		role = entity.UserRole(strings.TrimSpace(strings.ToUpper(*in.Role)))
+		role = model.UserRole(strings.TrimSpace(strings.ToUpper(*in.Role)))
 		if !role.Valid() {
-			return AdminUpdateUserNormalized{}, entity.ErrBadRole
+			return AdminUpdateUserNormalized{}, model.ErrBadRole
 		}
 		out.Role = &role
 		out.RoleSet = true
@@ -115,7 +115,7 @@ func ValidateAdminUpdateUser(in AdminUpdateUserInput) (AdminUpdateUserNormalized
 func ValidateAdminPurchaseList(in AdminPurchaseListInput) (AdminPurchaseListNormalized, error) {
 	var (
 		out AdminPurchaseListNormalized
-		st  entity.PurchaseStatus
+		st  model.PurchaseStatus
 		err error
 	)
 	out.Limit, out.Offset, err = Paginate(in.Limit, in.Offset)
@@ -123,30 +123,30 @@ func ValidateAdminPurchaseList(in AdminPurchaseListInput) (AdminPurchaseListNorm
 		return AdminPurchaseListNormalized{}, err
 	}
 	if strings.TrimSpace(in.Status) != "" {
-		st = entity.PurchaseStatus(strings.TrimSpace(strings.ToUpper(in.Status)))
+		st = model.PurchaseStatus(strings.TrimSpace(strings.ToUpper(in.Status)))
 		if !st.Valid() {
-			return AdminPurchaseListNormalized{}, entity.ErrBadPurchase
+			return AdminPurchaseListNormalized{}, model.ErrBadPurchase
 		}
 		out.Status = &st
 	}
 	return out, nil
 }
 
-func ValidateAdminPurchaseStatus(status string) (entity.PurchaseStatus, error) {
+func ValidateAdminPurchaseStatus(status string) (model.PurchaseStatus, error) {
 	var (
-		st  entity.PurchaseStatus
+		st  model.PurchaseStatus
 		err error
 	)
 	err = validation.Validate(strings.TrimSpace(status), validation.Required)
 	if err != nil {
 		return "", err
 	}
-	st = entity.PurchaseStatus(strings.TrimSpace(strings.ToUpper(status)))
+	st = model.PurchaseStatus(strings.TrimSpace(strings.ToUpper(status)))
 	switch st {
-	case entity.PurchaseStatusPaid, entity.PurchaseStatusCancelled, entity.PurchaseStatusRefunded:
+	case model.PurchaseStatusPaid, model.PurchaseStatusCancelled, model.PurchaseStatusRefunded:
 		return st, nil
 	default:
-		return "", entity.ErrBadPurchase
+		return "", model.ErrBadPurchase
 	}
 }
 

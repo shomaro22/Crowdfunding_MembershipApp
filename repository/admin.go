@@ -3,7 +3,7 @@ package repository
 import (
 	"context"
 
-	"crowdfund-app/entity"
+	"crowdfund-app/model"
 
 	"gorm.io/gorm"
 )
@@ -19,7 +19,7 @@ type AdminDashboardStats struct {
 
 type AdminRepo interface {
 	DashboardStats(ctx context.Context) (AdminDashboardStats, error)
-	RecentUsers(ctx context.Context, limit int) ([]entity.User, error)
+	RecentUsers(ctx context.Context, limit int) ([]model.User, error)
 }
 
 type adminRepo struct {
@@ -39,28 +39,28 @@ func (r *adminRepo) DashboardStats(ctx context.Context) (AdminDashboardStats, er
 		out AdminDashboardStats
 		err error
 	)
-	err = r.dbCtx(ctx).Model(&entity.User{}).Count(&out.TotalUsers).Error
+	err = r.dbCtx(ctx).Model(&model.User{}).Count(&out.TotalUsers).Error
 	if err != nil {
 		return AdminDashboardStats{}, err
 	}
-	err = r.dbCtx(ctx).Model(&entity.Project{}).Count(&out.TotalProjects).Error
+	err = r.dbCtx(ctx).Model(&model.Project{}).Count(&out.TotalProjects).Error
 	if err != nil {
 		return AdminDashboardStats{}, err
 	}
-	err = r.dbCtx(ctx).Model(&entity.Purchase{}).Count(&out.TotalPurchases).Error
+	err = r.dbCtx(ctx).Model(&model.Purchase{}).Count(&out.TotalPurchases).Error
 	if err != nil {
 		return AdminDashboardStats{}, err
 	}
-	err = r.dbCtx(ctx).Model(&entity.Purchase{}).
-		Where("status = ?", entity.PurchaseStatusPaid).
+	err = r.dbCtx(ctx).Model(&model.Purchase{}).
+		Where("status = ?", model.PurchaseStatusPaid).
 		Select("COALESCE(SUM(total_price), 0)").
 		Scan(&out.TotalRevenue).Error
 	return out, err
 }
 
-func (r *adminRepo) RecentUsers(ctx context.Context, limit int) ([]entity.User, error) {
+func (r *adminRepo) RecentUsers(ctx context.Context, limit int) ([]model.User, error) {
 	var (
-		rows []entity.User
+		rows []model.User
 		err  error
 	)
 	if limit <= 0 {
@@ -71,7 +71,7 @@ func (r *adminRepo) RecentUsers(ctx context.Context, limit int) ([]entity.User, 
 }
 
 type AdminUserListFilter struct {
-	Role   *entity.UserRole
+	Role   *model.UserRole
 	Search string
 	Limit  int
 	Offset int

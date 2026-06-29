@@ -9,7 +9,7 @@ import (
 
 	"crowdfund-app/auth"
 	"crowdfund-app/controller"
-	"crowdfund-app/entity"
+	"crowdfund-app/model"
 	"crowdfund-app/middleware"
 	"crowdfund-app/router"
 
@@ -110,11 +110,11 @@ func BuildHTTP(opts *Options) (*echo.Echo, string, error) {
 	optionalJWT = []echo.MiddlewareFunc{
 		middleware.OptionalJWTAuth(app.UseCases.Auth.ParseToken, validateSession),
 	}
-	sellerRead = append(append([]echo.MiddlewareFunc{}, protected...), middleware.RequireRole(entity.UserRoleSeller))
+	sellerRead = append(append([]echo.MiddlewareFunc{}, protected...), middleware.RequireRole(model.UserRoleSeller))
 	sellerWrite = append(append([]echo.MiddlewareFunc{}, sellerRead...), middleware.Require2FA())
 	adminOnly = append(
 		append([]echo.MiddlewareFunc{}, protected...),
-		middleware.RequireRole(entity.UserRoleAdmin),
+		middleware.RequireRole(model.UserRoleAdmin),
 		middleware.Require2FA(),
 	)
 	rateLimiter = middleware.NewRateLimiter(app.UseCases.RateLimit)

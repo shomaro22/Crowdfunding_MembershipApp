@@ -19,7 +19,7 @@ import (
 	"crowdfund-app/auth"
 	"crowdfund-app/bootstrap"
 	"crowdfund-app/db"
-	"crowdfund-app/entity"
+	"crowdfund-app/model"
 	"crowdfund-app/stripe"
 
 	"github.com/golang-jwt/jwt/v5"
@@ -37,10 +37,10 @@ var (
 )
 
 type seedOpts struct {
-	Role          entity.UserRole
-	AdminRole     *entity.AdminRole
+	Role          model.UserRole
+	AdminRole     *model.AdminRole
 	TOTPEnabled   bool
-	AccountStatus entity.AccountStatus
+	AccountStatus model.AccountStatus
 }
 
 func TestMain(m *testing.M) {
@@ -143,11 +143,11 @@ func openDB(t *testing.T) *gorm.DB {
 	return testGDB
 }
 
-func seedUser(t *testing.T, gdb *gorm.DB, opts seedOpts) *entity.User {
+func seedUser(t *testing.T, gdb *gorm.DB, opts seedOpts) *model.User {
 	var (
 		hash string
 		now  time.Time
-		u    *entity.User
+		u    *model.User
 		err  error
 	)
 	t.Helper()
@@ -156,13 +156,13 @@ func seedUser(t *testing.T, gdb *gorm.DB, opts seedOpts) *entity.User {
 		t.Fatal(err)
 	}
 	now = time.Now().UTC()
-	u = &entity.User{
+	u = &model.User{
 		ID:            uuid.New(),
 		Email:         fmt.Sprintf("%s-%s@test.local", opts.Role, uuid.New()),
 		PasswordHash:  hash,
 		Role:          opts.Role,
-		AccountStatus: entity.AccountStatusActive,
-		SellerStatus:  entity.SellerStatusNotApplicable,
+		AccountStatus: model.AccountStatusActive,
+		SellerStatus:  model.SellerStatusNotApplicable,
 		AdminRole:     opts.AdminRole,
 		TOTPEnabled:   opts.TOTPEnabled,
 		TokenVersion:  0,
@@ -172,8 +172,8 @@ func seedUser(t *testing.T, gdb *gorm.DB, opts seedOpts) *entity.User {
 	if opts.AccountStatus != "" {
 		u.AccountStatus = opts.AccountStatus
 	}
-	if opts.Role == entity.UserRoleSeller {
-		u.SellerStatus = entity.SellerStatusActive
+	if opts.Role == model.UserRoleSeller {
+		u.SellerStatus = model.SellerStatusActive
 	}
 	if err = gdb.Create(u).Error; err != nil {
 		t.Fatal(err)
@@ -181,21 +181,21 @@ func seedUser(t *testing.T, gdb *gorm.DB, opts seedOpts) *entity.User {
 	return u
 }
 
-func seedProject(t *testing.T, gdb *gorm.DB, sellerID uuid.UUID, status entity.ProjectStatus) *entity.Project {
+func seedProject(t *testing.T, gdb *gorm.DB, sellerID uuid.UUID, status model.ProjectStatus) *model.Project {
 	var (
 		now time.Time
-		p   *entity.Project
+		p   *model.Project
 		err error
 	)
 	t.Helper()
 	now = time.Now().UTC()
-	p = &entity.Project{
+	p = &model.Project{
 		ID:           uuid.New(),
 		SellerID:     sellerID,
 		Title:        fmt.Sprintf("project-%s", uuid.New()),
 		Description:  "integration test project",
 		TargetAmount: 1000,
-		DurationType: entity.DurationUnlimited,
+		DurationType: model.DurationUnlimited,
 		StartDate:    now,
 		Status:       status,
 		CreatedAt:    now,
@@ -207,21 +207,21 @@ func seedProject(t *testing.T, gdb *gorm.DB, sellerID uuid.UUID, status entity.P
 	return p
 }
 
-func issueToken(u *entity.User, twoFA bool) (string, error) {
+func issueToken(u *model.User, twoFA bool) (string, error) {
 	return auth.NewTokenService([]byte(testJWTSecret), auth.DefaultAuthTTL).Issue(auth.AuthClaims{
 		UserID: u.ID, Role: u.Role, TwoFAVerified: twoFA,
 		AdminRole: u.AdminRole, TokenVersion: u.TokenVersion,
 	})
 }
 
-func issueAdminToken(t *testing.T, gdb *gorm.DB, role entity.AdminRole) string {
+func issueAdminToken(t *testing.T, gdb *gorm.DB, role model.AdminRole) string {
 	var (
-		u   *entity.User
+		u   *model.User
 		tok string
 		err error
 	)
 	t.Helper()
-	u = seedUser(t, gdb, seedOpts{Role: entity.UserRoleAdmin, AdminRole: &role, TOTPEnabled: true})
+	u = seedUser(t, gdb, seedOpts{Role: model.UserRoleAdmin, AdminRole: &role, TOTPEnabled: true})
 	tok, err = issueToken(u, true)
 	if err != nil {
 		t.Fatal(err)
@@ -320,7 +320,7 @@ func mediaUploadPOST(e *echo.Echo, token string, data []byte, filename string) *
 
 func expiredToken(userID uuid.UUID) string {
 	tok := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
-		"sub": userID.String(), "role": string(entity.UserRoleBuyer),
+		"sub": userID.String(), "role": string(model.UserRoleBuyer),
 		"2fa_verified": false, "tv": float64(0),
 		"exp": time.Now().Add(-time.Hour).Unix(),
 		"iat": time.Now().Add(-2 * time.Hour).Unix(),

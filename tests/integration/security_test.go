@@ -10,7 +10,7 @@ import (
 	"strings"
 	"testing"
 
-	"crowdfund-app/entity"
+	"crowdfund-app/model"
 
 	"github.com/google/uuid"
 	"github.com/labstack/echo/v4"
@@ -39,14 +39,14 @@ func TestSecurityTamperedJWT(t *testing.T) {
 	var (
 		e     *echo.Echo
 		gdb   *gorm.DB
-		u     *entity.User
+		u     *model.User
 		tok   string
 		rec   *httptest.ResponseRecorder
 		req   *http.Request
 	)
 	e = setupApp(t)
 	gdb = openDB(t)
-	u = seedUser(t, gdb, seedOpts{Role: entity.UserRoleBuyer})
+	u = seedUser(t, gdb, seedOpts{Role: model.UserRoleBuyer})
 	tok, _ = issueToken(u, true)
 	rec = httptest.NewRecorder()
 	req = httptest.NewRequest(http.MethodGet, "/me", nil)
@@ -61,14 +61,14 @@ func TestSecurityExpiredJWT(t *testing.T) {
 	var (
 		e   *echo.Echo
 		gdb *gorm.DB
-		u   *entity.User
+		u   *model.User
 		tok string
 		rec *httptest.ResponseRecorder
 		req *http.Request
 	)
 	e = setupApp(t)
 	gdb = openDB(t)
-	u = seedUser(t, gdb, seedOpts{Role: entity.UserRoleBuyer})
+	u = seedUser(t, gdb, seedOpts{Role: model.UserRoleBuyer})
 	tok = expiredToken(u.ID)
 	rec = httptest.NewRecorder()
 	req = httptest.NewRequest(http.MethodGet, "/me", nil)
@@ -83,16 +83,16 @@ func TestSecurityRevokedToken(t *testing.T) {
 	var (
 		e   *echo.Echo
 		gdb *gorm.DB
-		u   *entity.User
+		u   *model.User
 		tok string
 		rec *httptest.ResponseRecorder
 		req *http.Request
 	)
 	e = setupApp(t)
 	gdb = openDB(t)
-	u = seedUser(t, gdb, seedOpts{Role: entity.UserRoleBuyer})
+	u = seedUser(t, gdb, seedOpts{Role: model.UserRoleBuyer})
 	tok, _ = issueToken(u, true)
-	if err := gdb.Model(&entity.User{}).Where("id = ?", u.ID).
+	if err := gdb.Model(&model.User{}).Where("id = ?", u.ID).
 		UpdateColumn("token_version", gorm.Expr("token_version + 1")).Error; err != nil {
 		t.Fatal(err)
 	}
@@ -112,13 +112,13 @@ func TestSecurityBuyerCannotAccessAdmin(t *testing.T) {
 	var (
 		e   *echo.Echo
 		gdb *gorm.DB
-		u   *entity.User
+		u   *model.User
 		tok string
 		rec *httptest.ResponseRecorder
 	)
 	e = setupApp(t)
 	gdb = openDB(t)
-	u = seedUser(t, gdb, seedOpts{Role: entity.UserRoleBuyer})
+	u = seedUser(t, gdb, seedOpts{Role: model.UserRoleBuyer})
 	tok, _ = issueToken(u, true)
 	rec = httpGET(e, "/admin/reviews/users", tok)
 	if rec.Code != http.StatusForbidden {
@@ -130,16 +130,16 @@ func TestSecurityAdminRequires2FA(t *testing.T) {
 	var (
 		e     *echo.Echo
 		gdb   *gorm.DB
-		u     *entity.User
+		u     *model.User
 		tok   string
-		role  entity.AdminRole
+		role  model.AdminRole
 		rec   *httptest.ResponseRecorder
 	)
 	e = setupApp(t)
 	gdb = openDB(t)
-	role = entity.AdminRoleReviewAdmin
+	role = model.AdminRoleReviewAdmin
 	u = seedUser(t, gdb, seedOpts{
-		Role:      entity.UserRoleAdmin,
+		Role:      model.UserRoleAdmin,
 		AdminRole: &role,
 		TOTPEnabled: true,
 	})
@@ -157,14 +157,14 @@ func TestSecuritySellerWriteRequires2FA(t *testing.T) {
 	var (
 		e   *echo.Echo
 		gdb *gorm.DB
-		u   *entity.User
+		u   *model.User
 		tok string
 		rec *httptest.ResponseRecorder
 	)
 	e = setupApp(t)
 	gdb = openDB(t)
 	u = seedUser(t, gdb, seedOpts{
-		Role:        entity.UserRoleSeller,
+		Role:        model.UserRoleSeller,
 		TOTPEnabled: true,
 	})
 	tok, _ = issueToken(u, false)
@@ -181,14 +181,14 @@ func TestSecurityChangePasswordRequiresTOTP(t *testing.T) {
 	var (
 		e   *echo.Echo
 		gdb *gorm.DB
-		u   *entity.User
+		u   *model.User
 		tok string
 		rec *httptest.ResponseRecorder
 	)
 	e = setupApp(t)
 	gdb = openDB(t)
 	u = seedUser(t, gdb, seedOpts{
-		Role:        entity.UserRoleSeller,
+		Role:        model.UserRoleSeller,
 		TOTPEnabled: true,
 	})
 	tok, _ = issueToken(u, true)

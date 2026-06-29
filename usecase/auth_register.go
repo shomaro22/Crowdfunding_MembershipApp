@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"crowdfund-app/auth"
-	"crowdfund-app/entity"
+	"crowdfund-app/model"
 	"crowdfund-app/repository"
 	"crowdfund-app/validator"
 
@@ -38,7 +38,7 @@ func (a *AuthUseCase) RegisterBuyer(ctx context.Context, email, password string,
 		now         time.Time
 		trimmedName *string
 		n           string
-		u           *entity.User
+		u           *model.User
 	)
 
 	normalized, err = validator.ValidateBuyerReg(email, password)
@@ -63,21 +63,21 @@ func (a *AuthUseCase) RegisterBuyer(ctx context.Context, email, password string,
 			trimmedName = &n
 		}
 	}
-	u = &entity.User{
+	u = &model.User{
 		ID:            uuid.New(),
 		Email:         normalized,
 		Name:          trimmedName,
 		PasswordHash:  hash,
-		Role:          entity.UserRoleBuyer,
-		AccountStatus: entity.AccountStatusPending,
-		SellerStatus:  entity.SellerStatusNotApplicable,
+		Role:          model.UserRoleBuyer,
+		AccountStatus: model.AccountStatusPending,
+		SellerStatus:  model.SellerStatusNotApplicable,
 		CreatedAt:     now,
 		UpdatedAt:     now,
 	}
 	if err = a.Users.Create(ctx, u); err != nil {
 		return UserView{}, err
 	}
-	a.logActivity(ctx, &u.ID, entity.UserRegister, "user", u.ID.String(), meta, nil)
+	a.logActivity(ctx, &u.ID, model.UserRegister, "user", u.ID.String(), meta, nil)
 	return UserViewFrom(u), nil
 }
 
@@ -109,8 +109,8 @@ func (a *AuthUseCase) RegisterSeller(ctx context.Context, in SellerRegIn, meta R
 		backKey    string
 		hash       string
 		now        time.Time
-		u          *entity.User
-		reg        *entity.SellerReg
+		u          *model.User
+		reg        *model.SellerReg
 	)
 
 	if a.KYCStore == nil || a.SellerRegs == nil || a.DB == nil {
@@ -151,17 +151,17 @@ func (a *AuthUseCase) RegisterSeller(ctx context.Context, in SellerRegIn, meta R
 	}
 
 	now = time.Now().UTC()
-	u = &entity.User{
+	u = &model.User{
 		ID:            userID,
 		Email:         normalized,
 		PasswordHash:  hash,
-		Role:          entity.UserRoleSeller,
-		AccountStatus: entity.AccountStatusPending,
-		SellerStatus:  entity.SellerStatusPending,
+		Role:          model.UserRoleSeller,
+		AccountStatus: model.AccountStatusPending,
+		SellerStatus:  model.SellerStatusPending,
 		CreatedAt:     now,
 		UpdatedAt:     now,
 	}
-	reg = &entity.SellerReg{
+	reg = &model.SellerReg{
 		ID:           uuid.New(),
 		UserID:       userID,
 		FullName:     strings.TrimSpace(in.FullName),
@@ -170,7 +170,7 @@ func (a *AuthUseCase) RegisterSeller(ctx context.Context, in SellerRegIn, meta R
 		PhotoPresent: in.PhotoPresent,
 		IDFrontKey:   &frontKey,
 		IDBackKey:    &backKey,
-		Status:       entity.RegPending,
+		Status:       model.RegPending,
 		CreatedAt:    now,
 		UpdatedAt:    now,
 	}
@@ -188,6 +188,6 @@ func (a *AuthUseCase) RegisterSeller(ctx context.Context, in SellerRegIn, meta R
 		return nil, err
 	}
 
-	a.logActivity(ctx, &u.ID, entity.SellerRegister, "seller_registration", reg.ID.String(), meta, nil)
+	a.logActivity(ctx, &u.ID, model.SellerRegister, "seller_registration", reg.ID.String(), meta, nil)
 	return &SellerRegOut{User: UserViewFrom(u), Registration: SellerRegItemFrom(reg)}, nil
 }

@@ -3,30 +3,29 @@ package usecase
 import (
 	"context"
 
-	"crowdfund-app/entity"
+	"crowdfund-app/model"
+	"crowdfund-app/stripe"
 
 	"github.com/google/uuid"
 )
 
 func (p *PaymentUseCase) CreateCheckout(ctx context.Context, in CheckoutIn) (CheckoutOut, error) {
 	var (
-		sc         supportContext
-		purchase   *entity.Purchase
-		meta       map[string]string
-		sess       CheckoutSessionOut
-		successURL string
-		cancelURL  string
-		pm         entity.PaymentMethod
-		err        error
+		sc       supportContext
+		purchase *model.Purchase
+		meta     map[string]string
+		sess     stripe.CheckoutSessionOut
+		pm       model.PaymentMethod
+		err      error
 	)
-	if p.PaymentGateway == nil {
+	if p.Stripe == nil {
 		return CheckoutOut{}, ErrStripeUnavailable
 	}
-	pm = entity.PaymentMethod(in.PaymentMethod)
+	pm = model.PaymentMethod(in.PaymentMethod)
 	if pm == "" {
-		pm = entity.PaymentMethodKonbini
+		pm = model.PaymentMethodKonbini
 	}
-	if pm != entity.PaymentMethodKonbini && pm != entity.PaymentMethodCard {
+	if pm != model.PaymentMethodKonbini && pm != model.PaymentMethodCard {
 		return CheckoutOut{}, ErrBadRequest
 	}
 	sc, err = p.loadCheckoutContext(ctx, in.BuyerID, in.ProjectID, in.PlanID, pm)
@@ -35,21 +34,13 @@ func (p *PaymentUseCase) CreateCheckout(ctx context.Context, in CheckoutIn) (Che
 	}
 	purchase = p.newPendingPurchase(sc, pm, nil, nil)
 	meta = checkoutMetadata(sc, purchase.ID, pm)
-	successURL, err = resolveCheckoutURL(in.SuccessURL, in.FallbackSuccessURL, p.AppPublicURL)
-	if err != nil {
-		return CheckoutOut{}, err
-	}
-	cancelURL, err = resolveCheckoutURL(in.CancelURL, in.FallbackCancelURL, p.AppPublicURL)
-	if err != nil {
-		return CheckoutOut{}, err
-	}
-	sess, err = p.PaymentGateway.CreateCheckoutSession(ctx, CheckoutSessionIn{
+	sess, err = p.Stripe.CreateCheckoutSession(ctx, stripe.CheckoutSessionIn{
 		ProductName:      sc.project.Title,
 		Amount:           int64(sc.plan.Price),
 		ConnectAccountID: sc.connect.StripeAccountID,
 		CustomerEmail:    sc.buyer.Email,
-		SuccessURL:       successURL,
-		CancelURL:        cancelURL,
+		SuccessURL:       checkoutURL(in.SuccessURL, in.FallbackSuccessURL),
+		CancelURL:        checkoutURL(in.CancelURL, in.FallbackCancelURL),
 		PaymentMethod:    string(pm),
 		Metadata:         meta,
 	})
@@ -72,21 +63,21 @@ func (p *PaymentUseCase) CreateCheckout(ctx context.Context, in CheckoutIn) (Che
 func (p *PaymentUseCase) CreateIntent(ctx context.Context, in IntentIn) (IntentOut, error) {
 	var (
 		sc       supportContext
-		purchase *entity.Purchase
+		purchase *model.Purchase
 		meta     map[string]string
-		sub      SubscriptionIntentOut
+		sub      stripe.SubscriptionIntentOut
 		err      error
 	)
-	if p.PaymentGateway == nil {
+	if p.Stripe == nil {
 		return IntentOut{}, ErrStripeUnavailable
 	}
 	sc, err = p.loadSupportContext(ctx, in.BuyerID, in.ProjectID, in.PlanID)
 	if err != nil {
 		return IntentOut{}, err
 	}
-	purchase = p.newPendingPurchase(sc, entity.PaymentMethodCard, nil, nil)
-	meta = paymentMetadata(purchase.ID, in.ProjectID, in.PlanID, in.BuyerID, entity.BillingModeAuto)
-	sub, err = p.PaymentGateway.CreateSubscriptionIntent(ctx, SubscriptionIntentIn{
+	purchase = p.newPendingPurchase(sc, model.PaymentMethodCard, nil, nil)
+	meta = paymentMetadata(purchase.ID, in.ProjectID, in.PlanID, in.BuyerID, model.BillingModeAuto)
+	sub, err = p.Stripe.CreateSubscriptionIntent(ctx, stripe.SubscriptionIntentIn{
 		ProductName:      sc.project.Title,
 		Amount:           int64(sc.plan.Price),
 		ConnectAccountID: sc.connect.StripeAccountID,
@@ -108,17 +99,17 @@ func (p *PaymentUseCase) CreateIntent(ctx context.Context, in IntentIn) (IntentO
 
 func (p *PaymentUseCase) VerifyCheckout(ctx context.Context, buyerID uuid.UUID, sessionID string) (SupporterView, error) {
 	var (
-		sess     CheckoutSessionSnapshot
-		purchase *entity.Purchase
+		sess     stripe.CheckoutSessionSnapshot
+		purchase *model.Purchase
 		err      error
 	)
-	if p.PaymentGateway == nil {
+	if p.Stripe == nil {
 		return SupporterView{}, ErrStripeUnavailable
 	}
 	if sessionID == "" {
 		return SupporterView{}, ErrBadRequest
 	}
-	sess, err = p.PaymentGateway.GetCheckoutSession(ctx, sessionID)
+	sess, err = p.Stripe.GetCheckoutSession(ctx, sessionID)
 	if err != nil {
 		return SupporterView{}, ErrBadRequest
 	}
@@ -126,24 +117,24 @@ func (p *PaymentUseCase) VerifyCheckout(ctx context.Context, buyerID uuid.UUID, 
 	if err != nil {
 		return SupporterView{}, mapRepoNotFound(err)
 	}
-	return p.verifyAndFulfill(ctx, buyerID, purchase, sess.PaymentStatus == CheckoutPaymentStatusPaid, func(ctx context.Context) error {
+	return p.verifyAndFulfill(ctx, buyerID, purchase, sess.PaymentStatus == stripe.CheckoutPaymentStatusPaid, func(ctx context.Context) error {
 		return p.fulfillCheckoutSession(ctx, sess)
 	})
 }
 
 func (p *PaymentUseCase) VerifyIntent(ctx context.Context, buyerID uuid.UUID, intentID string) (SupporterView, error) {
 	var (
-		pi       PaymentIntentDetail
-		purchase *entity.Purchase
+		pi       stripe.PaymentIntentDetail
+		purchase *model.Purchase
 		err      error
 	)
-	if p.PaymentGateway == nil {
+	if p.Stripe == nil {
 		return SupporterView{}, ErrStripeUnavailable
 	}
 	if intentID == "" {
 		return SupporterView{}, ErrBadRequest
 	}
-	pi, err = p.PaymentGateway.GetPaymentIntentDetail(ctx, intentID)
+	pi, err = p.Stripe.GetPaymentIntentDetail(ctx, intentID)
 	if err != nil {
 		return SupporterView{}, ErrBadRequest
 	}
@@ -151,7 +142,7 @@ func (p *PaymentUseCase) VerifyIntent(ctx context.Context, buyerID uuid.UUID, in
 	if err != nil {
 		return SupporterView{}, mapRepoNotFound(err)
 	}
-	return p.verifyAndFulfill(ctx, buyerID, purchase, pi.Status == PaymentIntentStatusSucceeded, func(ctx context.Context) error {
+	return p.verifyAndFulfill(ctx, buyerID, purchase, pi.Status == stripe.PaymentIntentStatusSucceeded, func(ctx context.Context) error {
 		return p.fulfillPaymentIntent(ctx, pi)
 	})
 }
@@ -159,18 +150,18 @@ func (p *PaymentUseCase) VerifyIntent(ctx context.Context, buyerID uuid.UUID, in
 func (p *PaymentUseCase) verifyAndFulfill(
 	ctx context.Context,
 	buyerID uuid.UUID,
-	purchase *entity.Purchase,
+	purchase *model.Purchase,
 	paid bool,
 	fulfill func(context.Context) error,
 ) (SupporterView, error) {
 	var (
-		refreshed *entity.Purchase
+		refreshed *model.Purchase
 		err       error
 	)
 	if err = verifyPurchaseBuyer(purchase, buyerID); err != nil {
 		return SupporterView{}, err
 	}
-	if purchase.Status == entity.PurchaseStatusPaid {
+	if purchase.Status == model.PurchaseStatusPaid {
 		return p.supporterViewForPurchase(ctx, purchase)
 	}
 	if !paid {
@@ -186,16 +177,16 @@ func (p *PaymentUseCase) verifyAndFulfill(
 	return p.supporterViewForPurchase(ctx, refreshed)
 }
 
-func verifyPurchaseBuyer(purchase *entity.Purchase, buyerID uuid.UUID) error {
+func verifyPurchaseBuyer(purchase *model.Purchase, buyerID uuid.UUID) error {
 	if purchase == nil || purchase.BuyerID != buyerID {
 		return ErrForbidden
 	}
 	return nil
 }
 
-func (p *PaymentUseCase) supporterViewForPurchase(ctx context.Context, purchase *entity.Purchase) (SupporterView, error) {
+func (p *PaymentUseCase) supporterViewForPurchase(ctx context.Context, purchase *model.Purchase) (SupporterView, error) {
 	var (
-		supporter *entity.ProjectSupporter
+		supporter *model.ProjectSupporter
 		err       error
 	)
 	if purchase == nil {

@@ -4,22 +4,23 @@ import (
 	"context"
 	"time"
 
-	"crowdfund-app/entity"
+	"crowdfund-app/model"
 	"crowdfund-app/repository"
-	
+	"crowdfund-app/stripe"
+
 	"github.com/google/uuid"
 )
 
 type ConnectUseCase struct {
 	Users   repository.UserRepo
 	Connect repository.ConnectRepo
-	Stripe PaymentGateway
+	Stripe  stripe.Client
 }
 
 func (c *ConnectUseCase) GetAccount(ctx context.Context, sellerID uuid.UUID) (*ConnectAccountView, error) {
 	var (
-		u   *entity.User
-		row *entity.ConnectAccount
+		u   *model.User
+		row *model.ConnectAccount
 		err error
 	)
 	if c.Stripe == nil {
@@ -29,7 +30,7 @@ func (c *ConnectUseCase) GetAccount(ctx context.Context, sellerID uuid.UUID) (*C
 	if err != nil {
 		return nil, mapRepoNotFound(err)
 	}
-	if u.Role != entity.UserRoleSeller {
+	if u.Role != model.UserRoleSeller {
 		return nil, ErrForbidden
 	}
 	row, err = c.Connect.FindUserID(ctx, sellerID)
@@ -43,12 +44,12 @@ func (c *ConnectUseCase) GetAccount(ctx context.Context, sellerID uuid.UUID) (*C
 
 func (c *ConnectUseCase) CreateOnboardingLink(ctx context.Context, sellerID uuid.UUID) (string, error) {
 	var (
-		u    *entity.User
-		row  *entity.ConnectAccount
+		u    *model.User
+		row  *model.ConnectAccount
 		url  string
 		now  time.Time
 		err  error
-		snap AccountSnapshot
+		snap stripe.AccountSnapshot
 	)
 
 	if c.Stripe == nil {
@@ -58,7 +59,7 @@ func (c *ConnectUseCase) CreateOnboardingLink(ctx context.Context, sellerID uuid
 	if err != nil {
 		return "", mapRepoNotFound(err)
 	}
-	if u.Role != entity.UserRoleSeller || u.SellerStatus != entity.SellerStatusActive {
+	if u.Role != model.UserRoleSeller || u.SellerStatus != model.SellerStatusActive {
 		return "", ErrForbidden
 	}
 	row, err = c.Connect.FindUserID(ctx, sellerID)
@@ -74,7 +75,7 @@ func (c *ConnectUseCase) CreateOnboardingLink(ctx context.Context, sellerID uuid
 		if err != nil {
 			return "", err
 		}
-		row = &entity.ConnectAccount{
+		row = &model.ConnectAccount{
 			ID:              uuid.New(),
 			UserID:          sellerID,
 			StripeAccountID: accountID,
@@ -102,8 +103,8 @@ func (c *ConnectUseCase) CreateOnboardingLink(ctx context.Context, sellerID uuid
 
 func (c *ConnectUseCase) SyncFromStripeAccountID(ctx context.Context, stripeAccountID string) (*ConnectAccountView, error) {
 	var (
-		row  *entity.ConnectAccount
-		snap AccountSnapshot
+		row  *model.ConnectAccount
+		snap stripe.AccountSnapshot
 		now  time.Time
 		err  error
 	)
@@ -134,5 +135,5 @@ type ConnectSyncer interface {
 }
 
 type SupporterViewer interface {
-	ViewForSupporter(ctx context.Context, supporter *entity.ProjectSupporter) (SupporterView, error)
+	ViewForSupporter(ctx context.Context, supporter *model.ProjectSupporter) (SupporterView, error)
 }

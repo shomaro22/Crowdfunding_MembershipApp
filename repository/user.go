@@ -3,20 +3,20 @@ package repository
 import (
 	"context"
 
-	"crowdfund-app/entity"
+	"crowdfund-app/model"
 
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 )
 
 type UserRepo interface {
-	Create(ctx context.Context, u *entity.User) error
-	Update(ctx context.Context, u *entity.User) error
-	FindID(ctx context.Context, id uuid.UUID) (*entity.User, error)
-	FindEmail(ctx context.Context, email string) (*entity.User, error)
+	Create(ctx context.Context, u *model.User) error
+	Update(ctx context.Context, u *model.User) error
+	FindID(ctx context.Context, id uuid.UUID) (*model.User, error)
+	FindEmail(ctx context.Context, email string) (*model.User, error)
 	EmailExists(ctx context.Context, email string) (bool, error)
-	ListRoleStatus(ctx context.Context, role entity.UserRole, status entity.AccountStatus, limit, offset int) ([]entity.User, int64, error)
-	ListAdmin(ctx context.Context, f AdminUserListFilter) ([]entity.User, int64, error)
+	ListRoleStatus(ctx context.Context, role model.UserRole, status model.AccountStatus, limit, offset int) ([]model.User, int64, error)
+	ListAdmin(ctx context.Context, f AdminUserListFilter) ([]model.User, int64, error)
 	BumpTokenVer(ctx context.Context, userID uuid.UUID) (int64, error)
 }
 
@@ -28,20 +28,20 @@ func NewUserRepo(db *gorm.DB) UserRepo {
 	return &userRepo{db: db}
 }
 
-func (r *userRepo) Create(ctx context.Context, u *entity.User) error {
+func (r *userRepo) Create(ctx context.Context, u *model.User) error {
 	return dbFromCtx(ctx, r.db).Create(u).Error
 }
 
-func (r *userRepo) Update(ctx context.Context, u *entity.User) error {
+func (r *userRepo) Update(ctx context.Context, u *model.User) error {
 	return dbFromCtx(ctx, r.db).Save(u).Error
 }
 
-func (r *userRepo) FindID(ctx context.Context, id uuid.UUID) (*entity.User, error) {
-	return firstOnePtr[entity.User](dbFromCtx(ctx, r.db).Where("id = ?", id))
+func (r *userRepo) FindID(ctx context.Context, id uuid.UUID) (*model.User, error) {
+	return firstOnePtr[model.User](dbFromCtx(ctx, r.db).Where("id = ?", id))
 }
 
-func (r *userRepo) FindEmail(ctx context.Context, email string) (*entity.User, error) {
-	return firstOnePtr[entity.User](dbFromCtx(ctx, r.db).Where("email = ?", email))
+func (r *userRepo) FindEmail(ctx context.Context, email string) (*model.User, error) {
+	return firstOnePtr[model.User](dbFromCtx(ctx, r.db).Where("email = ?", email))
 }
 
 func (r *userRepo) EmailExists(ctx context.Context, email string) (bool, error) {
@@ -49,18 +49,18 @@ func (r *userRepo) EmailExists(ctx context.Context, email string) (bool, error) 
 		count int64
 		err   error
 	)
-	err = dbFromCtx(ctx, r.db).Model(&entity.User{}).Where("email = ?", email).Count(&count).Error
+	err = dbFromCtx(ctx, r.db).Model(&model.User{}).Where("email = ?", email).Count(&count).Error
 	return count > 0, err
 }
 
-func (r *userRepo) ListRoleStatus(ctx context.Context, role entity.UserRole, status entity.AccountStatus, limit, offset int) ([]entity.User, int64, error) {
+func (r *userRepo) ListRoleStatus(ctx context.Context, role model.UserRole, status model.AccountStatus, limit, offset int) ([]model.User, int64, error) {
 	var (
 		q     *gorm.DB
 		total int64
-		rows  []entity.User
+		rows  []model.User
 		err   error
 	)
-	q = dbFromCtx(ctx, r.db).Model(&entity.User{}).Where("role = ? AND account_status = ?", role, status)
+	q = dbFromCtx(ctx, r.db).Model(&model.User{}).Where("role = ? AND account_status = ?", role, status)
 	err = q.Count(&total).Error
 	if err != nil {
 		return nil, 0, err
@@ -79,14 +79,14 @@ func (r *userRepo) ListRoleStatus(ctx context.Context, role entity.UserRole, sta
 	return rows, total, err
 }
 
-func (r *userRepo) ListAdmin(ctx context.Context, f AdminUserListFilter) ([]entity.User, int64, error) {
+func (r *userRepo) ListAdmin(ctx context.Context, f AdminUserListFilter) ([]model.User, int64, error) {
 	var (
 		q     *gorm.DB
 		total int64
-		rows  []entity.User
+		rows  []model.User
 		err   error
 	)
-	q = dbFromCtx(ctx, r.db).Model(&entity.User{})
+	q = dbFromCtx(ctx, r.db).Model(&model.User{})
 	if f.Role != nil {
 		q = q.Where("role = ?", *f.Role)
 	}
@@ -106,10 +106,10 @@ func (r *userRepo) ListAdmin(ctx context.Context, f AdminUserListFilter) ([]enti
 func (r *userRepo) BumpTokenVer(ctx context.Context, userID uuid.UUID) (int64, error) {
 	var (
 		res *gorm.DB
-		u   entity.User
+		u   model.User
 		err error
 	)
-	res = dbFromCtx(ctx, r.db).Model(&entity.User{}).
+	res = dbFromCtx(ctx, r.db).Model(&model.User{}).
 		Where("id = ?", userID).
 		UpdateColumn("token_version", gorm.Expr("token_version + 1"))
 	if res.Error != nil {
