@@ -61,18 +61,3 @@ type ProjectImage struct {
 }
 
 func (ProjectImage) TableName() string { return "project_images" }
-
-type ProjectContent struct {
-	ID               uuid.UUID      `gorm:"type:uuid;primaryKey;default:gen_random_uuid()"`
-	ProjectID        uuid.UUID      `gorm:"type:uuid;not null;index"`
-	Title            string         `gorm:"not null"`
-	Body             *string        `gorm:"type:text"`
-	StorageKey       *string        `gorm:"column:storage_key;type:varchar"`
-	ExternalURL      *string        `gorm:"column:external_url;type:varchar"`
-	MinimumPlan      MembershipType `gorm:"column:minimum_plan;not null"`
-	SortOrder        int            `gorm:"column:sort_order;not null;default:0"`
-	CreatedAt        time.Time      `gorm:"not null"`
-	UpdatedAt        time.Time      `gorm:"not null"`
-}
-
-func (ProjectContent) TableName() string { return "project_contents" }

@@ -11,6 +11,7 @@ import (
 	"crowdfund-app/validator"
 
 	"github.com/google/uuid"
+	"gorm.io/gorm"
 )
 
 func (a *AuthUseCase) issueSession(ctx context.Context, u model.User, verified2FA bool) (*SessionTokens, error) {
@@ -310,4 +311,72 @@ func (a *AuthUseCase) ChangePassword(ctx context.Context, userID uuid.UUID, curr
 		return err
 	}
 	return InvalidateUserSessions(ctx, a.DB, a.Users, a.RefreshTokens, u.ID)
+}
+
+type UpdateProfileIn struct {
+	Name      *string
+	AvatarURL *string
+}
+
+func (a *AuthUseCase) GetUser(ctx context.Context, userID uuid.UUID) (UserView, error) {
+	var (
+		u   model.User
+		err error
+	)
+
+	u, err = a.Users.GetID(ctx, userID)
+	if err != nil {
+		return UserView{}, mapRepoNotFound(err)
+	}
+	return UserViewFrom(u), nil
+}
+
+func (a *AuthUseCase) UpdateProfile(ctx context.Context, userID uuid.UUID, in UpdateProfileIn) (UserView, error) {
+	var (
+		norm validator.UpdateProfileNormalized
+		u    model.User
+		err  error
+	)
+
+	norm, err = validator.ValidateUpdateProfile(validator.UpdateProfileInput{
+		Name:      in.Name,
+		AvatarURL: in.AvatarURL,
+	})
+	if err != nil {
+		return UserView{}, mapProfileModelErr(err)
+	}
+	u, err = a.Users.GetID(ctx, userID)
+	if err != nil {
+		return UserView{}, mapRepoNotFound(err)
+	}
+	if norm.NameSet {
+		u.Name = norm.Name
+	}
+	if norm.AvatarURLSet {
+		u.AvatarURL = norm.AvatarURL
+	}
+	if err = a.Users.Update(ctx, &u); err != nil {
+		return UserView{}, err
+	}
+	return UserViewFrom(u), nil
+}
+
+func InvalidateUserSessions(
+	ctx context.Context,
+	db *gorm.DB,
+	users repository.IUserRepo,
+	refresh repository.IRefreshTokenRepo,
+	userID uuid.UUID,
+) error {
+	var err error
+
+	return repository.WithTx(ctx, db, func(txCtx context.Context) error {
+		if _, err = users.BumpTokenVer(txCtx, userID); err != nil {
+			return err
+		}
+		if refresh == nil {
+			return nil
+		}
+		return refresh.RevokeAllByUser(txCtx, userID, time.Now().UTC())
+	})
 }
