@@ -5,7 +5,6 @@ package integration
 import (
 	"bytes"
 	"database/sql"
-	"encoding/json"
 	"fmt"
 	"io"
 	"mime/multipart"
@@ -280,16 +279,6 @@ func httpDELETE(e *echo.Echo, path, token string) *httptest.ResponseRecorder {
 	}
 	e.ServeHTTP(rec, req)
 	return rec
-}
-
-func bodyCode(rec *httptest.ResponseRecorder) string {
-	var m map[string]any
-	raw := strings.TrimSpace(rec.Body.String())
-	if raw == "" || json.Unmarshal([]byte(raw), &m) != nil {
-		return ""
-	}
-	c, _ := m["code"].(string)
-	return c
 }
 
 func mediaUploadPOST(e *echo.Echo, token string, data []byte, filename string) *httptest.ResponseRecorder {

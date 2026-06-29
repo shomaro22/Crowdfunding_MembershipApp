@@ -4,7 +4,6 @@ package integration
 
 import (
 	"bytes"
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -371,59 +370,4 @@ func postStripeWebhookWithID(t *testing.T, e *echo.Echo, eventID, eventType, ses
 	req.Header.Set("Stripe-Signature", stripe.StubWebhookSignature)
 	e.ServeHTTP(rec, req)
 	return rec
-}
-
-func buildStripeEventPayload(eventID, eventType, objectID string, meta map[string]string, konbini bool) ([]byte, error) {
-	var (
-		obj     map[string]any
-		objRaw  []byte
-		payload []byte
-		err     error
-	)
-	obj = map[string]any{
-		"id":       objectID,
-		"metadata": meta,
-	}
-	switch eventType {
-	case "payment_intent.succeeded":
-		obj["status"] = "succeeded"
-	case "checkout.session.async_payment_succeeded", "checkout.session.completed":
-		obj["payment_status"] = "paid"
-		if konbini {
-			obj["payment_method_types"] = []string{"konbini"}
-		}
-	case "checkout.session.expired":
-		if konbini {
-			obj["payment_method_types"] = []string{"konbini"}
-		}
-	}
-	objRaw, err = json.Marshal(obj)
-	if err != nil {
-		return nil, err
-	}
-	payload, err = json.Marshal(map[string]any{
-		"id":   eventID,
-		"type": eventType,
-		"data": map[string]any{
-			"object": json.RawMessage(objRaw),
-		},
-	})
-	return payload, err
-}
-
-func jsonStringField(t *testing.T, rec *httptest.ResponseRecorder, key string) string {
-	var (
-		m   map[string]any
-		raw string
-		ok  bool
-	)
-	t.Helper()
-	if err := json.Unmarshal(rec.Body.Bytes(), &m); err != nil {
-		t.Fatalf("json: %v body=%s", err, rec.Body.String())
-	}
-	raw, ok = m[key].(string)
-	if !ok || raw == "" {
-		t.Fatalf("missing %q in %s", key, rec.Body.String())
-	}
-	return raw
 }

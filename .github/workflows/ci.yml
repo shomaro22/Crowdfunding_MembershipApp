@@ -56,6 +56,9 @@ jobs:
       - name: Download modules
         run: go mod download
 
+      - name: Check no any
+        run: bash scripts/check-no-any.sh
+
       - name: Vet
         run: go vet ./...
 

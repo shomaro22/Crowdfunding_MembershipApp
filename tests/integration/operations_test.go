@@ -221,7 +221,7 @@ func TestOperationsSecurityEventsCounts(t *testing.T) {
 		gdb   *gorm.DB
 		tok   string
 		rec   *httptest.ResponseRecorder
-		m     map[string]any
+		body  securityEventsBody
 		now   time.Time
 	)
 	e = setupApp(t)
@@ -235,14 +235,14 @@ func TestOperationsSecurityEventsCounts(t *testing.T) {
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status=%d want 200", rec.Code)
 	}
-	if err := json.Unmarshal(rec.Body.Bytes(), &m); err != nil {
+	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
 		t.Fatal(err)
 	}
-	if n, _ := m["login_failed_count"].(float64); n < 1 {
-		t.Fatalf("login_failed_count=%v want >= 1", m["login_failed_count"])
+	if body.LoginFailedCount < 1 {
+		t.Fatalf("login_failed_count=%d want >= 1", body.LoginFailedCount)
 	}
-	if n, _ := m["rate_limited_count"].(float64); n < 1 {
-		t.Fatalf("rate_limited_count=%v want >= 1", m["rate_limited_count"])
+	if body.RateLimitedCount < 1 {
+		t.Fatalf("rate_limited_count=%d want >= 1", body.RateLimitedCount)
 	}
 }
 
