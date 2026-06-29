@@ -1,0 +1,12 @@
+.env
+data/
+*.exe
+*.test
+
+# OS
+.DS_Store
+
+# Frontend (repo root /frontend)
+frontend/node_modules/
+frontend/dist/
+frontend/.env
