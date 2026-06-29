@@ -38,12 +38,14 @@ func TestSellerDashboardForbiddenForBuyer(t *testing.T) {
 
 func TestSellerDashboardStatsAndSupporters(t *testing.T) {
 	var (
-		e         *echo.Echo
-		gdb       *gorm.DB
-		fx        sellerFixture
-		tok       string
-		rec       *httptest.ResponseRecorder
-		body      map[string]any
+		e        *echo.Echo
+		gdb      *gorm.DB
+		fx       sellerFixture
+		tok      string
+		rec      *httptest.ResponseRecorder
+		stats    sellerStatsBody
+		supports sellerSupportersBody
+		analysis sellerProjectsAnalysisBody
 	)
 	e = setupApp(t)
 	gdb = openDB(t)
@@ -54,30 +56,28 @@ func TestSellerDashboardStatsAndSupporters(t *testing.T) {
 	if rec.Code != http.StatusOK {
 		t.Fatalf("stats status=%d body=%s", rec.Code, rec.Body.String())
 	}
-	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
+	if err := json.Unmarshal(rec.Body.Bytes(), &stats); err != nil {
 		t.Fatal(err)
 	}
-	if int64(body["total_projects"].(float64)) != 1 {
-		t.Fatalf("total_projects=%v", body["total_projects"])
+	if stats.TotalProjects != 1 {
+		t.Fatalf("total_projects=%d", stats.TotalProjects)
 	}
-	if int64(body["total_supporters"].(float64)) != 1 {
-		t.Fatalf("total_supporters=%v", body["total_supporters"])
+	if stats.TotalSupporters != 1 {
+		t.Fatalf("total_supporters=%d", stats.TotalSupporters)
 	}
-	if int64(body["total_revenue"].(float64)) != 1000 {
-		t.Fatalf("total_revenue=%v", body["total_revenue"])
+	if stats.TotalRevenue != 1000 {
+		t.Fatalf("total_revenue=%d", stats.TotalRevenue)
 	}
 
 	rec = httpGET(e, fmt.Sprintf("/seller/supporters?project_id=%s", fx.project.ID), tok)
 	if rec.Code != http.StatusOK {
 		t.Fatalf("list status=%d body=%s", rec.Code, rec.Body.String())
 	}
-	body = nil
-	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
+	if err := json.Unmarshal(rec.Body.Bytes(), &supports); err != nil {
 		t.Fatal(err)
 	}
-	supporters, _ := body["supporters"].([]any)
-	if len(supporters) != 1 {
-		t.Fatalf("supporters len=%d want 1", len(supporters))
+	if len(supports.Supporters) != 1 {
+		t.Fatalf("supporters len=%d want 1", len(supports.Supporters))
 	}
 
 	rec = httpGET(e, "/seller/supporters/export", tok)
@@ -95,13 +95,11 @@ func TestSellerDashboardStatsAndSupporters(t *testing.T) {
 	if rec.Code != http.StatusOK {
 		t.Fatalf("analysis status=%d body=%s", rec.Code, rec.Body.String())
 	}
-	body = nil
-	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
+	if err := json.Unmarshal(rec.Body.Bytes(), &analysis); err != nil {
 		t.Fatal(err)
 	}
-	projects, _ := body["projects"].([]any)
-	if len(projects) != 1 {
-		t.Fatalf("projects len=%d want 1", len(projects))
+	if len(analysis.Projects) != 1 {
+		t.Fatalf("projects len=%d want 1", len(analysis.Projects))
 	}
 }
 
@@ -114,19 +112,19 @@ type sellerFixture struct {
 
 func seedSellerFixture(t *testing.T, gdb *gorm.DB) sellerFixture {
 	var (
-		now    time.Time
-		seller *model.User
-		buyer  *model.User
+		now     time.Time
+		seller  *model.User
+		buyer   *model.User
 		project *model.Project
-		plan   *model.ProjectPlan
-		err    error
+		plan    *model.ProjectPlan
+		err     error
 	)
 	t.Helper()
 	now = time.Now().UTC()
 	seller = seedUser(t, gdb, seedOpts{Role: model.UserRoleSeller, TOTPEnabled: true})
 	buyer = seedUser(t, gdb, seedOpts{Role: model.UserRoleBuyer})
 	project = seedProject(t, gdb, seller.ID, model.ProjectStatusActive)
-	err = gdb.Model(project).Updates(map[string]any{"supporter_count": 1}).Error
+	err = gdb.Model(project).Update("supporter_count", 1).Error
 	if err != nil {
 		t.Fatal(err)
 	}
