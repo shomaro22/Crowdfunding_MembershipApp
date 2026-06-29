@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	"crowdfund-app/entity"
+	"crowdfund-app/model"
 	"crowdfund-app/repository"
 
 	"github.com/google/uuid"
@@ -39,7 +39,7 @@ type SellerRegView struct {
 
 func (a *AdminUseCase) requireReviewAdmin(ctx context.Context, adminID uuid.UUID) error {
 	var (
-		admin *entity.User
+		admin *model.User
 		err   error
 	)
 
@@ -47,14 +47,14 @@ func (a *AdminUseCase) requireReviewAdmin(ctx context.Context, adminID uuid.UUID
 	if err != nil {
 		return mapRepoNotFoundAs(err, ErrForbidden)
 	}
-	if admin.Role != entity.UserRoleAdmin {
+	if admin.Role != model.UserRoleAdmin {
 		return ErrForbidden
 	}
 	if admin.AdminRole == nil {
 		return ErrForbidden
 	}
 	switch *admin.AdminRole {
-	case entity.AdminRoleSuperAdmin, entity.AdminRoleReviewAdmin:
+	case model.AdminRoleSuperAdmin, model.AdminRoleReviewAdmin:
 		return nil
 	default:
 		return ErrForbidden
@@ -82,7 +82,7 @@ func normalizeReviewReason(reason *string) *string {
 
 func (a *AdminUseCase) ResetUser2FA(ctx context.Context, adminID, targetUserID uuid.UUID, reason *string) (UserView, error) {
 	var (
-		u   *entity.User
+		u   *model.User
 		err error
 		now time.Time
 	)
@@ -115,16 +115,16 @@ func (a *AdminUseCase) ResetUser2FA(ctx context.Context, adminID, targetUserID u
 
 func (a *AdminUseCase) ChangeAdminRole(ctx context.Context, actorID, targetUserID uuid.UUID, newRole string, reason *string) (UserView, error) {
 	var (
-		actor   *entity.User
-		u       *entity.User
+		actor   *model.User
+		u       *model.User
 		err     error
 		now     time.Time
 		oldRole string
 		details string
-		role    entity.AdminRole
+		role    model.AdminRole
 	)
 
-	role = entity.AdminRole(newRole)
+	role = model.AdminRole(newRole)
 	if !role.Valid() {
 		return UserView{}, ErrBadRequest
 	}
@@ -132,15 +132,15 @@ func (a *AdminUseCase) ChangeAdminRole(ctx context.Context, actorID, targetUserI
 	if err != nil {
 		return UserView{}, mapRepoNotFoundAs(err, ErrForbidden)
 	}
-	if actor.Role != entity.UserRoleAdmin ||
-		actor.AdminRole == nil || *actor.AdminRole != entity.AdminRoleSuperAdmin {
+	if actor.Role != model.UserRoleAdmin ||
+		actor.AdminRole == nil || *actor.AdminRole != model.AdminRoleSuperAdmin {
 		return UserView{}, ErrForbidden
 	}
 	u, err = a.Users.FindID(ctx, targetUserID)
 	if err != nil {
 		return UserView{}, mapRepoNotFound(err)
 	}
-	if u.Role != entity.UserRoleAdmin {
+	if u.Role != model.UserRoleAdmin {
 		return UserView{}, ErrInvalidState
 	}
 	if u.AdminRole != nil && *u.AdminRole == role {
@@ -168,7 +168,7 @@ func (a *AdminUseCase) writeReviewDecision(ctx context.Context, reviewerID uuid.
 	if a.ReviewDecisions == nil {
 		return
 	}
-	_ = a.ReviewDecisions.Create(ctx, &entity.ReviewDecision{
+	_ = a.ReviewDecisions.Create(ctx, &model.ReviewDecision{
 		ID:           uuid.New(),
 		ReviewerID:   reviewerID,
 		ResourceType: resourceType,

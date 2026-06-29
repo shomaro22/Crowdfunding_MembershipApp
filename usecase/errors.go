@@ -3,7 +3,7 @@ package usecase
 import (
 	"errors"
 
-	"crowdfund-app/entity"
+	"crowdfund-app/model"
 	"crowdfund-app/repository"
 )
 
@@ -38,9 +38,9 @@ var (
 
 func mapBuyerRegEntityErr(err error) error {
 	switch {
-	case errors.Is(err, entity.ErrBadEmail):
+	case errors.Is(err, model.ErrBadEmail):
 		return ErrInvalidEmail
-	case errors.Is(err, entity.ErrWeakPassword):
+	case errors.Is(err, model.ErrWeakPassword):
 		return ErrWeakPassword
 	default:
 		return err
@@ -48,7 +48,7 @@ func mapBuyerRegEntityErr(err error) error {
 }
 
 func mapSellerKYCEntityErr(err error) error {
-	if errors.Is(err, entity.ErrBadKYC) {
+	if errors.Is(err, model.ErrBadKYC) {
 		return ErrBadKYC
 	}
 	return err
@@ -56,12 +56,12 @@ func mapSellerKYCEntityErr(err error) error {
 
 func mapProjectEntityErr(err error) error {
 	switch {
-	case errors.Is(err, entity.ErrBadTitle),
-		errors.Is(err, entity.ErrBadProject),
-		errors.Is(err, entity.ErrBadDuration),
-		errors.Is(err, entity.ErrBadMembership),
-		errors.Is(err, entity.ErrBadPrice),
-		errors.Is(err, entity.ErrBadImages):
+	case errors.Is(err, model.ErrBadTitle),
+		errors.Is(err, model.ErrBadProject),
+		errors.Is(err, model.ErrBadDuration),
+		errors.Is(err, model.ErrBadMembership),
+		errors.Is(err, model.ErrBadPrice),
+		errors.Is(err, model.ErrBadImages):
 		return ErrBadRequest
 	default:
 		return err
@@ -69,14 +69,14 @@ func mapProjectEntityErr(err error) error {
 }
 
 func mapMessageEntityErr(err error) error {
-	if errors.Is(err, entity.ErrBadMessage) {
+	if errors.Is(err, model.ErrBadMessage) {
 		return ErrBadRequest
 	}
 	return err
 }
 
 func mapProfileEntityErr(err error) error {
-	if errors.Is(err, entity.ErrBadProfile) {
+	if errors.Is(err, model.ErrBadProfile) {
 		return ErrBadRequest
 	}
 	return err

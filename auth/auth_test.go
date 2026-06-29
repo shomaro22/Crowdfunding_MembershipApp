@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"crowdfund-app/entity"
+	"crowdfund-app/model"
 
 	"github.com/google/uuid"
 )
@@ -14,7 +14,7 @@ func TestIssueParse(t *testing.T) {
 		secret    []byte
 		svc       *TokenService
 		uid       uuid.UUID
-		adminRole entity.AdminRole
+		adminRole model.AdminRole
 		token     string
 		err       error
 		claims    AuthClaims
@@ -23,10 +23,10 @@ func TestIssueParse(t *testing.T) {
 	secret = []byte("01234567890123456789012345678901")
 	svc = NewTokenService(secret, time.Minute)
 	uid = uuid.New()
-	adminRole = entity.AdminRoleSuperAdmin
+	adminRole = model.AdminRoleSuperAdmin
 	token, err = svc.Issue(AuthClaims{
 		UserID:        uid,
-		Role:          entity.UserRoleAdmin,
+		Role:          model.UserRoleAdmin,
 		TwoFAVerified: true,
 		AdminRole:     &adminRole,
 		TokenVersion:  1,
@@ -41,7 +41,7 @@ func TestIssueParse(t *testing.T) {
 	if claims.UserID != uid {
 		t.Fatalf("user id mismatch")
 	}
-	if claims.Role != entity.UserRoleAdmin {
+	if claims.Role != model.UserRoleAdmin {
 		t.Fatalf("role mismatch")
 	}
 	if !claims.TwoFAVerified {

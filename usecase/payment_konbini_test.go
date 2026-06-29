@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"crowdfund-app/entity"
+	"crowdfund-app/model"
 
 	"github.com/google/uuid"
 )
@@ -27,7 +27,7 @@ func TestKonbiniRenewalPeriod_FromPeriodEnd(t *testing.T) {
 	var (
 		end  = time.Date(2026, 4, 1, 0, 0, 0, 0, time.UTC)
 		paid = time.Date(2026, 3, 28, 10, 0, 0, 0, time.UTC)
-		s    = &entity.ProjectSupporter{CurrentPeriodEnd: end}
+		s    = &model.ProjectSupporter{CurrentPeriodEnd: end}
 		got  periodRange
 	)
 	got = konbiniRenewalPeriod(s, paid)
@@ -43,7 +43,7 @@ func TestKonbiniRenewalPeriod_LatePayment(t *testing.T) {
 	var (
 		end  = time.Date(2026, 3, 1, 0, 0, 0, 0, time.UTC)
 		paid = time.Date(2026, 3, 10, 0, 0, 0, 0, time.UTC)
-		s    = &entity.ProjectSupporter{CurrentPeriodEnd: end}
+		s    = &model.ProjectSupporter{CurrentPeriodEnd: end}
 		got  periodRange
 	)
 	got = konbiniRenewalPeriod(s, paid)

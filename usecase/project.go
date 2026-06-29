@@ -5,7 +5,7 @@ import (
 	"strings"
 	"time"
 
-	"crowdfund-app/entity"
+	"crowdfund-app/model"
 	"crowdfund-app/repository"
 	"crowdfund-app/validator"
 
@@ -56,10 +56,10 @@ type ProjectUseCase struct {
 	DB       *gorm.DB
 }
 
-func buildProjectImages(ins []ImageIn, legacyURL *string, now time.Time) ([]entity.ProjectImage, *string, error) {
+func buildProjectImages(ins []ImageIn, legacyURL *string, now time.Time) ([]model.ProjectImage, *string, error) {
 	var (
-		inputs  []entity.ImageInput
-		images  []entity.ProjectImage
+		inputs  []model.ImageInput
+		images  []model.ProjectImage
 		mainURL *string
 		err     error
 		i       int
@@ -68,9 +68,9 @@ func buildProjectImages(ins []ImageIn, legacyURL *string, now time.Time) ([]enti
 	)
 
 	if len(ins) > 0 {
-		inputs = make([]entity.ImageInput, len(ins))
+		inputs = make([]model.ImageInput, len(ins))
 		for i = range ins {
-			inputs[i] = entity.ImageInput{
+			inputs[i] = model.ImageInput{
 				ImageURL: ins[i].ImageURL,
 				IsMain:   ins[i].IsMain,
 				Order:    ins[i].Order,
@@ -78,7 +78,7 @@ func buildProjectImages(ins []ImageIn, legacyURL *string, now time.Time) ([]enti
 		}
 	} else if legacyURL != nil && strings.TrimSpace(*legacyURL) != "" {
 		url = strings.TrimSpace(*legacyURL)
-		inputs = []entity.ImageInput{{ImageURL: url, IsMain: true, Order: 0}}
+		inputs = []model.ImageInput{{ImageURL: url, IsMain: true, Order: 0}}
 	}
 	if err = validator.ValidateProjectImages(inputs); err != nil {
 		return nil, nil, mapProjectEntityErr(err)
@@ -87,10 +87,10 @@ func buildProjectImages(ins []ImageIn, legacyURL *string, now time.Time) ([]enti
 		return nil, nil, nil
 	}
 	orders = imageSortOrders(inputs)
-	images = make([]entity.ProjectImage, len(inputs))
+	images = make([]model.ProjectImage, len(inputs))
 	for i = range inputs {
 		url = strings.TrimSpace(inputs[i].ImageURL)
-		images[i] = entity.ProjectImage{
+		images[i] = model.ProjectImage{
 			ID:        uuid.New(),
 			ImageURL:  url,
 			IsMain:    inputs[i].IsMain,
@@ -104,7 +104,7 @@ func buildProjectImages(ins []ImageIn, legacyURL *string, now time.Time) ([]enti
 	return images, mainURL, nil
 }
 
-func imageSortOrders(inputs []entity.ImageInput) []int {
+func imageSortOrders(inputs []model.ImageInput) []int {
 	var (
 		orders  = make([]int, len(inputs))
 		allZero = true
@@ -124,19 +124,19 @@ func imageSortOrders(inputs []entity.ImageInput) []int {
 	return orders
 }
 
-func (p *ProjectUseCase) EnrichList(ctx context.Context, rows []entity.Project, total int64) ([]ProjectView, int64, error) {
+func (p *ProjectUseCase) EnrichList(ctx context.Context, rows []model.Project, total int64) ([]ProjectView, int64, error) {
 	var (
 		out         []ProjectView
 		sellerCache map[uuid.UUID]*UserView
 		i           int
-		project        entity.Project
+		project        model.Project
 		seller      *UserView
 		ok          bool
-		u           *entity.User
-		plans       []entity.ProjectPlan
-		images      []entity.ProjectImage
+		u           *model.User
+		plans       []model.ProjectPlan
+		images      []model.ProjectImage
 		err         error
-		projectCopy entity.Project
+		projectCopy model.Project
 	)
 
 	out = make([]ProjectView, 0, len(rows))
@@ -164,7 +164,7 @@ func (p *ProjectUseCase) EnrichList(ctx context.Context, rows []entity.Project, 
 
 func (p *ProjectUseCase) ListPublic(ctx context.Context, search, sort string, limit, offset int) ([]ProjectView, int64, error) {
 	var (
-		rows  []entity.Project
+		rows  []model.Project
 		total int64
 		err   error
 	)
@@ -184,9 +184,9 @@ func (p *ProjectUseCase) ListPublic(ctx context.Context, search, sort string, li
 
 func (p *ProjectUseCase) ListMine(ctx context.Context, sellerID uuid.UUID, limit, offset int) ([]ProjectView, int64, error) {
 	var (
-		u     *entity.User
+		u     *model.User
 		err   error
-		rows  []entity.Project
+		rows  []model.Project
 		total int64
 	)
 
@@ -194,7 +194,7 @@ func (p *ProjectUseCase) ListMine(ctx context.Context, sellerID uuid.UUID, limit
 	if err != nil {
 		return nil, 0, mapRepoNotFoundAs(err, ErrForbidden)
 	}
-	if u.Role != entity.UserRoleSeller {
+	if u.Role != model.UserRoleSeller {
 		return nil, 0, ErrForbidden
 	}
 	rows, total, err = p.Projects.ListSeller(ctx, sellerID, limit, offset)
@@ -206,10 +206,10 @@ func (p *ProjectUseCase) ListMine(ctx context.Context, sellerID uuid.UUID, limit
 
 func (p *ProjectUseCase) FindView(ctx context.Context, id uuid.UUID, viewerID *uuid.UUID, viewerRole string) (*ProjectView, error) {
 	var (
-		project   *entity.Project
-		plans  []entity.ProjectPlan
-		images []entity.ProjectImage
-		u      *entity.User
+		project   *model.Project
+		plans  []model.ProjectPlan
+		images []model.ProjectImage
+		u      *model.User
 		seller *UserView
 		err    error
 		now    = time.Now().UTC()
@@ -233,8 +233,8 @@ func (p *ProjectUseCase) FindView(ctx context.Context, id uuid.UUID, viewerID *u
 
 func (p *ProjectUseCase) ListPlans(ctx context.Context, projectID uuid.UUID, viewerID *uuid.UUID, viewerRole string) ([]ProjectPlanView, error) {
 	var (
-		project  *entity.Project
-		plans []entity.ProjectPlan
+		project  *model.Project
+		plans []model.ProjectPlan
 		err   error
 		now   time.Time
 	)
@@ -250,23 +250,23 @@ func (p *ProjectUseCase) ListPlans(ctx context.Context, projectID uuid.UUID, vie
 	return ProjectPlansFrom(plans), nil
 }
 
-func parseUserRole(raw string) entity.UserRole {
-	var role entity.UserRole
-	role = entity.UserRole(strings.TrimSpace(raw))
+func parseUserRole(raw string) model.UserRole {
+	var role model.UserRole
+	role = model.UserRole(strings.TrimSpace(raw))
 	if role.Valid() {
 		return role
 	}
 	return ""
 }
 
-func canViewProject(project *entity.Project, viewerID *uuid.UUID, role entity.UserRole, now time.Time) bool {
+func canViewProject(project *model.Project, viewerID *uuid.UUID, role model.UserRole, now time.Time) bool {
 	if project.IsPublic(now) {
 		return true
 	}
 	if viewerID != nil && *viewerID == project.SellerID {
 		return true
 	}
-	if role == entity.UserRoleAdmin {
+	if role == model.UserRoleAdmin {
 		return true
 	}
 	return false

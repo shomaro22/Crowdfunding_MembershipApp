@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"crowdfund-app/auth"
-	"crowdfund-app/entity"
+	"crowdfund-app/model"
 	"crowdfund-app/repository"
 
 	"github.com/google/uuid"
@@ -44,8 +44,8 @@ type LoginResult struct {
 }
 
 type SessionInfo struct {
-	Role      entity.UserRole
-	AdminRole *entity.AdminRole
+	Role      model.UserRole
+	AdminRole *model.AdminRole
 }
 
 type AuthUseCase struct {
@@ -67,11 +67,11 @@ type AuthUseCase struct {
 	AppPublicURL  string
 }
 
-func (a *AuthUseCase) logActivity(ctx context.Context, userID *uuid.UUID, action entity.ActivityAction, resource, resourceID string, meta RequestMeta, extra entity.JSONMetadata) {
+func (a *AuthUseCase) logActivity(ctx context.Context, userID *uuid.UUID, action model.ActivityAction, resource, resourceID string, meta RequestMeta, extra model.JSONMetadata) {
 	LogActivity(ctx, a.Activity, userID, action, resource, resourceID, meta, extra)
 }
 
-func twoFAVerified(u *entity.User) bool {
+func twoFAVerified(u *model.User) bool {
 	if !u.MustSetup2FA() {
 		return true
 	}

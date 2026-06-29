@@ -5,7 +5,7 @@ import (
 	"strings"
 	"time"
 
-	"crowdfund-app/entity"
+	"crowdfund-app/model"
 	"crowdfund-app/repository"
 
 	"github.com/google/uuid"
@@ -13,13 +13,13 @@ import (
 
 func (a *AdminUseCase) ListBuyerPending(ctx context.Context, limit, offset int) ([]UserView, int64, error) {
 	var (
-		rows  []entity.User
+		rows  []model.User
 		total int64
 		out   []UserView
 		err   error
 		i     int
 	)
-	rows, total, err = a.Users.ListRoleStatus(ctx, entity.UserRoleBuyer, entity.AccountStatusPending, limit, offset)
+	rows, total, err = a.Users.ListRoleStatus(ctx, model.UserRoleBuyer, model.AccountStatusPending, limit, offset)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -32,7 +32,7 @@ func (a *AdminUseCase) ListBuyerPending(ctx context.Context, limit, offset int) 
 
 func (a *AdminUseCase) ApproveBuyer(ctx context.Context, adminID, userID uuid.UUID, reason *string) (UserView, error) {
 	var (
-		u   *entity.User
+		u   *model.User
 		err error
 		now time.Time
 	)
@@ -44,23 +44,23 @@ func (a *AdminUseCase) ApproveBuyer(ctx context.Context, adminID, userID uuid.UU
 	if err != nil {
 		return UserView{}, mapRepoNotFound(err)
 	}
-	if u.Role != entity.UserRoleBuyer || u.AccountStatus != entity.AccountStatusPending {
+	if u.Role != model.UserRoleBuyer || u.AccountStatus != model.AccountStatusPending {
 		return UserView{}, ErrInvalidState
 	}
 	now = time.Now().UTC()
-	u.AccountStatus = entity.AccountStatusActive
+	u.AccountStatus = model.AccountStatusActive
 	u.UpdatedAt = now
 	if err = a.Users.Update(ctx, u); err != nil {
 		return UserView{}, err
 	}
 	WriteAudit(ctx, a.Audit, adminID, "buyer_registration.approve", "user", u.ID.String(), reason, nil)
-	a.writeReviewDecision(ctx, adminID, entity.ReviewBuyerRegistration, userID, entity.ReviewApproved, reason)
+	a.writeReviewDecision(ctx, adminID, model.ReviewBuyerRegistration, userID, model.ReviewApproved, reason)
 	return UserViewFrom(u), nil
 }
 
 func (a *AdminUseCase) RejectBuyer(ctx context.Context, adminID, userID uuid.UUID, reason *string) (UserView, error) {
 	var (
-		u   *entity.User
+		u   *model.User
 		err error
 		now time.Time
 	)
@@ -76,33 +76,33 @@ func (a *AdminUseCase) RejectBuyer(ctx context.Context, adminID, userID uuid.UUI
 	if err != nil {
 		return UserView{}, mapRepoNotFound(err)
 	}
-	if u.Role != entity.UserRoleBuyer || u.AccountStatus != entity.AccountStatusPending {
+	if u.Role != model.UserRoleBuyer || u.AccountStatus != model.AccountStatusPending {
 		return UserView{}, ErrInvalidState
 	}
 	now = time.Now().UTC()
-	u.AccountStatus = entity.AccountStatusSuspended
+	u.AccountStatus = model.AccountStatusSuspended
 	u.UpdatedAt = now
 	if err = a.Users.Update(ctx, u); err != nil {
 		return UserView{}, err
 	}
 	WriteAudit(ctx, a.Audit, adminID, "buyer_registration.reject", "user", u.ID.String(), reason, nil)
-	a.writeReviewDecision(ctx, adminID, entity.ReviewBuyerRegistration, userID, entity.ReviewRejected, reason)
+	a.writeReviewDecision(ctx, adminID, model.ReviewBuyerRegistration, userID, model.ReviewRejected, reason)
 	return UserViewFrom(u), nil
 }
 
 func (a *AdminUseCase) ListSellerRegs(ctx context.Context, status string, limit, offset int) ([]SellerRegItemView, int64, error) {
 	var (
-		rows  []entity.SellerReg
+		rows  []model.SellerReg
 		total int64
 		out   []SellerRegItemView
 		err   error
 		i     int
-		st    entity.RegStatus
+		st    model.RegStatus
 	)
 
-	st = entity.RegStatus(status)
+	st = model.RegStatus(status)
 	if !st.Valid() {
-		st = entity.RegPending
+		st = model.RegPending
 	}
 	rows, total, err = a.SellerRegs.List(ctx, st, limit, offset)
 	if err != nil {
@@ -117,9 +117,9 @@ func (a *AdminUseCase) ListSellerRegs(ctx context.Context, status string, limit,
 
 func (a *AdminUseCase) GetSellerReg(ctx context.Context, id uuid.UUID) (*SellerRegView, error) {
 	var (
-		reg *entity.SellerReg
+		reg *model.SellerReg
 		err error
-		u   *entity.User
+		u   *model.User
 		now time.Time
 		out *SellerRegView
 		tok string
@@ -151,9 +151,9 @@ func (a *AdminUseCase) GetSellerReg(ctx context.Context, id uuid.UUID) (*SellerR
 
 func (a *AdminUseCase) ApproveSellerReg(ctx context.Context, adminID, regID uuid.UUID) (SellerRegItemView, error) {
 	var (
-		reg *entity.SellerReg
+		reg *model.SellerReg
 		err error
-		u   *entity.User
+		u   *model.User
 		now time.Time
 	)
 
@@ -175,13 +175,13 @@ func (a *AdminUseCase) ApproveSellerReg(ctx context.Context, adminID, regID uuid
 	err = repository.WithTx(ctx, a.DB, func(txCtx context.Context) error {
 		var txErr error
 
-		u.AccountStatus = entity.AccountStatusActive
-		u.SellerStatus = entity.SellerStatusActive
+		u.AccountStatus = model.AccountStatusActive
+		u.SellerStatus = model.SellerStatusActive
 		u.UpdatedAt = now
 		if txErr = a.Users.Update(txCtx, u); txErr != nil {
 			return txErr
 		}
-		reg.Status = entity.RegApproved
+		reg.Status = model.RegApproved
 		reg.ReviewedAt = &now
 		reg.ReviewedBy = &adminID
 		reg.UpdatedAt = now
@@ -191,13 +191,13 @@ func (a *AdminUseCase) ApproveSellerReg(ctx context.Context, adminID, regID uuid
 		return SellerRegItemView{}, err
 	}
 	WriteAudit(ctx, a.Audit, adminID, "seller_registration.approve", "seller_registration", reg.ID.String(), nil, nil)
-	a.writeReviewDecision(ctx, adminID, entity.ReviewSellerRegistration, regID, entity.ReviewApproved, nil)
+	a.writeReviewDecision(ctx, adminID, model.ReviewSellerRegistration, regID, model.ReviewApproved, nil)
 	return SellerRegItemFrom(reg), nil
 }
 
 func (a *AdminUseCase) RejectSellerReg(ctx context.Context, adminID, regID uuid.UUID, reason string) (SellerRegItemView, error) {
 	var (
-		reg *entity.SellerReg
+		reg *model.SellerReg
 		err error
 		now time.Time
 	)
@@ -213,11 +213,11 @@ func (a *AdminUseCase) RejectSellerReg(ctx context.Context, adminID, regID uuid.
 	if err != nil {
 		return SellerRegItemView{}, mapRepoNotFound(err)
 	}
-	if reg.Status != entity.RegPending {
+	if reg.Status != model.RegPending {
 		return SellerRegItemView{}, ErrInvalidState
 	}
 	now = time.Now().UTC()
-	reg.Status = entity.RegRejected
+	reg.Status = model.RegRejected
 	reg.RejectReason = &reason
 	reg.ReviewedAt = &now
 	reg.ReviewedBy = &adminID
@@ -226,6 +226,6 @@ func (a *AdminUseCase) RejectSellerReg(ctx context.Context, adminID, regID uuid.
 		return SellerRegItemView{}, err
 	}
 	WriteAudit(ctx, a.Audit, adminID, "seller_registration.reject", "seller_registration", reg.ID.String(), &reason, nil)
-	a.writeReviewDecision(ctx, adminID, entity.ReviewSellerRegistration, regID, entity.ReviewRejected, &reason)
+	a.writeReviewDecision(ctx, adminID, model.ReviewSellerRegistration, regID, model.ReviewRejected, &reason)
 	return SellerRegItemFrom(reg), nil
 }

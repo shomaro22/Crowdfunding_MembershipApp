@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"time"
 
-	"crowdfund-app/entity"
+	"crowdfund-app/model"
 
 	"github.com/google/uuid"
 	"github.com/redis/go-redis/v9"
@@ -14,9 +14,9 @@ import (
 )
 
 type OAuthRepo interface {
-	Create(ctx context.Context, row *entity.OAuthAccount) error
-	FindSub(ctx context.Context, provider entity.OAuthProvider, sub string) (*entity.OAuthAccount, error)
-	FindUserID(ctx context.Context, userID uuid.UUID, provider entity.OAuthProvider) (*entity.OAuthAccount, error)
+	Create(ctx context.Context, row *model.OAuthAccount) error
+	FindSub(ctx context.Context, provider model.OAuthProvider, sub string) (*model.OAuthAccount, error)
+	FindUserID(ctx context.Context, userID uuid.UUID, provider model.OAuthProvider) (*model.OAuthAccount, error)
 }
 
 type oauthRepo struct {
@@ -27,18 +27,18 @@ func NewOAuthRepo(db *gorm.DB) OAuthRepo {
 	return &oauthRepo{db: db}
 }
 
-func (r *oauthRepo) Create(ctx context.Context, row *entity.OAuthAccount) error {
+func (r *oauthRepo) Create(ctx context.Context, row *model.OAuthAccount) error {
 	return dbFromCtx(ctx, r.db).Create(row).Error
 }
 
-func (r *oauthRepo) FindSub(ctx context.Context, provider entity.OAuthProvider, sub string) (*entity.OAuthAccount, error) {
-	return firstOnePtr[entity.OAuthAccount](
+func (r *oauthRepo) FindSub(ctx context.Context, provider model.OAuthProvider, sub string) (*model.OAuthAccount, error) {
+	return firstOnePtr[model.OAuthAccount](
 		dbFromCtx(ctx, r.db).Where("provider = ? AND provider_sub = ?", provider, sub),
 	)
 }
 
-func (r *oauthRepo) FindUserID(ctx context.Context, userID uuid.UUID, provider entity.OAuthProvider) (*entity.OAuthAccount, error) {
-	return firstOnePtr[entity.OAuthAccount](
+func (r *oauthRepo) FindUserID(ctx context.Context, userID uuid.UUID, provider model.OAuthProvider) (*model.OAuthAccount, error) {
+	return firstOnePtr[model.OAuthAccount](
 		dbFromCtx(ctx, r.db).Where("user_id = ? AND provider = ?", userID, provider),
 	)
 }

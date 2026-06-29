@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"crowdfund-app/entity"
+	"crowdfund-app/model"
 
 	"github.com/google/uuid"
 )
@@ -24,7 +24,7 @@ func TestTokenVersion(t *testing.T) {
 	uid = uuid.New()
 	token, err = svc.Issue(AuthClaims{
 		UserID:       uid,
-		Role:         entity.UserRoleBuyer,
+		Role:         model.UserRoleBuyer,
 		TokenVersion: 1,
 	})
 	if err != nil {

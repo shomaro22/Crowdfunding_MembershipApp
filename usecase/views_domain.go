@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"time"
 
-	"crowdfund-app/entity"
+	"crowdfund-app/model"
 
 	"github.com/google/uuid"
 )
@@ -47,7 +47,7 @@ type ListThreadsResult struct {
 	PerPage int
 }
 
-func MessageItemFrom(msg *entity.Message) MessageItemView {
+func MessageItemFrom(msg *model.Message) MessageItemView {
 	if msg == nil {
 		return MessageItemView{}
 	}
@@ -63,7 +63,7 @@ func MessageItemFrom(msg *entity.Message) MessageItemView {
 	}
 }
 
-func MessageItemWithUsers(msg *entity.Message, sender, receiver *UserView) MessageItemView {
+func MessageItemWithUsers(msg *model.Message, sender, receiver *UserView) MessageItemView {
 	var out MessageItemView
 	out = MessageItemFrom(msg)
 	out.Sender = sender
@@ -130,7 +130,7 @@ type SecurityEventsView struct {
 	To               time.Time
 }
 
-func ActivityLogViewFrom(row entity.ActivityLog) ActivityLogView {
+func ActivityLogViewFrom(row model.ActivityLog) ActivityLogView {
 	return ActivityLogView{
 		ID:         row.ID,
 		UserID:     row.UserID,
@@ -145,7 +145,7 @@ func ActivityLogViewFrom(row entity.ActivityLog) ActivityLogView {
 	}
 }
 
-func AuditLogViewFrom(row entity.AuditLog, adminEmail string) AuditLogView {
+func AuditLogViewFrom(row model.AuditLog, adminEmail string) AuditLogView {
 	return AuditLogView{
 		ID:         row.ID,
 		AdminID:    row.AdminID,

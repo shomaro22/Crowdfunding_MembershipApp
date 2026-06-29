@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	"crowdfund-app/entity"
+	"crowdfund-app/model"
 
 	"github.com/google/uuid"
 	"gorm.io/gorm"
@@ -18,11 +18,11 @@ type MessageThreadSummary struct {
 }
 
 type MessageRepo interface {
-	Create(ctx context.Context, row *entity.Message) error
-	FindID(ctx context.Context, id uuid.UUID) (*entity.Message, error)
-	ListForUser(ctx context.Context, userID uuid.UUID) ([]entity.Message, error)
+	Create(ctx context.Context, row *model.Message) error
+	FindID(ctx context.Context, id uuid.UUID) (*model.Message, error)
+	ListForUser(ctx context.Context, userID uuid.UUID) ([]model.Message, error)
 	ListThreadSummaries(ctx context.Context, userID uuid.UUID, offset, limit int) ([]MessageThreadSummary, int64, error)
-	ListMessagesInThread(ctx context.Context, userID, projectID, partnerID uuid.UUID, limit int) ([]entity.Message, error)
+	ListMessagesInThread(ctx context.Context, userID, projectID, partnerID uuid.UUID, limit int) ([]model.Message, error)
 	MarkRead(ctx context.Context, id uuid.UUID, at time.Time) error
 	CountUnread(ctx context.Context, userID uuid.UUID) (int64, error)
 }
@@ -39,17 +39,17 @@ func (r *messageRepo) dbCtx(ctx context.Context) *gorm.DB {
 	return dbFromCtx(ctx, r.db)
 }
 
-func (r *messageRepo) Create(ctx context.Context, row *entity.Message) error {
+func (r *messageRepo) Create(ctx context.Context, row *model.Message) error {
 	return r.dbCtx(ctx).Create(row).Error
 }
 
-func (r *messageRepo) FindID(ctx context.Context, id uuid.UUID) (*entity.Message, error) {
-	return firstOnePtr[entity.Message](r.dbCtx(ctx).Where("id = ?", id))
+func (r *messageRepo) FindID(ctx context.Context, id uuid.UUID) (*model.Message, error) {
+	return firstOnePtr[model.Message](r.dbCtx(ctx).Where("id = ?", id))
 }
 
-func (r *messageRepo) ListForUser(ctx context.Context, userID uuid.UUID) ([]entity.Message, error) {
+func (r *messageRepo) ListForUser(ctx context.Context, userID uuid.UUID) ([]model.Message, error) {
 	var (
-		rows []entity.Message
+		rows []model.Message
 		err  error
 	)
 	err = r.dbCtx(ctx).
@@ -97,9 +97,9 @@ func (r *messageRepo) ListThreadSummaries(ctx context.Context, userID uuid.UUID,
 	return rows, total, nil
 }
 
-func (r *messageRepo) ListMessagesInThread(ctx context.Context, userID, projectID, partnerID uuid.UUID, limit int) ([]entity.Message, error) {
+func (r *messageRepo) ListMessagesInThread(ctx context.Context, userID, projectID, partnerID uuid.UUID, limit int) ([]model.Message, error) {
 	var (
-		rows []entity.Message
+		rows []model.Message
 		err  error
 	)
 	err = r.dbCtx(ctx).
@@ -118,7 +118,7 @@ func (r *messageRepo) ListMessagesInThread(ctx context.Context, userID, projectI
 }
 
 func (r *messageRepo) MarkRead(ctx context.Context, id uuid.UUID, at time.Time) error {
-	return r.dbCtx(ctx).Model(&entity.Message{}).
+	return r.dbCtx(ctx).Model(&model.Message{}).
 		Where("id = ? AND is_read = FALSE", id).
 		Updates(map[string]any{
 			"is_read": true,
@@ -131,7 +131,7 @@ func (r *messageRepo) CountUnread(ctx context.Context, userID uuid.UUID) (int64,
 		n   int64
 		err error
 	)
-	err = r.dbCtx(ctx).Model(&entity.Message{}).
+	err = r.dbCtx(ctx).Model(&model.Message{}).
 		Where("receiver_id = ? AND is_read = FALSE", userID).
 		Count(&n).Error
 	return n, err

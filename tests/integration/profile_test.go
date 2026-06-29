@@ -8,7 +8,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"crowdfund-app/entity"
+	"crowdfund-app/model"
 
 	"github.com/labstack/echo/v4"
 	"gorm.io/gorm"
@@ -34,14 +34,14 @@ func TestProfileGetAndUpdate(t *testing.T) {
 	var (
 		e      *echo.Echo
 		gdb    *gorm.DB
-		buyer  *entity.User
+		buyer  *model.User
 		tok    string
 		rec    *httptest.ResponseRecorder
 		body   map[string]any
 	)
 	e = setupApp(t)
 	gdb = openDB(t)
-	buyer = seedUser(t, gdb, seedOpts{Role: entity.UserRoleBuyer})
+	buyer = seedUser(t, gdb, seedOpts{Role: model.UserRoleBuyer})
 	tok, _ = issueToken(buyer, true)
 
 	rec = httpGET(e, "/me/profile", tok)
@@ -87,13 +87,13 @@ func TestProfileUpdateBadRequest(t *testing.T) {
 	var (
 		e     *echo.Echo
 		gdb   *gorm.DB
-		buyer *entity.User
+		buyer *model.User
 		tok   string
 		rec   *httptest.ResponseRecorder
 	)
 	e = setupApp(t)
 	gdb = openDB(t)
-	buyer = seedUser(t, gdb, seedOpts{Role: entity.UserRoleBuyer})
+	buyer = seedUser(t, gdb, seedOpts{Role: model.UserRoleBuyer})
 	tok, _ = issueToken(buyer, true)
 
 	rec = httpPUT(e, "/me/profile", tok, `{}`)

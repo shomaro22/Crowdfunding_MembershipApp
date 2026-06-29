@@ -5,7 +5,7 @@ import (
 	"strings"
 	"time"
 
-	"crowdfund-app/entity"
+	"crowdfund-app/model"
 	"crowdfund-app/repository"
 	"crowdfund-app/validator"
 
@@ -14,13 +14,13 @@ import (
 
 func (p *ProjectUseCase) Create(ctx context.Context, sellerID uuid.UUID, in CreateProjectIn) (*ProjectView, error) {
 	var (
-		u          *entity.User
+		u          *model.User
 		err        error
-		planInputs []entity.PlanInput
+		planInputs []model.PlanInput
 		now        time.Time
-		project       *entity.Project
-		plans      []entity.ProjectPlan
-		images     []entity.ProjectImage
+		project       *model.Project
+		plans      []model.ProjectPlan
+		images     []model.ProjectImage
 		i          int
 		plan       PlanIn
 	)
@@ -29,40 +29,40 @@ func (p *ProjectUseCase) Create(ctx context.Context, sellerID uuid.UUID, in Crea
 	if err != nil {
 		return nil, mapRepoNotFound(err)
 	}
-	if u.Role != entity.UserRoleSeller || u.SellerStatus != entity.SellerStatusActive {
+	if u.Role != model.UserRoleSeller || u.SellerStatus != model.SellerStatusActive {
 		return nil, ErrForbidden
 	}
-	planInputs = make([]entity.PlanInput, len(in.Plans))
+	planInputs = make([]model.PlanInput, len(in.Plans))
 	for i, plan = range in.Plans {
-		planInputs[i] = entity.PlanInput{
-			MembershipType: entity.MembershipType(plan.MembershipType),
+		planInputs[i] = model.PlanInput{
+			MembershipType: model.MembershipType(plan.MembershipType),
 			Price:          plan.Price,
 			MaxSupporters:  plan.MaxSupporters,
 			Benefits:       plan.Benefits,
 		}
 	}
-	if err = validator.ValidateProject(in.Title, in.Description, in.TargetAmount, entity.DurationType(in.DurationType), in.StartDate, in.EndDate, planInputs); err != nil {
+	if err = validator.ValidateProject(in.Title, in.Description, in.TargetAmount, model.DurationType(in.DurationType), in.StartDate, in.EndDate, planInputs); err != nil {
 		return nil, mapProjectEntityErr(err)
 	}
 	now = time.Now().UTC()
-	project = &entity.Project{
+	project = &model.Project{
 		ID:           uuid.New(),
 		SellerID:     sellerID,
 		Title:        strings.TrimSpace(in.Title),
 		Description:  strings.TrimSpace(in.Description),
 		TargetAmount: in.TargetAmount,
-		DurationType: entity.DurationType(in.DurationType),
+		DurationType: model.DurationType(in.DurationType),
 		StartDate:    in.StartDate.UTC(),
 		EndDate:      in.EndDate,
-		Status:       entity.ProjectStatusPending,
+		Status:       model.ProjectStatusPending,
 		CreatedAt:    now,
 		UpdatedAt:    now,
 	}
-	plans = make([]entity.ProjectPlan, 0, len(in.Plans))
+	plans = make([]model.ProjectPlan, 0, len(in.Plans))
 	for _, plan = range in.Plans {
-		plans = append(plans, entity.ProjectPlan{
+		plans = append(plans, model.ProjectPlan{
 			ID:             uuid.New(),
-			MembershipType: entity.MembershipType(plan.MembershipType),
+			MembershipType: model.MembershipType(plan.MembershipType),
 			Price:          plan.Price,
 			MaxSupporters:  plan.MaxSupporters,
 			Benefits:       strings.TrimSpace(plan.Benefits),
@@ -83,13 +83,13 @@ func (p *ProjectUseCase) Create(ctx context.Context, sellerID uuid.UUID, in Crea
 
 func (p *ProjectUseCase) Update(ctx context.Context, sellerID, projectID uuid.UUID, in UpdateProjectIn) (*ProjectView, error) {
 	var (
-		project   *entity.Project
-		plans  []entity.ProjectPlan
-		images []entity.ProjectImage
-		seller *entity.User
+		project   *model.Project
+		plans  []model.ProjectPlan
+		images []model.ProjectImage
+		seller *model.User
 		err    error
 		now    time.Time
-		dur    entity.DurationType
+		dur    model.DurationType
 		start  time.Time
 		end    *time.Time
 	)
@@ -124,7 +124,7 @@ func (p *ProjectUseCase) Update(ctx context.Context, sellerID, projectID uuid.UU
 	start = project.StartDate
 	end = project.EndDate
 	if in.DurationType != nil {
-		dur = entity.DurationType(*in.DurationType)
+		dur = model.DurationType(*in.DurationType)
 	}
 	if in.StartDate != nil {
 		start = in.StartDate.UTC()
@@ -151,8 +151,8 @@ func (p *ProjectUseCase) Update(ctx context.Context, sellerID, projectID uuid.UU
 			return nil, mapProjectEntityErr(err)
 		}
 	}
-	if in.IsReapply && project.Status == entity.ProjectStatusActive {
-		project.Status = entity.ProjectStatusPending
+	if in.IsReapply && project.Status == model.ProjectStatusActive {
+		project.Status = model.ProjectStatusPending
 	}
 	project.UpdatedAt = now
 	err = repository.WithTx(ctx, p.DB, func(txCtx context.Context) error {
@@ -173,10 +173,10 @@ func (p *ProjectUseCase) Update(ctx context.Context, sellerID, projectID uuid.UU
 
 func (p *ProjectUseCase) RequestDelete(ctx context.Context, sellerID, projectID uuid.UUID) (*ProjectView, error) {
 	var (
-		project   *entity.Project
-		plans  []entity.ProjectPlan
-		images []entity.ProjectImage
-		seller *entity.User
+		project   *model.Project
+		plans  []model.ProjectPlan
+		images []model.ProjectImage
+		seller *model.User
 		err    error
 		now    time.Time
 	)
@@ -188,12 +188,12 @@ func (p *ProjectUseCase) RequestDelete(ctx context.Context, sellerID, projectID 
 	if project.SellerID != sellerID {
 		return nil, ErrForbidden
 	}
-	if project.Status != entity.ProjectStatusActive {
+	if project.Status != model.ProjectStatusActive {
 		return nil, ErrInvalidState
 	}
 	now = time.Now().UTC()
 	project.DeleteRequested = true
-	project.Status = entity.ProjectStatusDeleteRequested
+	project.Status = model.ProjectStatusDeleteRequested
 	project.UpdatedAt = now
 	if err = p.Projects.Update(ctx, project); err != nil {
 		return nil, err

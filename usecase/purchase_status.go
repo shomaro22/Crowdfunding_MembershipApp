@@ -4,28 +4,28 @@ import (
 	"context"
 	"time"
 
-	"crowdfund-app/entity"
+	"crowdfund-app/model"
 	"crowdfund-app/repository"
 
 	"github.com/google/uuid"
 )
 
-func markPurchasePaidSimple(ctx context.Context, purchases repository.PurchaseRepo, purchase *entity.Purchase) error {
+func markPurchasePaidSimple(ctx context.Context, purchases repository.PurchaseRepo, purchase *model.Purchase) error {
 	var (
-		from entity.PurchaseStatus
+		from model.PurchaseStatus
 		err  error
 	)
 	from = purchase.Status
-	purchase.Status = entity.PurchaseStatusPaid
+	purchase.Status = model.PurchaseStatusPaid
 	purchase.UpdatedAt = time.Now().UTC()
 	if err = purchases.Update(ctx, purchase); err != nil {
 		return err
 	}
-	return purchases.RecordEvent(ctx, &entity.PurchaseEvent{
+	return purchases.RecordEvent(ctx, &model.PurchaseEvent{
 		ID:         uuid.New(),
 		PurchaseID: purchase.ID,
 		FromStatus: &from,
-		ToStatus:   entity.PurchaseStatusPaid,
+		ToStatus:   model.PurchaseStatusPaid,
 		CreatedAt:  time.Now().UTC(),
 	})
 }
