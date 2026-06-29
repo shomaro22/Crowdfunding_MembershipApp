@@ -18,7 +18,7 @@ func TestListActivityLogsRejectsInvalidActionViaValidator(t *testing.T) {
 	)
 	bad = "not.a.real.action"
 	q.Action = &bad
-	ops = OperationsUseCase{Activity: stubActivityRepoForOps{}}
+	ops = OperationsUseCase{Activity: stubIActivityRepoForOps{}}
 	_, err = ops.ListActivityLogs(t.Context(), q)
 	if err != ErrBadRequest {
 		t.Fatalf("expected ErrBadRequest, got %v", err)
@@ -34,27 +34,27 @@ func TestListActivityLogsRejectsInvalidIPViaValidator(t *testing.T) {
 	)
 	ip = "not-an-ip"
 	q.IP = &ip
-	ops = OperationsUseCase{Activity: stubActivityRepoForOps{}}
+	ops = OperationsUseCase{Activity: stubIActivityRepoForOps{}}
 	_, err = ops.ListActivityLogs(t.Context(), q)
 	if err != ErrBadRequest {
 		t.Fatalf("expected ErrBadRequest, got %v", err)
 	}
 }
 
-type stubActivityRepoForOps struct{}
+type stubIActivityRepoForOps struct{}
 
-func (stubActivityRepoForOps) Create(_ context.Context, _ *model.ActivityLog) error {
+func (stubIActivityRepoForOps) Create(_ context.Context, _ *model.ActivityLog) error {
 	return nil
 }
 
-func (stubActivityRepoForOps) List(_ context.Context, _ repository.ActivityListFilter) ([]model.ActivityLog, int64, error) {
+func (stubIActivityRepoForOps) List(_ context.Context, _ repository.ActivityListFilter) ([]model.ActivityLog, int64, error) {
 	return nil, 0, nil
 }
 
-func (stubActivityRepoForOps) CountByActionBetween(_ context.Context, _ model.ActivityAction, _, _ time.Time) (int64, error) {
+func (stubIActivityRepoForOps) CountByActionBetween(_ context.Context, _ model.ActivityAction, _, _ time.Time) (int64, error) {
 	return 0, nil
 }
 
-func (stubActivityRepoForOps) TopIPsBetween(_ context.Context, _, _ time.Time, _ int) ([]repository.ActivityIPCount, error) {
+func (stubIActivityRepoForOps) TopIPsBetween(_ context.Context, _, _ time.Time, _ int) ([]repository.ActivityIPCount, error) {
 	return nil, nil
 }

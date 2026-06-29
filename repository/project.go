@@ -11,16 +11,16 @@ import (
 	"gorm.io/gorm"
 )
 
-type ProjectRepo interface {
+type IProjectRepo interface {
 	Create(ctx context.Context, p *model.Project, plans []model.ProjectPlan, images []model.ProjectImage) error
-	FindID(ctx context.Context, id uuid.UUID) (*model.Project, []model.ProjectPlan, []model.ProjectImage, error)
+	GetID(ctx context.Context, id uuid.UUID) (model.Project, []model.ProjectPlan, []model.ProjectImage, error)
 	ListPublic(ctx context.Context, f ProjectListFilter) ([]model.Project, int64, error)
 	ListSeller(ctx context.Context, sellerID uuid.UUID, limit, offset int) ([]model.Project, int64, error)
 	ListAll(ctx context.Context, status *model.ProjectStatus, limit, offset int) ([]model.Project, int64, error)
 	Update(ctx context.Context, p *model.Project) error
 	ReplaceImages(ctx context.Context, projectID uuid.UUID, images []model.ProjectImage) error
 	Delete(ctx context.Context, id uuid.UUID) error
-	FindPlan(ctx context.Context, projectID, planID uuid.UUID) (*model.ProjectPlan, error)
+	GetPlan(ctx context.Context, projectID, planID uuid.UUID) (model.ProjectPlan, error)
 	IncrementSupportCounts(ctx context.Context, projectID, planID uuid.UUID) error
 	TransferPlanSupportCount(ctx context.Context, projectID, fromPlanID, toPlanID uuid.UUID) error
 	AddCurrentAmount(ctx context.Context, projectID uuid.UUID, amount int64) error
@@ -30,7 +30,7 @@ type projectRepo struct {
 	db *gorm.DB
 }
 
-func NewProjectRepo(db *gorm.DB) ProjectRepo {
+func NewProjectRepo(db *gorm.DB) IProjectRepo {
 	return &projectRepo{db: db}
 }
 
@@ -159,7 +159,7 @@ type ProjectListFilter struct {
 	AsOf   time.Time
 }
 
-func (r *projectRepo) FindID(ctx context.Context, id uuid.UUID) (*model.Project, []model.ProjectPlan, []model.ProjectImage, error) {
+func (r *projectRepo) GetID(ctx context.Context, id uuid.UUID) (model.Project, []model.ProjectPlan, []model.ProjectImage, error) {
 	var (
 		p      model.Project
 		plans  []model.ProjectPlan
@@ -169,15 +169,15 @@ func (r *projectRepo) FindID(ctx context.Context, id uuid.UUID) (*model.Project,
 
 	err = firstOne(r.dbCtx(ctx).Where("id = ?", id), &p)
 	if err != nil {
-		return nil, nil, nil, err
+		return model.Project{}, nil, nil, err
 	}
 	if err = r.dbCtx(ctx).Where("project_id = ?", id).Order("membership_type ASC").Find(&plans).Error; err != nil {
-		return nil, nil, nil, err
+		return model.Project{}, nil, nil, err
 	}
 	if err = r.dbCtx(ctx).Where("project_id = ?", id).Order("sort_order ASC").Find(&images).Error; err != nil {
-		return nil, nil, nil, err
+		return model.Project{}, nil, nil, err
 	}
-	return &p, plans, images, nil
+	return p, plans, images, nil
 }
 
 func (r *projectRepo) ListPublic(ctx context.Context, f ProjectListFilter) ([]model.Project, int64, error) {
@@ -269,8 +269,8 @@ func (r *projectRepo) ListAll(ctx context.Context, status *model.ProjectStatus, 
 	return rows, total, err
 }
 
-func (r *projectRepo) FindPlan(ctx context.Context, projectID, planID uuid.UUID) (*model.ProjectPlan, error) {
-	return firstOnePtr[model.ProjectPlan](
+func (r *projectRepo) GetPlan(ctx context.Context, projectID, planID uuid.UUID) (model.ProjectPlan, error) {
+	return getOne[model.ProjectPlan](
 		r.dbCtx(ctx).Where("id = ? AND project_id = ?", planID, projectID),
 	)
 }

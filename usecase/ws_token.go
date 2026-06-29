@@ -15,20 +15,20 @@ import (
 const wsTokenTTL = 60 * time.Second
 
 type WSTokenUseCase struct {
-	Tokens   repository.WSTokenRepo
-	Users    repository.UserRepo
-	Activity repository.ActivityRepo
+	Tokens   repository.IWSTokenRepo
+	Users    repository.IUserRepo
+	Activity repository.IActivityRepo
 }
 
 func (w *WSTokenUseCase) Issue(ctx context.Context, userID uuid.UUID) (string, error) {
 	var (
-		u     *model.User
+		u     model.User
 		plain string
 		now   time.Time
 		row   *model.WSToken
 		err   error
 	)
-	u, err = w.Users.FindID(ctx, userID)
+	u, err = w.Users.GetID(ctx, userID)
 	if err != nil {
 		return "", mapRepoNotFoundAs(err, ErrForbidden)
 	}
@@ -56,7 +56,7 @@ func (w *WSTokenUseCase) Issue(ctx context.Context, userID uuid.UUID) (string, e
 func (w *WSTokenUseCase) Consume(ctx context.Context, plain string, meta RequestMeta) (uuid.UUID, error) {
 	var (
 		row   *model.WSToken
-		u     *model.User
+		u     model.User
 		now   time.Time
 		err   error
 	)
@@ -69,7 +69,7 @@ func (w *WSTokenUseCase) Consume(ctx context.Context, plain string, meta Request
 	if err != nil {
 		return uuid.Nil, mapRepoNotFoundAs(err, ErrInvalidToken)
 	}
-	u, err = w.Users.FindID(ctx, row.UserID)
+	u, err = w.Users.GetID(ctx, row.UserID)
 	if err != nil {
 		return uuid.Nil, mapRepoNotFoundAs(err, ErrInvalidToken)
 	}

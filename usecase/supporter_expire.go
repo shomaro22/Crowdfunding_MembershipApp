@@ -5,6 +5,8 @@ import (
 	"time"
 
 	"crowdfund-app/model"
+
+	"github.com/google/uuid"
 )
 
 func isExpirableStatus(status model.SupporterStatus) bool {
@@ -31,7 +33,7 @@ func (s *SupporterUseCase) RunExpireSupporters(ctx context.Context, dryRun bool)
 		return len(rows), 0, nil
 	}
 	for i = range rows {
-		if err = s.expireSupporter(ctx, &rows[i], now); err != nil {
+		if err = s.expireSupporter(ctx, rows[i], now); err != nil {
 			failed++
 			continue
 		}
@@ -40,15 +42,15 @@ func (s *SupporterUseCase) RunExpireSupporters(ctx context.Context, dryRun bool)
 	return processed, failed, nil
 }
 
-func (s *SupporterUseCase) expireSupporter(ctx context.Context, supporter *model.ProjectSupporter, now time.Time) error {
+func (s *SupporterUseCase) expireSupporter(ctx context.Context, supporter model.ProjectSupporter, now time.Time) error {
 	var (
-		row *model.ProjectSupporter
+		row model.ProjectSupporter
 		err error
 	)
-	if supporter == nil {
+	if supporter.ID == uuid.Nil {
 		return ErrNotFound
 	}
-	row, err = s.Supporters.FindID(ctx, supporter.ID)
+	row, err = s.Supporters.GetID(ctx, supporter.ID)
 	if err != nil {
 		return mapRepoNotFound(err)
 	}
@@ -60,5 +62,5 @@ func (s *SupporterUseCase) expireSupporter(ctx context.Context, supporter *model
 	}
 	row.Status = model.SupporterStatusExpired
 	row.UpdatedAt = now
-	return s.Supporters.Update(ctx, row)
+	return s.Supporters.Update(ctx, &row)
 }

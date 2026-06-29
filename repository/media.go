@@ -25,7 +25,7 @@ type MediaImage struct {
 	Size        int64
 }
 
-type MediaStore interface {
+type IMediaStore interface {
 	Save(ctx context.Context, userID uuid.UUID, img MediaImage) (publicPath string, err error)
 }
 

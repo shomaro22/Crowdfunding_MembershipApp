@@ -13,7 +13,7 @@ func TestTokenBucketAllow(t *testing.T) {
 	var (
 		mr   *miniredis.Miniredis
 		rdb  *redis.Client
-		repo RateLimitRepo
+		repo IRateLimitRepo
 		ctx  context.Context
 		ok   bool
 		i    int
@@ -47,7 +47,7 @@ func TestTokenBucketAllow(t *testing.T) {
 
 func TestTokenBucketFailOpenNilRedis(t *testing.T) {
 	var (
-		repo RateLimitRepo
+		repo IRateLimitRepo
 		ok   bool
 		err  error
 	)

@@ -9,10 +9,10 @@ import (
 	"gorm.io/gorm"
 )
 
-type BatchRepo interface {
+type IBatchRepo interface {
 	Create(ctx context.Context, row *model.BatchRun) error
 	Update(ctx context.Context, row *model.BatchRun) error
-	FindID(ctx context.Context, id uuid.UUID) (*model.BatchRun, error)
+	GetID(ctx context.Context, id uuid.UUID) (model.BatchRun, error)
 	List(ctx context.Context, jobName *string, status *model.BatchStatus, limit int) ([]model.BatchRun, int64, error)
 }
 
@@ -20,7 +20,7 @@ type batchRepo struct {
 	db *gorm.DB
 }
 
-func NewBatchRepo(db *gorm.DB) BatchRepo {
+func NewBatchRepo(db *gorm.DB) IBatchRepo {
 	return &batchRepo{db: db}
 }
 
@@ -36,8 +36,8 @@ func (r *batchRepo) Update(ctx context.Context, row *model.BatchRun) error {
 	return r.dbCtx(ctx).Save(row).Error
 }
 
-func (r *batchRepo) FindID(ctx context.Context, id uuid.UUID) (*model.BatchRun, error) {
-	return firstOnePtr[model.BatchRun](r.dbCtx(ctx).Where("id = ?", id))
+func (r *batchRepo) GetID(ctx context.Context, id uuid.UUID) (model.BatchRun, error) {
+	return getOne[model.BatchRun](r.dbCtx(ctx).Where("id = ?", id))
 }
 
 func (r *batchRepo) List(ctx context.Context, jobName *string, status *model.BatchStatus, limit int) ([]model.BatchRun, int64, error) {

@@ -43,7 +43,7 @@ func (a *AuthUseCase) RegisterBuyer(ctx context.Context, email, password string,
 
 	normalized, err = validator.ValidateBuyerReg(email, password)
 	if err != nil {
-		return UserView{}, mapBuyerRegEntityErr(err)
+		return UserView{}, mapBuyerRegModelErr(err)
 	}
 	exists, err = a.Users.EmailExists(ctx, normalized)
 	if err != nil {
@@ -78,7 +78,7 @@ func (a *AuthUseCase) RegisterBuyer(ctx context.Context, email, password string,
 		return UserView{}, err
 	}
 	a.logActivity(ctx, &u.ID, model.UserRegister, "user", u.ID.String(), meta, nil)
-	return UserViewFrom(u), nil
+	return UserViewFrom(*u), nil
 }
 
 func (a *AuthUseCase) EmailFree(ctx context.Context, email string) (bool, error) {
@@ -119,10 +119,10 @@ func (a *AuthUseCase) RegisterSeller(ctx context.Context, in SellerRegIn, meta R
 
 	normalized, err = validator.ValidateBuyerReg(in.Email, in.Password)
 	if err != nil {
-		return nil, mapBuyerRegEntityErr(err)
+		return nil, mapBuyerRegModelErr(err)
 	}
 	if err = validator.ValidateSellerKYC(in.FullName, in.BirthDate, in.Address, in.PhotoPresent); err != nil {
-		return nil, mapSellerKYCEntityErr(err)
+		return nil, mapSellerKYCModelErr(err)
 	}
 
 	exists, err = a.Users.EmailExists(ctx, normalized)
@@ -189,5 +189,5 @@ func (a *AuthUseCase) RegisterSeller(ctx context.Context, in SellerRegIn, meta R
 	}
 
 	a.logActivity(ctx, &u.ID, model.SellerRegister, "seller_registration", reg.ID.String(), meta, nil)
-	return &SellerRegOut{User: UserViewFrom(u), Registration: SellerRegItemFrom(reg)}, nil
+	return &SellerRegOut{User: UserViewFrom(*u), Registration: SellerRegItemFrom(*reg)}, nil
 }

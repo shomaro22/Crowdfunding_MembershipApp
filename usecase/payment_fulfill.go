@@ -18,10 +18,10 @@ func (p *PaymentUseCase) fulfillPaymentIntentID(
 	planID uuid.UUID,
 ) error {
 	var (
-		purchase *model.Purchase
+		purchase model.Purchase
 		err      error
 	)
-	purchase, err = p.Purchases.FindIntentID(ctx, intentID)
+	purchase, err = p.Purchases.GetIntentID(ctx, intentID)
 	if isRepoNotFound(err) {
 		return nil
 	}
@@ -46,26 +46,25 @@ func defaultPeriod(start, end *time.Time) periodRange {
 
 func (p *PaymentUseCase) fulfillFirstSupport(
 	ctx context.Context,
-	purchase *model.Purchase,
+	purchase model.Purchase,
 	planID uuid.UUID,
 	period periodRange,
 	customerID, subscriptionID, invoiceID *string,
 ) error {
 	return repository.WithTx(ctx, p.DB, func(txCtx context.Context) error {
 		var (
-			locked     *model.Purchase
-			membership *model.ProjectSupporter
+			membership model.ProjectSupporter
+			hasMember  bool
 			supporter  model.ProjectSupporter
-			resolved  uuid.UUID
-			plans     []model.ProjectPlan
-			now       time.Time
-			err       error
+			resolved   uuid.UUID
+			plans      []model.ProjectPlan
+			now        time.Time
+			err        error
 		)
-		locked, err = p.Purchases.FindIDLock(txCtx, purchase.ID)
+		purchase, err = p.Purchases.GetIDLock(txCtx, purchase.ID)
 		if err != nil {
 			return mapRepoNotFound(err)
 		}
-		purchase = locked
 		if purchase.Status == model.PurchaseStatusPaid {
 			return nil
 		}
@@ -73,16 +72,18 @@ func (p *PaymentUseCase) fulfillFirstSupport(
 			return nil
 		}
 		now = time.Now().UTC()
-		membership, err = p.Supporters.FindMembership(txCtx, purchase.ProjectID, purchase.BuyerID)
+		membership, err = p.Supporters.GetMembership(txCtx, purchase.ProjectID, purchase.BuyerID)
 		if isRepoNotFound(err) {
-			membership = nil
+			hasMember = false
 		} else if err != nil {
 			return err
+		} else {
+			hasMember = true
 		}
-		if membership != nil {
+		if hasMember {
 			return p.markPurchasePaid(txCtx, purchase, membership.ID, period, invoiceID)
 		}
-		_, plans, _, err = p.Projects.FindID(txCtx, purchase.ProjectID)
+		_, plans, _, err = p.Projects.GetID(txCtx, purchase.ProjectID)
 		if err != nil {
 			return mapRepoNotFound(err)
 		}
@@ -117,14 +118,14 @@ func (p *PaymentUseCase) fulfillFirstSupport(
 	})
 }
 
-func billingModeForPurchase(purchase *model.Purchase) model.BillingMode {
+func billingModeForPurchase(purchase model.Purchase) model.BillingMode {
 	if purchase.PaymentMethod == model.PaymentMethodKonbini {
 		return model.BillingModeKonbini
 	}
 	return model.BillingModeAuto
 }
 
-func findPlanForPurchase(plans []model.ProjectPlan, purchase *model.Purchase) uuid.UUID {
+func findPlanForPurchase(plans []model.ProjectPlan, purchase model.Purchase) uuid.UUID {
 	if len(plans) == 1 {
 		return plans[0].ID
 	}
@@ -146,7 +147,7 @@ func stripeString(s string) *string {
 	return &s
 }
 
-func (p *PaymentUseCase) markPurchasePaid(ctx context.Context, purchase *model.Purchase, supporterID uuid.UUID, period periodRange, invoiceID *string) error {
+func (p *PaymentUseCase) markPurchasePaid(ctx context.Context, purchase model.Purchase, supporterID uuid.UUID, period periodRange, invoiceID *string) error {
 	var (
 		from model.PurchaseStatus
 		err  error
@@ -158,7 +159,7 @@ func (p *PaymentUseCase) markPurchasePaid(ctx context.Context, purchase *model.P
 	purchase.PeriodEnd = &period.end
 	purchase.StripeInvoiceID = invoiceID
 	purchase.UpdatedAt = time.Now().UTC()
-	if err = p.Purchases.Update(ctx, purchase); err != nil {
+	if err = p.Purchases.Update(ctx, &purchase); err != nil {
 		return err
 	}
 	if err = p.Projects.AddCurrentAmount(ctx, purchase.ProjectID, int64(purchase.TotalPrice)); err != nil {
@@ -173,15 +174,15 @@ func (p *PaymentUseCase) markPurchasePaid(ctx context.Context, purchase *model.P
 	})
 }
 
-func (p *PaymentUseCase) markPurchaseFailed(ctx context.Context, purchase *model.Purchase, reason string) error {
+func (p *PaymentUseCase) markPurchaseFailed(ctx context.Context, purchase model.Purchase, reason string) error {
 	return p.markPurchaseTerminal(ctx, purchase, model.PurchaseStatusFailed, reason)
 }
 
-func (p *PaymentUseCase) markPurchaseCancelled(ctx context.Context, purchase *model.Purchase, reason string) error {
+func (p *PaymentUseCase) markPurchaseCancelled(ctx context.Context, purchase model.Purchase, reason string) error {
 	return p.markPurchaseTerminal(ctx, purchase, model.PurchaseStatusCancelled, reason)
 }
 
-func (p *PaymentUseCase) markPurchaseTerminal(ctx context.Context, purchase *model.Purchase, to model.PurchaseStatus, reason string) error {
+func (p *PaymentUseCase) markPurchaseTerminal(ctx context.Context, purchase model.Purchase, to model.PurchaseStatus, reason string) error {
 	var (
 		from model.PurchaseStatus
 		err  error
@@ -189,7 +190,7 @@ func (p *PaymentUseCase) markPurchaseTerminal(ctx context.Context, purchase *mod
 	from = purchase.Status
 	purchase.Status = to
 	purchase.UpdatedAt = time.Now().UTC()
-	if err = p.Purchases.Update(ctx, purchase); err != nil {
+	if err = p.Purchases.Update(ctx, &purchase); err != nil {
 		return err
 	}
 	if err = p.Purchases.RecordEvent(ctx, &model.PurchaseEvent{

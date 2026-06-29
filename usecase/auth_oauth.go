@@ -44,7 +44,7 @@ func (a *AuthUseCase) GoogleCallback(ctx context.Context, code, state string, me
 		ok      bool
 		err     error
 		profile *auth.GoogleProfile
-		u       *model.User
+		u       model.User
 		tokens  *SessionTokens
 		cbCode  string
 	)
@@ -99,7 +99,7 @@ func (a *AuthUseCase) ExchangeOAuthCode(ctx context.Context, code string, meta R
 		userID    uuid.UUID
 		ok        bool
 		err       error
-		u         *model.User
+		u         model.User
 		authToken string
 	)
 
@@ -117,7 +117,7 @@ func (a *AuthUseCase) ExchangeOAuthCode(ctx context.Context, code string, meta R
 	if !ok {
 		return nil, ErrInvalidToken
 	}
-	u, err = a.Users.FindID(ctx, userID)
+	u, err = a.Users.GetID(ctx, userID)
 	if err != nil {
 		return nil, mapRepoNotFoundAs(err, ErrInvalidToken)
 	}
@@ -137,43 +137,46 @@ func (a *AuthUseCase) ExchangeOAuthCode(ctx context.Context, code string, meta R
 	return &LoginResult{User: UserViewFrom(u), AuthToken: authToken}, nil
 }
 
-func (a *AuthUseCase) resolveGoogleUser(ctx context.Context, profile *auth.GoogleProfile) (*model.User, error) {
+func (a *AuthUseCase) resolveGoogleUser(ctx context.Context, profile *auth.GoogleProfile) (model.User, error) {
 	var (
-		acc      *model.OAuthAccount
+		acc      model.OAuthAccount
 		err      error
-		existing *model.User
+		existing model.User
 		now      time.Time
 		link     *model.OAuthAccount
 		pwPlain  string
 		pwHash   string
 		name     *string
 		n        string
-		u        *model.User
+		u        model.User
+		hasAcc   bool
 	)
 
-	acc, err = a.OAuth.FindSub(ctx, model.OAuthProviderGoogle, profile.Sub)
+	acc, err = a.OAuth.GetSub(ctx, model.OAuthProviderGoogle, profile.Sub)
 	if isRepoNotFound(err) {
-		acc = nil
+		hasAcc = false
 	} else if err != nil {
-		return nil, err
+		return model.User{}, err
+	} else {
+		hasAcc = true
 	}
-	if acc != nil {
-		u, err = a.Users.FindID(ctx, acc.UserID)
+	if hasAcc {
+		u, err = a.Users.GetID(ctx, acc.UserID)
 		if err != nil {
-			return nil, mapRepoNotFound(err)
+			return model.User{}, mapRepoNotFound(err)
 		}
 		return u, nil
 	}
-	existing, err = a.Users.FindEmail(ctx, profile.Email)
+	existing, err = a.Users.GetEmail(ctx, profile.Email)
 	if isRepoNotFound(err) {
-		existing = nil
+		existing = model.User{}
 	} else if err != nil {
-		return nil, err
+		return model.User{}, err
 	}
 	now = time.Now().UTC()
-	if existing != nil {
+	if existing.ID != uuid.Nil {
 		if existing.Role != model.UserRoleBuyer {
-			return nil, ErrOAuthForbidden
+			return model.User{}, ErrOAuthForbidden
 		}
 		link = &model.OAuthAccount{
 			ID:          uuid.New(),
@@ -184,23 +187,23 @@ func (a *AuthUseCase) resolveGoogleUser(ctx context.Context, profile *auth.Googl
 			CreatedAt:   now,
 		}
 		if err = a.OAuth.Create(ctx, link); err != nil {
-			return nil, err
+			return model.User{}, err
 		}
 		return existing, nil
 	}
 	pwPlain, err = auth.OpaqueHex()
 	if err != nil {
-		return nil, err
+		return model.User{}, err
 	}
 	pwHash, err = auth.HashPassword(pwPlain)
 	if err != nil {
-		return nil, err
+		return model.User{}, err
 	}
 	if profile.Name != "" {
 		n = profile.Name
 		name = &n
 	}
-	u = &model.User{
+	u = model.User{
 		ID:            uuid.New(),
 		Email:         profile.Email,
 		Name:          name,
@@ -211,8 +214,8 @@ func (a *AuthUseCase) resolveGoogleUser(ctx context.Context, profile *auth.Googl
 		CreatedAt:     now,
 		UpdatedAt:     now,
 	}
-	if err = a.Users.Create(ctx, u); err != nil {
-		return nil, err
+	if err = a.Users.Create(ctx, &u); err != nil {
+		return model.User{}, err
 	}
 	link = &model.OAuthAccount{
 		ID:          uuid.New(),
@@ -223,7 +226,7 @@ func (a *AuthUseCase) resolveGoogleUser(ctx context.Context, profile *auth.Googl
 		CreatedAt:   now,
 	}
 	if err = a.OAuth.Create(ctx, link); err != nil {
-		return nil, fmt.Errorf("oauth link: %w", err)
+		return model.User{}, fmt.Errorf("oauth link: %w", err)
 	}
 	return u, nil
 }

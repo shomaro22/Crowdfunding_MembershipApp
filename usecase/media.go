@@ -17,7 +17,7 @@ type MediaUploadIn struct {
 }
 
 type MediaUseCase struct {
-	Store        repository.MediaStore
+	Store        repository.IMediaStore
 	APIPublicURL string
 }
 

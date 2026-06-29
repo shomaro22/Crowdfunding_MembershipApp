@@ -23,9 +23,9 @@ type ToggleFavoriteIn struct {
 }
 
 type FavoriteUseCase struct {
-	Favorites repository.FavoriteRepo
+	Favorites repository.IFavoriteRepo
 	Projects  *ProjectUseCase
-	Activity  repository.ActivityRepo
+	Activity  repository.IActivityRepo
 }
 
 func (f *FavoriteUseCase) List(ctx context.Context, userID uuid.UUID) ([]ProjectView, error) {
@@ -34,7 +34,7 @@ func (f *FavoriteUseCase) List(ctx context.Context, userID uuid.UUID) ([]Project
 		projects []model.Project
 		i        int
 		fav      model.Favorite
-		project  *model.Project
+		project  model.Project
 		err      error
 	)
 	if f == nil || f.Favorites == nil || f.Projects == nil {
@@ -47,14 +47,11 @@ func (f *FavoriteUseCase) List(ctx context.Context, userID uuid.UUID) ([]Project
 	projects = make([]model.Project, 0, len(rows))
 	for i = range rows {
 		fav = rows[i]
-		project, _, _, err = f.Projects.Projects.FindID(ctx, fav.ProjectID)
+		project, _, _, err = f.Projects.Projects.GetID(ctx, fav.ProjectID)
 		if err != nil {
-			return nil, err
+			return nil, mapRepoNotFound(err)
 		}
-		if project == nil {
-			continue
-		}
-		projects = append(projects, *project)
+		projects = append(projects, project)
 	}
 	if len(projects) == 0 {
 		return []ProjectView{}, nil
