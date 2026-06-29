@@ -39,7 +39,7 @@ func TestReportsCreateListPatch(t *testing.T) {
 		buyTok  string
 		admTok  string
 		rec     *httptest.ResponseRecorder
-		body    map[string]any
+		body    reportBody
 		id      string
 		role    model.AdminRole
 	)
@@ -67,7 +67,7 @@ func TestReportsCreateListPatch(t *testing.T) {
 	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
 		t.Fatal(err)
 	}
-	id, _ = body["id"].(string)
+	id = body.ID
 	if id == "" {
 		t.Fatal("missing report id")
 	}
@@ -89,12 +89,12 @@ func TestReportsCreateListPatch(t *testing.T) {
 	if rec.Code != http.StatusOK {
 		t.Fatalf("patch status=%d body=%s", rec.Code, rec.Body.String())
 	}
-	body = nil
+	body = reportBody{}
 	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
 		t.Fatal(err)
 	}
-	if body["status"] != "RESOLVED" {
-		t.Fatalf("status=%v", body["status"])
+	if body.Status != "RESOLVED" {
+		t.Fatalf("status=%q", body.Status)
 	}
 }
 

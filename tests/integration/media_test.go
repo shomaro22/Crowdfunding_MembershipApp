@@ -34,7 +34,7 @@ func TestMediaUploadAndFetch(t *testing.T) {
 		seller *model.User
 		tok    string
 		rec    *httptest.ResponseRecorder
-		body   map[string]any
+		body   mediaUploadBody
 		urlStr string
 		parsed *neturl.URL
 		err    error
@@ -51,7 +51,7 @@ func TestMediaUploadAndFetch(t *testing.T) {
 	if err = json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
 		t.Fatal(err)
 	}
-	urlStr, _ = body["url"].(string)
+	urlStr = body.URL
 	if urlStr == "" {
 		t.Fatal("missing url")
 	}
