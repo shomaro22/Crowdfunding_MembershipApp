@@ -28,8 +28,6 @@ var (
 	ErrSellerPending = errors.New("seller is not approved")
 	ErrDupSupporter  = errors.New("active supporter already exists for this project")
 	ErrNoBenefits    = errors.New("supporter is not active")
-	ErrPlanTooLow    = errors.New("plan rank is insufficient for this content")
-	ErrNotPublic     = errors.New("project is not publicly available")
 	ErrBadMessage    = errors.New("message content is required and must be at most 4000 characters")
 	ErrBadTitle      = errors.New("title must be 1 to 200 characters")
 	ErrBadPrice      = errors.New("plan price must be between 1 and 100000 JPY")
