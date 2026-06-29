@@ -2,7 +2,6 @@ package repository
 
 import (
 	"context"
-	"errors"
 
 	"crowdfund-app/entity"
 
@@ -38,33 +37,11 @@ func (r *userRepo) Update(ctx context.Context, u *entity.User) error {
 }
 
 func (r *userRepo) FindID(ctx context.Context, id uuid.UUID) (*entity.User, error) {
-	var (
-		u   entity.User
-		err error
-	)
-	err = dbFromCtx(ctx, r.db).Where("id = ?", id).First(&u).Error
-	if errors.Is(err, gorm.ErrRecordNotFound) {
-		return nil, nil
-	}
-	if err != nil {
-		return nil, err
-	}
-	return &u, nil
+	return firstOnePtr[entity.User](dbFromCtx(ctx, r.db).Where("id = ?", id))
 }
 
 func (r *userRepo) FindEmail(ctx context.Context, email string) (*entity.User, error) {
-	var (
-		u   entity.User
-		err error
-	)
-	err = dbFromCtx(ctx, r.db).Where("email = ?", email).First(&u).Error
-	if errors.Is(err, gorm.ErrRecordNotFound) {
-		return nil, nil
-	}
-	if err != nil {
-		return nil, err
-	}
-	return &u, nil
+	return firstOnePtr[entity.User](dbFromCtx(ctx, r.db).Where("email = ?", email))
 }
 
 func (r *userRepo) EmailExists(ctx context.Context, email string) (bool, error) {
