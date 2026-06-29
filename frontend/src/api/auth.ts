@@ -1,0 +1,126 @@
+import { apiRequest } from '@/lib/api-client'
+import { setAccessToken } from '@/lib/token-store'
+import type {
+  AuthTokenResponse,
+  LoginResponse,
+  RefreshResponse,
+  RegisterBuyerResponse,
+  RegisterSellerResponse,
+  Setup2FAResponse,
+  User,
+  Verify2FAResponse,
+} from '@/types/api'
+
+export async function login(email: string, password: string): Promise<LoginResponse> {
+  return apiRequest<LoginResponse>('/auth/login', {
+    method: 'POST',
+    body: { email, password },
+    skipRefresh: true,
+  })
+}
+
+export async function challenge2FA(code: string): Promise<AuthTokenResponse> {
+  const res = await apiRequest<AuthTokenResponse>('/auth/2fa/challenge', {
+    method: 'POST',
+    body: { code },
+    skipRefresh: true,
+  })
+  setAccessToken(res.auth_token)
+  return res
+}
+
+export async function refreshSession(): Promise<string | null> {
+  try {
+    const res = await apiRequest<RefreshResponse>('/auth/refresh', {
+      method: 'POST',
+      skipRefresh: true,
+    })
+    setAccessToken(res.auth_token)
+    return res.auth_token
+  } catch {
+    return null
+  }
+}
+
+export async function logout(): Promise<void> {
+  await apiRequest<void>('/auth/logout', { method: 'POST', skipRefresh: true })
+}
+
+export async function fetchMe(): Promise<User> {
+  return apiRequest<User>('/me', { auth: true })
+}
+
+export async function registerBuyer(email: string, password: string): Promise<RegisterBuyerResponse> {
+  return apiRequest<RegisterBuyerResponse>('/auth/register', {
+    method: 'POST',
+    body: { email, password },
+    skipRefresh: true,
+  })
+}
+
+export interface SellerRegistrationPayload {
+  email: string
+  password: string
+  full_name: string
+  birth_date: string
+  address: string
+  identity_document_front: File
+  identity_document_back: File
+}
+
+export async function registerSeller(payload: SellerRegistrationPayload): Promise<RegisterSellerResponse> {
+  const form = new FormData()
+  form.append('registration', JSON.stringify({
+    email: payload.email,
+    password: payload.password,
+    full_name: payload.full_name,
+    birth_date: payload.birth_date,
+    address: payload.address,
+  }))
+  form.append('identity_document_front', payload.identity_document_front)
+  form.append('identity_document_back', payload.identity_document_back)
+
+  const base = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8080'
+  const response = await fetch(`${String(base).replace(/\/+$/, '')}/auth/register/seller`, {
+    method: 'POST',
+    credentials: 'include',
+    body: form,
+  })
+
+  if (!response.ok) {
+    const text = await response.text()
+    throw new Error(text || 'Registration failed')
+  }
+
+  return (await response.json()) as RegisterSellerResponse
+}
+
+export async function exchangeOAuthCode(code: string): Promise<AuthTokenResponse> {
+  const res = await apiRequest<AuthTokenResponse>('/auth/oauth/exchange', {
+    method: 'POST',
+    body: { code },
+    skipRefresh: true,
+  })
+  setAccessToken(res.auth_token)
+  return res
+}
+
+export async function setup2FA(): Promise<Setup2FAResponse> {
+  return apiRequest<Setup2FAResponse>('/auth/2fa/setup', { method: 'POST', auth: true })
+}
+
+export async function verify2FA(code: string): Promise<Verify2FAResponse> {
+  return apiRequest<Verify2FAResponse>('/auth/2fa/verify', {
+    method: 'POST',
+    body: { code },
+    auth: true,
+  })
+}
+
+export async function forgotPassword(email: string): Promise<void> {
+  await apiRequest<void>('/auth/forgot-password', {
+    method: 'POST',
+    body: { email },
+    skipRefresh: true,
+  })
+}
