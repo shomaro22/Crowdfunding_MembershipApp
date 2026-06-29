@@ -4,12 +4,12 @@ import (
 	"context"
 	"time"
 
-	"crowdfund-app/entity"
+	"crowdfund-app/model"
 )
 
-func isExpirableStatus(status entity.SupporterStatus) bool {
+func isExpirableStatus(status model.SupporterStatus) bool {
 	switch status {
-	case entity.SupporterStatusActive, entity.SupporterStatusPendingRenewal, entity.SupporterStatusCancelled:
+	case model.SupporterStatusActive, model.SupporterStatusPendingRenewal, model.SupporterStatusCancelled:
 		return true
 	default:
 		return false
@@ -18,7 +18,7 @@ func isExpirableStatus(status entity.SupporterStatus) bool {
 
 func (s *SupporterUseCase) RunExpireSupporters(ctx context.Context, dryRun bool) (processed, failed int, err error) {
 	var (
-		rows []entity.ProjectSupporter
+		rows []model.ProjectSupporter
 		now  time.Time
 		i    int
 	)
@@ -40,9 +40,9 @@ func (s *SupporterUseCase) RunExpireSupporters(ctx context.Context, dryRun bool)
 	return processed, failed, nil
 }
 
-func (s *SupporterUseCase) expireSupporter(ctx context.Context, supporter *entity.ProjectSupporter, now time.Time) error {
+func (s *SupporterUseCase) expireSupporter(ctx context.Context, supporter *model.ProjectSupporter, now time.Time) error {
 	var (
-		row *entity.ProjectSupporter
+		row *model.ProjectSupporter
 		err error
 	)
 	if supporter == nil {
@@ -52,13 +52,13 @@ func (s *SupporterUseCase) expireSupporter(ctx context.Context, supporter *entit
 	if err != nil {
 		return mapRepoNotFound(err)
 	}
-	if row.Status == entity.SupporterStatusExpired {
+	if row.Status == model.SupporterStatusExpired {
 		return nil
 	}
 	if !now.After(row.CurrentPeriodEnd) || !isExpirableStatus(row.Status) {
 		return nil
 	}
-	row.Status = entity.SupporterStatusExpired
+	row.Status = model.SupporterStatusExpired
 	row.UpdatedAt = now
 	return s.Supporters.Update(ctx, row)
 }

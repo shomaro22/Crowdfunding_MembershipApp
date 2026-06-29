@@ -3,7 +3,7 @@ package usecase
 import (
 	"testing"
 
-	"crowdfund-app/entity"
+	"crowdfund-app/model"
 
 	"github.com/google/uuid"
 )
@@ -11,7 +11,7 @@ import (
 func TestVerifyPurchaseBuyer(t *testing.T) {
 	var (
 		buyer = uuid.New()
-		p     = &entity.Purchase{BuyerID: buyer}
+		p     = &model.Purchase{BuyerID: buyer}
 	)
 	if err := verifyPurchaseBuyer(p, buyer); err != nil {
 		t.Fatalf("expected ok: %v", err)

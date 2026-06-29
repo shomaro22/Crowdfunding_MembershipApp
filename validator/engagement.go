@@ -4,7 +4,7 @@ import (
 	"strings"
 	"unicode/utf8"
 
-	"crowdfund-app/entity"
+	"crowdfund-app/model"
 
 	"github.com/google/uuid"
 	validation "github.com/go-ozzo/ozzo-validation/v4"
@@ -50,7 +50,7 @@ type CreateReportInput struct {
 }
 
 type CreateReportNormalized struct {
-	TargetType entity.ReportTargetType
+	TargetType model.ReportTargetType
 	TargetID   uuid.UUID
 	Reason     string
 	Detail     *string
@@ -63,7 +63,7 @@ type AdminReportListInput struct {
 }
 
 type AdminReportListNormalized struct {
-	Status *entity.ReportStatus
+	Status *model.ReportStatus
 	Limit  int
 	Offset int
 }
@@ -86,9 +86,9 @@ func ValidateCreateReport(in CreateReportInput) (CreateReportNormalized, error) 
 	if err != nil {
 		return CreateReportNormalized{}, err
 	}
-	out.TargetType = entity.ReportTargetType(strings.TrimSpace(strings.ToUpper(in.TargetType)))
+	out.TargetType = model.ReportTargetType(strings.TrimSpace(strings.ToUpper(in.TargetType)))
 	if !out.TargetType.Valid() {
-		return CreateReportNormalized{}, entity.ErrBadReportTarget
+		return CreateReportNormalized{}, model.ErrBadReportTarget
 	}
 	out.TargetID = in.TargetID
 	out.Reason = strings.TrimSpace(in.Reason)
@@ -96,7 +96,7 @@ func ValidateCreateReport(in CreateReportInput) (CreateReportNormalized, error) 
 		d := strings.TrimSpace(*in.Detail)
 		if d != "" {
 			if runeLenReport(d) > MaxReportDetailLen {
-				return CreateReportNormalized{}, entity.ErrBadReport
+				return CreateReportNormalized{}, model.ErrBadReport
 			}
 			out.Detail = &d
 		}
@@ -107,7 +107,7 @@ func ValidateCreateReport(in CreateReportInput) (CreateReportNormalized, error) 
 func ValidateAdminReportList(in AdminReportListInput) (AdminReportListNormalized, error) {
 	var (
 		out AdminReportListNormalized
-		st  entity.ReportStatus
+		st  model.ReportStatus
 		err error
 	)
 	out.Limit, out.Offset, err = Paginate(in.Limit, in.Offset)
@@ -115,18 +115,18 @@ func ValidateAdminReportList(in AdminReportListInput) (AdminReportListNormalized
 		return AdminReportListNormalized{}, err
 	}
 	if in.Status != nil && strings.TrimSpace(*in.Status) != "" {
-		st = entity.ReportStatus(strings.TrimSpace(strings.ToUpper(*in.Status)))
+		st = model.ReportStatus(strings.TrimSpace(strings.ToUpper(*in.Status)))
 		if !st.Valid() {
-			return AdminReportListNormalized{}, entity.ErrBadReport
+			return AdminReportListNormalized{}, model.ErrBadReport
 		}
 		out.Status = &st
 	}
 	return out, nil
 }
 
-func ValidateAdminReportUpdate(in AdminReportUpdateInput) (entity.ReportStatus, *string, error) {
+func ValidateAdminReportUpdate(in AdminReportUpdateInput) (model.ReportStatus, *string, error) {
 	var (
-		status entity.ReportStatus
+		status model.ReportStatus
 		res    *string
 		err    error
 	)
@@ -136,15 +136,15 @@ func ValidateAdminReportUpdate(in AdminReportUpdateInput) (entity.ReportStatus, 
 	if err != nil {
 		return "", nil, err
 	}
-	status = entity.ReportStatus(strings.TrimSpace(strings.ToUpper(in.Status)))
+	status = model.ReportStatus(strings.TrimSpace(strings.ToUpper(in.Status)))
 	if !status.Valid() {
-		return "", nil, entity.ErrBadReport
+		return "", nil, model.ErrBadReport
 	}
 	if in.Resolution != nil {
 		s := strings.TrimSpace(*in.Resolution)
 		if s != "" {
 			if runeLenReport(s) > MaxReportResolutionLen {
-				return "", nil, entity.ErrBadReport
+				return "", nil, model.ErrBadReport
 			}
 			res = &s
 		}

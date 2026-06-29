@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"crowdfund-app/entity"
+	"crowdfund-app/model"
 	"crowdfund-app/stripe"
 )
 
@@ -28,9 +28,9 @@ func TestIsAutoSubscriptionRenewal(t *testing.T) {
 func TestCanIssueKonbiniRenewal(t *testing.T) {
 	var (
 		periodEnd = time.Date(2026, 4, 1, 0, 0, 0, 0, time.UTC)
-		s         = &entity.ProjectSupporter{
-			Status:           entity.SupporterStatusActive,
-			BillingMode:      entity.BillingModeKonbini,
+		s         = &model.ProjectSupporter{
+			Status:           model.SupporterStatusActive,
+			BillingMode:      model.BillingModeKonbini,
 			CurrentPeriodEnd: periodEnd,
 		}
 	)
@@ -40,7 +40,7 @@ func TestCanIssueKonbiniRenewal(t *testing.T) {
 	if !canIssueKonbiniRenewal(s, periodEnd.AddDate(0, 0, -7)) {
 		t.Fatal("7 days before end should be allowed")
 	}
-	s.Status = entity.SupporterStatusPendingRenewal
+	s.Status = model.SupporterStatusPendingRenewal
 	if !canIssueKonbiniRenewal(s, time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)) {
 		t.Fatal("pending renewal should always be allowed")
 	}

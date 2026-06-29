@@ -3,7 +3,7 @@ package validator
 import (
 	"testing"
 
-	"crowdfund-app/entity"
+	"crowdfund-app/model"
 )
 
 func TestValidateAdminUserList(t *testing.T) {
@@ -12,7 +12,7 @@ func TestValidateAdminUserList(t *testing.T) {
 		err error
 	)
 	out, err = ValidateAdminUserList(AdminUserListInput{Role: "buyer", Limit: 10})
-	if err != nil || out.Role == nil || *out.Role != entity.UserRoleBuyer {
+	if err != nil || out.Role == nil || *out.Role != model.UserRoleBuyer {
 		t.Fatalf("err=%v role=%v", err, out.Role)
 	}
 	_, err = ValidateAdminUserList(AdminUserListInput{Role: "INVALID"})
@@ -23,11 +23,11 @@ func TestValidateAdminUserList(t *testing.T) {
 
 func TestValidateAdminPurchaseStatus(t *testing.T) {
 	var (
-		st  entity.PurchaseStatus
+		st  model.PurchaseStatus
 		err error
 	)
 	st, err = ValidateAdminPurchaseStatus("PAID")
-	if err != nil || st != entity.PurchaseStatusPaid {
+	if err != nil || st != model.PurchaseStatusPaid {
 		t.Fatalf("err=%v st=%q", err, st)
 	}
 	_, err = ValidateAdminPurchaseStatus("PENDING")

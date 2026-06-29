@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	"crowdfund-app/entity"
+	"crowdfund-app/model"
 
 	"github.com/google/uuid"
 	"gorm.io/gorm"
@@ -34,7 +34,7 @@ type PlanBreakdownRow struct {
 
 type SellerRepo interface {
 	DashboardStats(ctx context.Context, sellerID uuid.UUID) (SellerDashboardStats, error)
-	ListSupporters(ctx context.Context, sellerID uuid.UUID, projectID *uuid.UUID, limit, offset int) ([]entity.ProjectSupporter, int64, error)
+	ListSupporters(ctx context.Context, sellerID uuid.UUID, projectID *uuid.UUID, limit, offset int) ([]model.ProjectSupporter, int64, error)
 	ListProjectAnalysis(ctx context.Context, sellerID uuid.UUID) ([]ProjectAnalysisRow, error)
 	PlanBreakdownByProject(ctx context.Context, sellerID uuid.UUID) ([]PlanBreakdownRow, error)
 }
@@ -56,42 +56,42 @@ func (r *sellerRepo) DashboardStats(ctx context.Context, sellerID uuid.UUID) (Se
 		out SellerDashboardStats
 		err error
 	)
-	err = r.dbCtx(ctx).Model(&entity.Project{}).
+	err = r.dbCtx(ctx).Model(&model.Project{}).
 		Where("seller_id = ?", sellerID).
 		Count(&out.TotalProjects).Error
 	if err != nil {
 		return SellerDashboardStats{}, err
 	}
-	err = r.dbCtx(ctx).Model(&entity.Project{}).
-		Where("seller_id = ? AND status = ?", sellerID, entity.ProjectStatusActive).
+	err = r.dbCtx(ctx).Model(&model.Project{}).
+		Where("seller_id = ? AND status = ?", sellerID, model.ProjectStatusActive).
 		Count(&out.ActiveProjects).Error
 	if err != nil {
 		return SellerDashboardStats{}, err
 	}
-	err = r.dbCtx(ctx).Model(&entity.Project{}).
+	err = r.dbCtx(ctx).Model(&model.Project{}).
 		Where("seller_id = ?", sellerID).
 		Select("COALESCE(SUM(supporter_count), 0)").
 		Scan(&out.TotalSupporters).Error
 	if err != nil {
 		return SellerDashboardStats{}, err
 	}
-	err = r.dbCtx(ctx).Model(&entity.Purchase{}).
+	err = r.dbCtx(ctx).Model(&model.Purchase{}).
 		Select("COALESCE(SUM(purchases.total_price), 0)").
 		Joins("JOIN projects ON projects.id = purchases.project_id").
 		Where("projects.seller_id = ?", sellerID).
-		Where("purchases.status = ?", entity.PurchaseStatusPaid).
+		Where("purchases.status = ?", model.PurchaseStatusPaid).
 		Scan(&out.TotalRevenue).Error
 	return out, err
 }
 
-func (r *sellerRepo) ListSupporters(ctx context.Context, sellerID uuid.UUID, projectID *uuid.UUID, limit, offset int) ([]entity.ProjectSupporter, int64, error) {
+func (r *sellerRepo) ListSupporters(ctx context.Context, sellerID uuid.UUID, projectID *uuid.UUID, limit, offset int) ([]model.ProjectSupporter, int64, error) {
 	var (
 		q     *gorm.DB
 		total int64
-		rows  []entity.ProjectSupporter
+		rows  []model.ProjectSupporter
 		err   error
 	)
-	q = r.dbCtx(ctx).Model(&entity.ProjectSupporter{}).
+	q = r.dbCtx(ctx).Model(&model.ProjectSupporter{}).
 		Joins("JOIN projects ON projects.id = project_supporters.project_id").
 		Where("projects.seller_id = ?", sellerID)
 	if projectID != nil {
@@ -121,13 +121,13 @@ func (r *sellerRepo) ListProjectAnalysis(ctx context.Context, sellerID uuid.UUID
 		rows []ProjectAnalysisRow
 		err  error
 	)
-	err = r.dbCtx(ctx).Model(&entity.Project{}).
+	err = r.dbCtx(ctx).Model(&model.Project{}).
 		Select(`
 			projects.id AS project_id,
 			projects.title AS title,
 			projects.supporter_count AS supporter_count,
 			COALESCE(SUM(CASE WHEN purchases.status = ? THEN purchases.total_price ELSE 0 END), 0) AS revenue`,
-			entity.PurchaseStatusPaid).
+			model.PurchaseStatusPaid).
 		Joins("LEFT JOIN purchases ON purchases.project_id = projects.id").
 		Where("projects.seller_id = ?", sellerID).
 		Group("projects.id, projects.title, projects.supporter_count").
@@ -143,15 +143,15 @@ func (r *sellerRepo) PlanBreakdownByProject(ctx context.Context, sellerID uuid.U
 		err  error
 	)
 	now = time.Now().UTC()
-	err = r.dbCtx(ctx).Model(&entity.ProjectSupporter{}).
+	err = r.dbCtx(ctx).Model(&model.ProjectSupporter{}).
 		Select("project_supporters.project_id, project_plans.membership_type, COUNT(*) AS count").
 		Joins("JOIN projects ON projects.id = project_supporters.project_id").
 		Joins("JOIN project_plans ON project_plans.id = project_supporters.plan_id").
 		Where("projects.seller_id = ?", sellerID).
-		Where("project_supporters.status IN ?", []entity.SupporterStatus{
-			entity.SupporterStatusActive,
-			entity.SupporterStatusPendingRenewal,
-			entity.SupporterStatusCancelled,
+		Where("project_supporters.status IN ?", []model.SupporterStatus{
+			model.SupporterStatusActive,
+			model.SupporterStatusPendingRenewal,
+			model.SupporterStatusCancelled,
 		}).
 		Where("project_supporters.current_period_end >= ?", now).
 		Group("project_supporters.project_id, project_plans.membership_type").

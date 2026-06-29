@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"crowdfund-app/entity"
+	"crowdfund-app/model"
 	"crowdfund-app/wshub"
 
 	"github.com/google/uuid"
@@ -38,13 +38,13 @@ func TestWSMessageCreatedBroadcast(t *testing.T) {
 	gdb = openDB(t)
 	fx = seedPaymentFixture(t, gdb)
 	now = time.Now().UTC()
-	err = gdb.Create(&entity.ProjectSupporter{
+	err = gdb.Create(&model.ProjectSupporter{
 		ID:                 uuid.New(),
 		ProjectID:          fx.project.ID,
 		UserID:             fx.buyer.ID,
 		PlanID:             fx.plan.ID,
-		Status:             entity.SupporterStatusActive,
-		BillingMode:        entity.BillingModeKonbini,
+		Status:             model.SupporterStatusActive,
+		BillingMode:        model.BillingModeKonbini,
 		CurrentPeriodStart: now,
 		CurrentPeriodEnd:   now.AddDate(0, 0, 30),
 		CreatedAt:          now,

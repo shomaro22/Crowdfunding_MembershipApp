@@ -7,7 +7,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"crowdfund-app/entity"
+	"crowdfund-app/model"
 
 	"github.com/labstack/echo/v4"
 	"gorm.io/gorm"
@@ -17,13 +17,13 @@ func TestProjectBuyerCannotCreate(t *testing.T) {
 	var (
 		e   *echo.Echo
 		gdb *gorm.DB
-		u   *entity.User
+		u   *model.User
 		tok string
 		rec *httptest.ResponseRecorder
 	)
 	e = setupApp(t)
 	gdb = openDB(t)
-	u = seedUser(t, gdb, seedOpts{Role: entity.UserRoleBuyer})
+	u = seedUser(t, gdb, seedOpts{Role: model.UserRoleBuyer})
 	tok, _ = issueToken(u, true)
 	rec = httpPOST(e, "/projects", tok, `{"title":"t","description":"d"}`)
 	if rec.Code != http.StatusForbidden {
@@ -35,16 +35,16 @@ func TestProjectReviewAdminCanListProjects(t *testing.T) {
 	var (
 		e     *echo.Echo
 		gdb   *gorm.DB
-		u     *entity.User
+		u     *model.User
 		tok   string
-		role  entity.AdminRole
+		role  model.AdminRole
 		rec   *httptest.ResponseRecorder
 	)
 	e = setupApp(t)
 	gdb = openDB(t)
-	role = entity.AdminRoleReviewAdmin
+	role = model.AdminRoleReviewAdmin
 	u = seedUser(t, gdb, seedOpts{
-		Role:        entity.UserRoleAdmin,
+		Role:        model.UserRoleAdmin,
 		AdminRole:   &role,
 		TOTPEnabled: true,
 	})
@@ -59,16 +59,16 @@ func TestProjectFinanceAdminCannotListProjects(t *testing.T) {
 	var (
 		e     *echo.Echo
 		gdb   *gorm.DB
-		u     *entity.User
+		u     *model.User
 		tok   string
-		role  entity.AdminRole
+		role  model.AdminRole
 		rec   *httptest.ResponseRecorder
 	)
 	e = setupApp(t)
 	gdb = openDB(t)
-	role = entity.AdminRoleFinanceAdmin
+	role = model.AdminRoleFinanceAdmin
 	u = seedUser(t, gdb, seedOpts{
-		Role:        entity.UserRoleAdmin,
+		Role:        model.UserRoleAdmin,
 		AdminRole:   &role,
 		TOTPEnabled: true,
 	})
@@ -83,14 +83,14 @@ func TestProjectPendingHiddenFromPublic(t *testing.T) {
 	var (
 		e       *echo.Echo
 		gdb     *gorm.DB
-		seller  *entity.User
-		project    *entity.Project
+		seller  *model.User
+		project    *model.Project
 		rec     *httptest.ResponseRecorder
 	)
 	e = setupApp(t)
 	gdb = openDB(t)
-	seller = seedUser(t, gdb, seedOpts{Role: entity.UserRoleSeller})
-	project = seedProject(t, gdb, seller.ID, entity.ProjectStatusPending)
+	seller = seedUser(t, gdb, seedOpts{Role: model.UserRoleSeller})
+	project = seedProject(t, gdb, seller.ID, model.ProjectStatusPending)
 	rec = httpGET(e, "/projects/"+project.ID.String(), "")
 	if rec.Code != http.StatusNotFound {
 		t.Fatalf("status=%d want 404", rec.Code)
@@ -101,18 +101,18 @@ func TestProjectSellerCanViewOwnPending(t *testing.T) {
 	var (
 		e      *echo.Echo
 		gdb    *gorm.DB
-		seller *entity.User
-		project   *entity.Project
+		seller *model.User
+		project   *model.Project
 		tok    string
 		rec    *httptest.ResponseRecorder
 	)
 	e = setupApp(t)
 	gdb = openDB(t)
 	seller = seedUser(t, gdb, seedOpts{
-		Role:        entity.UserRoleSeller,
+		Role:        model.UserRoleSeller,
 		TOTPEnabled: true,
 	})
-	project = seedProject(t, gdb, seller.ID, entity.ProjectStatusPending)
+	project = seedProject(t, gdb, seller.ID, model.ProjectStatusPending)
 	tok, _ = issueToken(seller, true)
 	rec = httpGET(e, "/projects/"+project.ID.String(), tok)
 	if rec.Code != http.StatusOK {
@@ -124,21 +124,21 @@ func TestProjectRejectBuyerRequiresReason(t *testing.T) {
 	var (
 		e       *echo.Echo
 		gdb     *gorm.DB
-		buyer   *entity.User
-		admin   *entity.User
+		buyer   *model.User
+		admin   *model.User
 		tok     string
-		role    entity.AdminRole
+		role    model.AdminRole
 		rec     *httptest.ResponseRecorder
 	)
 	e = setupApp(t)
 	gdb = openDB(t)
 	buyer = seedUser(t, gdb, seedOpts{
-		Role:          entity.UserRoleBuyer,
-		AccountStatus: entity.AccountStatusPending,
+		Role:          model.UserRoleBuyer,
+		AccountStatus: model.AccountStatusPending,
 	})
-	role = entity.AdminRoleReviewAdmin
+	role = model.AdminRoleReviewAdmin
 	admin = seedUser(t, gdb, seedOpts{
-		Role:        entity.UserRoleAdmin,
+		Role:        model.UserRoleAdmin,
 		AdminRole:   &role,
 		TOTPEnabled: true,
 	})
@@ -153,20 +153,20 @@ func TestProjectPatchRejectRequiresReason(t *testing.T) {
 	var (
 		e      *echo.Echo
 		gdb    *gorm.DB
-		seller *entity.User
-		admin  *entity.User
-		project   *entity.Project
+		seller *model.User
+		admin  *model.User
+		project   *model.Project
 		tok    string
-		role   entity.AdminRole
+		role   model.AdminRole
 		rec    *httptest.ResponseRecorder
 	)
 	e = setupApp(t)
 	gdb = openDB(t)
-	seller = seedUser(t, gdb, seedOpts{Role: entity.UserRoleSeller})
-	project = seedProject(t, gdb, seller.ID, entity.ProjectStatusPending)
-	role = entity.AdminRoleReviewAdmin
+	seller = seedUser(t, gdb, seedOpts{Role: model.UserRoleSeller})
+	project = seedProject(t, gdb, seller.ID, model.ProjectStatusPending)
+	role = model.AdminRoleReviewAdmin
 	admin = seedUser(t, gdb, seedOpts{
-		Role:        entity.UserRoleAdmin,
+		Role:        model.UserRoleAdmin,
 		AdminRole:   &role,
 		TOTPEnabled: true,
 	})
@@ -181,20 +181,20 @@ func TestProjectHardDeleteActiveForbidden(t *testing.T) {
 	var (
 		e      *echo.Echo
 		gdb    *gorm.DB
-		seller *entity.User
-		admin  *entity.User
-		project   *entity.Project
+		seller *model.User
+		admin  *model.User
+		project   *model.Project
 		tok    string
-		role   entity.AdminRole
+		role   model.AdminRole
 		rec    *httptest.ResponseRecorder
 	)
 	e = setupApp(t)
 	gdb = openDB(t)
-	seller = seedUser(t, gdb, seedOpts{Role: entity.UserRoleSeller})
-	project = seedProject(t, gdb, seller.ID, entity.ProjectStatusActive)
-	role = entity.AdminRoleReviewAdmin
+	seller = seedUser(t, gdb, seedOpts{Role: model.UserRoleSeller})
+	project = seedProject(t, gdb, seller.ID, model.ProjectStatusActive)
+	role = model.AdminRoleReviewAdmin
 	admin = seedUser(t, gdb, seedOpts{
-		Role:        entity.UserRoleAdmin,
+		Role:        model.UserRoleAdmin,
 		AdminRole:   &role,
 		TOTPEnabled: true,
 	})
@@ -209,22 +209,22 @@ func TestProjectHardDeleteDeletedAllowed(t *testing.T) {
 	var (
 		e      *echo.Echo
 		gdb    *gorm.DB
-		seller *entity.User
-		admin  *entity.User
-		project   *entity.Project
+		seller *model.User
+		admin  *model.User
+		project   *model.Project
 		tok    string
-		role   entity.AdminRole
+		role   model.AdminRole
 		rec    *httptest.ResponseRecorder
 		err    error
 		n      int64
 	)
 	e = setupApp(t)
 	gdb = openDB(t)
-	seller = seedUser(t, gdb, seedOpts{Role: entity.UserRoleSeller})
-	project = seedProject(t, gdb, seller.ID, entity.ProjectStatusDeleted)
-	role = entity.AdminRoleReviewAdmin
+	seller = seedUser(t, gdb, seedOpts{Role: model.UserRoleSeller})
+	project = seedProject(t, gdb, seller.ID, model.ProjectStatusDeleted)
+	role = model.AdminRoleReviewAdmin
 	admin = seedUser(t, gdb, seedOpts{
-		Role:        entity.UserRoleAdmin,
+		Role:        model.UserRoleAdmin,
 		AdminRole:   &role,
 		TOTPEnabled: true,
 	})
@@ -233,7 +233,7 @@ func TestProjectHardDeleteDeletedAllowed(t *testing.T) {
 	if rec.Code != http.StatusNoContent {
 		t.Fatalf("status=%d want 204", rec.Code)
 	}
-	err = gdb.Model(&entity.Project{}).Where("id = ?", project.ID).Count(&n).Error
+	err = gdb.Model(&model.Project{}).Where("id = ?", project.ID).Count(&n).Error
 	if err != nil {
 		t.Fatal(err)
 	}

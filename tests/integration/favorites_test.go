@@ -9,7 +9,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"crowdfund-app/entity"
+	"crowdfund-app/model"
 
 	"github.com/google/uuid"
 	"github.com/labstack/echo/v4"
@@ -32,18 +32,18 @@ func TestFavoritesAddListCheckRemove(t *testing.T) {
 	var (
 		e       *echo.Echo
 		gdb     *gorm.DB
-		seller  *entity.User
-		buyer   *entity.User
-		project *entity.Project
+		seller  *model.User
+		buyer   *model.User
+		project *model.Project
 		tok     string
 		rec     *httptest.ResponseRecorder
 		body    map[string]any
 	)
 	e = setupApp(t)
 	gdb = openDB(t)
-	seller = seedUser(t, gdb, seedOpts{Role: entity.UserRoleSeller})
-	buyer = seedUser(t, gdb, seedOpts{Role: entity.UserRoleBuyer})
-	project = seedProject(t, gdb, seller.ID, entity.ProjectStatusActive)
+	seller = seedUser(t, gdb, seedOpts{Role: model.UserRoleSeller})
+	buyer = seedUser(t, gdb, seedOpts{Role: model.UserRoleBuyer})
+	project = seedProject(t, gdb, seller.ID, model.ProjectStatusActive)
 	tok, _ = issueToken(buyer, true)
 
 	rec = httpPOST(e, "/favorites", tok, fmt.Sprintf(`{"project_id":"%s","action":"add"}`, project.ID))
@@ -99,17 +99,17 @@ func TestFavoritesPendingProjectNotFound(t *testing.T) {
 	var (
 		e       *echo.Echo
 		gdb     *gorm.DB
-		seller  *entity.User
-		buyer   *entity.User
-		project *entity.Project
+		seller  *model.User
+		buyer   *model.User
+		project *model.Project
 		tok     string
 		rec     *httptest.ResponseRecorder
 	)
 	e = setupApp(t)
 	gdb = openDB(t)
-	seller = seedUser(t, gdb, seedOpts{Role: entity.UserRoleSeller})
-	buyer = seedUser(t, gdb, seedOpts{Role: entity.UserRoleBuyer})
-	project = seedProject(t, gdb, seller.ID, entity.ProjectStatusPending)
+	seller = seedUser(t, gdb, seedOpts{Role: model.UserRoleSeller})
+	buyer = seedUser(t, gdb, seedOpts{Role: model.UserRoleBuyer})
+	project = seedProject(t, gdb, seller.ID, model.ProjectStatusPending)
 	tok, _ = issueToken(buyer, true)
 
 	rec = httpPOST(e, "/favorites", tok, fmt.Sprintf(`{"project_id":"%s","action":"add"}`, project.ID))
@@ -122,14 +122,14 @@ func TestFavoritesRemoveMissing(t *testing.T) {
 	var (
 		e      *echo.Echo
 		gdb    *gorm.DB
-		buyer  *entity.User
+		buyer  *model.User
 		tok    string
 		rec    *httptest.ResponseRecorder
 		pid    uuid.UUID
 	)
 	e = setupApp(t)
 	gdb = openDB(t)
-	buyer = seedUser(t, gdb, seedOpts{Role: entity.UserRoleBuyer})
+	buyer = seedUser(t, gdb, seedOpts{Role: model.UserRoleBuyer})
 	tok, _ = issueToken(buyer, true)
 	pid = uuid.New()
 

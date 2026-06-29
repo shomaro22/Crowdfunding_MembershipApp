@@ -9,7 +9,7 @@ import (
 	neturl "net/url"
 	"testing"
 
-	"crowdfund-app/entity"
+	"crowdfund-app/model"
 
 	"github.com/labstack/echo/v4"
 	"gorm.io/gorm"
@@ -31,7 +31,7 @@ func TestMediaUploadAndFetch(t *testing.T) {
 	var (
 		e      *echo.Echo
 		gdb    *gorm.DB
-		seller *entity.User
+		seller *model.User
 		tok    string
 		rec    *httptest.ResponseRecorder
 		body   map[string]any
@@ -41,7 +41,7 @@ func TestMediaUploadAndFetch(t *testing.T) {
 	)
 	e = setupApp(t)
 	gdb = openDB(t)
-	seller = seedUser(t, gdb, seedOpts{Role: entity.UserRoleSeller})
+	seller = seedUser(t, gdb, seedOpts{Role: model.UserRoleSeller})
 	tok, _ = issueToken(seller, true)
 
 	rec = mediaUploadPOST(e, tok, minimalPNGBytes(), "test.png")
@@ -71,13 +71,13 @@ func TestMediaUploadUnsupportedType(t *testing.T) {
 	var (
 		e      *echo.Echo
 		gdb    *gorm.DB
-		seller *entity.User
+		seller *model.User
 		tok    string
 		rec    *httptest.ResponseRecorder
 	)
 	e = setupApp(t)
 	gdb = openDB(t)
-	seller = seedUser(t, gdb, seedOpts{Role: entity.UserRoleSeller})
+	seller = seedUser(t, gdb, seedOpts{Role: model.UserRoleSeller})
 	tok, _ = issueToken(seller, true)
 	rec = mediaUploadPOST(e, tok, []byte("not an image"), "test.txt")
 	if rec.Code != http.StatusUnsupportedMediaType {

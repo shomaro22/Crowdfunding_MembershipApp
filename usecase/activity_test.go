@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"crowdfund-app/entity"
+	"crowdfund-app/model"
 	"crowdfund-app/repository"
 	"crowdfund-app/usecase"
 
@@ -13,19 +13,19 @@ import (
 )
 
 type stubActivityRepo struct {
-	last *entity.ActivityLog
+	last *model.ActivityLog
 }
 
-func (s *stubActivityRepo) Create(_ context.Context, row *entity.ActivityLog) error {
+func (s *stubActivityRepo) Create(_ context.Context, row *model.ActivityLog) error {
 	s.last = row
 	return nil
 }
 
-func (s *stubActivityRepo) List(_ context.Context, _ repository.ActivityListFilter) ([]entity.ActivityLog, int64, error) {
+func (s *stubActivityRepo) List(_ context.Context, _ repository.ActivityListFilter) ([]model.ActivityLog, int64, error) {
 	return nil, 0, nil
 }
 
-func (s *stubActivityRepo) CountByActionBetween(_ context.Context, _ entity.ActivityAction, _, _ time.Time) (int64, error) {
+func (s *stubActivityRepo) CountByActionBetween(_ context.Context, _ model.ActivityAction, _, _ time.Time) (int64, error) {
 	return 0, nil
 }
 
@@ -49,8 +49,8 @@ func TestLogRateLimitDenied(t *testing.T) {
 	if repo.last == nil {
 		t.Fatal("expected activity log row")
 	}
-	if repo.last.Action != entity.SecRateLimit {
-		t.Fatalf("action=%q want %q", repo.last.Action, entity.SecRateLimit)
+	if repo.last.Action != model.SecRateLimit {
+		t.Fatalf("action=%q want %q", repo.last.Action, model.SecRateLimit)
 	}
 	if repo.last.UserID == nil || *repo.last.UserID != uid {
 		t.Fatalf("user_id=%v want %v", repo.last.UserID, uid)

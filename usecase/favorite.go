@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	"crowdfund-app/entity"
+	"crowdfund-app/model"
 	"crowdfund-app/repository"
 	"crowdfund-app/validator"
 
@@ -30,11 +30,11 @@ type FavoriteUseCase struct {
 
 func (f *FavoriteUseCase) List(ctx context.Context, userID uuid.UUID) ([]ProjectView, error) {
 	var (
-		rows     []entity.Favorite
-		projects []entity.Project
+		rows     []model.Favorite
+		projects []model.Project
 		i        int
-		fav      entity.Favorite
-		project  *entity.Project
+		fav      model.Favorite
+		project  *model.Project
 		err      error
 	)
 	if f == nil || f.Favorites == nil || f.Projects == nil {
@@ -44,7 +44,7 @@ func (f *FavoriteUseCase) List(ctx context.Context, userID uuid.UUID) ([]Project
 	if err != nil {
 		return nil, err
 	}
-	projects = make([]entity.Project, 0, len(rows))
+	projects = make([]model.Project, 0, len(rows))
 	for i = range rows {
 		fav = rows[i]
 		project, _, _, err = f.Projects.Projects.FindID(ctx, fav.ProjectID)
@@ -116,7 +116,7 @@ func (f *FavoriteUseCase) addFavorite(ctx context.Context, userID, projectID uui
 		now    time.Time
 		err    error
 	)
-	_, err = f.Projects.FindView(ctx, projectID, &userID, string(entity.UserRoleBuyer))
+	_, err = f.Projects.FindView(ctx, projectID, &userID, string(model.UserRoleBuyer))
 	if err != nil {
 		return FavoriteStatusView{}, err
 	}
@@ -128,7 +128,7 @@ func (f *FavoriteUseCase) addFavorite(ctx context.Context, userID, projectID uui
 		return FavoriteStatusView{ProjectID: projectID, IsFavorited: true}, ErrFavoriteExists
 	}
 	now = time.Now().UTC()
-	err = f.Favorites.Create(ctx, &entity.Favorite{
+	err = f.Favorites.Create(ctx, &model.Favorite{
 		ID:        uuid.New(),
 		UserID:    userID,
 		ProjectID: projectID,
@@ -140,7 +140,7 @@ func (f *FavoriteUseCase) addFavorite(ctx context.Context, userID, projectID uui
 		}
 		return FavoriteStatusView{}, err
 	}
-	LogActivity(ctx, f.Activity, &userID, entity.FavoriteAdd, "project", projectID.String(), meta, ActivityMeta(map[string]string{
+	LogActivity(ctx, f.Activity, &userID, model.FavoriteAdd, "project", projectID.String(), meta, ActivityMeta(map[string]string{
 		"project_id": projectID.String(),
 	}))
 	return FavoriteStatusView{ProjectID: projectID, IsFavorited: true}, nil
@@ -158,7 +158,7 @@ func (f *FavoriteUseCase) removeFavorite(ctx context.Context, userID, projectID 
 	if !removed {
 		return FavoriteStatusView{}, ErrNotFound
 	}
-	LogActivity(ctx, f.Activity, &userID, entity.FavoriteRemove, "project", projectID.String(), meta, ActivityMeta(map[string]string{
+	LogActivity(ctx, f.Activity, &userID, model.FavoriteRemove, "project", projectID.String(), meta, ActivityMeta(map[string]string{
 		"project_id": projectID.String(),
 	}))
 	return FavoriteStatusView{ProjectID: projectID, IsFavorited: false}, nil

@@ -2,7 +2,7 @@ package router
 
 import (
 	"crowdfund-app/controller"
-	"crowdfund-app/entity"
+	"crowdfund-app/model"
 	"crowdfund-app/middleware"
 
 	"github.com/labstack/echo/v4"
@@ -185,14 +185,14 @@ func New(cfg Config) *echo.Echo {
 		)
 		admin = e.Group("/admin", cfg.AdminOnly...)
 		reportModeration = middleware.RequireAdminRole(
-			entity.AdminRoleSuperAdmin,
-			entity.AdminRoleReviewAdmin,
-			entity.AdminRoleSupportAdmin,
+			model.AdminRoleSuperAdmin,
+			model.AdminRoleReviewAdmin,
+			model.AdminRoleSupportAdmin,
 		)
 		if cfg.Admin != nil {
-			reviewAdmin = middleware.RequireAdminRole(entity.AdminRoleReviewAdmin, entity.AdminRoleSuperAdmin)
-			userManagement = middleware.RequireAdminRole(entity.AdminRoleSuperAdmin, entity.AdminRoleSupportAdmin)
-			financeAdmin = middleware.RequireAdminRole(entity.AdminRoleSuperAdmin, entity.AdminRoleFinanceAdmin)
+			reviewAdmin = middleware.RequireAdminRole(model.AdminRoleReviewAdmin, model.AdminRoleSuperAdmin)
+			userManagement = middleware.RequireAdminRole(model.AdminRoleSuperAdmin, model.AdminRoleSupportAdmin)
+			financeAdmin = middleware.RequireAdminRole(model.AdminRoleSuperAdmin, model.AdminRoleFinanceAdmin)
 			admin.GET("/stats", cfg.Admin.DashboardStats, userManagement)
 			admin.GET("/users", cfg.Admin.ListUsers, userManagement)
 			admin.PUT("/users/:userId", cfg.Admin.UpdateUser, userManagement)
@@ -211,22 +211,22 @@ func New(cfg Config) *echo.Echo {
 			admin.DELETE("/projects/:projectId", cfg.Admin.DeleteProject, reviewAdmin)
 			admin.PATCH("/projects/:projectId/delete-request", cfg.Admin.PatchDeleteReq, reviewAdmin)
 			admin.POST("/users/:userId/reset-2fa", cfg.Admin.ResetUser2FA,
-				middleware.RequireAdminRole(entity.AdminRoleSupportAdmin, entity.AdminRoleSuperAdmin))
+				middleware.RequireAdminRole(model.AdminRoleSupportAdmin, model.AdminRoleSuperAdmin))
 			admin.PATCH("/users/:userId/admin-role", cfg.Admin.ChangeAdminRole,
-				middleware.RequireAdminRole(entity.AdminRoleSuperAdmin))
+				middleware.RequireAdminRole(model.AdminRoleSuperAdmin))
 		}
 		if cfg.AdminOperations != nil {
 			ops := cfg.AdminOperations
 			admin.GET("/activity", ops.ListActivity,
-				middleware.RequireAdminRole(entity.AdminRoleSuperAdmin, entity.AdminRoleSupportAdmin, entity.AdminRoleFinanceAdmin))
+				middleware.RequireAdminRole(model.AdminRoleSuperAdmin, model.AdminRoleSupportAdmin, model.AdminRoleFinanceAdmin))
 			admin.GET("/security", ops.GetSecurity,
-				middleware.RequireAdminRole(entity.AdminRoleSuperAdmin, entity.AdminRoleSupportAdmin))
+				middleware.RequireAdminRole(model.AdminRoleSuperAdmin, model.AdminRoleSupportAdmin))
 			admin.GET("/batches", ops.ListBatches,
-				middleware.RequireAdminRole(entity.AdminRoleSuperAdmin, entity.AdminRoleFinanceAdmin))
+				middleware.RequireAdminRole(model.AdminRoleSuperAdmin, model.AdminRoleFinanceAdmin))
 			admin.POST("/batches/:jobName/run", ops.RunBatch,
-				middleware.RequireAdminRole(entity.AdminRoleSuperAdmin))
+				middleware.RequireAdminRole(model.AdminRoleSuperAdmin))
 			admin.GET("/audit-logs", ops.ListAuditLogs,
-				middleware.RequireAdminRole(entity.AdminRoleSuperAdmin))
+				middleware.RequireAdminRole(model.AdminRoleSuperAdmin))
 		}
 		if cfg.Reports != nil {
 			admin.GET("/reports", cfg.Reports.ListAdmin, reportModeration)

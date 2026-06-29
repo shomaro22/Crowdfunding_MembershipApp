@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"crowdfund-app/entity"
+	"crowdfund-app/model"
 
 	"github.com/google/uuid"
 )
@@ -78,11 +78,11 @@ func TestValidateBatchJobNameAcceptsSupported(t *testing.T) {
 		name string
 		err  error
 	)
-	name, err = ValidateBatchJobName(entity.PurgeTokens)
+	name, err = ValidateBatchJobName(model.PurgeTokens)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if name != entity.PurgeTokens {
+	if name != model.PurgeTokens {
 		t.Fatalf("name=%q", name)
 	}
 }
@@ -125,7 +125,7 @@ func TestValidateActivityLogsPreservesUserID(t *testing.T) {
 }
 
 func TestIsSupportedBatchJob(t *testing.T) {
-	if !IsSupportedBatchJob(entity.ApplyPlans) {
+	if !IsSupportedBatchJob(model.ApplyPlans) {
 		t.Fatal("apply_plans should be supported")
 	}
 	if IsSupportedBatchJob("expire_projects") {
@@ -139,12 +139,12 @@ func TestValidateBatchRunsAcceptsValidStatus(t *testing.T) {
 		out    BatchRunsNormalized
 		err    error
 	)
-	status = string(entity.BatchSuccess)
+	status = string(model.BatchSuccess)
 	out, err = ValidateBatchRuns(BatchRunsInput{Status: &status})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if out.Status == nil || *out.Status != entity.BatchSuccess {
+	if out.Status == nil || *out.Status != model.BatchSuccess {
 		t.Fatalf("status=%v", out.Status)
 	}
 }
