@@ -2,13 +2,11 @@ package repository
 
 import (
 	"context"
-	"errors"
 
 	"crowdfund-app/entity"
 
 	"github.com/google/uuid"
 	"gorm.io/gorm"
-	"gorm.io/gorm/clause"
 )
 
 type PurchaseRepo interface {
@@ -46,90 +44,28 @@ func (r *purchaseRepo) Update(ctx context.Context, row *entity.Purchase) error {
 }
 
 func (r *purchaseRepo) FindID(ctx context.Context, id uuid.UUID) (*entity.Purchase, error) {
-	var row entity.Purchase
-	err := firstOne(r.dbCtx(ctx).Where("id = ?", id), &row)
-	if err != nil {
-		return nil, err
-	}
-	return &row, nil
+	return firstOnePtr[entity.Purchase](r.dbCtx(ctx).Where("id = ?", id))
 }
 
 func (r *purchaseRepo) FindIDLock(ctx context.Context, id uuid.UUID) (*entity.Purchase, error) {
-	var (
-		row entity.Purchase
-		err error
-	)
-	err = r.dbCtx(ctx).Clauses(clause.Locking{Strength: "UPDATE"}).
-		Where("id = ?", id).First(&row).Error
-	if errors.Is(err, gorm.ErrRecordNotFound) {
-		return nil, nil
-	}
-	if err != nil {
-		return nil, err
-	}
-	return &row, nil
+	return firstOneForUpdatePtr[entity.Purchase](r.dbCtx(ctx).Where("id = ?", id))
 }
 
 func (r *purchaseRepo) FindSessionID(ctx context.Context, sessionID string) (*entity.Purchase, error) {
-	var (
-		row entity.Purchase
-		err error
-	)
-	err = r.dbCtx(ctx).Where("stripe_checkout_session_id = ?", sessionID).First(&row).Error
-	if errors.Is(err, gorm.ErrRecordNotFound) {
-		return nil, nil
-	}
-	if err != nil {
-		return nil, err
-	}
-	return &row, nil
+	return firstOnePtr[entity.Purchase](r.dbCtx(ctx).Where("stripe_checkout_session_id = ?", sessionID))
 }
 
 func (r *purchaseRepo) FindIntentID(ctx context.Context, intentID string) (*entity.Purchase, error) {
-	var (
-		row entity.Purchase
-		err error
-	)
-	err = r.dbCtx(ctx).Where("stripe_payment_intent_id = ?", intentID).First(&row).Error
-	if errors.Is(err, gorm.ErrRecordNotFound) {
-		return nil, nil
-	}
-	if err != nil {
-		return nil, err
-	}
-	return &row, nil
+	return firstOnePtr[entity.Purchase](r.dbCtx(ctx).Where("stripe_payment_intent_id = ?", intentID))
 }
 
 func (r *purchaseRepo) FindPendingBuyerProject(ctx context.Context, buyerID, projectID uuid.UUID) (*entity.Purchase, error) {
-	var (
-		row entity.Purchase
-		err error
-	)
-	err = r.dbCtx(ctx).
-		Where("buyer_id = ? AND project_id = ? AND status = ?", buyerID, projectID, entity.PurchaseStatusPending).
-		First(&row).Error
-	if errors.Is(err, gorm.ErrRecordNotFound) {
-		return nil, nil
-	}
-	if err != nil {
-		return nil, err
-	}
-	return &row, nil
+	return firstOnePtr[entity.Purchase](r.dbCtx(ctx).
+		Where("buyer_id = ? AND project_id = ? AND status = ?", buyerID, projectID, entity.PurchaseStatusPending))
 }
 
 func (r *purchaseRepo) FindStripeInvoiceID(ctx context.Context, invoiceID string) (*entity.Purchase, error) {
-	var (
-		row entity.Purchase
-		err error
-	)
-	err = r.dbCtx(ctx).Where("stripe_invoice_id = ?", invoiceID).First(&row).Error
-	if errors.Is(err, gorm.ErrRecordNotFound) {
-		return nil, nil
-	}
-	if err != nil {
-		return nil, err
-	}
-	return &row, nil
+	return firstOnePtr[entity.Purchase](r.dbCtx(ctx).Where("stripe_invoice_id = ?", invoiceID))
 }
 
 func (r *purchaseRepo) ListByBuyerID(ctx context.Context, buyerID uuid.UUID, limit, offset int) ([]entity.Purchase, int64, error) {

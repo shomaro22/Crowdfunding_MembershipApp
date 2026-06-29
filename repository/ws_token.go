@@ -2,7 +2,6 @@ package repository
 
 import (
 	"context"
-	"errors"
 	"time"
 
 	"crowdfund-app/entity"
@@ -44,13 +43,9 @@ func (r *wsTokenRepo) ConsumeValidHash(ctx context.Context, hash string, now tim
 			_ = tx.Rollback()
 		}
 	}()
-	err = tx.
+	err = mapRecordNotFound(tx.
 		Where("token_hash = ? AND used_at IS NULL AND expires_at > ?", hash, now).
-		First(&row).Error
-	if errors.Is(err, gorm.ErrRecordNotFound) {
-		err = gorm.ErrRecordNotFound
-		return nil, nil
-	}
+		First(&row).Error)
 	if err != nil {
 		return nil, err
 	}
@@ -62,8 +57,7 @@ func (r *wsTokenRepo) ConsumeValidHash(ctx context.Context, hash string, now tim
 		return nil, err
 	}
 	if res.RowsAffected != 1 {
-		err = gorm.ErrRecordNotFound
-		return nil, nil
+		return nil, ErrNotFound
 	}
 	if err = tx.Commit().Error; err != nil {
 		return nil, err

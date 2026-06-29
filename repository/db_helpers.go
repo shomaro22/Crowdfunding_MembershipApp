@@ -53,3 +53,21 @@ func getOneForUpdate[T tableModel](db *gorm.DB) (T, error) {
 	}
 	return row, nil
 }
+
+func firstOnePtr[T tableModel](db *gorm.DB) (*T, error) {
+	var row T
+	err := firstOne(db, &row)
+	if err != nil {
+		return nil, err
+	}
+	return &row, nil
+}
+
+func firstOneForUpdatePtr[T tableModel](db *gorm.DB) (*T, error) {
+	var row T
+	err := firstOneForUpdate(db, &row)
+	if err != nil {
+		return nil, err
+	}
+	return &row, nil
+}
