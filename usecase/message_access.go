@@ -16,8 +16,8 @@ func (m *MessageUseCase) loadProject(ctx context.Context, projectID uuid.UUID) (
 		err     error
 	)
 	project, _, _, err = m.Projects.FindID(ctx, projectID)
-	if err != nil || project == nil {
-		return nil, ErrNotFound
+	if err != nil {
+		return nil, mapRepoNotFound(err)
 	}
 	return project, nil
 }
@@ -28,8 +28,8 @@ func (m *MessageUseCase) requireActiveMember(ctx context.Context, projectID, use
 		err       error
 	)
 	supporter, err = m.Supporters.FindMembership(ctx, projectID, userID)
-	if err != nil || supporter == nil {
-		return ErrForbidden
+	if err != nil {
+		return mapRepoNotFoundAs(err, ErrForbidden)
 	}
 	if err = entity.CanMessage(*supporter, time.Now().UTC()); err != nil {
 		return ErrForbidden

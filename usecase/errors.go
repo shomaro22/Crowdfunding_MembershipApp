@@ -92,3 +92,21 @@ func mapMediaStoreError(err error) error {
 		return err
 	}
 }
+
+func isRepoNotFound(err error) bool {
+	return errors.Is(err, repository.ErrNotFound)
+}
+
+func mapRepoNotFound(err error) error {
+	if isRepoNotFound(err) {
+		return ErrNotFound
+	}
+	return err
+}
+
+func mapRepoNotFoundAs(err error, target error) error {
+	if isRepoNotFound(err) {
+		return target
+	}
+	return err
+}

@@ -127,13 +127,13 @@ func (m *MessageUseCase) enrichThread(ctx context.Context, t *MessageThreadView)
 		return nil
 	}
 	project, _, _, err = m.Projects.FindID(ctx, t.ProjectID)
-	if err != nil || project == nil {
-		return ErrNotFound
+	if err != nil {
+		return mapRepoNotFound(err)
 	}
 	t.ProjectTitle = project.Title
 	u, err = m.Users.FindID(ctx, t.Partner.ID)
-	if err != nil || u == nil {
-		return ErrNotFound
+	if err != nil {
+		return mapRepoNotFound(err)
 	}
 	t.Partner = UserViewFrom(u)
 	reverseMessageItems(t.Messages)
@@ -199,8 +199,8 @@ func (m *MessageUseCase) MarkRead(ctx context.Context, userID, messageID uuid.UU
 		err error
 	)
 	msg, err = m.Messages.FindID(ctx, messageID)
-	if err != nil || msg == nil {
-		return ErrNotFound
+	if err != nil {
+		return mapRepoNotFound(err)
 	}
 	if err = m.authorizeReadParticipant(msg, userID); err != nil {
 		return err
