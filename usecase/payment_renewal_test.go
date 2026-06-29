@@ -28,7 +28,7 @@ func TestIsAutoSubscriptionRenewal(t *testing.T) {
 func TestCanIssueKonbiniRenewal(t *testing.T) {
 	var (
 		periodEnd = time.Date(2026, 4, 1, 0, 0, 0, 0, time.UTC)
-		s         = &model.ProjectSupporter{
+		s         = model.ProjectSupporter{
 			Status:           model.SupporterStatusActive,
 			BillingMode:      model.BillingModeKonbini,
 			CurrentPeriodEnd: periodEnd,

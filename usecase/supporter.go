@@ -19,12 +19,12 @@ type UpgradeOut struct {
 
 type SupporterUseCase struct {
 	DB         *gorm.DB
-	Users      repository.UserRepo
-	Projects   repository.ProjectRepo
-	Supporters repository.SupporterRepo
-	Purchases  repository.PurchaseRepo
-	Connect    repository.ConnectRepo
-	Activity   repository.ActivityRepo
+	Users      repository.IUserRepo
+	Projects   repository.IProjectRepo
+	Supporters repository.ISupporterRepo
+	Purchases  repository.IPurchaseRepo
+	Connect    repository.IConnectRepo
+	Activity   repository.IActivityRepo
 	Stripe     stripe.Client
 }
 
@@ -35,7 +35,7 @@ type ChangeBillingIn struct {
 
 func (s *SupporterUseCase) Cancel(ctx context.Context, userID, supporterID uuid.UUID) (SupporterView, error) {
 	var (
-		supporter *model.ProjectSupporter
+		supporter model.ProjectSupporter
 		now       time.Time
 		err       error
 	)
@@ -56,7 +56,7 @@ func (s *SupporterUseCase) Cancel(ctx context.Context, userID, supporterID uuid.
 	}
 	supporter.Status = model.SupporterStatusCancelled
 	supporter.UpdatedAt = now
-	if err = s.Supporters.Update(ctx, supporter); err != nil {
+	if err = s.Supporters.Update(ctx, &supporter); err != nil {
 		return SupporterView{}, err
 	}
 	return s.enrichView(ctx, supporter)
@@ -64,7 +64,7 @@ func (s *SupporterUseCase) Cancel(ctx context.Context, userID, supporterID uuid.
 
 func (s *SupporterUseCase) Rejoin(ctx context.Context, userID, supporterID uuid.UUID) (SupporterView, error) {
 	var (
-		supporter *model.ProjectSupporter
+		supporter model.ProjectSupporter
 		now       time.Time
 		err       error
 	)
@@ -88,7 +88,7 @@ func (s *SupporterUseCase) Rejoin(ctx context.Context, userID, supporterID uuid.
 	}
 	supporter.Status = model.SupporterStatusActive
 	supporter.UpdatedAt = now
-	if err = s.Supporters.Update(ctx, supporter); err != nil {
+	if err = s.Supporters.Update(ctx, &supporter); err != nil {
 		return SupporterView{}, err
 	}
 	return s.enrichView(ctx, supporter)
@@ -96,7 +96,7 @@ func (s *SupporterUseCase) Rejoin(ctx context.Context, userID, supporterID uuid.
 
 func (s *SupporterUseCase) ChangeBilling(ctx context.Context, userID, supporterID uuid.UUID, in ChangeBillingIn) (SupporterView, error) {
 	var (
-		supporter *model.ProjectSupporter
+		supporter model.ProjectSupporter
 		mode      model.BillingMode
 		now       time.Time
 		err       error
@@ -131,13 +131,13 @@ func (s *SupporterUseCase) ChangeBilling(ctx context.Context, userID, supporterI
 			return SupporterView{}, err
 		}
 	}
-	if err = s.Supporters.Update(ctx, supporter); err != nil {
+	if err = s.Supporters.Update(ctx, &supporter); err != nil {
 		return SupporterView{}, err
 	}
 	return s.enrichView(ctx, supporter)
 }
 
-func (s *SupporterUseCase) applyBillingMode(ctx context.Context, supporter *model.ProjectSupporter, mode model.BillingMode) error {
+func (s *SupporterUseCase) applyBillingMode(ctx context.Context, supporter model.ProjectSupporter, mode model.BillingMode) error {
 	switch mode {
 	case model.BillingModeKonbini:
 		supporter.StripeSubscriptionID = nil
@@ -155,10 +155,7 @@ func (s *SupporterUseCase) applyBillingMode(ctx context.Context, supporter *mode
 	}
 }
 
-func supporterCanManage(s *model.ProjectSupporter, now time.Time) bool {
-	if s == nil {
-		return false
-	}
+func supporterCanManage(s model.ProjectSupporter, now time.Time) bool {
 	switch s.Status {
 	case model.SupporterStatusActive, model.SupporterStatusPendingRenewal, model.SupporterStatusCancelled:
 		return s.HasBenefits(now)
@@ -167,6 +164,6 @@ func supporterCanManage(s *model.ProjectSupporter, now time.Time) bool {
 	}
 }
 
-func (s *SupporterUseCase) ViewForSupporter(ctx context.Context, supporter *model.ProjectSupporter) (SupporterView, error) {
+func (s *SupporterUseCase) ViewForSupporter(ctx context.Context, supporter model.ProjectSupporter) (SupporterView, error) {
 	return s.enrichView(ctx, supporter)
 }

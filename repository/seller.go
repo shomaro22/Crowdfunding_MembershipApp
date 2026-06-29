@@ -32,7 +32,7 @@ type PlanBreakdownRow struct {
 	Count          int       `gorm:"column:count"`
 }
 
-type SellerRepo interface {
+type ISellerRepo interface {
 	DashboardStats(ctx context.Context, sellerID uuid.UUID) (SellerDashboardStats, error)
 	ListSupporters(ctx context.Context, sellerID uuid.UUID, projectID *uuid.UUID, limit, offset int) ([]model.ProjectSupporter, int64, error)
 	ListProjectAnalysis(ctx context.Context, sellerID uuid.UUID) ([]ProjectAnalysisRow, error)
@@ -43,7 +43,7 @@ type sellerRepo struct {
 	db *gorm.DB
 }
 
-func NewSellerRepo(db *gorm.DB) SellerRepo {
+func NewSellerRepo(db *gorm.DB) ISellerRepo {
 	return &sellerRepo{db: db}
 }
 

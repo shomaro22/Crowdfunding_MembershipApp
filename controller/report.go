@@ -86,8 +86,8 @@ func (h *ReportController) PatchAdmin(c echo.Context) error {
 	if err != nil {
 		return err
 	}
-	if err = c.Bind(&body); err != nil || body.Status == "" {
-		return echo.NewHTTPError(http.StatusBadRequest, apiError("status required", "BAD_REQUEST"))
+	if err = bindBody(c, &body); err != nil || body.Status == "" {
+		return badRequest(c, "status required")
 	}
 	view, err = h.Reports.UpdateAdmin(reqCtx(c), adminID, reportID, usecase.UpdateReportIn{
 		Status:     body.Status,

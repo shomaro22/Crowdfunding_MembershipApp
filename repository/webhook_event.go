@@ -11,7 +11,7 @@ import (
 	"gorm.io/gorm/clause"
 )
 
-type WebhookEventRepo interface {
+type IWebhookEventRepo interface {
 	Claim(ctx context.Context, stripeEventID, eventType string) (bool, error)
 	Release(ctx context.Context, stripeEventID string) error
 }
@@ -20,7 +20,7 @@ type webhookEventRepo struct {
 	db *gorm.DB
 }
 
-func NewWebhookEventRepo(db *gorm.DB) WebhookEventRepo {
+func NewWebhookEventRepo(db *gorm.DB) IWebhookEventRepo {
 	return &webhookEventRepo{db: db}
 }
 

@@ -13,12 +13,12 @@ import (
 
 func (p *PaymentUseCase) fulfillCheckoutSession(ctx context.Context, sess stripe.CheckoutSessionSnapshot) error {
 	var (
-		purchase *model.Purchase
+		purchase model.Purchase
 		planID   uuid.UUID
 		purpose  checkoutPurpose
 		err      error
 	)
-	purchase, err = p.Purchases.FindSessionID(ctx, sess.ID)
+	purchase, err = p.Purchases.GetSessionID(ctx, sess.ID)
 	if isRepoNotFound(err) {
 		return nil
 	}
@@ -45,24 +45,22 @@ func (p *PaymentUseCase) fulfillCheckoutSession(ctx context.Context, sess stripe
 	return p.fulfillFirstSupport(ctx, purchase, planID, defaultPeriod(nil, nil), nil, nil, nil)
 }
 
-func (p *PaymentUseCase) fulfillKonbiniFirstSupport(ctx context.Context, purchase *model.Purchase, planID uuid.UUID, paidAt time.Time) error {
+func (p *PaymentUseCase) fulfillKonbiniFirstSupport(ctx context.Context, purchase model.Purchase, planID uuid.UUID, paidAt time.Time) error {
 	return p.fulfillFirstSupport(ctx, purchase, planID, konbiniFirstPeriod(paidAt), nil, nil, nil)
 }
 
-func (p *PaymentUseCase) fulfillKonbiniRenewal(ctx context.Context, purchase *model.Purchase, planID uuid.UUID, paidAt time.Time) error {
+func (p *PaymentUseCase) fulfillKonbiniRenewal(ctx context.Context, purchase model.Purchase, planID uuid.UUID, paidAt time.Time) error {
 	return repository.WithTx(ctx, p.DB, func(txCtx context.Context) error {
 		var (
-			locked    *model.Purchase
-			supporter *model.ProjectSupporter
+			supporter model.ProjectSupporter
 			period    periodRange
 			now       time.Time
 			err       error
 		)
-		locked, err = p.Purchases.FindIDLock(txCtx, purchase.ID)
+		purchase, err = p.Purchases.GetIDLock(txCtx, purchase.ID)
 		if err != nil {
 			return mapRepoNotFound(err)
 		}
-		purchase = locked
 		if purchase.Status == model.PurchaseStatusPaid {
 			return nil
 		}
@@ -72,7 +70,7 @@ func (p *PaymentUseCase) fulfillKonbiniRenewal(ctx context.Context, purchase *mo
 		if purchase.SupporterID == nil {
 			return ErrNotFound
 		}
-		supporter, err = p.Supporters.FindID(txCtx, *purchase.SupporterID)
+		supporter, err = p.Supporters.GetID(txCtx, *purchase.SupporterID)
 		if err != nil {
 			return mapRepoNotFound(err)
 		}
@@ -85,15 +83,15 @@ func (p *PaymentUseCase) fulfillKonbiniRenewal(ctx context.Context, purchase *mo
 			supporter.PlanID = planID
 		}
 		supporter.UpdatedAt = now
-		if err = p.Supporters.Update(txCtx, supporter); err != nil {
+		if err = p.Supporters.Update(txCtx, &supporter); err != nil {
 			return err
 		}
 		return p.markPurchasePaid(txCtx, purchase, supporter.ID, period, nil)
 	})
 }
 
-func (p *PaymentUseCase) handleKonbiniCheckoutUnpaid(ctx context.Context, purchase *model.Purchase, reason string, cancelled bool) error {
-	if purchase == nil || purchase.Status != model.PurchaseStatusPending {
+func (p *PaymentUseCase) handleKonbiniCheckoutUnpaid(ctx context.Context, purchase model.Purchase, reason string, cancelled bool) error {
+	if purchase.Status != model.PurchaseStatusPending {
 		return nil
 	}
 	if !isKonbiniPurchase(purchase) {
@@ -111,10 +109,10 @@ func (p *PaymentUseCase) handleKonbiniCheckoutUnpaid(ctx context.Context, purcha
 	return p.markPurchaseFailed(ctx, purchase, reason)
 }
 
-func (p *PaymentUseCase) failKonbiniRenewal(ctx context.Context, purchase *model.Purchase, reason string, cancelled bool) error {
+func (p *PaymentUseCase) failKonbiniRenewal(ctx context.Context, purchase model.Purchase, reason string, cancelled bool) error {
 	return repository.WithTx(ctx, p.DB, func(txCtx context.Context) error {
 		var (
-			supporter *model.ProjectSupporter
+			supporter model.ProjectSupporter
 			err       error
 		)
 		if cancelled {
@@ -128,7 +126,7 @@ func (p *PaymentUseCase) failKonbiniRenewal(ctx context.Context, purchase *model
 		if purchase.SupporterID == nil {
 			return nil
 		}
-		supporter, err = p.Supporters.FindID(txCtx, *purchase.SupporterID)
+		supporter, err = p.Supporters.GetID(txCtx, *purchase.SupporterID)
 		if isRepoNotFound(err) {
 			return nil
 		}
@@ -140,14 +138,14 @@ func (p *PaymentUseCase) failKonbiniRenewal(ctx context.Context, purchase *model
 		}
 		supporter.Status = model.SupporterStatusPendingRenewal
 		supporter.UpdatedAt = time.Now().UTC()
-		return p.Supporters.Update(txCtx, supporter)
+		return p.Supporters.Update(txCtx, &supporter)
 	})
 }
 func konbiniFirstPeriod(paidAt time.Time) periodRange {
 	return periodRange{start: paidAt, end: paidAt.AddDate(0, 0, supportPeriodDays)}
 }
 
-func konbiniRenewalPeriod(supporter *model.ProjectSupporter, paidAt time.Time) periodRange {
+func konbiniRenewalPeriod(supporter model.ProjectSupporter, paidAt time.Time) periodRange {
 	var start time.Time
 	start = supporter.CurrentPeriodEnd
 	if paidAt.After(start) {
@@ -176,12 +174,12 @@ func (p *PaymentUseCase) fulfillPaymentIntent(ctx context.Context, pi stripe.Pay
 
 func (p *PaymentUseCase) fulfillKonbiniPaymentIntent(ctx context.Context, pi stripe.PaymentIntentDetail) error {
 	var (
-		purchase *model.Purchase
+		purchase model.Purchase
 		planID   uuid.UUID
 		purpose  checkoutPurpose
 		err      error
 	)
-	purchase, err = p.Purchases.FindIntentID(ctx, pi.ID)
+	purchase, err = p.Purchases.GetIntentID(ctx, pi.ID)
 	if isRepoNotFound(err) {
 		return nil
 	}

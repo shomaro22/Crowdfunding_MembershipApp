@@ -20,7 +20,7 @@ type RequestMeta struct {
 
 func LogActivity(
 	ctx context.Context,
-	repo repository.ActivityRepo,
+	repo repository.IActivityRepo,
 	userID *uuid.UUID,
 	action model.ActivityAction,
 	resource, resourceID string,
@@ -87,7 +87,7 @@ func ActivityMeta(fields map[string]string) model.JSONMetadata {
 
 func LogRateLimitDenied(
 	ctx context.Context,
-	repo repository.ActivityRepo,
+	repo repository.IActivityRepo,
 	userID *uuid.UUID,
 	policy, ruleKey string,
 	meta RequestMeta,
@@ -98,10 +98,7 @@ func LogRateLimitDenied(
 	}))
 }
 
-func purchaseActivityMeta(purchase *model.Purchase) model.JSONMetadata {
-	if purchase == nil {
-		return nil
-	}
+func purchaseActivityMeta(purchase model.Purchase) model.JSONMetadata {
 	return activityMeta(map[string]string{
 		"project_id":     purchase.ProjectID.String(),
 		"payment_method": string(purchase.PaymentMethod),
@@ -111,7 +108,7 @@ func purchaseActivityMeta(purchase *model.Purchase) model.JSONMetadata {
 
 func WriteAudit(
 	ctx context.Context,
-	repo repository.AuditRepo,
+	repo repository.IAuditRepo,
 	adminID uuid.UUID,
 	action, resource, resourceID string,
 	reason, details *string,

@@ -10,7 +10,7 @@ import (
 	"github.com/google/uuid"
 )
 
-func markPurchasePaidSimple(ctx context.Context, purchases repository.PurchaseRepo, purchase *model.Purchase) error {
+func markPurchasePaidSimple(ctx context.Context, purchases repository.IPurchaseRepo, purchase model.Purchase) error {
 	var (
 		from model.PurchaseStatus
 		err  error
@@ -18,7 +18,7 @@ func markPurchasePaidSimple(ctx context.Context, purchases repository.PurchaseRe
 	from = purchase.Status
 	purchase.Status = model.PurchaseStatusPaid
 	purchase.UpdatedAt = time.Now().UTC()
-	if err = purchases.Update(ctx, purchase); err != nil {
+	if err = purchases.Update(ctx, &purchase); err != nil {
 		return err
 	}
 	return purchases.RecordEvent(ctx, &model.PurchaseEvent{

@@ -10,9 +10,9 @@ import (
 	"gorm.io/gorm"
 )
 
-type RefreshTokenRepo interface {
+type IRefreshTokenRepo interface {
 	Create(ctx context.Context, row *model.RefreshToken) error
-	FindValidHash(ctx context.Context, hash string, now time.Time) (*model.RefreshToken, error)
+	GetValidHash(ctx context.Context, hash string, now time.Time) (model.RefreshToken, error)
 	Revoke(ctx context.Context, id uuid.UUID, at time.Time) error
 	RevokeAllByUser(ctx context.Context, userID uuid.UUID, at time.Time) error
 }
@@ -21,7 +21,7 @@ type refreshTokenRepo struct {
 	db *gorm.DB
 }
 
-func NewRefreshTokenRepo(db *gorm.DB) RefreshTokenRepo {
+func NewRefreshTokenRepo(db *gorm.DB) IRefreshTokenRepo {
 	return &refreshTokenRepo{db: db}
 }
 
@@ -29,8 +29,8 @@ func (r *refreshTokenRepo) Create(ctx context.Context, row *model.RefreshToken) 
 	return dbFromCtx(ctx, r.db).Create(row).Error
 }
 
-func (r *refreshTokenRepo) FindValidHash(ctx context.Context, hash string, now time.Time) (*model.RefreshToken, error) {
-	return firstOnePtr[model.RefreshToken](dbFromCtx(ctx, r.db).
+func (r *refreshTokenRepo) GetValidHash(ctx context.Context, hash string, now time.Time) (model.RefreshToken, error) {
+	return getOne[model.RefreshToken](dbFromCtx(ctx, r.db).
 		Where("token_hash = ? AND revoked_at IS NULL AND expires_at > ?", hash, now))
 }
 

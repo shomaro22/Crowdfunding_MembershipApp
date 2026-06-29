@@ -8,32 +8,32 @@ import (
 )
 
 type Repositories struct {
-	Users           repository.UserRepo
-	SellerRegs      repository.SellerRegRepo
-	RefreshTokens   repository.RefreshTokenRepo
-	ResetToks       repository.ResetRepo
-	Activity        repository.ActivityRepo
-	Audit           repository.AuditRepo
-	ReviewDecisions repository.ReviewDecisionRepo
-	Projects        repository.ProjectRepo
-	Connect         repository.ConnectRepo
-	Webhooks        repository.WebhookEventRepo
-	Supporters      repository.SupporterRepo
-	Purchases       repository.PurchaseRepo
-	OAuth           repository.OAuthRepo
-	TOTPBackup      repository.TOTPBackupRepo
-	Batch           repository.BatchRepo
-	Messages        repository.MessageRepo
-	WSTokens        repository.WSTokenRepo
-	Favorites       repository.FavoriteRepo
-	Reports         repository.ReportRepo
-	Seller          repository.SellerRepo
-	Admin           repository.AdminRepo
+	Users           repository.IUserRepo
+	SellerRegs      repository.ISellerRegRepo
+	RefreshTokens   repository.IRefreshTokenRepo
+	ResetToks       repository.IResetRepo
+	Activity        repository.IActivityRepo
+	Audit           repository.IAuditRepo
+	ReviewDecisions repository.IReviewDecisionRepo
+	Projects        repository.IProjectRepo
+	Connect         repository.IConnectRepo
+	Webhooks        repository.IWebhookEventRepo
+	Supporters      repository.ISupporterRepo
+	Purchases       repository.IPurchaseRepo
+	OAuth           repository.IOAuthRepo
+	TOTPBackup      repository.ITOTPBackupRepo
+	Batch           repository.IBatchRepo
+	Messages        repository.IMessageRepo
+	WSTokens        repository.IWSTokenRepo
+	Favorites       repository.IFavoriteRepo
+	Reports         repository.IReportRepo
+	Seller          repository.ISellerRepo
+	Admin           repository.IAdminRepo
 }
 
 type RedisRepositories struct {
-	OAuthCache repository.OAuthCache
-	RateLimit  repository.RateLimitRepo
+	OAuthCache repository.IOAuthCache
+	RateLimit  repository.IRateLimitRepo
 }
 
 func NewRepositories(db *gorm.DB) Repositories {

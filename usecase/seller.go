@@ -39,8 +39,8 @@ type SupporterEnricher interface {
 }
 
 type SellerUseCase struct {
-	Projects   repository.ProjectRepo
-	Seller     repository.SellerRepo
+	Projects   repository.IProjectRepo
+	Seller     repository.ISellerRepo
 	Supporters SupporterEnricher
 }
 
@@ -166,13 +166,13 @@ func (s *SellerUseCase) ProjectAnalysis(ctx context.Context, sellerID uuid.UUID)
 
 func (s *SellerUseCase) ensureSellerProject(ctx context.Context, sellerID, projectID uuid.UUID) error {
 	var (
-		project *model.Project
+		project model.Project
 		err     error
 	)
 	if s.Projects == nil {
 		return ErrBadRequest
 	}
-	project, _, _, err = s.Projects.FindID(ctx, projectID)
+	project, _, _, err = s.Projects.GetID(ctx, projectID)
 	if err != nil {
 		return mapRepoNotFoundAs(err, ErrForbidden)
 	}

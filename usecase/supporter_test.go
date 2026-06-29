@@ -11,7 +11,7 @@ func TestSupporterCanManage(t *testing.T) {
 	var (
 		now = time.Date(2026, 3, 15, 0, 0, 0, 0, time.UTC)
 		end = time.Date(2026, 4, 1, 0, 0, 0, 0, time.UTC)
-		s   = &model.ProjectSupporter{
+		s   = model.ProjectSupporter{
 			Status:           model.SupporterStatusActive,
 			CurrentPeriodEnd: end,
 		}

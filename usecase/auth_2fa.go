@@ -26,14 +26,14 @@ type TOTPVerifyResult struct {
 
 func (a *AuthUseCase) Setup2FA(ctx context.Context, userID uuid.UUID) (*TOTPSetupResult, error) {
 	var (
-		u      *model.User
+		u      model.User
 		err    error
 		issuer string
 		setup  *auth.TOTPSetup
 		enc    string
 	)
 
-	u, err = a.Users.FindID(ctx, userID)
+	u, err = a.Users.GetID(ctx, userID)
 	if err != nil {
 		return nil, mapRepoNotFound(err)
 	}
@@ -54,7 +54,7 @@ func (a *AuthUseCase) Setup2FA(ctx context.Context, userID uuid.UUID) (*TOTPSetu
 	}
 	u.TOTPSecret = &enc
 	u.UpdatedAt = time.Now().UTC()
-	if err = a.Users.Update(ctx, u); err != nil {
+	if err = a.Users.Update(ctx, &u); err != nil {
 		return nil, err
 	}
 	return &TOTPSetupResult{Secret: setup.Secret, OTPAuthURL: setup.OTPAuthURL}, nil
@@ -62,14 +62,14 @@ func (a *AuthUseCase) Setup2FA(ctx context.Context, userID uuid.UUID) (*TOTPSetu
 
 func (a *AuthUseCase) Verify2FASetup(ctx context.Context, userID uuid.UUID, code string) (*TOTPVerifyResult, error) {
 	var (
-		u      *model.User
+		u      model.User
 		err    error
 		secret string
 		now    time.Time
 		codes  []string
 	)
 
-	u, err = a.Users.FindID(ctx, userID)
+	u, err = a.Users.GetID(ctx, userID)
 	if err != nil {
 		return nil, mapRepoNotFound(err)
 	}
@@ -86,7 +86,7 @@ func (a *AuthUseCase) Verify2FASetup(ctx context.Context, userID uuid.UUID, code
 	now = time.Now().UTC()
 	u.TOTPEnabled = true
 	u.UpdatedAt = now
-	if err = a.Users.Update(ctx, u); err != nil {
+	if err = a.Users.Update(ctx, &u); err != nil {
 		return nil, err
 	}
 	codes, err = a.genBackupCodes(ctx, u.ID)
@@ -103,7 +103,7 @@ func (a *AuthUseCase) Challenge2FA(ctx context.Context, pendingToken, code strin
 	var (
 		uid    uuid.UUID
 		err    error
-		u      *model.User
+		u      model.User
 		tokens *SessionTokens
 	)
 
@@ -111,7 +111,7 @@ func (a *AuthUseCase) Challenge2FA(ctx context.Context, pendingToken, code strin
 	if err != nil {
 		return nil, ErrInvalidToken
 	}
-	u, err = a.Users.FindID(ctx, uid)
+	u, err = a.Users.GetID(ctx, uid)
 	if err != nil {
 		return nil, mapRepoNotFoundAs(err, ErrInvalidToken)
 	}
@@ -137,7 +137,7 @@ func (a *AuthUseCase) Challenge2FA(ctx context.Context, pendingToken, code strin
 	}, nil
 }
 
-func (a *AuthUseCase) verifyTOTPOrBackup(ctx context.Context, u *model.User, code string) bool {
+func (a *AuthUseCase) verifyTOTPOrBackup(ctx context.Context, u model.User, code string) bool {
 	var (
 		secret string
 		err    error
@@ -176,7 +176,7 @@ func (a *AuthUseCase) verifyTOTPOrBackup(ctx context.Context, u *model.User, cod
 	return false
 }
 
-func (a *AuthUseCase) decryptTOTP(u *model.User) (string, error) {
+func (a *AuthUseCase) decryptTOTP(u model.User) (string, error) {
 	if u.TOTPSecret == nil || strings.TrimSpace(*u.TOTPSecret) == "" {
 		return "", Err2FANotConfigured
 	}

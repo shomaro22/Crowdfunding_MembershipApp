@@ -56,19 +56,19 @@ type CreateReportNormalized struct {
 	Detail     *string
 }
 
-type AdminReportListInput struct {
+type IAdminReportListInput struct {
 	Status *string
 	Limit  int
 	Offset int
 }
 
-type AdminReportListNormalized struct {
+type IAdminReportListNormalized struct {
 	Status *model.ReportStatus
 	Limit  int
 	Offset int
 }
 
-type AdminReportUpdateInput struct {
+type IAdminReportUpdateInput struct {
 	Status     string
 	Resolution *string
 }
@@ -104,27 +104,27 @@ func ValidateCreateReport(in CreateReportInput) (CreateReportNormalized, error) 
 	return out, nil
 }
 
-func ValidateAdminReportList(in AdminReportListInput) (AdminReportListNormalized, error) {
+func ValidateIAdminReportList(in IAdminReportListInput) (IAdminReportListNormalized, error) {
 	var (
-		out AdminReportListNormalized
+		out IAdminReportListNormalized
 		st  model.ReportStatus
 		err error
 	)
 	out.Limit, out.Offset, err = Paginate(in.Limit, in.Offset)
 	if err != nil {
-		return AdminReportListNormalized{}, err
+		return IAdminReportListNormalized{}, err
 	}
 	if in.Status != nil && strings.TrimSpace(*in.Status) != "" {
 		st = model.ReportStatus(strings.TrimSpace(strings.ToUpper(*in.Status)))
 		if !st.Valid() {
-			return AdminReportListNormalized{}, model.ErrBadReport
+			return IAdminReportListNormalized{}, model.ErrBadReport
 		}
 		out.Status = &st
 	}
 	return out, nil
 }
 
-func ValidateAdminReportUpdate(in AdminReportUpdateInput) (model.ReportStatus, *string, error) {
+func ValidateIAdminReportUpdate(in IAdminReportUpdateInput) (model.ReportStatus, *string, error) {
 	var (
 		status model.ReportStatus
 		res    *string

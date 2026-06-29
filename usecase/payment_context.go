@@ -20,13 +20,15 @@ func (p *PaymentUseCase) loadSupportContext(ctx context.Context, buyerID, projec
 	if err != nil {
 		return sc, err
 	}
-	sc.membership, err = p.Supporters.FindMembership(ctx, projectID, buyerID)
+	sc.membership, err = p.Supporters.GetMembership(ctx, projectID, buyerID)
 	if isRepoNotFound(err) {
-		sc.membership = nil
+		sc.hasMembership = false
 	} else if err != nil {
 		return sc, err
+	} else {
+		sc.hasMembership = true
 	}
-	if sc.membership != nil {
+	if sc.hasMembership {
 		return sc, ErrAlreadySupporting
 	}
 	if err = checkPlanCapacity(sc.plan); err != nil {
@@ -52,13 +54,15 @@ func (p *PaymentUseCase) loadKonbiniCheckoutContext(ctx context.Context, buyerID
 	if err != nil {
 		return sc, err
 	}
-	sc.membership, err = p.Supporters.FindMembership(ctx, projectID, buyerID)
+	sc.membership, err = p.Supporters.GetMembership(ctx, projectID, buyerID)
 	if isRepoNotFound(err) {
-		sc.membership = nil
+		sc.hasMembership = false
 	} else if err != nil {
 		return sc, err
+	} else {
+		sc.hasMembership = true
 	}
-	if sc.membership == nil {
+	if !sc.hasMembership {
 		if err = checkPlanCapacity(sc.plan); err != nil {
 			return sc, err
 		}
@@ -78,26 +82,25 @@ func (p *PaymentUseCase) loadKonbiniCheckoutContext(ctx context.Context, buyerID
 func (p *PaymentUseCase) loadCheckoutBase(ctx context.Context, buyerID, projectID, planID uuid.UUID) (supportContext, error) {
 	var (
 		sc   supportContext
-		pend *model.Purchase
+		pend model.Purchase
 		err  error
 	)
 	sc, err = p.loadBuyerProjectPlan(ctx, buyerID, projectID, planID)
 	if err != nil {
 		return sc, err
 	}
-	pend, err = p.Purchases.FindPendingBuyerProject(ctx, buyerID, projectID)
+	pend, err = p.Purchases.GetPendingBuyerProject(ctx, buyerID, projectID)
 	if isRepoNotFound(err) {
-		pend = nil
+		// no pending checkout
 	} else if err != nil {
 		return sc, err
-	}
-	if pend != nil {
+	} else if pend.ID != uuid.Nil {
 		return sc, ErrPendingCheckout
 	}
 	return sc, nil
 }
 
-func checkPlanCapacity(plan *model.ProjectPlan) error {
+func checkPlanCapacity(plan model.ProjectPlan) error {
 	if plan.MaxSupporters != nil && plan.SupporterCount >= *plan.MaxSupporters {
 		return ErrForbidden
 	}
@@ -106,24 +109,25 @@ func checkPlanCapacity(plan *model.ProjectPlan) error {
 
 func (p *PaymentUseCase) loadBuyerProjectPlan(ctx context.Context, buyerID, projectID, planID uuid.UUID) (supportContext, error) {
 	var (
-		sc      supportContext
-		u       *model.User
-		project *model.Project
-		plans   []model.ProjectPlan
-		plan    *model.ProjectPlan
-		conn    *model.ConnectAccount
-		i       int
-		err     error
+		sc        supportContext
+		u         model.User
+		project   model.Project
+		plans     []model.ProjectPlan
+		plan      model.ProjectPlan
+		planFound bool
+		conn      model.ConnectAccount
+		i         int
+		err       error
 	)
 	sc.now = time.Now().UTC()
-	u, err = p.Users.FindID(ctx, buyerID)
+	u, err = p.Users.GetID(ctx, buyerID)
 	if err != nil {
 		return sc, mapRepoNotFound(err)
 	}
 	if !u.IsActive() || u.Role != model.UserRoleBuyer {
 		return sc, ErrForbidden
 	}
-	project, plans, _, err = p.Projects.FindID(ctx, projectID)
+	project, plans, _, err = p.Projects.GetID(ctx, projectID)
 	if err != nil {
 		return sc, mapRepoNotFound(err)
 	}
@@ -135,14 +139,15 @@ func (p *PaymentUseCase) loadBuyerProjectPlan(ctx context.Context, buyerID, proj
 			if !plans[i].IsActive {
 				return sc, ErrNotFound
 			}
-			plan = &plans[i]
+			plan = plans[i]
+			planFound = true
 			break
 		}
 	}
-	if plan == nil {
+	if !planFound {
 		return sc, ErrNotFound
 	}
-	conn, err = p.Connect.FindUserID(ctx, project.SellerID)
+	conn, err = p.Connect.GetUserID(ctx, project.SellerID)
 	if isRepoNotFound(err) {
 		return sc, ErrForbidden
 	}
@@ -159,11 +164,8 @@ func (p *PaymentUseCase) loadBuyerProjectPlan(ctx context.Context, buyerID, proj
 	return sc, nil
 }
 
-func canIssueKonbiniRenewal(s *model.ProjectSupporter, now time.Time) bool {
+func canIssueKonbiniRenewal(s model.ProjectSupporter, now time.Time) bool {
 	var windowStart time.Time
-	if s == nil {
-		return false
-	}
 	if s.Status == model.SupporterStatusPendingRenewal {
 		return true
 	}

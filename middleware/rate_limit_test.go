@@ -13,9 +13,9 @@ import (
 	"github.com/labstack/echo/v4"
 )
 
-type denyRateLimitRepo struct{}
+type denyIRateLimitRepo struct{}
 
-func (denyRateLimitRepo) Allow(_ context.Context, _ string, _ int, _ time.Duration) (bool, int, error) {
+func (denyIRateLimitRepo) Allow(_ context.Context, _ string, _ int, _ time.Duration) (bool, int, error) {
 	return false, 30, nil
 }
 
@@ -30,7 +30,7 @@ func TestRateLimiterOnDenied(t *testing.T) {
 		req     *http.Request
 	)
 	e = echo.New()
-	limiter = middleware.NewRateLimiter(&usecase.RateLimitUseCase{Repo: denyRateLimitRepo{}})
+	limiter = middleware.NewRateLimiter(&usecase.RateLimitUseCase{Repo: denyIRateLimitRepo{}})
 	limiter.OnDenied = func(c echo.Context, p middleware.RatePolicy, ruleKey string) {
 		called = true
 		policy = p.Name
@@ -64,7 +64,7 @@ func TestRateLimiterOnDeniedNilHook(t *testing.T) {
 		req     *http.Request
 	)
 	e = echo.New()
-	limiter = middleware.NewRateLimiter(&usecase.RateLimitUseCase{Repo: denyRateLimitRepo{}})
+	limiter = middleware.NewRateLimiter(&usecase.RateLimitUseCase{Repo: denyIRateLimitRepo{}})
 	rec = httptest.NewRecorder()
 	req = httptest.NewRequest(http.MethodPost, "/auth/login", nil)
 	e.POST("/auth/login", func(c echo.Context) error {

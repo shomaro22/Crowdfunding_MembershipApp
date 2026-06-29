@@ -14,18 +14,18 @@ import (
 
 func (p *ProjectUseCase) Create(ctx context.Context, sellerID uuid.UUID, in CreateProjectIn) (*ProjectView, error) {
 	var (
-		u          *model.User
+		u          model.User
 		err        error
 		planInputs []model.PlanInput
 		now        time.Time
-		project       *model.Project
+		project    *model.Project
 		plans      []model.ProjectPlan
 		images     []model.ProjectImage
 		i          int
 		plan       PlanIn
 	)
 
-	u, err = p.Users.FindID(ctx, sellerID)
+	u, err = p.Users.GetID(ctx, sellerID)
 	if err != nil {
 		return nil, mapRepoNotFound(err)
 	}
@@ -42,7 +42,7 @@ func (p *ProjectUseCase) Create(ctx context.Context, sellerID uuid.UUID, in Crea
 		}
 	}
 	if err = validator.ValidateProject(in.Title, in.Description, in.TargetAmount, model.DurationType(in.DurationType), in.StartDate, in.EndDate, planInputs); err != nil {
-		return nil, mapProjectEntityErr(err)
+		return nil, mapProjectModelErr(err)
 	}
 	now = time.Now().UTC()
 	project = &model.Project{
@@ -73,28 +73,28 @@ func (p *ProjectUseCase) Create(ctx context.Context, sellerID uuid.UUID, in Crea
 	}
 	images, project.MainImageURL, err = buildProjectImages(in.Images, in.ImageURL, now)
 	if err != nil {
-		return nil, mapProjectEntityErr(err)
+		return nil, mapProjectModelErr(err)
 	}
 	if err = p.Projects.Create(ctx, project, plans, images); err != nil {
 		return nil, err
 	}
-	return AssembleProjectViewPtr(project, plans, images, UserViewPtr(u)), nil
+	return AssembleProjectViewPtr(*project, plans, images, UserViewPtr(u)), nil
 }
 
 func (p *ProjectUseCase) Update(ctx context.Context, sellerID, projectID uuid.UUID, in UpdateProjectIn) (*ProjectView, error) {
 	var (
-		project   *model.Project
-		plans  []model.ProjectPlan
-		images []model.ProjectImage
-		seller *model.User
-		err    error
-		now    time.Time
-		dur    model.DurationType
-		start  time.Time
-		end    *time.Time
+		project model.Project
+		plans   []model.ProjectPlan
+		images  []model.ProjectImage
+		seller  model.User
+		err     error
+		now     time.Time
+		dur     model.DurationType
+		start   time.Time
+		end     *time.Time
 	)
 
-	project, plans, images, err = p.Projects.FindID(ctx, projectID)
+	project, plans, images, err = p.Projects.GetID(ctx, projectID)
 	if err != nil {
 		return nil, mapRepoNotFound(err)
 	}
@@ -104,7 +104,7 @@ func (p *ProjectUseCase) Update(ctx context.Context, sellerID, projectID uuid.UU
 	now = time.Now().UTC()
 	if in.Title != nil {
 		if err = validator.ValidateTitle(*in.Title); err != nil {
-			return nil, mapProjectEntityErr(err)
+			return nil, mapProjectModelErr(err)
 		}
 		project.Title = strings.TrimSpace(*in.Title)
 	}
@@ -134,7 +134,7 @@ func (p *ProjectUseCase) Update(ctx context.Context, sellerID, projectID uuid.UU
 	}
 	if in.DurationType != nil || in.StartDate != nil || in.EndDate != nil {
 		if err = validator.ValidateDuration(dur, start, end); err != nil {
-			return nil, mapProjectEntityErr(err)
+			return nil, mapProjectModelErr(err)
 		}
 		project.DurationType = dur
 		project.StartDate = start
@@ -143,12 +143,12 @@ func (p *ProjectUseCase) Update(ctx context.Context, sellerID, projectID uuid.UU
 	if in.Images != nil {
 		images, project.MainImageURL, err = buildProjectImages(*in.Images, nil, now)
 		if err != nil {
-			return nil, mapProjectEntityErr(err)
+			return nil, mapProjectModelErr(err)
 		}
 	} else if in.ImageURL != nil {
 		images, project.MainImageURL, err = buildProjectImages(nil, in.ImageURL, now)
 		if err != nil {
-			return nil, mapProjectEntityErr(err)
+			return nil, mapProjectModelErr(err)
 		}
 	}
 	if in.IsReapply && project.Status == model.ProjectStatusActive {
@@ -156,7 +156,7 @@ func (p *ProjectUseCase) Update(ctx context.Context, sellerID, projectID uuid.UU
 	}
 	project.UpdatedAt = now
 	err = repository.WithTx(ctx, p.DB, func(txCtx context.Context) error {
-		if err = p.Projects.Update(txCtx, project); err != nil {
+		if err = p.Projects.Update(txCtx, &project); err != nil {
 			return err
 		}
 		if in.Images != nil || in.ImageURL != nil {
@@ -167,21 +167,24 @@ func (p *ProjectUseCase) Update(ctx context.Context, sellerID, projectID uuid.UU
 	if err != nil {
 		return nil, err
 	}
-	seller, _ = p.Users.FindID(ctx, project.SellerID)
+	seller, err = p.Users.GetID(ctx, project.SellerID)
+	if err != nil {
+		return nil, mapRepoNotFound(err)
+	}
 	return AssembleProjectViewPtr(project, plans, images, UserViewPtr(seller)), nil
 }
 
 func (p *ProjectUseCase) RequestDelete(ctx context.Context, sellerID, projectID uuid.UUID) (*ProjectView, error) {
 	var (
-		project   *model.Project
-		plans  []model.ProjectPlan
-		images []model.ProjectImage
-		seller *model.User
-		err    error
-		now    time.Time
+		project model.Project
+		plans   []model.ProjectPlan
+		images  []model.ProjectImage
+		seller  model.User
+		err     error
+		now     time.Time
 	)
 
-	project, plans, images, err = p.Projects.FindID(ctx, projectID)
+	project, plans, images, err = p.Projects.GetID(ctx, projectID)
 	if err != nil {
 		return nil, mapRepoNotFound(err)
 	}
@@ -195,9 +198,12 @@ func (p *ProjectUseCase) RequestDelete(ctx context.Context, sellerID, projectID 
 	project.DeleteRequested = true
 	project.Status = model.ProjectStatusDeleteRequested
 	project.UpdatedAt = now
-	if err = p.Projects.Update(ctx, project); err != nil {
+	if err = p.Projects.Update(ctx, &project); err != nil {
 		return nil, err
 	}
-	seller, _ = p.Users.FindID(ctx, project.SellerID)
+	seller, err = p.Users.GetID(ctx, project.SellerID)
+	if err != nil {
+		return nil, mapRepoNotFound(err)
+	}
 	return AssembleProjectViewPtr(project, plans, images, UserViewPtr(seller)), nil
 }

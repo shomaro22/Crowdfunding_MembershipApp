@@ -51,8 +51,8 @@ type UpdateProjectIn struct {
 }
 
 type ProjectUseCase struct {
-	Projects repository.ProjectRepo
-	Users    repository.UserRepo
+	Projects repository.IProjectRepo
+	Users    repository.IUserRepo
 	DB       *gorm.DB
 }
 
@@ -81,7 +81,7 @@ func buildProjectImages(ins []ImageIn, legacyURL *string, now time.Time) ([]mode
 		inputs = []model.ImageInput{{ImageURL: url, IsMain: true, Order: 0}}
 	}
 	if err = validator.ValidateProjectImages(inputs); err != nil {
-		return nil, nil, mapProjectEntityErr(err)
+		return nil, nil, mapProjectModelErr(err)
 	}
 	if len(inputs) == 0 {
 		return nil, nil, nil
@@ -129,14 +129,13 @@ func (p *ProjectUseCase) EnrichList(ctx context.Context, rows []model.Project, t
 		out         []ProjectView
 		sellerCache map[uuid.UUID]*UserView
 		i           int
-		project        model.Project
+		project     model.Project
 		seller      *UserView
 		ok          bool
-		u           *model.User
+		u           model.User
 		plans       []model.ProjectPlan
 		images      []model.ProjectImage
 		err         error
-		projectCopy model.Project
 	)
 
 	out = make([]ProjectView, 0, len(rows))
@@ -145,19 +144,18 @@ func (p *ProjectUseCase) EnrichList(ctx context.Context, rows []model.Project, t
 		project = rows[i]
 		seller, ok = sellerCache[project.SellerID]
 		if !ok {
-			u, err = p.Users.FindID(ctx, project.SellerID)
+			u, err = p.Users.GetID(ctx, project.SellerID)
 			if err != nil {
-				return nil, 0, err
+				return nil, 0, mapRepoNotFound(err)
 			}
 			seller = UserViewPtr(u)
 			sellerCache[project.SellerID] = seller
 		}
-		_, plans, images, err = p.Projects.FindID(ctx, project.ID)
+		_, plans, images, err = p.Projects.GetID(ctx, project.ID)
 		if err != nil {
-			return nil, 0, err
+			return nil, 0, mapRepoNotFound(err)
 		}
-		projectCopy = project
-		out = append(out, AssembleProjectView(&projectCopy, plans, images, seller))
+		out = append(out, AssembleProjectView(project, plans, images, seller))
 	}
 	return out, total, nil
 }
@@ -184,13 +182,13 @@ func (p *ProjectUseCase) ListPublic(ctx context.Context, search, sort string, li
 
 func (p *ProjectUseCase) ListMine(ctx context.Context, sellerID uuid.UUID, limit, offset int) ([]ProjectView, int64, error) {
 	var (
-		u     *model.User
+		u     model.User
 		err   error
 		rows  []model.Project
 		total int64
 	)
 
-	u, err = p.Users.FindID(ctx, sellerID)
+	u, err = p.Users.GetID(ctx, sellerID)
 	if err != nil {
 		return nil, 0, mapRepoNotFoundAs(err, ErrForbidden)
 	}
@@ -206,40 +204,41 @@ func (p *ProjectUseCase) ListMine(ctx context.Context, sellerID uuid.UUID, limit
 
 func (p *ProjectUseCase) FindView(ctx context.Context, id uuid.UUID, viewerID *uuid.UUID, viewerRole string) (*ProjectView, error) {
 	var (
-		project   *model.Project
-		plans  []model.ProjectPlan
-		images []model.ProjectImage
-		u      *model.User
-		seller *UserView
-		err    error
-		now    = time.Now().UTC()
+		project model.Project
+		plans   []model.ProjectPlan
+		images  []model.ProjectImage
+		u       model.User
+		seller  *UserView
+		err     error
+		now     = time.Now().UTC()
+		v       ProjectView
 	)
 
-	project, plans, images, err = p.Projects.FindID(ctx, id)
+	project, plans, images, err = p.Projects.GetID(ctx, id)
 	if err != nil {
 		return nil, mapRepoNotFound(err)
 	}
 	if !canViewProject(project, viewerID, parseUserRole(viewerRole), now) {
 		return nil, ErrNotFound
 	}
-	u, err = p.Users.FindID(ctx, project.SellerID)
+	u, err = p.Users.GetID(ctx, project.SellerID)
 	if err != nil {
-		return nil, err
+		return nil, mapRepoNotFound(err)
 	}
 	seller = UserViewPtr(u)
-	v := AssembleProjectView(project, plans, images, seller)
+	v = AssembleProjectView(project, plans, images, seller)
 	return &v, nil
 }
 
 func (p *ProjectUseCase) ListPlans(ctx context.Context, projectID uuid.UUID, viewerID *uuid.UUID, viewerRole string) ([]ProjectPlanView, error) {
 	var (
-		project  *model.Project
-		plans []model.ProjectPlan
-		err   error
-		now   time.Time
+		project model.Project
+		plans   []model.ProjectPlan
+		err     error
+		now     time.Time
 	)
 
-	project, plans, _, err = p.Projects.FindID(ctx, projectID)
+	project, plans, _, err = p.Projects.GetID(ctx, projectID)
 	if err != nil {
 		return nil, mapRepoNotFound(err)
 	}
@@ -259,7 +258,7 @@ func parseUserRole(raw string) model.UserRole {
 	return ""
 }
 
-func canViewProject(project *model.Project, viewerID *uuid.UUID, role model.UserRole, now time.Time) bool {
+func canViewProject(project model.Project, viewerID *uuid.UUID, role model.UserRole, now time.Time) bool {
 	if project.IsPublic(now) {
 		return true
 	}
