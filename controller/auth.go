@@ -1,7 +1,6 @@
 package controller
 
 import (
-	"net/http"
 
 	"crowdfund-app/auth"
 	"crowdfund-app/usecase"
@@ -11,12 +10,12 @@ import (
 )
 
 type AuthController struct {
-	Auth         AuthUseCase
+	Auth         IAuthUseCase
 	CookieCfg    auth.CookieCfg
 	AppPublicURL string
 }
 
-func NewAuthController(authUC AuthUseCase, cookieCfg auth.CookieCfg, appPublicURL string) *AuthController {
+func NewAuthController(authUC IAuthUseCase, cookieCfg auth.CookieCfg, appPublicURL string) *AuthController {
 	return &AuthController{Auth: authUC, CookieCfg: cookieCfg, AppPublicURL: appPublicURL}
 }
 
@@ -46,22 +45,22 @@ func (h *AuthController) Login(c echo.Context) error {
 		res  *usecase.LoginResult
 		err  error
 	)
-	if err = c.Bind(&body); err != nil {
-		return echo.NewHTTPError(http.StatusBadRequest, apiError("invalid request body", "BAD_REQUEST"))
+	if err = bindBody(c, &body); err != nil {
+		return err
 	}
-	res, err = h.Auth.Login(c.Request().Context(), body.Email, body.Password, requestMeta(c))
+	res, err = h.Auth.Login(reqCtx(c), body.Email, body.Password, requestMeta(c))
 	if err != nil {
 		return mapUseCaseError(err)
 	}
 	if res.Requires2FA {
 		auth.SetPending2FA(c, h.CookieCfg, h.Auth.SigningKey(), res.User.ID)
-		return c.JSON(http.StatusOK, login2FAResponse{
+		return jsonOK(c, login2FAResponse{
 			Requires2FA: true,
 			User:        UserWireFrom(res.User),
 		})
 	}
 	auth.SetRefreshCookie(c, h.CookieCfg, res.RefreshToken)
-	return c.JSON(http.StatusOK, authTokenResponse{
+	return jsonOK(c, authTokenResponse{
 		AuthToken: res.AuthToken,
 		User:      UserWireFrom(res.User),
 	})
@@ -75,12 +74,12 @@ func (h *AuthController) Refresh(c echo.Context) error {
 		err          error
 	)
 	plain = auth.RefreshTokenFrom(c, h.CookieCfg)
-	authToken, refreshToken, err = h.Auth.Refresh(c.Request().Context(), plain, requestMeta(c))
+	authToken, refreshToken, err = h.Auth.Refresh(reqCtx(c), plain, requestMeta(c))
 	if err != nil {
 		return mapUseCaseError(err)
 	}
 	auth.SetRefreshCookie(c, h.CookieCfg, refreshToken)
-	return c.JSON(http.StatusOK, map[string]string{"auth_token": authToken})
+	return jsonOK(c, map[string]string{"auth_token": authToken})
 }
 
 func (h *AuthController) Logout(c echo.Context) error {
@@ -89,11 +88,11 @@ func (h *AuthController) Logout(c echo.Context) error {
 		err   error
 	)
 	plain = auth.RefreshTokenFrom(c, h.CookieCfg)
-	if err = h.Auth.Logout(c.Request().Context(), plain, requestMeta(c)); err != nil {
+	if err = h.Auth.Logout(reqCtx(c), plain, requestMeta(c)); err != nil {
 		return mapUseCaseError(err)
 	}
 	auth.ClearRefreshCookie(c, h.CookieCfg)
-	return c.NoContent(http.StatusOK)
+	return noContent(c)
 }
 
 func (h *AuthController) ForgotPassword(c echo.Context) error {
@@ -101,11 +100,11 @@ func (h *AuthController) ForgotPassword(c echo.Context) error {
 		body forgotPasswordRequest
 		err  error
 	)
-	if err = c.Bind(&body); err != nil {
-		return echo.NewHTTPError(http.StatusBadRequest, apiError("invalid request body", "BAD_REQUEST"))
+	if err = bindBody(c, &body); err != nil {
+		return err
 	}
-	_ = h.Auth.ForgotPassword(c.Request().Context(), body.Email)
-	return c.NoContent(http.StatusOK)
+	_ = h.Auth.ForgotPassword(reqCtx(c), body.Email)
+	return noContent(c)
 }
 
 func (h *AuthController) ResetPassword(c echo.Context) error {
@@ -113,13 +112,13 @@ func (h *AuthController) ResetPassword(c echo.Context) error {
 		body resetPasswordRequest
 		err  error
 	)
-	if err = c.Bind(&body); err != nil {
-		return echo.NewHTTPError(http.StatusBadRequest, apiError("invalid request body", "BAD_REQUEST"))
+	if err = bindBody(c, &body); err != nil {
+		return err
 	}
-	if err = h.Auth.ResetPassword(c.Request().Context(), body.Token, body.Password); err != nil {
+	if err = h.Auth.ResetPassword(reqCtx(c), body.Token, body.Password); err != nil {
 		return mapUseCaseError(err)
 	}
-	return c.NoContent(http.StatusOK)
+	return noContent(c)
 }
 
 func (h *AuthController) Me(c echo.Context) error {
@@ -128,15 +127,15 @@ func (h *AuthController) Me(c echo.Context) error {
 		u   usecase.UserView
 		err error
 	)
-	uid, err = CurrentUserID(c)
+	uid, err = requireUserID(c)
 	if err != nil {
 		return err
 	}
-	u, err = h.Auth.GetUser(c.Request().Context(), uid)
+	u, err = h.Auth.GetUser(reqCtx(c), uid)
 	if err != nil {
 		return mapUseCaseError(err)
 	}
-	return c.JSON(http.StatusOK, map[string]UserWire{"user": UserWireFrom(u)})
+	return jsonOK(c, map[string]UserWire{"user": UserWireFrom(u)})
 }
 
 func (h *AuthController) ChangePassword(c echo.Context) error {
@@ -145,17 +144,17 @@ func (h *AuthController) ChangePassword(c echo.Context) error {
 		body changePwRequest
 		err  error
 	)
-	uid, err = CurrentUserID(c)
+	uid, err = requireUserID(c)
 	if err != nil {
 		return err
 	}
-	if err = c.Bind(&body); err != nil {
-		return echo.NewHTTPError(http.StatusBadRequest, apiError("invalid request body", "BAD_REQUEST"))
+	if err = bindBody(c, &body); err != nil {
+		return err
 	}
-	if err = h.Auth.ChangePassword(c.Request().Context(), uid, body.CurrentPassword, body.NewPassword, body.TotpCode); err != nil {
+	if err = h.Auth.ChangePassword(reqCtx(c), uid, body.CurrentPassword, body.NewPassword, body.TotpCode); err != nil {
 		return mapUseCaseError(err)
 	}
-	return c.NoContent(http.StatusOK)
+	return noContent(c)
 }
 
 func (h *AuthController) CheckEmail(c echo.Context) error {
@@ -165,11 +164,11 @@ func (h *AuthController) CheckEmail(c echo.Context) error {
 		err       error
 	)
 	email = c.QueryParam("email")
-	available, err = h.Auth.EmailFree(c.Request().Context(), email)
+	available, err = h.Auth.EmailFree(reqCtx(c), email)
 	if err != nil {
 		return mapUseCaseError(err)
 	}
-	return c.JSON(http.StatusOK, map[string]bool{"available": available})
+	return jsonOK(c, map[string]bool{"available": available})
 }
 
 func (h *AuthController) GetProfile(c echo.Context) error {
@@ -178,15 +177,15 @@ func (h *AuthController) GetProfile(c echo.Context) error {
 		u   usecase.UserView
 		err error
 	)
-	uid, err = CurrentUserID(c)
+	uid, err = requireUserID(c)
 	if err != nil {
 		return err
 	}
-	u, err = h.Auth.GetUser(c.Request().Context(), uid)
+	u, err = h.Auth.GetUser(reqCtx(c), uid)
 	if err != nil {
 		return mapUseCaseError(err)
 	}
-	return c.JSON(http.StatusOK, UserWireFrom(u))
+	return jsonOK(c, UserWireFrom(u))
 }
 
 func (h *AuthController) UpdateProfile(c echo.Context) error {
@@ -196,19 +195,19 @@ func (h *AuthController) UpdateProfile(c echo.Context) error {
 		u    usecase.UserView
 		err  error
 	)
-	uid, err = CurrentUserID(c)
+	uid, err = requireUserID(c)
 	if err != nil {
 		return err
 	}
-	if err = c.Bind(&body); err != nil {
-		return echo.NewHTTPError(http.StatusBadRequest, apiError("invalid request body", "BAD_REQUEST"))
+	if err = bindBody(c, &body); err != nil {
+		return err
 	}
-	u, err = h.Auth.UpdateProfile(c.Request().Context(), uid, usecase.UpdateProfileIn{
+	u, err = h.Auth.UpdateProfile(reqCtx(c), uid, usecase.UpdateProfileIn{
 		Name:      body.Name,
 		AvatarURL: body.AvatarURL,
 	})
 	if err != nil {
 		return mapUseCaseError(err)
 	}
-	return c.JSON(http.StatusOK, UserWireFrom(u))
+	return jsonOK(c, UserWireFrom(u))
 }

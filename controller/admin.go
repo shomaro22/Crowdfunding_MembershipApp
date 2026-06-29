@@ -2,7 +2,6 @@ package controller
 
 import (
 	"net/http"
-	"strconv"
 
 	"crowdfund-app/usecase"
 
@@ -11,11 +10,11 @@ import (
 )
 
 type AdminController struct {
-	Admin        AdminUseCase
+	Admin        IAdminUseCase
 	APIPublicURL string
 }
 
-func NewAdminController(admin AdminUseCase, apiPublicURL string) *AdminController {
+func NewAdminController(admin IAdminUseCase, apiPublicURL string) *AdminController {
 	return &AdminController{Admin: admin, APIPublicURL: apiPublicURL}
 }
 
@@ -29,20 +28,20 @@ func (h *AdminController) ResetUser2FA(c echo.Context) error {
 		u   usecase.UserView
 		err error
 	)
-	adminID, err = CurrentUserID(c)
+	adminID, err = requireUserID(c)
 	if err != nil {
 		return err
 	}
-	userID, err = uuid.Parse(c.Param("userId"))
+	userID, err = pathUUID(c, "userId", "invalid user id")
 	if err != nil {
-		return echo.NewHTTPError(http.StatusBadRequest, apiError("invalid user id", "BAD_REQUEST"))
+		return err
 	}
 	_ = c.Bind(&body)
-	u, err = h.Admin.ResetUser2FA(c.Request().Context(), adminID, userID, body.Reason)
+	u, err = h.Admin.ResetUser2FA(reqCtx(c), adminID, userID, body.Reason)
 	if err != nil {
 		return mapUseCaseError(err)
 	}
-	return c.JSON(http.StatusOK, map[string]UserWire{"user": UserWireFrom(u)})
+	return jsonOK(c, map[string]UserWire{"user": UserWireFrom(u)})
 }
 
 func (h *AdminController) ChangeAdminRole(c echo.Context) error {
@@ -56,22 +55,22 @@ func (h *AdminController) ChangeAdminRole(c echo.Context) error {
 		u   usecase.UserView
 		err error
 	)
-	actorID, err = CurrentUserID(c)
+	actorID, err = requireUserID(c)
 	if err != nil {
 		return err
 	}
-	userID, err = uuid.Parse(c.Param("userId"))
+	userID, err = pathUUID(c, "userId", "invalid user id")
 	if err != nil {
-		return echo.NewHTTPError(http.StatusBadRequest, apiError("invalid user id", "BAD_REQUEST"))
+		return err
 	}
 	if err = c.Bind(&body); err != nil || body.AdminRole == "" {
 		return echo.NewHTTPError(http.StatusBadRequest, apiError("admin_role required", "BAD_REQUEST"))
 	}
-	u, err = h.Admin.ChangeAdminRole(c.Request().Context(), actorID, userID, body.AdminRole, body.Reason)
+	u, err = h.Admin.ChangeAdminRole(reqCtx(c), actorID, userID, body.AdminRole, body.Reason)
 	if err != nil {
 		return mapUseCaseError(err)
 	}
-	return c.JSON(http.StatusOK, map[string]UserWire{"user": UserWireFrom(u)})
+	return jsonOK(c, map[string]UserWire{"user": UserWireFrom(u)})
 }
 
 func (h *AdminController) DashboardStats(c echo.Context) error {
@@ -81,7 +80,7 @@ func (h *AdminController) DashboardStats(c echo.Context) error {
 		i     int
 		err   error
 	)
-	stats, err = h.Admin.DashboardStats(c.Request().Context())
+	stats, err = h.Admin.DashboardStats(reqCtx(c))
 	if err != nil {
 		return mapUseCaseError(err)
 	}
@@ -89,7 +88,7 @@ func (h *AdminController) DashboardStats(c echo.Context) error {
 	for i = range stats.RecentUsers {
 		items = append(items, UserWireFrom(stats.RecentUsers[i]))
 	}
-	return c.JSON(http.StatusOK, adminStatsWire{
+	return jsonOK(c, adminStatsWire{
 		TotalUsers:     stats.TotalUsers,
 		TotalProjects:  stats.TotalProjects,
 		TotalPurchases: stats.TotalPurchases,
@@ -108,9 +107,8 @@ func (h *AdminController) ListUsers(c echo.Context) error {
 		i      int
 		err    error
 	)
-	limit, _ = strconv.Atoi(c.QueryParam("limit"))
-	offset, _ = strconv.Atoi(c.QueryParam("offset"))
-	users, total, err = h.Admin.ListUsers(c.Request().Context(), c.QueryParam("role"), c.QueryParam("search"), limit, offset)
+	limit, offset = queryPage(c)
+	users, total, err = h.Admin.ListUsers(reqCtx(c), c.QueryParam("role"), c.QueryParam("search"), limit, offset)
 	if err != nil {
 		return mapUseCaseError(err)
 	}
@@ -118,7 +116,7 @@ func (h *AdminController) ListUsers(c echo.Context) error {
 	for i = range users {
 		items = append(items, UserWireFrom(users[i]))
 	}
-	return c.JSON(http.StatusOK, usersPageJSON{Users: items, Total: total})
+	return jsonOK(c, usersPageJSON{Users: items, Total: total})
 }
 
 func (h *AdminController) UpdateUser(c echo.Context) error {
@@ -129,18 +127,18 @@ func (h *AdminController) UpdateUser(c echo.Context) error {
 		u       usecase.UserView
 		err     error
 	)
-	adminID, err = CurrentUserID(c)
+	adminID, err = requireUserID(c)
 	if err != nil {
 		return err
 	}
-	userID, err = uuid.Parse(c.Param("userId"))
+	userID, err = pathUUID(c, "userId", "invalid user id")
 	if err != nil {
-		return echo.NewHTTPError(http.StatusBadRequest, apiError("invalid user id", "BAD_REQUEST"))
+		return err
 	}
-	if err = c.Bind(&body); err != nil {
-		return echo.NewHTTPError(http.StatusBadRequest, apiError("invalid request body", "BAD_REQUEST"))
+	if err = bindBody(c, &body); err != nil {
+		return err
 	}
-	u, err = h.Admin.UpdateUser(c.Request().Context(), adminID, userID, usecase.AdminUpdateUserIn{
+	u, err = h.Admin.UpdateUser(reqCtx(c), adminID, userID, usecase.AdminUpdateUserIn{
 		Email:    body.Email,
 		Name:     body.Name,
 		Role:     body.Role,
@@ -149,7 +147,7 @@ func (h *AdminController) UpdateUser(c echo.Context) error {
 	if err != nil {
 		return mapUseCaseError(err)
 	}
-	return c.JSON(http.StatusOK, UserWireFrom(u))
+	return jsonOK(c, UserWireFrom(u))
 }
 
 func (h *AdminController) DeleteUser(c echo.Context) error {
@@ -158,15 +156,15 @@ func (h *AdminController) DeleteUser(c echo.Context) error {
 		userID  uuid.UUID
 		err     error
 	)
-	adminID, err = CurrentUserID(c)
+	adminID, err = requireUserID(c)
 	if err != nil {
 		return err
 	}
-	userID, err = uuid.Parse(c.Param("userId"))
+	userID, err = pathUUID(c, "userId", "invalid user id")
 	if err != nil {
-		return echo.NewHTTPError(http.StatusBadRequest, apiError("invalid user id", "BAD_REQUEST"))
+		return err
 	}
-	if err = h.Admin.DeleteUser(c.Request().Context(), adminID, userID); err != nil {
+	if err = h.Admin.DeleteUser(reqCtx(c), adminID, userID); err != nil {
 		return mapUseCaseError(err)
 	}
 	return c.NoContent(http.StatusNoContent)
@@ -180,13 +178,12 @@ func (h *AdminController) ListPurchases(c echo.Context) error {
 		total  int64
 		err    error
 	)
-	limit, _ = strconv.Atoi(c.QueryParam("limit"))
-	offset, _ = strconv.Atoi(c.QueryParam("offset"))
-	rows, total, err = h.Admin.ListPurchases(c.Request().Context(), c.QueryParam("status"), limit, offset)
+	limit, offset = queryPage(c)
+	rows, total, err = h.Admin.ListPurchases(reqCtx(c), c.QueryParam("status"), limit, offset)
 	if err != nil {
 		return mapUseCaseError(err)
 	}
-	return c.JSON(http.StatusOK, listPurchasesJSON(rows, total))
+	return jsonOK(c, listPurchasesJSON(rows, total))
 }
 
 func (h *AdminController) PatchPurchase(c echo.Context) error {
@@ -197,20 +194,20 @@ func (h *AdminController) PatchPurchase(c echo.Context) error {
 		view       usecase.PurchaseView
 		err        error
 	)
-	adminID, err = CurrentUserID(c)
+	adminID, err = requireUserID(c)
 	if err != nil {
 		return err
 	}
-	purchaseID, err = uuid.Parse(c.Param("purchaseId"))
+	purchaseID, err = pathUUID(c, "purchaseId", "invalid purchase id")
 	if err != nil {
-		return echo.NewHTTPError(http.StatusBadRequest, apiError("invalid purchase id", "BAD_REQUEST"))
+		return err
 	}
 	if err = c.Bind(&body); err != nil || body.Status == "" {
 		return echo.NewHTTPError(http.StatusBadRequest, apiError("status required", "BAD_REQUEST"))
 	}
-	view, err = h.Admin.PatchPurchaseStatus(c.Request().Context(), adminID, purchaseID, body.Status)
+	view, err = h.Admin.PatchPurchaseStatus(reqCtx(c), adminID, purchaseID, body.Status)
 	if err != nil {
 		return mapUseCaseError(err)
 	}
-	return c.JSON(http.StatusOK, purchaseToJSON(view))
+	return jsonOK(c, purchaseToJSON(view))
 }
