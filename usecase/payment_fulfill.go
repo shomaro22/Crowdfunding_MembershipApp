@@ -22,7 +22,10 @@ func (p *PaymentUseCase) fulfillPaymentIntentID(
 		err      error
 	)
 	purchase, err = p.Purchases.FindIntentID(ctx, intentID)
-	if err != nil || purchase == nil {
+	if isRepoNotFound(err) {
+		return nil
+	}
+	if err != nil {
 		return err
 	}
 	period := defaultPeriod(nil, nil)
@@ -54,14 +57,13 @@ func (p *PaymentUseCase) fulfillFirstSupport(
 			membership *entity.ProjectSupporter
 			supporter  entity.ProjectSupporter
 			resolved  uuid.UUID
-			project      *entity.Project
 			plans     []entity.ProjectPlan
 			now       time.Time
 			err       error
 		)
 		locked, err = p.Purchases.FindIDLock(txCtx, purchase.ID)
-		if err != nil || locked == nil {
-			return ErrNotFound
+		if err != nil {
+			return mapRepoNotFound(err)
 		}
 		purchase = locked
 		if purchase.Status == entity.PurchaseStatusPaid {
@@ -72,15 +74,17 @@ func (p *PaymentUseCase) fulfillFirstSupport(
 		}
 		now = time.Now().UTC()
 		membership, err = p.Supporters.FindMembership(txCtx, purchase.ProjectID, purchase.BuyerID)
-		if err != nil {
+		if isRepoNotFound(err) {
+			membership = nil
+		} else if err != nil {
 			return err
 		}
 		if membership != nil {
 			return p.markPurchasePaid(txCtx, purchase, membership.ID, period, invoiceID)
 		}
-		project, plans, _, err = p.Projects.FindID(txCtx, purchase.ProjectID)
-		if err != nil || project == nil {
-			return ErrNotFound
+		_, plans, _, err = p.Projects.FindID(txCtx, purchase.ProjectID)
+		if err != nil {
+			return mapRepoNotFound(err)
 		}
 		resolved = planID
 		if resolved == uuid.Nil {

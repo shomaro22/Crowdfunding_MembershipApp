@@ -41,8 +41,8 @@ func (a *AdminUseCase) ApproveBuyer(ctx context.Context, adminID, userID uuid.UU
 		return UserView{}, err
 	}
 	u, err = a.Users.FindID(ctx, userID)
-	if err != nil || u == nil {
-		return UserView{}, ErrNotFound
+	if err != nil {
+		return UserView{}, mapRepoNotFound(err)
 	}
 	if u.Role != entity.UserRoleBuyer || u.AccountStatus != entity.AccountStatusPending {
 		return UserView{}, ErrInvalidState
@@ -73,8 +73,8 @@ func (a *AdminUseCase) RejectBuyer(ctx context.Context, adminID, userID uuid.UUI
 		return UserView{}, err
 	}
 	u, err = a.Users.FindID(ctx, userID)
-	if err != nil || u == nil {
-		return UserView{}, ErrNotFound
+	if err != nil {
+		return UserView{}, mapRepoNotFound(err)
 	}
 	if u.Role != entity.UserRoleBuyer || u.AccountStatus != entity.AccountStatusPending {
 		return UserView{}, ErrInvalidState
@@ -126,12 +126,12 @@ func (a *AdminUseCase) GetSellerReg(ctx context.Context, id uuid.UUID) (*SellerR
 	)
 
 	reg, err = a.SellerRegs.FindID(ctx, id)
-	if err != nil || reg == nil {
-		return nil, ErrNotFound
+	if err != nil {
+		return nil, mapRepoNotFound(err)
 	}
 	u, err = a.Users.FindID(ctx, reg.UserID)
-	if err != nil || u == nil {
-		return nil, ErrNotFound
+	if err != nil {
+		return nil, mapRepoNotFound(err)
 	}
 	now = time.Now().UTC()
 	out = &SellerRegView{Registration: SellerRegItemFrom(reg), User: UserViewFrom(u)}
@@ -161,15 +161,15 @@ func (a *AdminUseCase) ApproveSellerReg(ctx context.Context, adminID, regID uuid
 		return SellerRegItemView{}, err
 	}
 	reg, err = a.SellerRegs.FindID(ctx, regID)
-	if err != nil || reg == nil {
-		return SellerRegItemView{}, ErrNotFound
+	if err != nil {
+		return SellerRegItemView{}, mapRepoNotFound(err)
 	}
 	if !reg.CanApprove() {
 		return SellerRegItemView{}, ErrInvalidState
 	}
 	u, err = a.Users.FindID(ctx, reg.UserID)
-	if err != nil || u == nil {
-		return SellerRegItemView{}, ErrNotFound
+	if err != nil {
+		return SellerRegItemView{}, mapRepoNotFound(err)
 	}
 	now = time.Now().UTC()
 	err = repository.WithTx(ctx, a.DB, func(txCtx context.Context) error {
@@ -210,8 +210,8 @@ func (a *AdminUseCase) RejectSellerReg(ctx context.Context, adminID, regID uuid.
 		return SellerRegItemView{}, err
 	}
 	reg, err = a.SellerRegs.FindID(ctx, regID)
-	if err != nil || reg == nil {
-		return SellerRegItemView{}, ErrNotFound
+	if err != nil {
+		return SellerRegItemView{}, mapRepoNotFound(err)
 	}
 	if reg.Status != entity.RegPending {
 		return SellerRegItemView{}, ErrInvalidState

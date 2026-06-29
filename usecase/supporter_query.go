@@ -76,21 +76,18 @@ func (s *SupporterUseCase) applyPendingChanges(ctx context.Context, supporter *e
 		return false, nil
 	}
 	err = repository.WithTx(ctx, s.DB, func(txCtx context.Context) error {
-		var (
-			locked *entity.ProjectSupporter
-			project *entity.Project
-		)
+		var locked *entity.ProjectSupporter
 		locked, err = s.Supporters.FindID(txCtx, supporter.ID)
-		if err != nil || locked == nil {
-			return ErrNotFound
+		if err != nil {
+			return mapRepoNotFound(err)
 		}
 		if locked.PlanChangeDate == nil || now.Before(*locked.PlanChangeDate) {
 			*supporter = *locked
 			return nil
 		}
-		project, _, _, err = s.Projects.FindID(txCtx, locked.ProjectID)
-		if err != nil || project == nil {
-			return ErrNotFound
+		_, _, _, err = s.Projects.FindID(txCtx, locked.ProjectID)
+		if err != nil {
+			return mapRepoNotFound(err)
 		}
 		if locked.PendingPlanID != nil {
 			if err = s.commitPendingPlan(txCtx, locked, *locked.PendingPlanID, true); err != nil {
@@ -149,18 +146,18 @@ func (s *SupporterUseCase) enrichView(ctx context.Context, supporter *entity.Pro
 	v.Supporter = SupporterItemFrom(supporter)
 	project, _, _, err = s.Projects.FindID(ctx, supporter.ProjectID)
 	if err != nil {
-		return SupporterView{}, err
+		return SupporterView{}, mapRepoNotFound(err)
 	}
 	v.Project = ProjectItemPtrFrom(project)
 	plan, err = s.Projects.FindPlan(ctx, supporter.ProjectID, supporter.PlanID)
 	if err != nil {
-		return SupporterView{}, err
+		return SupporterView{}, mapRepoNotFound(err)
 	}
 	v.Plan = ProjectPlanPtrFrom(plan)
 	if supporter.PendingPlanID != nil {
 		plan, err = s.Projects.FindPlan(ctx, supporter.ProjectID, *supporter.PendingPlanID)
 		if err != nil {
-			return SupporterView{}, err
+			return SupporterView{}, mapRepoNotFound(err)
 		}
 		v.PendingPlan = ProjectPlanPtrFrom(plan)
 	}
@@ -173,8 +170,8 @@ func (s *SupporterUseCase) loadOwned(ctx context.Context, userID, supporterID uu
 		err error
 	)
 	row, err = s.Supporters.FindOwned(ctx, supporterID, userID)
-	if err != nil || row == nil {
-		return nil, ErrNotFound
+	if err != nil {
+		return nil, mapRepoNotFound(err)
 	}
 	return row, nil
 }
@@ -193,7 +190,10 @@ func (s *SupporterUseCase) commitPendingPlan(
 	)
 	if validatePlan {
 		newPlan, err = s.Projects.FindPlan(ctx, locked.ProjectID, newPlanID)
-		if err != nil || newPlan == nil || !newPlan.IsActive {
+		if err != nil {
+			return mapRepoNotFound(err)
+		}
+		if !newPlan.IsActive {
 			return ErrBadRequest
 		}
 	}
@@ -203,8 +203,8 @@ func (s *SupporterUseCase) commitPendingPlan(
 	oldPlanID = locked.PlanID
 	if locked.BillingMode == entity.BillingModeAuto && locked.StripeSubscriptionID != nil && s.Stripe != nil {
 		plan, err = s.Projects.FindPlan(ctx, locked.ProjectID, newPlanID)
-		if err != nil || plan == nil {
-			return ErrNotFound
+		if err != nil {
+			return mapRepoNotFound(err)
 		}
 		if err = s.Stripe.UpdateSubscriptionAmount(ctx, *locked.StripeSubscriptionID, int64(plan.Price)); err != nil {
 			return err
