@@ -178,8 +178,8 @@ func (r *ReportUseCase) UpdateAdmin(ctx context.Context, adminID, reportID uuid.
 		return ReportView{}, ErrBadRequest
 	}
 	row, err = r.Reports.FindID(ctx, reportID)
-	if err != nil || row == nil {
-		return ReportView{}, ErrNotFound
+	if err != nil {
+		return ReportView{}, mapRepoNotFound(err)
 	}
 	status, resolution, err = validator.ValidateAdminReportUpdate(validator.AdminReportUpdateInput{
 		Status:     in.Status,
@@ -203,42 +203,28 @@ func (r *ReportUseCase) UpdateAdmin(ctx context.Context, adminID, reportID uuid.
 }
 
 func (r *ReportUseCase) validateTarget(ctx context.Context, reporterID uuid.UUID, targetType entity.ReportTargetType, targetID uuid.UUID) error {
-	var (
-		project *entity.Project
-		message *entity.Message
-		user    *entity.User
-		err     error
-	)
+	var err error
 	switch targetType {
 	case entity.ReportTargetProject:
-		project, _, _, err = r.Projects.FindID(ctx, targetID)
+		_, _, _, err = r.Projects.FindID(ctx, targetID)
 		if err != nil {
-			return err
-		}
-		if project == nil {
-			return ErrNotFound
+			return mapRepoNotFound(err)
 		}
 	case entity.ReportTargetMessage:
 		if r.Messages == nil {
 			return ErrBadRequest
 		}
-		message, err = r.Messages.FindID(ctx, targetID)
+		_, err = r.Messages.FindID(ctx, targetID)
 		if err != nil {
-			return err
-		}
-		if message == nil {
-			return ErrNotFound
+			return mapRepoNotFound(err)
 		}
 	case entity.ReportTargetUser:
 		if targetID == reporterID {
 			return ErrBadRequest
 		}
-		user, err = r.Users.FindID(ctx, targetID)
+		_, err = r.Users.FindID(ctx, targetID)
 		if err != nil {
-			return err
-		}
-		if user == nil {
-			return ErrNotFound
+			return mapRepoNotFound(err)
 		}
 	default:
 		return ErrBadRequest

@@ -22,10 +22,7 @@ func (a *AuthUseCase) GetUser(ctx context.Context, userID uuid.UUID) (UserView, 
 
 	u, err = a.Users.FindID(ctx, userID)
 	if err != nil {
-		return UserView{}, err
-	}
-	if u == nil {
-		return UserView{}, ErrNotFound
+		return UserView{}, mapRepoNotFound(err)
 	}
 	return UserViewFrom(u), nil
 }
@@ -46,10 +43,7 @@ func (a *AuthUseCase) UpdateProfile(ctx context.Context, userID uuid.UUID, in Up
 	}
 	u, err = a.Users.FindID(ctx, userID)
 	if err != nil {
-		return UserView{}, err
-	}
-	if u == nil {
-		return UserView{}, ErrNotFound
+		return UserView{}, mapRepoNotFound(err)
 	}
 	if norm.NameSet {
 		u.Name = norm.Name

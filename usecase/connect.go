@@ -6,15 +6,14 @@ import (
 
 	"crowdfund-app/entity"
 	"crowdfund-app/repository"
-	"crowdfund-app/stripe"
-
+	
 	"github.com/google/uuid"
 )
 
 type ConnectUseCase struct {
 	Users   repository.UserRepo
 	Connect repository.ConnectRepo
-	Stripe  stripe.Client
+	Stripe PaymentGateway
 }
 
 func (c *ConnectUseCase) GetAccount(ctx context.Context, sellerID uuid.UUID) (*ConnectAccountView, error) {
@@ -27,14 +26,16 @@ func (c *ConnectUseCase) GetAccount(ctx context.Context, sellerID uuid.UUID) (*C
 		return nil, ErrStripeUnavailable
 	}
 	u, err = c.Users.FindID(ctx, sellerID)
-	if err != nil || u == nil {
-		return nil, ErrNotFound
+	if err != nil {
+		return nil, mapRepoNotFound(err)
 	}
 	if u.Role != entity.UserRoleSeller {
 		return nil, ErrForbidden
 	}
 	row, err = c.Connect.FindUserID(ctx, sellerID)
-	if err != nil {
+	if isRepoNotFound(err) {
+		row = nil
+	} else if err != nil {
 		return nil, err
 	}
 	return ConnectAccountViewFrom(row), nil
@@ -47,21 +48,23 @@ func (c *ConnectUseCase) CreateOnboardingLink(ctx context.Context, sellerID uuid
 		url  string
 		now  time.Time
 		err  error
-		snap stripe.AccountSnapshot
+		snap AccountSnapshot
 	)
 
 	if c.Stripe == nil {
 		return "", ErrStripeUnavailable
 	}
 	u, err = c.Users.FindID(ctx, sellerID)
-	if err != nil || u == nil {
-		return "", ErrNotFound
+	if err != nil {
+		return "", mapRepoNotFound(err)
 	}
 	if u.Role != entity.UserRoleSeller || u.SellerStatus != entity.SellerStatusActive {
 		return "", ErrForbidden
 	}
 	row, err = c.Connect.FindUserID(ctx, sellerID)
-	if err != nil {
+	if isRepoNotFound(err) {
+		row = nil
+	} else if err != nil {
 		return "", err
 	}
 	now = time.Now().UTC()
@@ -100,7 +103,7 @@ func (c *ConnectUseCase) CreateOnboardingLink(ctx context.Context, sellerID uuid
 func (c *ConnectUseCase) SyncFromStripeAccountID(ctx context.Context, stripeAccountID string) (*ConnectAccountView, error) {
 	var (
 		row  *entity.ConnectAccount
-		snap stripe.AccountSnapshot
+		snap AccountSnapshot
 		now  time.Time
 		err  error
 	)
@@ -108,8 +111,8 @@ func (c *ConnectUseCase) SyncFromStripeAccountID(ctx context.Context, stripeAcco
 		return nil, ErrStripeUnavailable
 	}
 	row, err = c.Connect.FindStripeAccountID(ctx, stripeAccountID)
-	if err != nil || row == nil {
-		return nil, ErrNotFound
+	if err != nil {
+		return nil, mapRepoNotFound(err)
 	}
 	snap, err = c.Stripe.GetAccount(ctx, stripeAccountID)
 	if err != nil {

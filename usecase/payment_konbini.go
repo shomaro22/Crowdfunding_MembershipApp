@@ -6,12 +6,11 @@ import (
 
 	"crowdfund-app/entity"
 	"crowdfund-app/repository"
-	"crowdfund-app/stripe"
 
 	"github.com/google/uuid"
 )
 
-func (p *PaymentUseCase) fulfillCheckoutSession(ctx context.Context, sess stripe.CheckoutSessionSnapshot) error {
+func (p *PaymentUseCase) fulfillCheckoutSession(ctx context.Context, sess CheckoutSessionSnapshot) error {
 	var (
 		purchase *entity.Purchase
 		planID   uuid.UUID
@@ -19,7 +18,10 @@ func (p *PaymentUseCase) fulfillCheckoutSession(ctx context.Context, sess stripe
 		err      error
 	)
 	purchase, err = p.Purchases.FindSessionID(ctx, sess.ID)
-	if err != nil || purchase == nil {
+	if isRepoNotFound(err) {
+		return nil
+	}
+	if err != nil {
 		return err
 	}
 	if purchase.Status == entity.PurchaseStatusPaid {
@@ -28,7 +30,7 @@ func (p *PaymentUseCase) fulfillCheckoutSession(ctx context.Context, sess stripe
 	if purchase.Status != entity.PurchaseStatusPending {
 		return nil
 	}
-	planID, err = uuid.Parse(sess.Metadata[stripe.MetaPlanID])
+	planID, err = uuid.Parse(sess.Metadata[MetaPlanID])
 	if err != nil {
 		planID = uuid.Nil
 	}
@@ -56,8 +58,8 @@ func (p *PaymentUseCase) fulfillKonbiniRenewal(ctx context.Context, purchase *en
 			err       error
 		)
 		locked, err = p.Purchases.FindIDLock(txCtx, purchase.ID)
-		if err != nil || locked == nil {
-			return ErrNotFound
+		if err != nil {
+			return mapRepoNotFound(err)
 		}
 		purchase = locked
 		if purchase.Status == entity.PurchaseStatusPaid {
@@ -70,8 +72,8 @@ func (p *PaymentUseCase) fulfillKonbiniRenewal(ctx context.Context, purchase *en
 			return ErrNotFound
 		}
 		supporter, err = p.Supporters.FindID(txCtx, *purchase.SupporterID)
-		if err != nil || supporter == nil {
-			return ErrNotFound
+		if err != nil {
+			return mapRepoNotFound(err)
 		}
 		period = konbiniRenewalPeriod(supporter, paidAt)
 		now = time.Now().UTC()
@@ -126,7 +128,10 @@ func (p *PaymentUseCase) failKonbiniRenewal(ctx context.Context, purchase *entit
 			return nil
 		}
 		supporter, err = p.Supporters.FindID(txCtx, *purchase.SupporterID)
-		if err != nil || supporter == nil {
+		if isRepoNotFound(err) {
+			return nil
+		}
+		if err != nil {
 			return err
 		}
 		if supporter.Status == entity.SupporterStatusPendingRenewal {
@@ -150,25 +155,25 @@ func konbiniRenewalPeriod(supporter *entity.ProjectSupporter, paidAt time.Time) 
 	return periodRange{start: start, end: start.AddDate(0, 0, supportPeriodDays)}
 }
 
-func (p *PaymentUseCase) fulfillPaymentIntent(ctx context.Context, pi stripe.PaymentIntentDetail) error {
+func (p *PaymentUseCase) fulfillPaymentIntent(ctx context.Context, pi PaymentIntentDetail) error {
 	var (
 		planID uuid.UUID
 		err    error
 	)
-	if pi.Metadata[stripe.MetaBillingMode] == string(entity.BillingModeAuto) {
-		planID, err = uuid.Parse(pi.Metadata[stripe.MetaPlanID])
+	if pi.Metadata[MetaBillingMode] == string(entity.BillingModeAuto) {
+		planID, err = uuid.Parse(pi.Metadata[MetaPlanID])
 		if err != nil {
 			planID = uuid.Nil
 		}
 		return p.fulfillPaymentIntentID(ctx, pi.ID, time.Time{}, time.Time{}, nil, nil, nil, planID)
 	}
-	if pi.Metadata[stripe.MetaBillingMode] != string(entity.BillingModeKonbini) {
+	if pi.Metadata[MetaBillingMode] != string(entity.BillingModeKonbini) {
 		return nil
 	}
 	return p.fulfillKonbiniPaymentIntent(ctx, pi)
 }
 
-func (p *PaymentUseCase) fulfillKonbiniPaymentIntent(ctx context.Context, pi stripe.PaymentIntentDetail) error {
+func (p *PaymentUseCase) fulfillKonbiniPaymentIntent(ctx context.Context, pi PaymentIntentDetail) error {
 	var (
 		purchase *entity.Purchase
 		planID   uuid.UUID
@@ -176,10 +181,13 @@ func (p *PaymentUseCase) fulfillKonbiniPaymentIntent(ctx context.Context, pi str
 		err      error
 	)
 	purchase, err = p.Purchases.FindIntentID(ctx, pi.ID)
-	if err != nil || purchase == nil {
+	if isRepoNotFound(err) {
+		return nil
+	}
+	if err != nil {
 		return err
 	}
-	planID, err = uuid.Parse(pi.Metadata[stripe.MetaPlanID])
+	planID, err = uuid.Parse(pi.Metadata[MetaPlanID])
 	if err != nil {
 		planID = uuid.Nil
 	}
