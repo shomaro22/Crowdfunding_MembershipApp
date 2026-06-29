@@ -35,18 +35,7 @@ func (r *reportRepo) Create(ctx context.Context, row *entity.Report) error {
 }
 
 func (r *reportRepo) FindID(ctx context.Context, id uuid.UUID) (*entity.Report, error) {
-	var (
-		row entity.Report
-		err error
-	)
-	err = r.dbCtx(ctx).Where("id = ?", id).First(&row).Error
-	if errors.Is(err, gorm.ErrRecordNotFound) {
-		return nil, nil
-	}
-	if err != nil {
-		return nil, err
-	}
-	return &row, nil
+	return firstOnePtr[entity.Report](r.dbCtx(ctx).Where("id = ?", id))
 }
 
 func (r *reportRepo) List(ctx context.Context, status *entity.ReportStatus, limit, offset int) ([]entity.Report, int64, error) {
