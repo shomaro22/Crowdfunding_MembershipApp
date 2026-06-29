@@ -2,7 +2,6 @@ package repository
 
 import (
 	"context"
-	"errors"
 
 	"crowdfund-app/entity"
 
@@ -30,33 +29,11 @@ func (r *connectRepo) dbCtx(ctx context.Context) *gorm.DB {
 }
 
 func (r *connectRepo) FindUserID(ctx context.Context, userID uuid.UUID) (*entity.ConnectAccount, error) {
-	var (
-		row entity.ConnectAccount
-		err error
-	)
-	err = r.dbCtx(ctx).Where("user_id = ?", userID).First(&row).Error
-	if errors.Is(err, gorm.ErrRecordNotFound) {
-		return nil, nil
-	}
-	if err != nil {
-		return nil, err
-	}
-	return &row, nil
+	return firstOnePtr[entity.ConnectAccount](r.dbCtx(ctx).Where("user_id = ?", userID))
 }
 
 func (r *connectRepo) FindStripeAccountID(ctx context.Context, stripeAccountID string) (*entity.ConnectAccount, error) {
-	var (
-		row entity.ConnectAccount
-		err error
-	)
-	err = r.dbCtx(ctx).Where("stripe_account_id = ?", stripeAccountID).First(&row).Error
-	if errors.Is(err, gorm.ErrRecordNotFound) {
-		return nil, nil
-	}
-	if err != nil {
-		return nil, err
-	}
-	return &row, nil
+	return firstOnePtr[entity.ConnectAccount](r.dbCtx(ctx).Where("stripe_account_id = ?", stripeAccountID))
 }
 
 func (r *connectRepo) Create(ctx context.Context, row *entity.ConnectAccount) error {

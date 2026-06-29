@@ -2,7 +2,6 @@ package repository
 
 import (
 	"context"
-	"errors"
 
 	"crowdfund-app/entity"
 
@@ -35,33 +34,11 @@ func (r *sellerRegRepo) Update(ctx context.Context, reg *entity.SellerReg) error
 }
 
 func (r *sellerRegRepo) FindID(ctx context.Context, id uuid.UUID) (*entity.SellerReg, error) {
-	var (
-		m   entity.SellerReg
-		err error
-	)
-	err = dbFromCtx(ctx, r.db).Where("id = ?", id).First(&m).Error
-	if errors.Is(err, gorm.ErrRecordNotFound) {
-		return nil, nil
-	}
-	if err != nil {
-		return nil, err
-	}
-	return &m, nil
+	return firstOnePtr[entity.SellerReg](dbFromCtx(ctx, r.db).Where("id = ?", id))
 }
 
 func (r *sellerRegRepo) FindUserID(ctx context.Context, userID uuid.UUID) (*entity.SellerReg, error) {
-	var (
-		m   entity.SellerReg
-		err error
-	)
-	err = dbFromCtx(ctx, r.db).Where("user_id = ?", userID).First(&m).Error
-	if errors.Is(err, gorm.ErrRecordNotFound) {
-		return nil, nil
-	}
-	if err != nil {
-		return nil, err
-	}
-	return &m, nil
+	return firstOnePtr[entity.SellerReg](dbFromCtx(ctx, r.db).Where("user_id = ?", userID))
 }
 
 func (r *sellerRegRepo) List(ctx context.Context, status entity.RegStatus, limit, offset int) ([]entity.SellerReg, int64, error) {

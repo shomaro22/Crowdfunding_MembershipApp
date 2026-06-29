@@ -2,7 +2,6 @@ package repository
 
 import (
 	"context"
-	"errors"
 	"strings"
 	"time"
 
@@ -168,10 +167,7 @@ func (r *projectRepo) FindID(ctx context.Context, id uuid.UUID) (*entity.Project
 		err    error
 	)
 
-	err = r.dbCtx(ctx).Where("id = ?", id).First(&p).Error
-	if errors.Is(err, gorm.ErrRecordNotFound) {
-		return nil, nil, nil, nil
-	}
+	err = firstOne(r.dbCtx(ctx).Where("id = ?", id), &p)
 	if err != nil {
 		return nil, nil, nil, err
 	}
@@ -274,18 +270,9 @@ func (r *projectRepo) ListAll(ctx context.Context, status *entity.ProjectStatus,
 }
 
 func (r *projectRepo) FindPlan(ctx context.Context, projectID, planID uuid.UUID) (*entity.ProjectPlan, error) {
-	var (
-		plan entity.ProjectPlan
-		err  error
+	return firstOnePtr[entity.ProjectPlan](
+		r.dbCtx(ctx).Where("id = ? AND project_id = ?", planID, projectID),
 	)
-	err = r.dbCtx(ctx).Where("id = ? AND project_id = ?", planID, projectID).First(&plan).Error
-	if errors.Is(err, gorm.ErrRecordNotFound) {
-		return nil, nil
-	}
-	if err != nil {
-		return nil, err
-	}
-	return &plan, nil
 }
 
 func paginate(limit, offset int) (int, int) {
