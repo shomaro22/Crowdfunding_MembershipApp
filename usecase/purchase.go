@@ -10,12 +10,12 @@ import (
 )
 
 type PurchaseUseCase struct {
-	Users     repository.UserRepo
-	Projects  repository.ProjectRepo
-	Purchases repository.PurchaseRepo
+	Users     repository.IUserRepo
+	Projects  repository.IProjectRepo
+	Purchases repository.IPurchaseRepo
 }
 
-func (p *PurchaseUseCase) EnrichPurchase(ctx context.Context, row *model.Purchase) (PurchaseView, error) {
+func (p *PurchaseUseCase) EnrichPurchase(ctx context.Context, row model.Purchase) (PurchaseView, error) {
 	return p.enrichPurchase(ctx, row)
 }
 
@@ -34,7 +34,7 @@ func (p *PurchaseUseCase) ListMine(ctx context.Context, buyerID uuid.UUID, limit
 	out = make([]PurchaseView, 0, len(rows))
 	for i = range rows {
 		var v PurchaseView
-		v, err = p.enrichPurchase(ctx, &rows[i])
+		v, err = p.enrichPurchase(ctx, rows[i])
 		if err != nil {
 			return nil, 0, err
 		}
@@ -43,23 +43,23 @@ func (p *PurchaseUseCase) ListMine(ctx context.Context, buyerID uuid.UUID, limit
 	return out, total, nil
 }
 
-func (p *PurchaseUseCase) enrichPurchase(ctx context.Context, row *model.Purchase) (PurchaseView, error) {
+func (p *PurchaseUseCase) enrichPurchase(ctx context.Context, row model.Purchase) (PurchaseView, error) {
 	var (
 		v       PurchaseView
-		project *model.Project
-		buyer   *model.User
+		project model.Project
+		buyer   model.User
 		err     error
 	)
-	if row == nil {
+	if row.ID == uuid.Nil {
 		return PurchaseView{}, ErrNotFound
 	}
 	v.Purchase = PurchaseItemFrom(row)
-	project, _, _, err = p.Projects.FindID(ctx, row.ProjectID)
+	project, _, _, err = p.Projects.GetID(ctx, row.ProjectID)
 	if err != nil {
 		return PurchaseView{}, mapRepoNotFound(err)
 	}
 	v.Project = ProjectItemPtrFrom(project)
-	buyer, err = p.Users.FindID(ctx, row.BuyerID)
+	buyer, err = p.Users.GetID(ctx, row.BuyerID)
 	if err != nil {
 		return PurchaseView{}, mapRepoNotFound(err)
 	}

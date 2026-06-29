@@ -15,9 +15,9 @@ import (
 
 type BatchUseCase struct {
 	DB         *gorm.DB
-	Runs       repository.BatchRepo
+	Runs       repository.IBatchRepo
 	Supporters *SupporterUseCase
-	WSTokens   repository.WSTokenRepo
+	WSTokens   repository.IWSTokenRepo
 }
 
 func (b *BatchUseCase) Run(ctx context.Context, jobName, triggeredBy string, dryRun bool) (*BatchRunView, error) {

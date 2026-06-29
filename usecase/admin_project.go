@@ -38,13 +38,13 @@ func (a *AdminUseCase) ListProjects(ctx context.Context, status *string, limit, 
 
 func (a *AdminUseCase) PatchProject(ctx context.Context, adminID, projectID uuid.UUID, status string, reason *string) (*ProjectView, error) {
 	var (
-		project   *model.Project
+		project   model.Project
 		plans     []model.ProjectPlan
 		images    []model.ProjectImage
 		err       error
 		now       time.Time
 		action    string
-		seller    *model.User
+		seller    model.User
 		projectSt model.ProjectStatus
 	)
 
@@ -58,7 +58,7 @@ func (a *AdminUseCase) PatchProject(ctx context.Context, adminID, projectID uuid
 	if a.Projects == nil {
 		return nil, ErrNotFound
 	}
-	project, plans, images, err = a.Projects.FindID(ctx, projectID)
+	project, plans, images, err = a.Projects.GetID(ctx, projectID)
 	if err != nil {
 		return nil, mapRepoNotFound(err)
 	}
@@ -81,7 +81,7 @@ func (a *AdminUseCase) PatchProject(ctx context.Context, adminID, projectID uuid
 	now = time.Now().UTC()
 	project.Status = projectSt
 	project.UpdatedAt = now
-	if err = a.Projects.Update(ctx, project); err != nil {
+	if err = a.Projects.Update(ctx, &project); err != nil {
 		return nil, err
 	}
 	action = "project.approve"
@@ -94,14 +94,17 @@ func (a *AdminUseCase) PatchProject(ctx context.Context, adminID, projectID uuid
 	} else {
 		a.writeReviewDecision(ctx, adminID, model.ReviewProject, projectID, model.ReviewRejected, reason)
 	}
-	seller, _ = a.Users.FindID(ctx, project.SellerID)
+	seller, err = a.Users.GetID(ctx, project.SellerID)
+	if err != nil {
+		return nil, mapRepoNotFound(err)
+	}
 	return AssembleProjectViewPtr(project, plans, images, UserViewPtr(seller)), nil
 }
 
 func (a *AdminUseCase) DeleteProject(ctx context.Context, adminID, projectID uuid.UUID) error {
 	var (
-		project *model.Project
-		err  error
+		project model.Project
+		err     error
 	)
 
 	if err = a.requireReviewAdmin(ctx, adminID); err != nil {
@@ -110,7 +113,7 @@ func (a *AdminUseCase) DeleteProject(ctx context.Context, adminID, projectID uui
 	if a.Projects == nil {
 		return ErrNotFound
 	}
-	project, _, _, err = a.Projects.FindID(ctx, projectID)
+	project, _, _, err = a.Projects.GetID(ctx, projectID)
 	if err != nil {
 		return mapRepoNotFound(err)
 	}
@@ -128,12 +131,12 @@ func (a *AdminUseCase) DeleteProject(ctx context.Context, adminID, projectID uui
 
 func (a *AdminUseCase) PatchDeleteReq(ctx context.Context, adminID, projectID uuid.UUID, action string, reason *string) (*ProjectView, error) {
 	var (
-		project   *model.Project
-		plans  []model.ProjectPlan
-		images []model.ProjectImage
-		err    error
-		now    time.Time
-		seller *model.User
+		project model.Project
+		plans   []model.ProjectPlan
+		images  []model.ProjectImage
+		err     error
+		now     time.Time
+		seller  model.User
 	)
 
 	if err = a.requireReviewAdmin(ctx, adminID); err != nil {
@@ -142,7 +145,7 @@ func (a *AdminUseCase) PatchDeleteReq(ctx context.Context, adminID, projectID uu
 	if a.Projects == nil {
 		return nil, ErrNotFound
 	}
-	project, plans, images, err = a.Projects.FindID(ctx, projectID)
+	project, plans, images, err = a.Projects.GetID(ctx, projectID)
 	if err != nil {
 		return nil, mapRepoNotFound(err)
 	}
@@ -155,7 +158,7 @@ func (a *AdminUseCase) PatchDeleteReq(ctx context.Context, adminID, projectID uu
 		project.Status = model.ProjectStatusDeleted
 		project.DeleteRequested = false
 		project.UpdatedAt = now
-		if err = a.Projects.Update(ctx, project); err != nil {
+		if err = a.Projects.Update(ctx, &project); err != nil {
 			return nil, err
 		}
 		WriteAudit(ctx, a.Audit, adminID, "project.delete_request.approve", "project", project.ID.String(), reason, nil)
@@ -164,7 +167,7 @@ func (a *AdminUseCase) PatchDeleteReq(ctx context.Context, adminID, projectID uu
 		project.Status = model.ProjectStatusActive
 		project.DeleteRequested = false
 		project.UpdatedAt = now
-		if err = a.Projects.Update(ctx, project); err != nil {
+		if err = a.Projects.Update(ctx, &project); err != nil {
 			return nil, err
 		}
 		WriteAudit(ctx, a.Audit, adminID, "project.delete_request.reject", "project", project.ID.String(), reason, nil)
@@ -172,6 +175,9 @@ func (a *AdminUseCase) PatchDeleteReq(ctx context.Context, adminID, projectID uu
 	default:
 		return nil, ErrBadRequest
 	}
-	seller, _ = a.Users.FindID(ctx, project.SellerID)
+	seller, err = a.Users.GetID(ctx, project.SellerID)
+	if err != nil {
+		return nil, mapRepoNotFound(err)
+	}
 	return AssembleProjectViewPtr(project, plans, images, UserViewPtr(seller)), nil
 }

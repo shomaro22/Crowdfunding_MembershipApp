@@ -9,29 +9,28 @@ import (
 	"github.com/google/uuid"
 )
 
-
-func (m *MessageUseCase) loadProject(ctx context.Context, projectID uuid.UUID) (*model.Project, error) {
+func (m *MessageUseCase) loadProject(ctx context.Context, projectID uuid.UUID) (model.Project, error) {
 	var (
-		project *model.Project
+		project model.Project
 		err     error
 	)
-	project, _, _, err = m.Projects.FindID(ctx, projectID)
+	project, _, _, err = m.Projects.GetID(ctx, projectID)
 	if err != nil {
-		return nil, mapRepoNotFound(err)
+		return model.Project{}, mapRepoNotFound(err)
 	}
 	return project, nil
 }
 
 func (m *MessageUseCase) requireActiveMember(ctx context.Context, projectID, userID uuid.UUID) error {
 	var (
-		supporter *model.ProjectSupporter
+		supporter model.ProjectSupporter
 		err       error
 	)
-	supporter, err = m.Supporters.FindMembership(ctx, projectID, userID)
+	supporter, err = m.Supporters.GetMembership(ctx, projectID, userID)
 	if err != nil {
 		return mapRepoNotFoundAs(err, ErrForbidden)
 	}
-	if err = model.CanMessage(*supporter, time.Now().UTC()); err != nil {
+	if err = model.CanMessage(supporter, time.Now().UTC()); err != nil {
 		return ErrForbidden
 	}
 	return nil
@@ -39,7 +38,7 @@ func (m *MessageUseCase) requireActiveMember(ctx context.Context, projectID, use
 
 func (m *MessageUseCase) CanSubscribeProject(ctx context.Context, projectID, userID uuid.UUID) error {
 	var (
-		project *model.Project
+		project model.Project
 		err     error
 	)
 	project, err = m.loadProject(ctx, projectID)
@@ -55,35 +54,35 @@ func (m *MessageUseCase) CanSubscribeProject(ctx context.Context, projectID, use
 func (m *MessageUseCase) authorizeSend(
 	ctx context.Context,
 	senderID, projectID, receiverID uuid.UUID,
-) (*model.Project, error) {
+) (model.Project, error) {
 	var (
-		project   *model.Project
-		err       error
+		project model.Project
+		err     error
 	)
 	project, err = m.loadProject(ctx, projectID)
 	if err != nil {
-		return nil, err
+		return model.Project{}, err
 	}
 	if project.SellerID == senderID {
 		if receiverID == senderID {
-			return nil, ErrBadRequest
+			return model.Project{}, ErrBadRequest
 		}
 		if err = m.requireActiveMember(ctx, projectID, receiverID); err != nil {
-			return nil, err
+			return model.Project{}, err
 		}
 		return project, nil
 	}
 	if receiverID != project.SellerID {
-		return nil, ErrForbidden
+		return model.Project{}, ErrForbidden
 	}
 	if err = m.requireActiveMember(ctx, projectID, senderID); err != nil {
-		return nil, err
+		return model.Project{}, err
 	}
 	return project, nil
 }
 
-func (m *MessageUseCase) authorizeReadParticipant(msg *model.Message, userID uuid.UUID) error {
-	if msg == nil {
+func (m *MessageUseCase) authorizeReadParticipant(msg model.Message, userID uuid.UUID) error {
+	if msg.ID == uuid.Nil {
 		return ErrNotFound
 	}
 	if msg.SenderID != userID && msg.ReceiverID != userID {

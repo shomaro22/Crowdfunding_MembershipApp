@@ -10,7 +10,7 @@ import (
 	"gorm.io/gorm"
 )
 
-type FavoriteRepo interface {
+type IFavoriteRepo interface {
 	ListByUser(ctx context.Context, userID uuid.UUID) ([]model.Favorite, error)
 	Exists(ctx context.Context, userID, projectID uuid.UUID) (bool, error)
 	Create(ctx context.Context, row *model.Favorite) error
@@ -21,7 +21,7 @@ type favoriteRepo struct {
 	db *gorm.DB
 }
 
-func NewFavoriteRepo(db *gorm.DB) FavoriteRepo {
+func NewFavoriteRepo(db *gorm.DB) IFavoriteRepo {
 	return &favoriteRepo{db: db}
 }
 

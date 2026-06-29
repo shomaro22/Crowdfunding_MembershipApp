@@ -42,7 +42,7 @@ func (s *SupporterUseCase) RunApplyPlans(ctx context.Context, dryRun bool) (proc
 		return len(rows), 0, nil
 	}
 	for i = range rows {
-		ok, err = s.applyPendingChanges(ctx, &rows[i])
+		ok, err = s.applyPendingChanges(ctx, rows[i])
 		if err != nil {
 			failed++
 			err = nil
@@ -55,13 +55,13 @@ func (s *SupporterUseCase) RunApplyPlans(ctx context.Context, dryRun bool) (proc
 	return processed, failed, nil
 }
 
-func (s *SupporterUseCase) applyPendingChanges(ctx context.Context, supporter *model.ProjectSupporter) (bool, error) {
+func (s *SupporterUseCase) applyPendingChanges(ctx context.Context, supporter model.ProjectSupporter) (bool, error) {
 	var (
 		now time.Time
 		due bool
 		err error
 	)
-	if supporter == nil {
+	if supporter.ID == uuid.Nil {
 		return false, nil
 	}
 	now = time.Now().UTC()
@@ -76,21 +76,21 @@ func (s *SupporterUseCase) applyPendingChanges(ctx context.Context, supporter *m
 		return false, nil
 	}
 	err = repository.WithTx(ctx, s.DB, func(txCtx context.Context) error {
-		var locked *model.ProjectSupporter
-		locked, err = s.Supporters.FindID(txCtx, supporter.ID)
+		var locked model.ProjectSupporter
+		locked, err = s.Supporters.GetID(txCtx, supporter.ID)
 		if err != nil {
 			return mapRepoNotFound(err)
 		}
 		if locked.PlanChangeDate == nil || now.Before(*locked.PlanChangeDate) {
-			*supporter = *locked
 			return nil
 		}
-		_, _, _, err = s.Projects.FindID(txCtx, locked.ProjectID)
+		_, _, _, err = s.Projects.GetID(txCtx, locked.ProjectID)
 		if err != nil {
 			return mapRepoNotFound(err)
 		}
 		if locked.PendingPlanID != nil {
-			if err = s.commitPendingPlan(txCtx, locked, *locked.PendingPlanID, true); err != nil {
+			locked, err = s.commitPendingPlan(txCtx, locked, *locked.PendingPlanID, true)
+			if err != nil {
 				return err
 			}
 		}
@@ -103,11 +103,7 @@ func (s *SupporterUseCase) applyPendingChanges(ctx context.Context, supporter *m
 		}
 		locked.PlanChangeDate = nil
 		locked.UpdatedAt = now
-		if err = s.Supporters.Update(txCtx, locked); err != nil {
-			return err
-		}
-		*supporter = *locked
-		return nil
+		return s.Supporters.Update(txCtx, &locked)
 	})
 	if err != nil {
 		return false, err
@@ -124,7 +120,7 @@ func (s *SupporterUseCase) enrichViews(ctx context.Context, rows []model.Project
 	)
 	out = make([]SupporterView, 0, len(rows))
 	for i = range rows {
-		v, err = s.enrichView(ctx, &rows[i])
+		v, err = s.enrichView(ctx, rows[i])
 		if err != nil {
 			return nil, err
 		}
@@ -133,81 +129,82 @@ func (s *SupporterUseCase) enrichViews(ctx context.Context, rows []model.Project
 	return out, nil
 }
 
-func (s *SupporterUseCase) enrichView(ctx context.Context, supporter *model.ProjectSupporter) (SupporterView, error) {
+func (s *SupporterUseCase) enrichView(ctx context.Context, supporter model.ProjectSupporter) (SupporterView, error) {
 	var (
-		v       SupporterView
-		project *model.Project
-		plan    *model.ProjectPlan
-		err     error
+		v           SupporterView
+		project     model.Project
+		plan        model.ProjectPlan
+		pendingPlan model.ProjectPlan
+		err         error
 	)
-	if supporter == nil {
+	if supporter.ID == uuid.Nil {
 		return SupporterView{}, ErrNotFound
 	}
 	v.Supporter = SupporterItemFrom(supporter)
-	project, _, _, err = s.Projects.FindID(ctx, supporter.ProjectID)
+	project, _, _, err = s.Projects.GetID(ctx, supporter.ProjectID)
 	if err != nil {
 		return SupporterView{}, mapRepoNotFound(err)
 	}
 	v.Project = ProjectItemPtrFrom(project)
-	plan, err = s.Projects.FindPlan(ctx, supporter.ProjectID, supporter.PlanID)
+	plan, err = s.Projects.GetPlan(ctx, supporter.ProjectID, supporter.PlanID)
 	if err != nil {
 		return SupporterView{}, mapRepoNotFound(err)
 	}
 	v.Plan = ProjectPlanPtrFrom(plan)
 	if supporter.PendingPlanID != nil {
-		plan, err = s.Projects.FindPlan(ctx, supporter.ProjectID, *supporter.PendingPlanID)
+		pendingPlan, err = s.Projects.GetPlan(ctx, supporter.ProjectID, *supporter.PendingPlanID)
 		if err != nil {
 			return SupporterView{}, mapRepoNotFound(err)
 		}
-		v.PendingPlan = ProjectPlanPtrFrom(plan)
+		v.PendingPlan = ProjectPlanPtrFrom(pendingPlan)
 	}
 	return v, nil
 }
 
-func (s *SupporterUseCase) loadOwned(ctx context.Context, userID, supporterID uuid.UUID) (*model.ProjectSupporter, error) {
+func (s *SupporterUseCase) loadOwned(ctx context.Context, userID, supporterID uuid.UUID) (model.ProjectSupporter, error) {
 	var (
-		row *model.ProjectSupporter
+		row model.ProjectSupporter
 		err error
 	)
-	row, err = s.Supporters.FindOwned(ctx, supporterID, userID)
+	row, err = s.Supporters.GetOwned(ctx, supporterID, userID)
 	if err != nil {
-		return nil, mapRepoNotFound(err)
+		return model.ProjectSupporter{}, mapRepoNotFound(err)
 	}
 	return row, nil
 }
 
 func (s *SupporterUseCase) commitPendingPlan(
 	ctx context.Context,
-	locked *model.ProjectSupporter,
+	locked model.ProjectSupporter,
 	newPlanID uuid.UUID,
 	validatePlan bool,
-) error {
+) (model.ProjectSupporter, error) {
 	var (
 		oldPlanID uuid.UUID
-		newPlan   *model.ProjectPlan
-		plan      *model.ProjectPlan
+		newPlan   model.ProjectPlan
+		plan      model.ProjectPlan
 		err       error
 	)
 	if validatePlan {
-		newPlan, err = s.Projects.FindPlan(ctx, locked.ProjectID, newPlanID)
+		newPlan, err = s.Projects.GetPlan(ctx, locked.ProjectID, newPlanID)
 		if err != nil {
-			return mapRepoNotFound(err)
+			return model.ProjectSupporter{}, mapRepoNotFound(err)
 		}
 		if !newPlan.IsActive {
-			return ErrBadRequest
+			return model.ProjectSupporter{}, ErrBadRequest
 		}
 	}
 	if err = s.Projects.TransferPlanSupportCount(ctx, locked.ProjectID, locked.PlanID, newPlanID); err != nil {
-		return err
+		return model.ProjectSupporter{}, err
 	}
 	oldPlanID = locked.PlanID
 	if locked.BillingMode == model.BillingModeAuto && locked.StripeSubscriptionID != nil && s.Stripe != nil {
-		plan, err = s.Projects.FindPlan(ctx, locked.ProjectID, newPlanID)
+		plan, err = s.Projects.GetPlan(ctx, locked.ProjectID, newPlanID)
 		if err != nil {
-			return mapRepoNotFound(err)
+			return model.ProjectSupporter{}, mapRepoNotFound(err)
 		}
 		if err = s.Stripe.UpdateSubscriptionAmount(ctx, *locked.StripeSubscriptionID, int64(plan.Price)); err != nil {
-			return err
+			return model.ProjectSupporter{}, err
 		}
 	}
 	locked.PlanID = newPlanID
@@ -218,5 +215,5 @@ func (s *SupporterUseCase) commitPendingPlan(
 			"to_plan_id":   newPlanID.String(),
 		}))
 	}
-	return nil
+	return locked, nil
 }

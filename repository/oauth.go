@@ -13,17 +13,17 @@ import (
 	"gorm.io/gorm"
 )
 
-type OAuthRepo interface {
+type IOAuthRepo interface {
 	Create(ctx context.Context, row *model.OAuthAccount) error
-	FindSub(ctx context.Context, provider model.OAuthProvider, sub string) (*model.OAuthAccount, error)
-	FindUserID(ctx context.Context, userID uuid.UUID, provider model.OAuthProvider) (*model.OAuthAccount, error)
+	GetSub(ctx context.Context, provider model.OAuthProvider, sub string) (model.OAuthAccount, error)
+	GetUserID(ctx context.Context, userID uuid.UUID, provider model.OAuthProvider) (model.OAuthAccount, error)
 }
 
 type oauthRepo struct {
 	db *gorm.DB
 }
 
-func NewOAuthRepo(db *gorm.DB) OAuthRepo {
+func NewOAuthRepo(db *gorm.DB) IOAuthRepo {
 	return &oauthRepo{db: db}
 }
 
@@ -31,19 +31,19 @@ func (r *oauthRepo) Create(ctx context.Context, row *model.OAuthAccount) error {
 	return dbFromCtx(ctx, r.db).Create(row).Error
 }
 
-func (r *oauthRepo) FindSub(ctx context.Context, provider model.OAuthProvider, sub string) (*model.OAuthAccount, error) {
-	return firstOnePtr[model.OAuthAccount](
+func (r *oauthRepo) GetSub(ctx context.Context, provider model.OAuthProvider, sub string) (model.OAuthAccount, error) {
+	return getOne[model.OAuthAccount](
 		dbFromCtx(ctx, r.db).Where("provider = ? AND provider_sub = ?", provider, sub),
 	)
 }
 
-func (r *oauthRepo) FindUserID(ctx context.Context, userID uuid.UUID, provider model.OAuthProvider) (*model.OAuthAccount, error) {
-	return firstOnePtr[model.OAuthAccount](
+func (r *oauthRepo) GetUserID(ctx context.Context, userID uuid.UUID, provider model.OAuthProvider) (model.OAuthAccount, error) {
+	return getOne[model.OAuthAccount](
 		dbFromCtx(ctx, r.db).Where("user_id = ? AND provider = ?", userID, provider),
 	)
 }
 
-type OAuthCache interface {
+type IOAuthCache interface {
 	SetState(ctx context.Context, state, from string, ttl time.Duration) error
 	PopState(ctx context.Context, state string) (from string, ok bool, err error)
 	SetCallbackCode(ctx context.Context, code string, userID uuid.UUID, ttl time.Duration) error
@@ -54,7 +54,7 @@ type redisOAuthCache struct {
 	rdb *redis.Client
 }
 
-func NewOAuthCache(rdb *redis.Client) OAuthCache {
+func NewOAuthCache(rdb *redis.Client) IOAuthCache {
 	return &redisOAuthCache{rdb: rdb}
 }
 

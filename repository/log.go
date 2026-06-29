@@ -30,7 +30,7 @@ type AuditListFilter struct {
 	Offset   int
 }
 
-type ActivityRepo interface {
+type IActivityRepo interface {
 	Create(ctx context.Context, row *model.ActivityLog) error
 	List(ctx context.Context, f ActivityListFilter) ([]model.ActivityLog, int64, error)
 	CountByActionBetween(ctx context.Context, action model.ActivityAction, from, to time.Time) (int64, error)
@@ -46,7 +46,7 @@ type activityRepo struct {
 	db *gorm.DB
 }
 
-func NewActivityRepo(db *gorm.DB) ActivityRepo {
+func NewActivityRepo(db *gorm.DB) IActivityRepo {
 	return &activityRepo{db: db}
 }
 
@@ -145,7 +145,7 @@ func (r *activityRepo) TopIPsBetween(ctx context.Context, from, to time.Time, li
 	return rows, nil
 }
 
-type AuditRepo interface {
+type IAuditRepo interface {
 	Create(ctx context.Context, row *model.AuditLog) error
 	List(ctx context.Context, f AuditListFilter) ([]model.AuditLog, int64, error)
 }
@@ -154,7 +154,7 @@ type auditRepo struct {
 	db *gorm.DB
 }
 
-func NewAuditRepo(db *gorm.DB) AuditRepo {
+func NewAuditRepo(db *gorm.DB) IAuditRepo {
 	return &auditRepo{db: db}
 }
 
@@ -200,7 +200,7 @@ func applyAuditListFilter(q *gorm.DB, f AuditListFilter) *gorm.DB {
 	return q
 }
 
-type ReviewDecisionRepo interface {
+type IReviewDecisionRepo interface {
 	Create(ctx context.Context, row *model.ReviewDecision) error
 }
 
@@ -208,7 +208,7 @@ type reviewDecisionRepo struct {
 	db *gorm.DB
 }
 
-func NewReviewDecisionRepo(db *gorm.DB) ReviewDecisionRepo {
+func NewReviewDecisionRepo(db *gorm.DB) IReviewDecisionRepo {
 	return &reviewDecisionRepo{db: db}
 }
 

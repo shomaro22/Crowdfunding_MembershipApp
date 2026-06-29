@@ -8,7 +8,7 @@ import (
 )
 
 type RateLimitUseCase struct {
-	Repo repository.RateLimitRepo
+	Repo repository.IRateLimitRepo
 }
 
 func (u *RateLimitUseCase) Allow(ctx context.Context, key string, limit int, period time.Duration) (bool, int, error) {

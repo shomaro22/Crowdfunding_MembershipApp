@@ -8,11 +8,11 @@ import (
 )
 
 type oauthStateBridge struct {
-	cache repository.OAuthCache
+	cache repository.IOAuthCache
 	ttl   time.Duration
 }
 
-func NewStateBridge(cache repository.OAuthCache) OAuthStateStore {
+func NewStateBridge(cache repository.IOAuthCache) OAuthStateStore {
 	return &oauthStateBridge{cache: cache, ttl: 10 * time.Minute}
 }
 

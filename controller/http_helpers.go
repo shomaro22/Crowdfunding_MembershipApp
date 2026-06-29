@@ -95,7 +95,11 @@ func jsonCreated(c echo.Context, body interface{}) error {
 }
 
 func noContent(c echo.Context) error {
-	return c.NoContent(http.StatusOK)
+	return c.NoContent(http.StatusNoContent)
+}
+
+func badRequest(c echo.Context, msg string) error {
+	return echo.NewHTTPError(http.StatusBadRequest, apiError(msg, "BAD_REQUEST"))
 }
 
 func requestMeta(c echo.Context) usecase.RequestMeta {

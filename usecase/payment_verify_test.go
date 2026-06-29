@@ -11,7 +11,7 @@ import (
 func TestVerifyPurchaseBuyer(t *testing.T) {
 	var (
 		buyer = uuid.New()
-		p     = &model.Purchase{BuyerID: buyer}
+		p     = model.Purchase{BuyerID: buyer}
 	)
 	if err := verifyPurchaseBuyer(p, buyer); err != nil {
 		t.Fatalf("expected ok: %v", err)
@@ -19,7 +19,7 @@ func TestVerifyPurchaseBuyer(t *testing.T) {
 	if verifyPurchaseBuyer(p, uuid.New()) != ErrForbidden {
 		t.Fatal("expected forbidden for other buyer")
 	}
-	if verifyPurchaseBuyer(nil, buyer) != ErrForbidden {
-		t.Fatal("expected forbidden for nil purchase")
+	if verifyPurchaseBuyer(model.Purchase{}, buyer) != ErrForbidden {
+		t.Fatal("expected forbidden for zero purchase")
 	}
 }
