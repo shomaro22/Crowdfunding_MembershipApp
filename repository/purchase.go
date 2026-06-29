@@ -46,14 +46,8 @@ func (r *purchaseRepo) Update(ctx context.Context, row *entity.Purchase) error {
 }
 
 func (r *purchaseRepo) FindID(ctx context.Context, id uuid.UUID) (*entity.Purchase, error) {
-	var (
-		row entity.Purchase
-		err error
-	)
-	err = r.dbCtx(ctx).Where("id = ?", id).First(&row).Error
-	if errors.Is(err, gorm.ErrRecordNotFound) {
-		return nil, nil
-	}
+	var row entity.Purchase
+	err := firstOne(r.dbCtx(ctx).Where("id = ?", id), &row)
 	if err != nil {
 		return nil, err
 	}
