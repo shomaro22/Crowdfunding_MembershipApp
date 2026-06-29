@@ -10,10 +10,10 @@ import (
 )
 
 type FavoriteController struct {
-	Favorites FavoriteUseCase
+	Favorites IFavoriteUseCase
 }
 
-func NewFavoriteController(favorites FavoriteUseCase) *FavoriteController {
+func NewFavoriteController(favorites IFavoriteUseCase) *FavoriteController {
 	return &FavoriteController{Favorites: favorites}
 }
 
@@ -23,15 +23,15 @@ func (h *FavoriteController) List(c echo.Context) error {
 		rows   []usecase.ProjectView
 		err    error
 	)
-	userID, err = CurrentUserID(c)
+	userID, err = requireUserID(c)
 	if err != nil {
 		return err
 	}
-	rows, err = h.Favorites.List(c.Request().Context(), userID)
+	rows, err = h.Favorites.List(reqCtx(c), userID)
 	if err != nil {
 		return mapUseCaseError(err)
 	}
-	return c.JSON(http.StatusOK, listFavoritesJSON(rows))
+	return jsonOK(c, listFavoritesJSON(rows))
 }
 
 func (h *FavoriteController) Toggle(c echo.Context) error {
@@ -41,18 +41,18 @@ func (h *FavoriteController) Toggle(c echo.Context) error {
 		out    usecase.FavoriteStatusView
 		err    error
 	)
-	userID, err = CurrentUserID(c)
+	userID, err = requireUserID(c)
 	if err != nil {
 		return err
 	}
-	if err = c.Bind(&body); err != nil {
-		return echo.NewHTTPError(http.StatusBadRequest, apiError("invalid request body", "BAD_REQUEST"))
+	if err = bindBody(c, &body); err != nil {
+		return err
 	}
 	projectID, err := uuid.Parse(body.ProjectID)
 	if err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, apiError("invalid project_id", "BAD_REQUEST"))
 	}
-	out, err = h.Favorites.Toggle(c.Request().Context(), userID, usecase.ToggleFavoriteIn{
+	out, err = h.Favorites.Toggle(reqCtx(c), userID, usecase.ToggleFavoriteIn{
 		ProjectID: projectID,
 		Action:    body.Action,
 		Meta:      requestMeta(c),
@@ -60,7 +60,7 @@ func (h *FavoriteController) Toggle(c echo.Context) error {
 	if err != nil {
 		return mapUseCaseError(err)
 	}
-	return c.JSON(http.StatusOK, favoriteStatusWireFrom(out))
+	return jsonOK(c, favoriteStatusWireFrom(out))
 }
 
 func (h *FavoriteController) Check(c echo.Context) error {
@@ -70,19 +70,19 @@ func (h *FavoriteController) Check(c echo.Context) error {
 		out       usecase.FavoriteStatusView
 		err       error
 	)
-	userID, err = CurrentUserID(c)
+	userID, err = requireUserID(c)
 	if err != nil {
 		return err
 	}
-	projectID, err = uuid.Parse(c.Param("projectId"))
+	projectID, err = pathUUID(c, "projectId", "invalid project id")
 	if err != nil {
-		return echo.NewHTTPError(http.StatusBadRequest, apiError("invalid project id", "BAD_REQUEST"))
+		return err
 	}
-	out, err = h.Favorites.Check(c.Request().Context(), userID, projectID)
+	out, err = h.Favorites.Check(reqCtx(c), userID, projectID)
 	if err != nil {
 		return mapUseCaseError(err)
 	}
-	return c.JSON(http.StatusOK, favoriteStatusWireFrom(out))
+	return jsonOK(c, favoriteStatusWireFrom(out))
 }
 
 type toggleFavoriteJSON struct {

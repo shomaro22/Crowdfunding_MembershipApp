@@ -10,7 +10,7 @@ import (
 	"github.com/google/uuid"
 )
 
-type AuthUseCase interface {
+type IAuthUseCase interface {
 	RegisterBuyer(ctx context.Context, email, password string, name *string, meta usecase.RequestMeta) (usecase.UserView, error)
 	RegisterSeller(ctx context.Context, in usecase.SellerRegIn, meta usecase.RequestMeta) (*usecase.SellerRegOut, error)
 	Login(ctx context.Context, email, password string, meta usecase.RequestMeta) (*usecase.LoginResult, error)
@@ -32,7 +32,7 @@ type AuthUseCase interface {
 	SigningKey() []byte
 }
 
-type AdminUseCase interface {
+type IAdminUseCase interface {
 	ListBuyerPending(ctx context.Context, limit, offset int) ([]usecase.UserView, int64, error)
 	ApproveBuyer(ctx context.Context, adminID, userID uuid.UUID, reason *string) (usecase.UserView, error)
 	RejectBuyer(ctx context.Context, adminID, userID uuid.UUID, reason *string) (usecase.UserView, error)
@@ -54,7 +54,7 @@ type AdminUseCase interface {
 	PatchPurchaseStatus(ctx context.Context, adminID, purchaseID uuid.UUID, status string) (usecase.PurchaseView, error)
 }
 
-type ProjectUseCase interface {
+type IProjectUseCase interface {
 	Create(ctx context.Context, sellerID uuid.UUID, in usecase.CreateProjectIn) (*usecase.ProjectView, error)
 	ListPublic(ctx context.Context, search, sort string, limit, offset int) ([]usecase.ProjectView, int64, error)
 	ListMine(ctx context.Context, sellerID uuid.UUID, limit, offset int) ([]usecase.ProjectView, int64, error)
@@ -64,12 +64,12 @@ type ProjectUseCase interface {
 	RequestDelete(ctx context.Context, sellerID, projectID uuid.UUID) (*usecase.ProjectView, error)
 }
 
-type ConnectUseCase interface {
+type IConnectUseCase interface {
 	GetAccount(ctx context.Context, sellerID uuid.UUID) (*usecase.ConnectAccountView, error)
 	CreateOnboardingLink(ctx context.Context, sellerID uuid.UUID) (string, error)
 }
 
-type PaymentUseCase interface {
+type IPaymentUseCase interface {
 	CreateCheckout(ctx context.Context, in usecase.CheckoutIn) (usecase.CheckoutOut, error)
 	CreateIntent(ctx context.Context, in usecase.IntentIn) (usecase.IntentOut, error)
 	VerifyCheckout(ctx context.Context, buyerID uuid.UUID, sessionID string) (usecase.SupporterView, error)
@@ -77,11 +77,11 @@ type PaymentUseCase interface {
 	HandleWebhook(ctx context.Context, payload []byte, signature string) error
 }
 
-type PurchaseUseCase interface {
+type IPurchaseUseCase interface {
 	ListMine(ctx context.Context, buyerID uuid.UUID, limit, offset int) ([]usecase.PurchaseView, int64, error)
 }
 
-type SupporterUseCase interface {
+type ISupporterUseCase interface {
 	ListMine(ctx context.Context, userID uuid.UUID) ([]usecase.SupporterView, error)
 	Upgrade(ctx context.Context, userID, supporterID, planID uuid.UUID) (usecase.UpgradeOut, error)
 	UpgradeConfirm(ctx context.Context, userID, supporterID uuid.UUID, intentID string) (usecase.SupporterView, error)
@@ -90,46 +90,46 @@ type SupporterUseCase interface {
 	ChangeBilling(ctx context.Context, userID, supporterID uuid.UUID, in usecase.ChangeBillingIn) (usecase.SupporterView, error)
 }
 
-type MessageUseCase interface {
+type IMessageUseCase interface {
 	ListThreads(ctx context.Context, userID uuid.UUID, q usecase.ListThreadsQuery) (usecase.ListThreadsResult, error)
 	Send(ctx context.Context, senderID uuid.UUID, in usecase.SendMessageIn) (usecase.MessageItemView, error)
 	MarkRead(ctx context.Context, userID, messageID uuid.UUID, meta usecase.RequestMeta) error
 	GetNotifications(ctx context.Context, userID uuid.UUID) (usecase.NotificationsView, error)
 }
 
-type MessageProjectAccess interface {
+type IMessageProjectAccess interface {
 	CanSubscribeProject(ctx context.Context, projectID, userID uuid.UUID) error
 	ConfirmWSSubscribe(ctx context.Context, userID, projectID uuid.UUID, meta usecase.RequestMeta) error
 }
 
-type WSTokenUseCase interface {
+type IWSTokenUseCase interface {
 	Issue(ctx context.Context, userID uuid.UUID) (string, error)
 }
 
-type FavoriteUseCase interface {
+type IFavoriteUseCase interface {
 	List(ctx context.Context, userID uuid.UUID) ([]usecase.ProjectView, error)
 	Toggle(ctx context.Context, userID uuid.UUID, in usecase.ToggleFavoriteIn) (usecase.FavoriteStatusView, error)
 	Check(ctx context.Context, userID, projectID uuid.UUID) (usecase.FavoriteStatusView, error)
 }
 
-type ReportUseCase interface {
+type IReportUseCase interface {
 	Create(ctx context.Context, reporterID uuid.UUID, in usecase.CreateReportIn) (usecase.ReportView, error)
 	ListAdmin(ctx context.Context, status *string, limit, offset int) (usecase.ReportsResult, error)
 	UpdateAdmin(ctx context.Context, adminID, reportID uuid.UUID, in usecase.UpdateReportIn) (usecase.ReportView, error)
 }
 
-type MediaUseCase interface {
+type IMediaUseCase interface {
 	UploadImage(ctx context.Context, userID uuid.UUID, in usecase.MediaUploadIn) (string, error)
 }
 
-type SellerUseCase interface {
+type ISellerUseCase interface {
 	DashboardStats(ctx context.Context, sellerID uuid.UUID) (usecase.SellerDashboardStatsView, error)
 	ListSupporters(ctx context.Context, sellerID uuid.UUID, projectID *uuid.UUID, limit, offset int) (usecase.SellerSupportersResult, error)
 	ExportSupporters(ctx context.Context, sellerID uuid.UUID, projectID *uuid.UUID) ([]usecase.SupporterView, error)
 	ProjectAnalysis(ctx context.Context, sellerID uuid.UUID) (usecase.ProjectAnalysisResult, error)
 }
 
-type OperationsUseCase interface {
+type IOperationsUseCase interface {
 	ListActivityLogs(ctx context.Context, q usecase.ActivityLogsQuery) (usecase.ActivityLogsResult, error)
 	ListAuditLogs(ctx context.Context, q usecase.AuditLogsQuery) (usecase.AuditLogsResult, error)
 	ListBatchRuns(ctx context.Context, q usecase.BatchRunsQuery) (usecase.BatchRunsResult, error)

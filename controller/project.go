@@ -2,9 +2,7 @@ package controller
 
 import (
 	"net/http"
-	"strconv"
 
-	"crowdfund-app/middleware"
 	"crowdfund-app/usecase"
 
 	"github.com/google/uuid"
@@ -12,10 +10,10 @@ import (
 )
 
 type ProjectController struct {
-	Projects ProjectUseCase
+	Projects IProjectUseCase
 }
 
-func NewProjectController(uc ProjectUseCase) *ProjectController {
+func NewProjectController(uc IProjectUseCase) *ProjectController {
 	return &ProjectController{Projects: uc}
 }
 
@@ -27,13 +25,12 @@ func (h *ProjectController) ListPublic(c echo.Context) error {
 		total  int64
 		err    error
 	)
-	limit, _ = strconv.Atoi(c.QueryParam("limit"))
-	offset, _ = strconv.Atoi(c.QueryParam("offset"))
-	rows, total, err = h.Projects.ListPublic(c.Request().Context(), c.QueryParam("search"), c.QueryParam("sort"), limit, offset)
+	limit, offset = queryPage(c)
+	rows, total, err = h.Projects.ListPublic(reqCtx(c), c.QueryParam("search"), c.QueryParam("sort"), limit, offset)
 	if err != nil {
 		return mapUseCaseError(err)
 	}
-	return c.JSON(http.StatusOK, listProjectsJSON(rows, total, limit, offset))
+	return jsonOK(c, listProjectsJSON(rows, total, limit, offset))
 }
 
 func (h *ProjectController) Create(c echo.Context) error {
@@ -44,22 +41,22 @@ func (h *ProjectController) Create(c echo.Context) error {
 		view     *usecase.ProjectView
 		err      error
 	)
-	sellerID, err = CurrentUserID(c)
+	sellerID, err = requireUserID(c)
 	if err != nil {
 		return err
 	}
-	if err = c.Bind(&body); err != nil {
-		return echo.NewHTTPError(http.StatusBadRequest, apiError("invalid request body", "BAD_REQUEST"))
+	if err = bindBody(c, &body); err != nil {
+		return err
 	}
 	in, err = body.toInput()
 	if err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, apiError("invalid request body", "BAD_REQUEST"))
 	}
-	view, err = h.Projects.Create(c.Request().Context(), sellerID, in)
+	view, err = h.Projects.Create(reqCtx(c), sellerID, in)
 	if err != nil {
 		return mapUseCaseError(err)
 	}
-	return c.JSON(http.StatusCreated, projectDetailJSON(view))
+	return jsonCreated(c, projectDetailJSON(view))
 }
 
 func (h *ProjectController) ListMine(c echo.Context) error {
@@ -71,71 +68,54 @@ func (h *ProjectController) ListMine(c echo.Context) error {
 		total    int64
 		err      error
 	)
-	sellerID, err = CurrentUserID(c)
+	sellerID, err = requireUserID(c)
 	if err != nil {
 		return err
 	}
-	limit, _ = strconv.Atoi(c.QueryParam("limit"))
-	offset, _ = strconv.Atoi(c.QueryParam("offset"))
-	rows, total, err = h.Projects.ListMine(c.Request().Context(), sellerID, limit, offset)
+	limit, offset = queryPage(c)
+	rows, total, err = h.Projects.ListMine(reqCtx(c), sellerID, limit, offset)
 	if err != nil {
 		return mapUseCaseError(err)
 	}
-	return c.JSON(http.StatusOK, listProjectsJSON(rows, total, limit, offset))
+	return jsonOK(c, listProjectsJSON(rows, total, limit, offset))
 }
 
 func (h *ProjectController) Get(c echo.Context) error {
 	var (
-		id         uuid.UUID
-		viewerID   *uuid.UUID
-		viewerRole string
-		uid        uuid.UUID
-		ok         bool
-		view       *usecase.ProjectView
-		err        error
+		id   uuid.UUID
+		view *usecase.ProjectView
+		v    viewerCtx
+		err  error
 	)
-	id, err = uuid.Parse(c.Param("projectId"))
+	id, err = pathUUID(c, "projectId", "invalid project id")
 	if err != nil {
-		return echo.NewHTTPError(http.StatusBadRequest, apiError("invalid project id", "BAD_REQUEST"))
+		return err
 	}
-	if uid, ok = middleware.AuthUserID(c); ok {
-		viewerID = &uid
-		if role, roleOK := middleware.AuthUserRole(c); roleOK {
-			viewerRole = string(role)
-		}
-	}
-	view, err = h.Projects.FindView(c.Request().Context(), id, viewerID, viewerRole)
+	v = optionalViewer(c)
+	view, err = h.Projects.FindView(reqCtx(c), id, v.UserID, v.Role)
 	if err != nil {
 		return mapUseCaseError(err)
 	}
-	return c.JSON(http.StatusOK, projectDetailJSON(view))
+	return jsonOK(c, projectDetailJSON(view))
 }
 
 func (h *ProjectController) ListPlans(c echo.Context) error {
 	var (
-		id         uuid.UUID
-		viewerID   *uuid.UUID
-		viewerRole string
-		plans      []usecase.ProjectPlanView
-		ok         bool
-		uid        uuid.UUID
-		err        error
+		id    uuid.UUID
+		plans []usecase.ProjectPlanView
+		v     viewerCtx
+		err   error
 	)
-	id, err = uuid.Parse(c.Param("projectId"))
+	id, err = pathUUID(c, "projectId", "invalid project id")
 	if err != nil {
-		return echo.NewHTTPError(http.StatusBadRequest, apiError("invalid project id", "BAD_REQUEST"))
+		return err
 	}
-	if uid, ok = middleware.AuthUserID(c); ok {
-		viewerID = &uid
-		if role, roleOK := middleware.AuthUserRole(c); roleOK {
-			viewerRole = string(role)
-		}
-	}
-	plans, err = h.Projects.ListPlans(c.Request().Context(), id, viewerID, viewerRole)
+	v = optionalViewer(c)
+	plans, err = h.Projects.ListPlans(reqCtx(c), id, v.UserID, v.Role)
 	if err != nil {
 		return mapUseCaseError(err)
 	}
-	return c.JSON(http.StatusOK, projectPlansToJSON(plans))
+	return jsonOK(c, projectPlansToJSON(plans))
 }
 
 func (h *ProjectController) Update(c echo.Context) error {
@@ -147,26 +127,26 @@ func (h *ProjectController) Update(c echo.Context) error {
 		view     *usecase.ProjectView
 		err      error
 	)
-	sellerID, err = CurrentUserID(c)
+	sellerID, err = requireUserID(c)
 	if err != nil {
 		return err
 	}
-	id, err = uuid.Parse(c.Param("projectId"))
+	id, err = pathUUID(c, "projectId", "invalid project id")
 	if err != nil {
-		return echo.NewHTTPError(http.StatusBadRequest, apiError("invalid project id", "BAD_REQUEST"))
+		return err
 	}
-	if err = c.Bind(&body); err != nil {
-		return echo.NewHTTPError(http.StatusBadRequest, apiError("invalid request body", "BAD_REQUEST"))
+	if err = bindBody(c, &body); err != nil {
+		return err
 	}
 	in, err = body.toInput()
 	if err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, apiError("invalid request body", "BAD_REQUEST"))
 	}
-	view, err = h.Projects.Update(c.Request().Context(), sellerID, id, in)
+	view, err = h.Projects.Update(reqCtx(c), sellerID, id, in)
 	if err != nil {
 		return mapUseCaseError(err)
 	}
-	return c.JSON(http.StatusOK, projectDetailJSON(view))
+	return jsonOK(c, projectDetailJSON(view))
 }
 
 func (h *ProjectController) RequestDelete(c echo.Context) error {
@@ -176,17 +156,17 @@ func (h *ProjectController) RequestDelete(c echo.Context) error {
 		view     *usecase.ProjectView
 		err      error
 	)
-	sellerID, err = CurrentUserID(c)
+	sellerID, err = requireUserID(c)
 	if err != nil {
 		return err
 	}
-	id, err = uuid.Parse(c.Param("projectId"))
+	id, err = pathUUID(c, "projectId", "invalid project id")
 	if err != nil {
-		return echo.NewHTTPError(http.StatusBadRequest, apiError("invalid project id", "BAD_REQUEST"))
+		return err
 	}
-	view, err = h.Projects.RequestDelete(c.Request().Context(), sellerID, id)
+	view, err = h.Projects.RequestDelete(reqCtx(c), sellerID, id)
 	if err != nil {
 		return mapUseCaseError(err)
 	}
-	return c.JSON(http.StatusOK, projectDetailJSON(view))
+	return jsonOK(c, projectDetailJSON(view))
 }
