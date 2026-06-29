@@ -3,7 +3,6 @@ package controller
 import (
 	"context"
 	"database/sql"
-	"net/http"
 
 	"crowdfund-app/db"
 
@@ -22,13 +21,13 @@ func (h *HealthController) Health(c echo.Context) error {
 		ctx  context.Context
 		body map[string]string
 	)
-	ctx = c.Request().Context()
+	ctx = reqCtx(c)
 	body = map[string]string{
 		"status": "ok",
 		"db":     pingDB(ctx, h.SQL),
 		"redis":  pingRedis(ctx, h.RDB),
 	}
-	return c.JSON(http.StatusOK, body)
+	return jsonOK(c, body)
 }
 
 func pingDB(ctx context.Context, gormDB *gorm.DB) string {
