@@ -2,7 +2,6 @@ package usecase
 
 import (
 	"context"
-	"log/slog"
 	"time"
 
 	"crowdfund-app/auth"
@@ -20,15 +19,6 @@ const (
 
 type Mailer interface {
 	SendPasswordReset(ctx context.Context, email, plainToken string) error
-}
-
-type LogMailer struct {
-	AppPublicURL string
-}
-
-func (m LogMailer) SendPasswordReset(_ context.Context, email, plainToken string) error {
-	slog.Info("password_reset_email", "to", email, "url", auth.PasswordResetURL(m.AppPublicURL, plainToken))
-	return nil
 }
 
 type SessionTokens struct {
@@ -49,17 +39,17 @@ type SessionInfo struct {
 }
 
 type AuthUseCase struct {
-	Users         repository.UserRepo
-	SellerRegs    repository.SellerRegRepo
-	RefreshTokens repository.RefreshTokenRepo
-	ResetToks     repository.ResetRepo
-	Activity      repository.ActivityRepo
-	OAuth         repository.OAuthRepo
-	OAuthCache    repository.OAuthCache
-	TOTPBackup    repository.TOTPBackupRepo
+	Users         repository.IUserRepo
+	SellerRegs    repository.ISellerRegRepo
+	RefreshTokens repository.IRefreshTokenRepo
+	ResetToks     repository.IResetRepo
+	Activity      repository.IActivityRepo
+	OAuth         repository.IOAuthRepo
+	OAuthCache    repository.IOAuthCache
+	TOTPBackup    repository.ITOTPBackupRepo
 	Tokens        *auth.TokenService
 	Mailer        Mailer
-	KYCStore      repository.KYCStore
+	KYCStore      repository.IKYCStore
 	Google        *auth.GoogleOAuth
 	TOTPKey       []byte
 	TOTPIssuer    string
@@ -71,7 +61,7 @@ func (a *AuthUseCase) logActivity(ctx context.Context, userID *uuid.UUID, action
 	LogActivity(ctx, a.Activity, userID, action, resource, resourceID, meta, extra)
 }
 
-func twoFAVerified(u *model.User) bool {
+func twoFAVerified(u model.User) bool {
 	if !u.MustSetup2FA() {
 		return true
 	}

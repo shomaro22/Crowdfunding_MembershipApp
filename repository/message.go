@@ -17,9 +17,9 @@ type MessageThreadSummary struct {
 	UnreadCount int       `gorm:"column:unread_count"`
 }
 
-type MessageRepo interface {
+type IMessageRepo interface {
 	Create(ctx context.Context, row *model.Message) error
-	FindID(ctx context.Context, id uuid.UUID) (*model.Message, error)
+	GetID(ctx context.Context, id uuid.UUID) (model.Message, error)
 	ListForUser(ctx context.Context, userID uuid.UUID) ([]model.Message, error)
 	ListThreadSummaries(ctx context.Context, userID uuid.UUID, offset, limit int) ([]MessageThreadSummary, int64, error)
 	ListMessagesInThread(ctx context.Context, userID, projectID, partnerID uuid.UUID, limit int) ([]model.Message, error)
@@ -31,7 +31,7 @@ type messageRepo struct {
 	db *gorm.DB
 }
 
-func NewMessageRepo(db *gorm.DB) MessageRepo {
+func NewMessageRepo(db *gorm.DB) IMessageRepo {
 	return &messageRepo{db: db}
 }
 
@@ -43,8 +43,8 @@ func (r *messageRepo) Create(ctx context.Context, row *model.Message) error {
 	return r.dbCtx(ctx).Create(row).Error
 }
 
-func (r *messageRepo) FindID(ctx context.Context, id uuid.UUID) (*model.Message, error) {
-	return firstOnePtr[model.Message](r.dbCtx(ctx).Where("id = ?", id))
+func (r *messageRepo) GetID(ctx context.Context, id uuid.UUID) (model.Message, error) {
+	return getOne[model.Message](r.dbCtx(ctx).Where("id = ?", id))
 }
 
 func (r *messageRepo) ListForUser(ctx context.Context, userID uuid.UUID) ([]model.Message, error) {

@@ -10,7 +10,7 @@ import (
 	"gorm.io/gorm"
 )
 
-type TOTPBackupRepo interface {
+type ITOTPBackupRepo interface {
 	CreateBatch(ctx context.Context, rows []model.TOTPBackupCode) error
 	ListUnused(ctx context.Context, userID uuid.UUID) ([]model.TOTPBackupCode, error)
 	MarkUsed(ctx context.Context, id uuid.UUID, at time.Time) error
@@ -21,7 +21,7 @@ type totpBackupRepo struct {
 	db *gorm.DB
 }
 
-func NewTOTPBackupRepo(db *gorm.DB) TOTPBackupRepo {
+func NewTOTPBackupRepo(db *gorm.DB) ITOTPBackupRepo {
 	return &totpBackupRepo{db: db}
 }
 

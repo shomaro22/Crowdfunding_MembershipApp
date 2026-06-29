@@ -9,11 +9,11 @@ import (
 	"gorm.io/gorm"
 )
 
-type SellerRegRepo interface {
+type ISellerRegRepo interface {
 	Create(ctx context.Context, r *model.SellerReg) error
 	Update(ctx context.Context, r *model.SellerReg) error
-	FindID(ctx context.Context, id uuid.UUID) (*model.SellerReg, error)
-	FindUserID(ctx context.Context, userID uuid.UUID) (*model.SellerReg, error)
+	GetID(ctx context.Context, id uuid.UUID) (model.SellerReg, error)
+	GetUserID(ctx context.Context, userID uuid.UUID) (model.SellerReg, error)
 	List(ctx context.Context, status model.RegStatus, limit, offset int) ([]model.SellerReg, int64, error)
 }
 
@@ -21,7 +21,7 @@ type sellerRegRepo struct {
 	db *gorm.DB
 }
 
-func NewSellerRegRepo(db *gorm.DB) SellerRegRepo {
+func NewSellerRegRepo(db *gorm.DB) ISellerRegRepo {
 	return &sellerRegRepo{db: db}
 }
 
@@ -33,12 +33,12 @@ func (r *sellerRegRepo) Update(ctx context.Context, reg *model.SellerReg) error 
 	return dbFromCtx(ctx, r.db).Save(reg).Error
 }
 
-func (r *sellerRegRepo) FindID(ctx context.Context, id uuid.UUID) (*model.SellerReg, error) {
-	return firstOnePtr[model.SellerReg](dbFromCtx(ctx, r.db).Where("id = ?", id))
+func (r *sellerRegRepo) GetID(ctx context.Context, id uuid.UUID) (model.SellerReg, error) {
+	return getOne[model.SellerReg](dbFromCtx(ctx, r.db).Where("id = ?", id))
 }
 
-func (r *sellerRegRepo) FindUserID(ctx context.Context, userID uuid.UUID) (*model.SellerReg, error) {
-	return firstOnePtr[model.SellerReg](dbFromCtx(ctx, r.db).Where("user_id = ?", userID))
+func (r *sellerRegRepo) GetUserID(ctx context.Context, userID uuid.UUID) (model.SellerReg, error) {
+	return getOne[model.SellerReg](dbFromCtx(ctx, r.db).Where("user_id = ?", userID))
 }
 
 func (r *sellerRegRepo) List(ctx context.Context, status model.RegStatus, limit, offset int) ([]model.SellerReg, int64, error) {

@@ -1,6 +1,7 @@
 package usecase
 
 import (
+	"encoding/json"
 	"time"
 
 	"crowdfund-app/model"
@@ -34,10 +35,7 @@ func adminRoleString(r *model.AdminRole) *string {
 	return &s
 }
 
-func UserViewFrom(u *model.User) UserView {
-	if u == nil {
-		return UserView{}
-	}
+func UserViewFrom(u model.User) UserView {
 	return UserView{
 		ID:            u.ID,
 		Email:         u.Email,
@@ -53,10 +51,7 @@ func UserViewFrom(u *model.User) UserView {
 	}
 }
 
-func UserViewPtr(u *model.User) *UserView {
-	if u == nil {
-		return nil
-	}
+func UserViewPtr(u model.User) *UserView {
 	v := UserViewFrom(u)
 	return &v
 }
@@ -68,10 +63,7 @@ type ConnectAccountView struct {
 	DetailsSubmitted bool
 }
 
-func ConnectAccountViewFrom(row *model.ConnectAccount) *ConnectAccountView {
-	if row == nil {
-		return nil
-	}
+func ConnectAccountViewFrom(row model.ConnectAccount) *ConnectAccountView {
 	return &ConnectAccountView{
 		StripeAccountID:  row.StripeAccountID,
 		ChargesEnabled:   row.ChargesEnabled,
@@ -126,10 +118,7 @@ type SellerRegItemView struct {
 	UpdatedAt    time.Time
 }
 
-func SellerRegItemFrom(r *model.SellerReg) SellerRegItemView {
-	if r == nil {
-		return SellerRegItemView{}
-	}
+func SellerRegItemFrom(r model.SellerReg) SellerRegItemView {
 	return SellerRegItemView{
 		ID:           r.ID,
 		UserID:       r.UserID,
@@ -164,10 +153,7 @@ type ProjectItemView struct {
 	UpdatedAt       time.Time
 }
 
-func ProjectItemFrom(p *model.Project) ProjectItemView {
-	if p == nil {
-		return ProjectItemView{}
-	}
+func ProjectItemFrom(p model.Project) ProjectItemView {
 	return ProjectItemView{
 		ID:              p.ID,
 		SellerID:        p.SellerID,
@@ -264,7 +250,7 @@ type ProjectView struct {
 	Seller  *UserView
 }
 
-func AssembleProjectView(project *model.Project, plans []model.ProjectPlan, images []model.ProjectImage, seller *UserView) ProjectView {
+func AssembleProjectView(project model.Project, plans []model.ProjectPlan, images []model.ProjectImage, seller *UserView) ProjectView {
 	return ProjectView{
 		Project: ProjectItemFrom(project),
 		Plans:   ProjectPlansFrom(plans),
@@ -273,7 +259,231 @@ func AssembleProjectView(project *model.Project, plans []model.ProjectPlan, imag
 	}
 }
 
-func AssembleProjectViewPtr(project *model.Project, plans []model.ProjectPlan, images []model.ProjectImage, seller *UserView) *ProjectView {
+func AssembleProjectViewPtr(project model.Project, plans []model.ProjectPlan, images []model.ProjectImage, seller *UserView) *ProjectView {
 	v := AssembleProjectView(project, plans, images, seller)
 	return &v
+}
+
+type MessageItemView struct {
+	ID         uuid.UUID
+	ProjectID  uuid.UUID
+	SenderID   uuid.UUID
+	ReceiverID uuid.UUID
+	Content    string
+	IsRead     bool
+	ReadAt     *time.Time
+	CreatedAt  time.Time
+	Sender     *UserView
+	Receiver   *UserView
+}
+
+type MessageThreadView struct {
+	ProjectID    uuid.UUID
+	ProjectTitle string
+	Partner      UserView
+	Messages     []MessageItemView
+	UnreadCount  int
+}
+
+type NotificationsView struct {
+	UnreadMessages int64
+}
+
+type ListThreadsQuery struct {
+	Page              int
+	PerPage           int
+	MessagesPerThread int
+}
+
+type ListThreadsResult struct {
+	Threads []MessageThreadView
+	Total   int64
+	Page    int
+	PerPage int
+}
+
+func MessageItemFrom(msg model.Message) MessageItemView {
+	return MessageItemView{
+		ID:         msg.ID,
+		ProjectID:  msg.ProjectID,
+		SenderID:   msg.SenderID,
+		ReceiverID: msg.ReceiverID,
+		Content:    msg.Content,
+		IsRead:     msg.IsRead,
+		ReadAt:     msg.ReadAt,
+		CreatedAt:  msg.CreatedAt,
+	}
+}
+
+func MessageItemWithUsers(msg model.Message, sender, receiver *UserView) MessageItemView {
+	var out MessageItemView
+	out = MessageItemFrom(msg)
+	out.Sender = sender
+	out.Receiver = receiver
+	return out
+}
+
+type ActivityLogView struct {
+	ID         uuid.UUID
+	UserID     *uuid.UUID
+	Action     string
+	Resource   *string
+	ResourceID *string
+	IPAddress  *string
+	UserAgent  *string
+	RequestID  *string
+	Metadata   json.RawMessage
+	CreatedAt  time.Time
+	User       *UserView
+}
+
+type ActivityLogsResult struct {
+	Logs   []ActivityLogView
+	Total  int64
+	Limit  int
+	Offset int
+}
+
+type AuditLogView struct {
+	ID         uuid.UUID
+	AdminID    uuid.UUID
+	AdminEmail string
+	Action     string
+	Resource   string
+	ResourceID string
+	Details    *string
+	Reason     *string
+	CreatedAt  time.Time
+}
+
+type AuditLogsResult struct {
+	Logs   []AuditLogView
+	Total  int64
+	Limit  int
+	Offset int
+}
+
+type BatchRunsResult struct {
+	Runs  []BatchRunView
+	Total int64
+	Limit int
+}
+
+type SecurityIPCountView struct {
+	IP    string
+	Count int64
+}
+
+type SecurityEventsView struct {
+	LoginFailedCount int64
+	RateLimitedCount int64
+	TopIPs           []SecurityIPCountView
+	From             time.Time
+	To               time.Time
+}
+
+func ActivityLogViewFrom(row model.ActivityLog) ActivityLogView {
+	return ActivityLogView{
+		ID:         row.ID,
+		UserID:     row.UserID,
+		Action:     string(row.Action),
+		Resource:   row.Resource,
+		ResourceID: row.ResourceID,
+		IPAddress:  row.IPAddress,
+		UserAgent:  row.UserAgent,
+		RequestID:  row.RequestID,
+		Metadata:   json.RawMessage(row.Metadata),
+		CreatedAt:  row.CreatedAt,
+	}
+}
+
+func AuditLogViewFrom(row model.AuditLog, adminEmail string) AuditLogView {
+	return AuditLogView{
+		ID:         row.ID,
+		AdminID:    row.AdminID,
+		AdminEmail: adminEmail,
+		Action:     row.Action,
+		Resource:   row.Resource,
+		ResourceID: row.ResourceID,
+		Details:    row.Details,
+		Reason:     row.Reason,
+		CreatedAt:  row.CreatedAt,
+	}
+}
+
+type SupporterItemView struct {
+	ID                 uuid.UUID
+	ProjectID          uuid.UUID
+	PlanID             uuid.UUID
+	UserID             uuid.UUID
+	Status             string
+	BillingMode        string
+	CurrentPeriodStart time.Time
+	CurrentPeriodEnd   time.Time
+	PendingPlanID      *uuid.UUID
+	PlanChangeDate     *time.Time
+}
+
+func SupporterItemFrom(s model.ProjectSupporter) SupporterItemView {
+	return SupporterItemView{
+		ID:                 s.ID,
+		ProjectID:          s.ProjectID,
+		PlanID:             s.PlanID,
+		UserID:             s.UserID,
+		Status:             string(s.Status),
+		BillingMode:        string(s.BillingMode),
+		CurrentPeriodStart: s.CurrentPeriodStart,
+		CurrentPeriodEnd:   s.CurrentPeriodEnd,
+		PendingPlanID:      s.PendingPlanID,
+		PlanChangeDate:     s.PlanChangeDate,
+	}
+}
+
+type SupporterView struct {
+	Supporter   SupporterItemView
+	Project     *ProjectItemView
+	Plan        *ProjectPlanView
+	PendingPlan *ProjectPlanView
+}
+
+func ProjectItemPtrFrom(p model.Project) *ProjectItemView {
+	v := ProjectItemFrom(p)
+	return &v
+}
+
+func ProjectPlanPtrFrom(plan model.ProjectPlan) *ProjectPlanView {
+	v := ProjectPlanFrom(plan)
+	return &v
+}
+
+type PurchaseItemView struct {
+	ID            uuid.UUID
+	ProjectID     uuid.UUID
+	SupporterID   *uuid.UUID
+	BuyerID       uuid.UUID
+	Quantity      int
+	TotalPrice    int
+	Status        string
+	PaymentMethod string
+	CreatedAt     time.Time
+}
+
+func PurchaseItemFrom(p model.Purchase) PurchaseItemView {
+	return PurchaseItemView{
+		ID:            p.ID,
+		ProjectID:     p.ProjectID,
+		SupporterID:   p.SupporterID,
+		BuyerID:       p.BuyerID,
+		Quantity:      p.Quantity,
+		TotalPrice:    p.TotalPrice,
+		Status:        string(p.Status),
+		PaymentMethod: string(p.PaymentMethod),
+		CreatedAt:     p.CreatedAt,
+	}
+}
+
+type PurchaseView struct {
+	Purchase PurchaseItemView
+	Project  *ProjectItemView
+	Buyer    *UserView
 }

@@ -36,16 +36,16 @@ func TestValidateCreateReport(t *testing.T) {
 	}
 }
 
-func TestValidateAdminReportUpdate(t *testing.T) {
+func TestValidateIAdminReportUpdate(t *testing.T) {
 	var (
 		status model.ReportStatus
 		err    error
 	)
-	status, _, err = ValidateAdminReportUpdate(AdminReportUpdateInput{Status: "resolved"})
+	status, _, err = ValidateIAdminReportUpdate(IAdminReportUpdateInput{Status: "resolved"})
 	if err != nil || status != model.ReportStatusResolved {
 		t.Fatalf("status=%q err=%v", status, err)
 	}
-	_, _, err = ValidateAdminReportUpdate(AdminReportUpdateInput{Status: "bad"})
+	_, _, err = ValidateIAdminReportUpdate(IAdminReportUpdateInput{Status: "bad"})
 	if err == nil {
 		t.Fatal("expected error")
 	}

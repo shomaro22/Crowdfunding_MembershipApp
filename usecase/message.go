@@ -28,11 +28,11 @@ type SendMessageIn struct {
 }
 
 type MessageUseCase struct {
-	Messages   repository.MessageRepo
-	Projects   repository.ProjectRepo
-	Supporters repository.SupporterRepo
-	Users      repository.UserRepo
-	Activity   repository.ActivityRepo
+	Messages   repository.IMessageRepo
+	Projects   repository.IProjectRepo
+	Supporters repository.ISupporterRepo
+	Users      repository.IUserRepo
+	Activity   repository.IActivityRepo
 	events     MessageEventHook
 }
 
@@ -107,7 +107,7 @@ func (m *MessageUseCase) ListThreads(ctx context.Context, userID uuid.UUID, q Li
 			Messages:    make([]MessageItemView, 0, len(rows)),
 		}
 		for _, msg := range rows {
-			t.Messages = append(t.Messages, MessageItemFrom(&msg))
+			t.Messages = append(t.Messages, MessageItemFrom(msg))
 		}
 		if err = m.enrichThread(ctx, &t); err != nil {
 			return ListThreadsResult{}, err
@@ -119,19 +119,19 @@ func (m *MessageUseCase) ListThreads(ctx context.Context, userID uuid.UUID, q Li
 
 func (m *MessageUseCase) enrichThread(ctx context.Context, t *MessageThreadView) error {
 	var (
-		project *model.Project
-		u       *model.User
+		project model.Project
+		u       model.User
 		err     error
 	)
 	if t == nil {
 		return nil
 	}
-	project, _, _, err = m.Projects.FindID(ctx, t.ProjectID)
+	project, _, _, err = m.Projects.GetID(ctx, t.ProjectID)
 	if err != nil {
 		return mapRepoNotFound(err)
 	}
 	t.ProjectTitle = project.Title
-	u, err = m.Users.FindID(ctx, t.Partner.ID)
+	u, err = m.Users.GetID(ctx, t.Partner.ID)
 	if err != nil {
 		return mapRepoNotFound(err)
 	}
@@ -152,8 +152,8 @@ func reverseMessageItems(items []MessageItemView) {
 
 func (m *MessageUseCase) Send(ctx context.Context, senderID uuid.UUID, in SendMessageIn) (MessageItemView, error) {
 	var (
-		sender   *model.User
-		receiver *model.User
+		sender   model.User
+		receiver model.User
 		row      *model.Message
 		now      time.Time
 		out      MessageItemView
@@ -161,7 +161,7 @@ func (m *MessageUseCase) Send(ctx context.Context, senderID uuid.UUID, in SendMe
 	)
 	in.Content = strings.TrimSpace(in.Content)
 	if err = validator.ValidateMessage(in.Content); err != nil {
-		return MessageItemView{}, mapMessageEntityErr(err)
+		return MessageItemView{}, mapMessageModelErr(err)
 	}
 	if _, err = m.authorizeSend(ctx, senderID, in.ProjectID, in.ReceiverID); err != nil {
 		return MessageItemView{}, err
@@ -183,9 +183,15 @@ func (m *MessageUseCase) Send(ctx context.Context, senderID uuid.UUID, in SendMe
 		"project_id":  in.ProjectID.String(),
 		"receiver_id": in.ReceiverID.String(),
 	}))
-	sender, _ = m.Users.FindID(ctx, senderID)
-	receiver, _ = m.Users.FindID(ctx, in.ReceiverID)
-	out = MessageItemWithUsers(row, UserViewPtr(sender), UserViewPtr(receiver))
+	sender, err = m.Users.GetID(ctx, senderID)
+	if err != nil {
+		return MessageItemView{}, mapRepoNotFound(err)
+	}
+	receiver, err = m.Users.GetID(ctx, in.ReceiverID)
+	if err != nil {
+		return MessageItemView{}, mapRepoNotFound(err)
+	}
+	out = MessageItemWithUsers(*row, UserViewPtr(sender), UserViewPtr(receiver))
 	if m.events != nil {
 		m.events.OnMessageCreated(ctx, out)
 	}
@@ -194,11 +200,11 @@ func (m *MessageUseCase) Send(ctx context.Context, senderID uuid.UUID, in SendMe
 
 func (m *MessageUseCase) MarkRead(ctx context.Context, userID, messageID uuid.UUID, meta RequestMeta) error {
 	var (
-		msg *model.Message
+		msg model.Message
 		now time.Time
 		err error
 	)
-	msg, err = m.Messages.FindID(ctx, messageID)
+	msg, err = m.Messages.GetID(ctx, messageID)
 	if err != nil {
 		return mapRepoNotFound(err)
 	}
@@ -244,5 +250,87 @@ func (m *MessageUseCase) ConfirmWSSubscribe(ctx context.Context, userID, project
 		return err
 	}
 	LogActivity(ctx, m.Activity, &userID, model.SecWSSubscribe, "project", projectID.String(), meta, nil)
+	return nil
+}
+
+func (m *MessageUseCase) loadProject(ctx context.Context, projectID uuid.UUID) (model.Project, error) {
+	var (
+		project model.Project
+		err     error
+	)
+	project, _, _, err = m.Projects.GetID(ctx, projectID)
+	if err != nil {
+		return model.Project{}, mapRepoNotFound(err)
+	}
+	return project, nil
+}
+
+func (m *MessageUseCase) requireActiveMember(ctx context.Context, projectID, userID uuid.UUID) error {
+	var (
+		supporter model.ProjectSupporter
+		err       error
+	)
+	supporter, err = m.Supporters.GetMembership(ctx, projectID, userID)
+	if err != nil {
+		return mapRepoNotFoundAs(err, ErrForbidden)
+	}
+	if err = model.CanMessage(supporter, time.Now().UTC()); err != nil {
+		return ErrForbidden
+	}
+	return nil
+}
+
+func (m *MessageUseCase) CanSubscribeProject(ctx context.Context, projectID, userID uuid.UUID) error {
+	var (
+		project model.Project
+		err     error
+	)
+	project, err = m.loadProject(ctx, projectID)
+	if err != nil {
+		return err
+	}
+	if project.SellerID == userID {
+		return nil
+	}
+	return m.requireActiveMember(ctx, projectID, userID)
+}
+
+func (m *MessageUseCase) authorizeSend(
+	ctx context.Context,
+	senderID, projectID, receiverID uuid.UUID,
+) (model.Project, error) {
+	var (
+		project model.Project
+		err     error
+	)
+	project, err = m.loadProject(ctx, projectID)
+	if err != nil {
+		return model.Project{}, err
+	}
+	if project.SellerID == senderID {
+		if receiverID == senderID {
+			return model.Project{}, ErrBadRequest
+		}
+		if err = m.requireActiveMember(ctx, projectID, receiverID); err != nil {
+			return model.Project{}, err
+		}
+		return project, nil
+	}
+	if receiverID != project.SellerID {
+		return model.Project{}, ErrForbidden
+	}
+	if err = m.requireActiveMember(ctx, projectID, senderID); err != nil {
+		return model.Project{}, err
+	}
+	return project, nil
+}
+
+func (m *MessageUseCase) authorizeReadParticipant(msg model.Message, userID uuid.UUID) error {
+	if msg.ID == uuid.Nil {
+		return ErrNotFound
+	}
+	if msg.SenderID != userID && msg.ReceiverID != userID {
+		return ErrForbidden
+	}
 	return nil
 }

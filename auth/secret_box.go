@@ -5,7 +5,6 @@ import (
 	"crypto/cipher"
 	"crypto/rand"
 	"encoding/base64"
-	"fmt"
 	"io"
 )
 
@@ -85,16 +84,4 @@ func deriveAESKey(key []byte) []byte {
 		out[i%32] ^= key[i]
 	}
 	return out
-}
-
-func MustEncryptSecret(key []byte, plain string) string {
-	var (
-		s   string
-		err error
-	)
-	s, err = EncryptSecret(key, plain)
-	if err != nil {
-		panic(fmt.Sprintf("encrypt secret: %v", err))
-	}
-	return s
 }

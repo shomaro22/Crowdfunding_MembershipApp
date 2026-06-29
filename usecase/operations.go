@@ -2,6 +2,7 @@ package usecase
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -39,10 +40,10 @@ type BatchRunsQuery struct {
 }
 
 type OperationsUseCase struct {
-	Activity repository.ActivityRepo
-	Audit    repository.AuditRepo
-	Runs     repository.BatchRepo
-	Users    repository.UserRepo
+	Activity repository.IActivityRepo
+	Audit    repository.IAuditRepo
+	Runs     repository.IBatchRepo
+	Users    repository.IUserRepo
 	Batch    *BatchUseCase
 }
 
@@ -55,7 +56,7 @@ func (o *OperationsUseCase) ListActivityLogs(ctx context.Context, q ActivityLogs
 		i      int
 		row    model.ActivityLog
 		view   ActivityLogView
-		u      *model.User
+		u      model.User
 		err    error
 	)
 	if o == nil || o.Activity == nil {
@@ -99,8 +100,12 @@ func (o *OperationsUseCase) ListActivityLogs(ctx context.Context, q ActivityLogs
 		row = rows[i]
 		view = ActivityLogViewFrom(row)
 		if row.UserID != nil && o.Users != nil {
-			u, _ = o.Users.FindID(ctx, *row.UserID)
-			if u != nil {
+			u, err = o.Users.GetID(ctx, *row.UserID)
+			if err != nil {
+				if !errors.Is(mapRepoNotFound(err), ErrNotFound) {
+					return ActivityLogsResult{}, err
+				}
+			} else {
 				uv := UserViewFrom(u)
 				view.User = &uv
 			}
@@ -119,7 +124,7 @@ func (o *OperationsUseCase) ListAuditLogs(ctx context.Context, q AuditLogsQuery)
 		i      int
 		row    model.AuditLog
 		email  string
-		u      *model.User
+		u      model.User
 		err    error
 	)
 	if o == nil || o.Audit == nil {
@@ -155,8 +160,12 @@ func (o *OperationsUseCase) ListAuditLogs(ctx context.Context, q AuditLogsQuery)
 		row = rows[i]
 		email = ""
 		if o.Users != nil {
-			u, _ = o.Users.FindID(ctx, row.AdminID)
-			if u != nil {
+			u, err = o.Users.GetID(ctx, row.AdminID)
+			if err != nil {
+				if !errors.Is(mapRepoNotFound(err), ErrNotFound) {
+					return AuditLogsResult{}, err
+				}
+			} else {
 				email = u.Email
 			}
 		}
