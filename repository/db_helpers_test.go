@@ -4,6 +4,8 @@ import (
 	"errors"
 	"testing"
 
+	"crowdfund-app/entity"
+
 	"gorm.io/gorm"
 )
 
@@ -33,4 +35,8 @@ func TestErrNotFoundDistinct(t *testing.T) {
 	if errors.Is(gorm.ErrRecordNotFound, ErrNotFound) {
 		t.Fatal("ErrNotFound must not match gorm.ErrRecordNotFound directly")
 	}
+}
+
+func TestTableModelConstraint(t *testing.T) {
+	var _ tableModel = entity.Purchase{}
 }
