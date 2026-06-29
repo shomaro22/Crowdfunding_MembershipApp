@@ -37,7 +37,7 @@ func TestProfileGetAndUpdate(t *testing.T) {
 		buyer  *model.User
 		tok    string
 		rec    *httptest.ResponseRecorder
-		body   map[string]any
+		body   userProfileBody
 	)
 	e = setupApp(t)
 	gdb = openDB(t)
@@ -51,35 +51,35 @@ func TestProfileGetAndUpdate(t *testing.T) {
 	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
 		t.Fatal(err)
 	}
-	if body["email"] != buyer.Email {
-		t.Fatalf("email=%v want %s", body["email"], buyer.Email)
+	if body.Email != buyer.Email {
+		t.Fatalf("email=%q want %s", body.Email, buyer.Email)
 	}
 
 	rec = httpPUT(e, "/me/profile", tok, `{"name":"Alice","avatar_url":"https://example.com/a.png"}`)
 	if rec.Code != http.StatusOK {
 		t.Fatalf("put status=%d body=%s", rec.Code, rec.Body.String())
 	}
-	body = nil
+	body = userProfileBody{}
 	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
 		t.Fatal(err)
 	}
-	if body["name"] != "Alice" {
-		t.Fatalf("name=%v want Alice", body["name"])
+	if body.Name != "Alice" {
+		t.Fatalf("name=%q want Alice", body.Name)
 	}
-	if body["avatar_url"] != "https://example.com/a.png" {
-		t.Fatalf("avatar_url=%v", body["avatar_url"])
+	if body.AvatarURL != "https://example.com/a.png" {
+		t.Fatalf("avatar_url=%q", body.AvatarURL)
 	}
 
 	rec = httpGET(e, "/me/profile", tok)
 	if rec.Code != http.StatusOK {
 		t.Fatalf("get after update status=%d body=%s", rec.Code, rec.Body.String())
 	}
-	body = nil
+	body = userProfileBody{}
 	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
 		t.Fatal(err)
 	}
-	if body["name"] != "Alice" {
-		t.Fatalf("persisted name=%v want Alice", body["name"])
+	if body.Name != "Alice" {
+		t.Fatalf("persisted name=%q want Alice", body.Name)
 	}
 }
 

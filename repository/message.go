@@ -120,10 +120,7 @@ func (r *messageRepo) ListMessagesInThread(ctx context.Context, userID, projectI
 func (r *messageRepo) MarkRead(ctx context.Context, id uuid.UUID, at time.Time) error {
 	return r.dbCtx(ctx).Model(&model.Message{}).
 		Where("id = ? AND is_read = FALSE", id).
-		Updates(map[string]any{
-			"is_read": true,
-			"read_at": at,
-		}).Error
+		Updates(model.Message{IsRead: true, ReadAt: &at}).Error
 }
 
 func (r *messageRepo) CountUnread(ctx context.Context, userID uuid.UUID) (int64, error) {

@@ -46,7 +46,7 @@ func TestAdminCatalogSupportUserManagement(t *testing.T) {
 		tok   string
 		buyer *model.User
 		rec   *httptest.ResponseRecorder
-		body  map[string]any
+		body  userProfileBody
 		name  = "Updated Name"
 	)
 	e = setupApp(t)
@@ -68,12 +68,12 @@ func TestAdminCatalogSupportUserManagement(t *testing.T) {
 	if rec.Code != http.StatusOK {
 		t.Fatalf("update status=%d body=%s", rec.Code, rec.Body.String())
 	}
-	body = nil
+	body = userProfileBody{}
 	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
 		t.Fatal(err)
 	}
-	if body["name"] != name {
-		t.Fatalf("name=%v want %q", body["name"], name)
+	if body.Name != name {
+		t.Fatalf("name=%q want %q", body.Name, name)
 	}
 
 	rec = httpGET(e, "/admin/purchases", tok)
@@ -92,7 +92,7 @@ func TestAdminCatalogPatchPurchase(t *testing.T) {
 		project  *model.Project
 		purchase *model.Purchase
 		rec      *httptest.ResponseRecorder
-		body     map[string]any
+		body     purchaseStatusBody
 		now      time.Time
 	)
 	e = setupApp(t)
@@ -124,7 +124,7 @@ func TestAdminCatalogPatchPurchase(t *testing.T) {
 	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
 		t.Fatal(err)
 	}
-	if body["status"] != "CANCELLED" {
-		t.Fatalf("status=%v want CANCELLED", body["status"])
+	if body.Status != "CANCELLED" {
+		t.Fatalf("status=%q want CANCELLED", body.Status)
 	}
 }
