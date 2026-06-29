@@ -34,10 +34,7 @@ func adminRoleString(r *model.AdminRole) *string {
 	return &s
 }
 
-func UserViewFrom(u *model.User) UserView {
-	if u == nil {
-		return UserView{}
-	}
+func UserViewFrom(u model.User) UserView {
 	return UserView{
 		ID:            u.ID,
 		Email:         u.Email,
@@ -53,10 +50,7 @@ func UserViewFrom(u *model.User) UserView {
 	}
 }
 
-func UserViewPtr(u *model.User) *UserView {
-	if u == nil {
-		return nil
-	}
+func UserViewPtr(u model.User) *UserView {
 	v := UserViewFrom(u)
 	return &v
 }
@@ -68,10 +62,7 @@ type ConnectAccountView struct {
 	DetailsSubmitted bool
 }
 
-func ConnectAccountViewFrom(row *model.ConnectAccount) *ConnectAccountView {
-	if row == nil {
-		return nil
-	}
+func ConnectAccountViewFrom(row model.ConnectAccount) *ConnectAccountView {
 	return &ConnectAccountView{
 		StripeAccountID:  row.StripeAccountID,
 		ChargesEnabled:   row.ChargesEnabled,
@@ -126,10 +117,7 @@ type SellerRegItemView struct {
 	UpdatedAt    time.Time
 }
 
-func SellerRegItemFrom(r *model.SellerReg) SellerRegItemView {
-	if r == nil {
-		return SellerRegItemView{}
-	}
+func SellerRegItemFrom(r model.SellerReg) SellerRegItemView {
 	return SellerRegItemView{
 		ID:           r.ID,
 		UserID:       r.UserID,
@@ -164,10 +152,7 @@ type ProjectItemView struct {
 	UpdatedAt       time.Time
 }
 
-func ProjectItemFrom(p *model.Project) ProjectItemView {
-	if p == nil {
-		return ProjectItemView{}
-	}
+func ProjectItemFrom(p model.Project) ProjectItemView {
 	return ProjectItemView{
 		ID:              p.ID,
 		SellerID:        p.SellerID,
@@ -264,7 +249,7 @@ type ProjectView struct {
 	Seller  *UserView
 }
 
-func AssembleProjectView(project *model.Project, plans []model.ProjectPlan, images []model.ProjectImage, seller *UserView) ProjectView {
+func AssembleProjectView(project model.Project, plans []model.ProjectPlan, images []model.ProjectImage, seller *UserView) ProjectView {
 	return ProjectView{
 		Project: ProjectItemFrom(project),
 		Plans:   ProjectPlansFrom(plans),
@@ -273,7 +258,7 @@ func AssembleProjectView(project *model.Project, plans []model.ProjectPlan, imag
 	}
 }
 
-func AssembleProjectViewPtr(project *model.Project, plans []model.ProjectPlan, images []model.ProjectImage, seller *UserView) *ProjectView {
+func AssembleProjectViewPtr(project model.Project, plans []model.ProjectPlan, images []model.ProjectImage, seller *UserView) *ProjectView {
 	v := AssembleProjectView(project, plans, images, seller)
 	return &v
 }

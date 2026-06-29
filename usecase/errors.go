@@ -36,7 +36,7 @@ var (
 	ErrReportExists       = errors.New("report already exists")
 )
 
-func mapBuyerRegEntityErr(err error) error {
+func mapBuyerRegModelErr(err error) error {
 	switch {
 	case errors.Is(err, model.ErrBadEmail):
 		return ErrInvalidEmail
@@ -47,14 +47,14 @@ func mapBuyerRegEntityErr(err error) error {
 	}
 }
 
-func mapSellerKYCEntityErr(err error) error {
+func mapSellerKYCModelErr(err error) error {
 	if errors.Is(err, model.ErrBadKYC) {
 		return ErrBadKYC
 	}
 	return err
 }
 
-func mapProjectEntityErr(err error) error {
+func mapProjectModelErr(err error) error {
 	switch {
 	case errors.Is(err, model.ErrBadTitle),
 		errors.Is(err, model.ErrBadProject),
@@ -68,14 +68,14 @@ func mapProjectEntityErr(err error) error {
 	}
 }
 
-func mapMessageEntityErr(err error) error {
+func mapMessageModelErr(err error) error {
 	if errors.Is(err, model.ErrBadMessage) {
 		return ErrBadRequest
 	}
 	return err
 }
 
-func mapProfileEntityErr(err error) error {
+func mapProfileModelErr(err error) error {
 	if errors.Is(err, model.ErrBadProfile) {
 		return ErrBadRequest
 	}

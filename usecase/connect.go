@@ -12,31 +12,32 @@ import (
 )
 
 type ConnectUseCase struct {
-	Users   repository.UserRepo
-	Connect repository.ConnectRepo
+	Users   repository.IUserRepo
+	Connect repository.IConnectRepo
 	Stripe  stripe.Client
 }
 
 func (c *ConnectUseCase) GetAccount(ctx context.Context, sellerID uuid.UUID) (*ConnectAccountView, error) {
 	var (
-		u   *model.User
-		row *model.ConnectAccount
+		u   model.User
+		row model.ConnectAccount
 		err error
 	)
 	if c.Stripe == nil {
 		return nil, ErrStripeUnavailable
 	}
-	u, err = c.Users.FindID(ctx, sellerID)
+	u, err = c.Users.GetID(ctx, sellerID)
 	if err != nil {
 		return nil, mapRepoNotFound(err)
 	}
 	if u.Role != model.UserRoleSeller {
 		return nil, ErrForbidden
 	}
-	row, err = c.Connect.FindUserID(ctx, sellerID)
+	row, err = c.Connect.GetUserID(ctx, sellerID)
 	if isRepoNotFound(err) {
-		row = nil
-	} else if err != nil {
+		return ConnectAccountViewFrom(model.ConnectAccount{}), nil
+	}
+	if err != nil {
 		return nil, err
 	}
 	return ConnectAccountViewFrom(row), nil
@@ -44,45 +45,48 @@ func (c *ConnectUseCase) GetAccount(ctx context.Context, sellerID uuid.UUID) (*C
 
 func (c *ConnectUseCase) CreateOnboardingLink(ctx context.Context, sellerID uuid.UUID) (string, error) {
 	var (
-		u    *model.User
-		row  *model.ConnectAccount
-		url  string
-		now  time.Time
-		err  error
-		snap stripe.AccountSnapshot
+		u      model.User
+		row    model.ConnectAccount
+		hasRow bool
+		url    string
+		now    time.Time
+		err    error
+		snap   stripe.AccountSnapshot
 	)
 
 	if c.Stripe == nil {
 		return "", ErrStripeUnavailable
 	}
-	u, err = c.Users.FindID(ctx, sellerID)
+	u, err = c.Users.GetID(ctx, sellerID)
 	if err != nil {
 		return "", mapRepoNotFound(err)
 	}
 	if u.Role != model.UserRoleSeller || u.SellerStatus != model.SellerStatusActive {
 		return "", ErrForbidden
 	}
-	row, err = c.Connect.FindUserID(ctx, sellerID)
+	row, err = c.Connect.GetUserID(ctx, sellerID)
 	if isRepoNotFound(err) {
-		row = nil
+		hasRow = false
 	} else if err != nil {
 		return "", err
+	} else {
+		hasRow = true
 	}
 	now = time.Now().UTC()
-	if row == nil {
+	if !hasRow {
 		var accountID string
 		accountID, err = c.Stripe.CreateExpressAccount(ctx, u.Email)
 		if err != nil {
 			return "", err
 		}
-		row = &model.ConnectAccount{
+		row = model.ConnectAccount{
 			ID:              uuid.New(),
 			UserID:          sellerID,
 			StripeAccountID: accountID,
 			CreatedAt:       now,
 			UpdatedAt:       now,
 		}
-		if err = c.Connect.Create(ctx, row); err != nil {
+		if err = c.Connect.Create(ctx, &row); err != nil {
 			return "", err
 		}
 	}
@@ -94,7 +98,7 @@ func (c *ConnectUseCase) CreateOnboardingLink(ctx context.Context, sellerID uuid
 	row.PayoutsEnabled = snap.PayoutsEnabled
 	row.DetailsSubmitted = snap.DetailsSubmitted
 	row.UpdatedAt = now
-	if err = c.Connect.Update(ctx, row); err != nil {
+	if err = c.Connect.Update(ctx, &row); err != nil {
 		return "", err
 	}
 	url, err = c.Stripe.CreateAccountLink(ctx, row.StripeAccountID, c.Stripe.ConnectReturnURL(), c.Stripe.ConnectRefreshURL())
@@ -103,7 +107,7 @@ func (c *ConnectUseCase) CreateOnboardingLink(ctx context.Context, sellerID uuid
 
 func (c *ConnectUseCase) SyncFromStripeAccountID(ctx context.Context, stripeAccountID string) (*ConnectAccountView, error) {
 	var (
-		row  *model.ConnectAccount
+		row  model.ConnectAccount
 		snap stripe.AccountSnapshot
 		now  time.Time
 		err  error
@@ -111,7 +115,7 @@ func (c *ConnectUseCase) SyncFromStripeAccountID(ctx context.Context, stripeAcco
 	if c.Stripe == nil {
 		return nil, ErrStripeUnavailable
 	}
-	row, err = c.Connect.FindStripeAccountID(ctx, stripeAccountID)
+	row, err = c.Connect.GetStripeAccountID(ctx, stripeAccountID)
 	if err != nil {
 		return nil, mapRepoNotFound(err)
 	}
@@ -124,7 +128,7 @@ func (c *ConnectUseCase) SyncFromStripeAccountID(ctx context.Context, stripeAcco
 	row.PayoutsEnabled = snap.PayoutsEnabled
 	row.DetailsSubmitted = snap.DetailsSubmitted
 	row.UpdatedAt = now
-	if err = c.Connect.Update(ctx, row); err != nil {
+	if err = c.Connect.Update(ctx, &row); err != nil {
 		return nil, err
 	}
 	return ConnectAccountViewFrom(row), nil
@@ -135,5 +139,5 @@ type ConnectSyncer interface {
 }
 
 type SupporterViewer interface {
-	ViewForSupporter(ctx context.Context, supporter *model.ProjectSupporter) (SupporterView, error)
+	ViewForSupporter(ctx context.Context, supporter model.ProjectSupporter) (SupporterView, error)
 }

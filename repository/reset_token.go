@@ -10,9 +10,9 @@ import (
 	"gorm.io/gorm"
 )
 
-type ResetRepo interface {
+type IResetRepo interface {
 	Create(ctx context.Context, row *model.ResetToken) error
-	FindValidHash(ctx context.Context, hash string, now time.Time) (*model.ResetToken, error)
+	GetValidHash(ctx context.Context, hash string, now time.Time) (model.ResetToken, error)
 	MarkUsed(ctx context.Context, id uuid.UUID, at time.Time) error
 }
 
@@ -20,7 +20,7 @@ type resetRepo struct {
 	db *gorm.DB
 }
 
-func NewResetRepo(db *gorm.DB) ResetRepo {
+func NewResetRepo(db *gorm.DB) IResetRepo {
 	return &resetRepo{db: db}
 }
 
@@ -28,8 +28,8 @@ func (r *resetRepo) Create(ctx context.Context, row *model.ResetToken) error {
 	return dbFromCtx(ctx, r.db).Create(row).Error
 }
 
-func (r *resetRepo) FindValidHash(ctx context.Context, hash string, now time.Time) (*model.ResetToken, error) {
-	return firstOnePtr[model.ResetToken](dbFromCtx(ctx, r.db).
+func (r *resetRepo) GetValidHash(ctx context.Context, hash string, now time.Time) (model.ResetToken, error) {
+	return getOne[model.ResetToken](dbFromCtx(ctx, r.db).
 		Where("token_hash = ? AND used_at IS NULL AND expires_at > ?", hash, now))
 }
 

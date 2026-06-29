@@ -26,7 +26,7 @@ func (u KYCUpload) toStoreImage() repository.KYCImage {
 }
 
 type KYCAccessUseCase struct {
-	KYC        repository.KYCStore
+	KYC        repository.IKYCStore
 	SignSecret []byte
 }
 

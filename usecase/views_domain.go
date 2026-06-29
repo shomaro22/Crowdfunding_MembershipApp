@@ -47,10 +47,7 @@ type ListThreadsResult struct {
 	PerPage int
 }
 
-func MessageItemFrom(msg *model.Message) MessageItemView {
-	if msg == nil {
-		return MessageItemView{}
-	}
+func MessageItemFrom(msg model.Message) MessageItemView {
 	return MessageItemView{
 		ID:         msg.ID,
 		ProjectID:  msg.ProjectID,
@@ -63,7 +60,7 @@ func MessageItemFrom(msg *model.Message) MessageItemView {
 	}
 }
 
-func MessageItemWithUsers(msg *model.Message, sender, receiver *UserView) MessageItemView {
+func MessageItemWithUsers(msg model.Message, sender, receiver *UserView) MessageItemView {
 	var out MessageItemView
 	out = MessageItemFrom(msg)
 	out.Sender = sender

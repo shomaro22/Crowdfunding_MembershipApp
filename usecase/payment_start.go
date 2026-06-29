@@ -12,7 +12,7 @@ import (
 func (p *PaymentUseCase) CreateCheckout(ctx context.Context, in CheckoutIn) (CheckoutOut, error) {
 	var (
 		sc       supportContext
-		purchase *model.Purchase
+		purchase model.Purchase
 		meta     map[string]string
 		sess     stripe.CheckoutSessionOut
 		pm       model.PaymentMethod
@@ -63,7 +63,7 @@ func (p *PaymentUseCase) CreateCheckout(ctx context.Context, in CheckoutIn) (Che
 func (p *PaymentUseCase) CreateIntent(ctx context.Context, in IntentIn) (IntentOut, error) {
 	var (
 		sc       supportContext
-		purchase *model.Purchase
+		purchase model.Purchase
 		meta     map[string]string
 		sub      stripe.SubscriptionIntentOut
 		err      error
@@ -100,7 +100,7 @@ func (p *PaymentUseCase) CreateIntent(ctx context.Context, in IntentIn) (IntentO
 func (p *PaymentUseCase) VerifyCheckout(ctx context.Context, buyerID uuid.UUID, sessionID string) (SupporterView, error) {
 	var (
 		sess     stripe.CheckoutSessionSnapshot
-		purchase *model.Purchase
+		purchase model.Purchase
 		err      error
 	)
 	if p.Stripe == nil {
@@ -113,7 +113,7 @@ func (p *PaymentUseCase) VerifyCheckout(ctx context.Context, buyerID uuid.UUID, 
 	if err != nil {
 		return SupporterView{}, ErrBadRequest
 	}
-	purchase, err = p.Purchases.FindSessionID(ctx, sessionID)
+	purchase, err = p.Purchases.GetSessionID(ctx, sessionID)
 	if err != nil {
 		return SupporterView{}, mapRepoNotFound(err)
 	}
@@ -125,7 +125,7 @@ func (p *PaymentUseCase) VerifyCheckout(ctx context.Context, buyerID uuid.UUID, 
 func (p *PaymentUseCase) VerifyIntent(ctx context.Context, buyerID uuid.UUID, intentID string) (SupporterView, error) {
 	var (
 		pi       stripe.PaymentIntentDetail
-		purchase *model.Purchase
+		purchase model.Purchase
 		err      error
 	)
 	if p.Stripe == nil {
@@ -138,7 +138,7 @@ func (p *PaymentUseCase) VerifyIntent(ctx context.Context, buyerID uuid.UUID, in
 	if err != nil {
 		return SupporterView{}, ErrBadRequest
 	}
-	purchase, err = p.Purchases.FindIntentID(ctx, intentID)
+	purchase, err = p.Purchases.GetIntentID(ctx, intentID)
 	if err != nil {
 		return SupporterView{}, mapRepoNotFound(err)
 	}
@@ -150,12 +150,12 @@ func (p *PaymentUseCase) VerifyIntent(ctx context.Context, buyerID uuid.UUID, in
 func (p *PaymentUseCase) verifyAndFulfill(
 	ctx context.Context,
 	buyerID uuid.UUID,
-	purchase *model.Purchase,
+	purchase model.Purchase,
 	paid bool,
 	fulfill func(context.Context) error,
 ) (SupporterView, error) {
 	var (
-		refreshed *model.Purchase
+		refreshed model.Purchase
 		err       error
 	)
 	if err = verifyPurchaseBuyer(purchase, buyerID); err != nil {
@@ -170,32 +170,29 @@ func (p *PaymentUseCase) verifyAndFulfill(
 	if err = fulfill(ctx); err != nil {
 		return SupporterView{}, err
 	}
-	refreshed, err = p.Purchases.FindID(ctx, purchase.ID)
+	refreshed, err = p.Purchases.GetID(ctx, purchase.ID)
 	if err != nil {
 		return SupporterView{}, mapRepoNotFound(err)
 	}
 	return p.supporterViewForPurchase(ctx, refreshed)
 }
 
-func verifyPurchaseBuyer(purchase *model.Purchase, buyerID uuid.UUID) error {
-	if purchase == nil || purchase.BuyerID != buyerID {
+func verifyPurchaseBuyer(purchase model.Purchase, buyerID uuid.UUID) error {
+	if purchase.BuyerID != buyerID {
 		return ErrForbidden
 	}
 	return nil
 }
 
-func (p *PaymentUseCase) supporterViewForPurchase(ctx context.Context, purchase *model.Purchase) (SupporterView, error) {
+func (p *PaymentUseCase) supporterViewForPurchase(ctx context.Context, purchase model.Purchase) (SupporterView, error) {
 	var (
-		supporter *model.ProjectSupporter
+		supporter model.ProjectSupporter
 		err       error
 	)
-	if purchase == nil {
-		return SupporterView{}, ErrNotFound
-	}
 	if purchase.SupporterID != nil {
-		supporter, err = p.Supporters.FindID(ctx, *purchase.SupporterID)
+		supporter, err = p.Supporters.GetID(ctx, *purchase.SupporterID)
 	} else {
-		supporter, err = p.Supporters.FindActive(ctx, purchase.ProjectID, purchase.BuyerID)
+		supporter, err = p.Supporters.GetActive(ctx, purchase.ProjectID, purchase.BuyerID)
 	}
 	if err != nil {
 		return SupporterView{}, mapRepoNotFound(err)

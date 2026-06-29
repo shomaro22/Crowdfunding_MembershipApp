@@ -13,11 +13,11 @@ import (
 
 func (s *SupporterUseCase) Upgrade(ctx context.Context, userID, supporterID, planID uuid.UUID) (UpgradeOut, error) {
 	var (
-		supporter *model.ProjectSupporter
-		current   *model.ProjectPlan
-		target    *model.ProjectPlan
-		project      *model.Project
-		conn      *model.ConnectAccount
+		supporter model.ProjectSupporter
+		current   model.ProjectPlan
+		target    model.ProjectPlan
+		project   model.Project
+		conn      model.ConnectAccount
 		now       time.Time
 		err       error
 	)
@@ -32,7 +32,7 @@ func (s *SupporterUseCase) Upgrade(ctx context.Context, userID, supporterID, pla
 	if supporter.PendingPlanID != nil {
 		return UpgradeOut{}, ErrBadRequest
 	}
-	target, err = s.Projects.FindPlan(ctx, supporter.ProjectID, planID)
+	target, err = s.Projects.GetPlan(ctx, supporter.ProjectID, planID)
 	if err != nil {
 		return UpgradeOut{}, mapRepoNotFound(err)
 	}
@@ -42,7 +42,7 @@ func (s *SupporterUseCase) Upgrade(ctx context.Context, userID, supporterID, pla
 	if target.ID == supporter.PlanID {
 		return UpgradeOut{}, ErrBadRequest
 	}
-	current, err = s.Projects.FindPlan(ctx, supporter.ProjectID, supporter.PlanID)
+	current, err = s.Projects.GetPlan(ctx, supporter.ProjectID, supporter.PlanID)
 	if err != nil {
 		return UpgradeOut{}, mapRepoNotFound(err)
 	}
@@ -52,11 +52,11 @@ func (s *SupporterUseCase) Upgrade(ctx context.Context, userID, supporterID, pla
 	if s.Stripe == nil {
 		return UpgradeOut{}, ErrStripeUnavailable
 	}
-	project, _, _, err = s.Projects.FindID(ctx, supporter.ProjectID)
+	project, _, _, err = s.Projects.GetID(ctx, supporter.ProjectID)
 	if err != nil {
 		return UpgradeOut{}, mapRepoNotFound(err)
 	}
-	conn, err = s.Connect.FindUserID(ctx, project.SellerID)
+	conn, err = s.Connect.GetUserID(ctx, project.SellerID)
 	if isRepoNotFound(err) {
 		return UpgradeOut{}, ErrForbidden
 	}
@@ -69,7 +69,7 @@ func (s *SupporterUseCase) Upgrade(ctx context.Context, userID, supporterID, pla
 	return s.startPaidUpgrade(ctx, supporter, current, target, conn, now)
 }
 
-func (s *SupporterUseCase) scheduleDowngrade(ctx context.Context, supporter *model.ProjectSupporter, target *model.ProjectPlan, now time.Time) (UpgradeOut, error) {
+func (s *SupporterUseCase) scheduleDowngrade(ctx context.Context, supporter model.ProjectSupporter, target model.ProjectPlan, now time.Time) (UpgradeOut, error) {
 	var (
 		changeAt time.Time
 		out      UpgradeOut
@@ -79,7 +79,7 @@ func (s *SupporterUseCase) scheduleDowngrade(ctx context.Context, supporter *mod
 	supporter.PendingPlanID = &target.ID
 	supporter.PlanChangeDate = &changeAt
 	supporter.UpdatedAt = now
-	if err = s.Supporters.Update(ctx, supporter); err != nil {
+	if err = s.Supporters.Update(ctx, &supporter); err != nil {
 		return UpgradeOut{}, err
 	}
 	out.Supporter, err = s.enrichView(ctx, supporter)
@@ -88,9 +88,9 @@ func (s *SupporterUseCase) scheduleDowngrade(ctx context.Context, supporter *mod
 
 func (s *SupporterUseCase) startPaidUpgrade(
 	ctx context.Context,
-	supporter *model.ProjectSupporter,
-	current, target *model.ProjectPlan,
-	conn *model.ConnectAccount,
+	supporter model.ProjectSupporter,
+	current, target model.ProjectPlan,
+	conn model.ConnectAccount,
 	now time.Time,
 ) (UpgradeOut, error) {
 	var (
@@ -154,7 +154,7 @@ func (s *SupporterUseCase) startPaidUpgrade(
 	supporter.PendingPlanID = &target.ID
 	supporter.PlanChangeDate = &changeAt
 	supporter.UpdatedAt = now
-	if err = s.Supporters.Update(ctx, supporter); err != nil {
+	if err = s.Supporters.Update(ctx, &supporter); err != nil {
 		return UpgradeOut{}, err
 	}
 	client = &pi.ClientSecret
@@ -165,8 +165,8 @@ func (s *SupporterUseCase) startPaidUpgrade(
 
 func (s *SupporterUseCase) UpgradeConfirm(ctx context.Context, userID, supporterID uuid.UUID, intentID string) (SupporterView, error) {
 	var (
-		supporter *model.ProjectSupporter
-		purchase  *model.Purchase
+		supporter model.ProjectSupporter
+		purchase  model.Purchase
 		pi        stripe.PaymentIntentSnapshot
 		now       time.Time
 		err       error
@@ -182,7 +182,7 @@ func (s *SupporterUseCase) UpgradeConfirm(ctx context.Context, userID, supporter
 	if supporter.PendingPlanID == nil {
 		return SupporterView{}, ErrBadRequest
 	}
-	purchase, err = s.Purchases.FindIntentID(ctx, intentID)
+	purchase, err = s.Purchases.GetIntentID(ctx, intentID)
 	if err != nil {
 		return SupporterView{}, mapRepoNotFound(err)
 	}
@@ -199,14 +199,14 @@ func (s *SupporterUseCase) UpgradeConfirm(ctx context.Context, userID, supporter
 	return s.finalizePaidUpgrade(ctx, supporter, purchase, now)
 }
 
-func (s *SupporterUseCase) finalizePaidUpgrade(ctx context.Context, supporter *model.ProjectSupporter, purchase *model.Purchase, now time.Time) (SupporterView, error) {
-	var err error
+func (s *SupporterUseCase) finalizePaidUpgrade(ctx context.Context, supporter model.ProjectSupporter, purchase model.Purchase, now time.Time) (SupporterView, error) {
+	var (
+		locked    model.ProjectSupporter
+		newPlanID uuid.UUID
+		err       error
+	)
 	err = repository.WithTx(ctx, s.DB, func(txCtx context.Context) error {
-		var (
-			locked    *model.ProjectSupporter
-			newPlanID uuid.UUID
-		)
-		locked, err = s.Supporters.FindID(txCtx, supporter.ID)
+		locked, err = s.Supporters.GetID(txCtx, supporter.ID)
 		if err != nil {
 			return mapRepoNotFound(err)
 		}
@@ -219,15 +219,16 @@ func (s *SupporterUseCase) finalizePaidUpgrade(ctx context.Context, supporter *m
 				return err
 			}
 		}
-		if err = s.commitPendingPlan(txCtx, locked, newPlanID, false); err != nil {
+		locked, err = s.commitPendingPlan(txCtx, locked, newPlanID, false)
+		if err != nil {
 			return err
 		}
 		locked.PlanChangeDate = nil
 		locked.UpdatedAt = now
-		if err = s.Supporters.Update(txCtx, locked); err != nil {
+		if err = s.Supporters.Update(txCtx, &locked); err != nil {
 			return err
 		}
-		*supporter = *locked
+		supporter = locked
 		return nil
 	})
 	if err != nil {

@@ -172,14 +172,20 @@ func (h *AdminController) DeleteUser(c echo.Context) error {
 
 func (h *AdminController) ListPurchases(c echo.Context) error {
 	var (
-		limit  int
-		offset int
-		rows   []usecase.PurchaseView
-		total  int64
-		err    error
+		limit   int
+		offset  int
+		status  string
+		statusQ *string
+		rows    []usecase.PurchaseView
+		total   int64
+		err     error
 	)
 	limit, offset = queryPage(c)
-	rows, total, err = h.Admin.ListPurchases(reqCtx(c), c.QueryParam("status"), limit, offset)
+	statusQ = queryOptionalString(c, "status")
+	if statusQ != nil {
+		status = *statusQ
+	}
+	rows, total, err = h.Admin.ListPurchases(reqCtx(c), status, limit, offset)
 	if err != nil {
 		return mapUseCaseError(err)
 	}
@@ -202,8 +208,8 @@ func (h *AdminController) PatchPurchase(c echo.Context) error {
 	if err != nil {
 		return err
 	}
-	if err = c.Bind(&body); err != nil || body.Status == "" {
-		return echo.NewHTTPError(http.StatusBadRequest, apiError("status required", "BAD_REQUEST"))
+	if err = bindBody(c, &body); err != nil || body.Status == "" {
+		return badRequest(c, "status required")
 	}
 	view, err = h.Admin.PatchPurchaseStatus(reqCtx(c), adminID, purchaseID, body.Status)
 	if err != nil {

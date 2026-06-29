@@ -32,7 +32,7 @@ type KYCImage struct {
 	Size        int64
 }
 
-type KYCStore interface {
+type IKYCStore interface {
 	Save(ctx context.Context, userID uuid.UUID, side string, img KYCImage) (key string, err error)
 	Remove(ctx context.Context, keys ...string) error
 	Open(key string) (*os.File, string, error)

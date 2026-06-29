@@ -13,8 +13,8 @@ import (
 func InvalidateUserSessions(
 	ctx context.Context,
 	db *gorm.DB,
-	users repository.UserRepo,
-	refresh repository.RefreshTokenRepo,
+	users repository.IUserRepo,
+	refresh repository.IRefreshTokenRepo,
 	userID uuid.UUID,
 ) error {
 	var err error

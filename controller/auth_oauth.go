@@ -55,8 +55,8 @@ func (h *AuthController) OAuthExchange(c echo.Context) error {
 		res *usecase.LoginResult
 		err error
 	)
-	if err = c.Bind(&body); err != nil || body.Code == "" {
-		return echo.NewHTTPError(http.StatusBadRequest, apiError("code required", "BAD_REQUEST"))
+	if err = bindBody(c, &body); err != nil || body.Code == "" {
+		return badRequest(c, "code required")
 	}
 	res, err = h.Auth.ExchangeOAuthCode(reqCtx(c), body.Code, requestMeta(c))
 	if err != nil {
@@ -112,8 +112,8 @@ func (h *AuthController) Verify2FA(c echo.Context) error {
 	if err != nil {
 		return err
 	}
-	if err = c.Bind(&body); err != nil || body.Code == "" {
-		return echo.NewHTTPError(http.StatusBadRequest, apiError("code required", "BAD_REQUEST"))
+	if err = bindBody(c, &body); err != nil || body.Code == "" {
+		return badRequest(c, "code required")
 	}
 	res, err = h.Auth.Verify2FASetup(reqCtx(c), uid, body.Code)
 	if err != nil {
@@ -138,8 +138,8 @@ func (h *AuthController) Challenge2FA(c echo.Context) error {
 	if pending == "" {
 		return echo.NewHTTPError(http.StatusUnauthorized, apiError("2fa session expired", "UNAUTHORIZED"))
 	}
-	if err = c.Bind(&body); err != nil || body.Code == "" {
-		return echo.NewHTTPError(http.StatusBadRequest, apiError("code required", "BAD_REQUEST"))
+	if err = bindBody(c, &body); err != nil || body.Code == "" {
+		return badRequest(c, "code required")
 	}
 	res, err = h.Auth.Challenge2FA(reqCtx(c), pending, body.Code, requestMeta(c))
 	if err != nil {
