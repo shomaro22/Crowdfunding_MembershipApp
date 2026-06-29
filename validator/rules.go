@@ -80,7 +80,7 @@ func TrimStringPtr(s *string) *string {
 }
 
 func activityActionRule() validation.Rule {
-	return validation.By(func(value any) error {
+	return validation.By(func(value interface{}) error {
 		var (
 			raw string
 			a   model.ActivityAction
@@ -99,7 +99,7 @@ func activityActionRule() validation.Rule {
 }
 
 func batchStatusRule() validation.Rule {
-	return validation.By(func(value any) error {
+	return validation.By(func(value interface{}) error {
 		var (
 			raw string
 			s   model.BatchStatus
@@ -118,7 +118,7 @@ func batchStatusRule() validation.Rule {
 }
 
 func batchJobNameRule() validation.Rule {
-	return validation.By(func(value any) error {
+	return validation.By(func(value interface{}) error {
 		var (
 			raw string
 			ok  bool
@@ -137,7 +137,7 @@ func batchJobNameRule() validation.Rule {
 }
 
 func optionalBatchJobNameRule() validation.Rule {
-	return validation.By(func(value any) error {
+	return validation.By(func(value interface{}) error {
 		var (
 			raw string
 			ok  bool
@@ -156,7 +156,7 @@ func optionalBatchJobNameRule() validation.Rule {
 }
 
 func ipAddressRule() validation.Rule {
-	return validation.By(func(value any) error {
+	return validation.By(func(value interface{}) error {
 		var (
 			raw string
 		)

@@ -37,7 +37,8 @@ func TestFavoritesAddListCheckRemove(t *testing.T) {
 		project *model.Project
 		tok     string
 		rec     *httptest.ResponseRecorder
-		body    map[string]any
+		body    favoriteStatusBody
+		list    favoritesListBody
 	)
 	e = setupApp(t)
 	gdb = openDB(t)
@@ -53,8 +54,8 @@ func TestFavoritesAddListCheckRemove(t *testing.T) {
 	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
 		t.Fatal(err)
 	}
-	if body["is_favorited"] != true {
-		t.Fatalf("is_favorited=%v want true", body["is_favorited"])
+	if !body.IsFavorited {
+		t.Fatalf("is_favorited=%v want true", body.IsFavorited)
 	}
 
 	rec = httpPOST(e, "/favorites", tok, fmt.Sprintf(`{"project_id":"%s","action":"add"}`, project.ID))
@@ -71,13 +72,11 @@ func TestFavoritesAddListCheckRemove(t *testing.T) {
 	if rec.Code != http.StatusOK {
 		t.Fatalf("list status=%d body=%s", rec.Code, rec.Body.String())
 	}
-	body = nil
-	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
+	if err := json.Unmarshal(rec.Body.Bytes(), &list); err != nil {
 		t.Fatal(err)
 	}
-	favs, _ := body["favorites"].([]any)
-	if len(favs) != 1 {
-		t.Fatalf("favorites len=%d want 1", len(favs))
+	if len(list.Favorites) != 1 {
+		t.Fatalf("favorites len=%d want 1", len(list.Favorites))
 	}
 
 	rec = httpPOST(e, "/favorites", tok, fmt.Sprintf(`{"project_id":"%s","action":"remove"}`, project.ID))
@@ -86,12 +85,12 @@ func TestFavoritesAddListCheckRemove(t *testing.T) {
 	}
 
 	rec = httpGET(e, "/favorites/check/"+project.ID.String(), tok)
-	body = nil
+	body = favoriteStatusBody{}
 	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
 		t.Fatal(err)
 	}
-	if body["is_favorited"] != false {
-		t.Fatalf("is_favorited=%v want false", body["is_favorited"])
+	if body.IsFavorited {
+		t.Fatalf("is_favorited=%v want false", body.IsFavorited)
 	}
 }
 
@@ -120,12 +119,12 @@ func TestFavoritesPendingProjectNotFound(t *testing.T) {
 
 func TestFavoritesRemoveMissing(t *testing.T) {
 	var (
-		e      *echo.Echo
-		gdb    *gorm.DB
-		buyer  *model.User
-		tok    string
-		rec    *httptest.ResponseRecorder
-		pid    uuid.UUID
+		e     *echo.Echo
+		gdb   *gorm.DB
+		buyer *model.User
+		tok   string
+		rec   *httptest.ResponseRecorder
+		pid   uuid.UUID
 	)
 	e = setupApp(t)
 	gdb = openDB(t)
