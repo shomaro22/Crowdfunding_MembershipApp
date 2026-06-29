@@ -2,7 +2,6 @@ package repository
 
 import (
 	"context"
-	"errors"
 
 	"crowdfund-app/entity"
 
@@ -38,18 +37,7 @@ func (r *batchRepo) Update(ctx context.Context, row *entity.BatchRun) error {
 }
 
 func (r *batchRepo) FindID(ctx context.Context, id uuid.UUID) (*entity.BatchRun, error) {
-	var (
-		row entity.BatchRun
-		err error
-	)
-	err = r.dbCtx(ctx).Where("id = ?", id).First(&row).Error
-	if errors.Is(err, gorm.ErrRecordNotFound) {
-		return nil, nil
-	}
-	if err != nil {
-		return nil, err
-	}
-	return &row, nil
+	return firstOnePtr[entity.BatchRun](r.dbCtx(ctx).Where("id = ?", id))
 }
 
 func (r *batchRepo) List(ctx context.Context, jobName *string, status *entity.BatchStatus, limit int) ([]entity.BatchRun, int64, error) {

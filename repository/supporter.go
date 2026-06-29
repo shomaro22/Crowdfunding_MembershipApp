@@ -2,7 +2,6 @@ package repository
 
 import (
 	"context"
-	"errors"
 	"time"
 
 	"crowdfund-app/entity"
@@ -37,83 +36,26 @@ func (r *supporterRepo) dbCtx(ctx context.Context) *gorm.DB {
 }
 
 func (r *supporterRepo) FindActive(ctx context.Context, projectID, userID uuid.UUID) (*entity.ProjectSupporter, error) {
-	var (
-		row entity.ProjectSupporter
-		err error
-	)
-	err = r.dbCtx(ctx).
-		Where("project_id = ? AND user_id = ? AND status = ?", projectID, userID, entity.SupporterStatusActive).
-		First(&row).Error
-	if errors.Is(err, gorm.ErrRecordNotFound) {
-		return nil, nil
-	}
-	if err != nil {
-		return nil, err
-	}
-	return &row, nil
+	return firstOnePtr[entity.ProjectSupporter](r.dbCtx(ctx).
+		Where("project_id = ? AND user_id = ? AND status = ?", projectID, userID, entity.SupporterStatusActive))
 }
 
 func (r *supporterRepo) FindMembership(ctx context.Context, projectID, userID uuid.UUID) (*entity.ProjectSupporter, error) {
-	var (
-		row entity.ProjectSupporter
-		err error
-	)
-	err = r.dbCtx(ctx).
+	return firstOnePtr[entity.ProjectSupporter](r.dbCtx(ctx).
 		Where("project_id = ? AND user_id = ? AND status IN ?", projectID, userID,
-			[]entity.SupporterStatus{entity.SupporterStatusActive, entity.SupporterStatusPendingRenewal}).
-		First(&row).Error
-	if errors.Is(err, gorm.ErrRecordNotFound) {
-		return nil, nil
-	}
-	if err != nil {
-		return nil, err
-	}
-	return &row, nil
+			[]entity.SupporterStatus{entity.SupporterStatusActive, entity.SupporterStatusPendingRenewal}))
 }
 
 func (r *supporterRepo) FindStripeSubscriptionID(ctx context.Context, subscriptionID string) (*entity.ProjectSupporter, error) {
-	var (
-		row entity.ProjectSupporter
-		err error
-	)
-	err = r.dbCtx(ctx).Where("stripe_subscription_id = ?", subscriptionID).First(&row).Error
-	if errors.Is(err, gorm.ErrRecordNotFound) {
-		return nil, nil
-	}
-	if err != nil {
-		return nil, err
-	}
-	return &row, nil
+	return firstOnePtr[entity.ProjectSupporter](r.dbCtx(ctx).Where("stripe_subscription_id = ?", subscriptionID))
 }
 
 func (r *supporterRepo) FindID(ctx context.Context, id uuid.UUID) (*entity.ProjectSupporter, error) {
-	var (
-		row entity.ProjectSupporter
-		err error
-	)
-	err = r.dbCtx(ctx).Where("id = ?", id).First(&row).Error
-	if errors.Is(err, gorm.ErrRecordNotFound) {
-		return nil, nil
-	}
-	if err != nil {
-		return nil, err
-	}
-	return &row, nil
+	return firstOnePtr[entity.ProjectSupporter](r.dbCtx(ctx).Where("id = ?", id))
 }
 
 func (r *supporterRepo) FindOwned(ctx context.Context, id, userID uuid.UUID) (*entity.ProjectSupporter, error) {
-	var (
-		row entity.ProjectSupporter
-		err error
-	)
-	err = r.dbCtx(ctx).Where("id = ? AND user_id = ?", id, userID).First(&row).Error
-	if errors.Is(err, gorm.ErrRecordNotFound) {
-		return nil, nil
-	}
-	if err != nil {
-		return nil, err
-	}
-	return &row, nil
+	return firstOnePtr[entity.ProjectSupporter](r.dbCtx(ctx).Where("id = ? AND user_id = ?", id, userID))
 }
 
 func (r *supporterRepo) ListByUserID(ctx context.Context, userID uuid.UUID) ([]entity.ProjectSupporter, error) {
