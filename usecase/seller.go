@@ -174,9 +174,9 @@ func (s *SellerUseCase) ensureSellerProject(ctx context.Context, sellerID, proje
 	}
 	project, _, _, err = s.Projects.FindID(ctx, projectID)
 	if err != nil {
-		return err
+		return mapRepoNotFoundAs(err, ErrForbidden)
 	}
-	if project == nil || project.SellerID != sellerID {
+	if project.SellerID != sellerID {
 		return ErrForbidden
 	}
 	return nil

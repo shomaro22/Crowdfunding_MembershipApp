@@ -56,12 +56,12 @@ func (p *PurchaseUseCase) enrichPurchase(ctx context.Context, row *entity.Purcha
 	v.Purchase = PurchaseItemFrom(row)
 	project, _, _, err = p.Projects.FindID(ctx, row.ProjectID)
 	if err != nil {
-		return PurchaseView{}, err
+		return PurchaseView{}, mapRepoNotFound(err)
 	}
 	v.Project = ProjectItemPtrFrom(project)
 	buyer, err = p.Users.FindID(ctx, row.BuyerID)
 	if err != nil {
-		return PurchaseView{}, err
+		return PurchaseView{}, mapRepoNotFound(err)
 	}
 	v.Buyer = UserViewPtr(buyer)
 	return v, nil

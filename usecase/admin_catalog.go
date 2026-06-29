@@ -105,8 +105,8 @@ func (a *AdminUseCase) UpdateUser(ctx context.Context, adminID, userID uuid.UUID
 		return UserView{}, mapAdminCatalogErr(err)
 	}
 	u, err = a.Users.FindID(ctx, userID)
-	if err != nil || u == nil {
-		return UserView{}, ErrNotFound
+	if err != nil {
+		return UserView{}, mapRepoNotFound(err)
 	}
 	if norm.Email != nil && *norm.Email != u.Email {
 		var exists bool
@@ -155,8 +155,8 @@ func (a *AdminUseCase) DeleteUser(ctx context.Context, adminID, userID uuid.UUID
 		err error
 	)
 	u, err = a.Users.FindID(ctx, userID)
-	if err != nil || u == nil {
-		return ErrNotFound
+	if err != nil {
+		return mapRepoNotFound(err)
 	}
 	if u.Role == entity.UserRoleAdmin {
 		return ErrForbidden
@@ -224,8 +224,8 @@ func (a *AdminUseCase) PatchPurchaseStatus(ctx context.Context, adminID, purchas
 		return PurchaseView{}, mapAdminCatalogErr(err)
 	}
 	purchase, err = a.Purchases.FindID(ctx, purchaseID)
-	if err != nil || purchase == nil {
-		return PurchaseView{}, ErrNotFound
+	if err != nil {
+		return PurchaseView{}, mapRepoNotFound(err)
 	}
 	if purchase.Status == to {
 		return a.PurchaseViews.EnrichPurchase(ctx, purchase)
