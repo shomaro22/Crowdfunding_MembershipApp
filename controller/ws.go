@@ -280,7 +280,11 @@ func (w *WSController) writeWSError(connID uuid.UUID, code, msg string, projectI
 	})
 }
 
-func writeWSFrame[T any](hub wshub.Hub, connID uuid.UUID, v T) {
+type outboundWSFrame interface {
+	wshub.SessionReadyOutbound | wshub.PongOutbound | wshub.ProjectAckOutbound | wshub.ErrorOutbound
+}
+
+func writeWSFrame[T outboundWSFrame](hub wshub.Hub, connID uuid.UUID, v T) {
 	var (
 		b   []byte
 		err error
