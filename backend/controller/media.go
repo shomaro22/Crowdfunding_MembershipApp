@@ -11,15 +11,15 @@ import (
 	"github.com/labstack/echo/v4"
 )
 
-type MediaController struct {
+type mediaController struct {
 	Media usecase.IMediaUsecase
 }
 
-func NewMediaController(media usecase.IMediaUsecase) *MediaController {
-	return &MediaController{Media: media}
+func NewMediaController(media usecase.IMediaUsecase) IMediaController {
+	return &mediaController{Media: media}
 }
 
-func (h *MediaController) UploadImage(c echo.Context) error {
+func (h *mediaController) UploadImage(c echo.Context) error {
 	var (
 		userID uuid.UUID
 		fh     *multipart.FileHeader

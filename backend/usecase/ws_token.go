@@ -5,7 +5,7 @@ import (
 	"strings"
 	"time"
 
-	"crowdfund-app/auth"
+	
 	"crowdfund-app/model"
 	"crowdfund-app/repository"
 
@@ -35,7 +35,7 @@ func (w *WSTokenUseCase) Issue(ctx context.Context, userID uuid.UUID) (string, e
 	if !u.IsActive() {
 		return "", ErrForbidden
 	}
-	plain, err = auth.OpaqueHex()
+	plain, err = OpaqueHex()
 	if err != nil {
 		return "", err
 	}
@@ -43,7 +43,7 @@ func (w *WSTokenUseCase) Issue(ctx context.Context, userID uuid.UUID) (string, e
 	row = &model.WSToken{
 		ID:        uuid.New(),
 		UserID:    userID,
-		TokenHash: auth.OpaqueHash(plain),
+		TokenHash: OpaqueHash(plain),
 		ExpiresAt: now.Add(wsTokenTTL),
 		CreatedAt: now,
 	}
@@ -65,7 +65,7 @@ func (w *WSTokenUseCase) Consume(ctx context.Context, plain string, meta Request
 		return uuid.Nil, ErrInvalidToken
 	}
 	now = time.Now().UTC()
-	row, err = w.Tokens.ConsumeValidHash(ctx, auth.OpaqueHash(plain), now)
+	row, err = w.Tokens.ConsumeValidHash(ctx, OpaqueHash(plain), now)
 	if err != nil {
 		return uuid.Nil, mapRepoNotFoundAs(err, ErrInvalidToken)
 	}

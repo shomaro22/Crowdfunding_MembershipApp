@@ -30,12 +30,14 @@ services:
       context: .
       dockerfile: Dockerfile
       target: backend-runtime
+    entrypoint: ["./seed"]
     environment:
       DATABASE_URL: postgres://postgres:postgres@postgres:5432/crowdfund?sslmode=disable
       JWT_SECRET: dev-only-change-me-32-chars-min!!
       TEST_USER_PASSWORD: password123
       SEED_TEST_USER_TEAM: "1"
-    command: ["./seed", "dev", "-team"]
+      SEED_TEST_USER_RESET: "1"
+    command: ["dev", "-team", "-reset"]
     restart: "no"
     depends_on:
       postgres:
@@ -55,19 +57,23 @@ services:
       PUBLIC_ROOT: /app/data/public
       PRIVATE_ROOT: /app/data/private
       PORT: "8080"
-      API_PUBLIC_URL: http://localhost
-      PUBLIC_APP_URL: http://localhost
-      CORS_ALLOW_ORIGINS: http://localhost
+      API_PUBLIC_URL: http://localhost:8080
+      PUBLIC_APP_URL: http://localhost:5173
+      CORS_ALLOW_ORIGINS: http://localhost:5173,http://127.0.0.1:5173
       COOKIE_SECURE: "false"
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-}
+      STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-}
+      STRIPE_CONNECT_RETURN_URL: ${STRIPE_CONNECT_RETURN_URL:-http://localhost:5173/seller/connect/return}
+      STRIPE_CONNECT_REFRESH_URL: ${STRIPE_CONNECT_REFRESH_URL:-http://localhost:5173/seller/connect/refresh}
     volumes:
       - uploads:/app/data/public
     depends_on:
+      backend-seed:
+        condition: service_completed_successfully
       postgres:
         condition: service_healthy
       redis:
         condition: service_healthy
-      backend-seed:
-        condition: service_completed_successfully
 
   frontend:
     build:

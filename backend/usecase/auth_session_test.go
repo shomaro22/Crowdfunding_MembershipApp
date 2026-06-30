@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"crowdfund-app/auth"
+	
 	"crowdfund-app/model"
 	"crowdfund-app/repository"
 	"crowdfund-app/usecase"
@@ -105,15 +105,15 @@ func TestAuthLoginCallsUserRepoAndActivity(t *testing.T) {
 		users    recordingUserRepo
 		refresh  recordingRefreshRepo
 		activity recordingActivityRepo
-		uc       usecase.AuthUseCase
+		uc      usecase.AuthUseCase
 		hash     string
 		res      *usecase.LoginResult
 		err      error
 		uid      uuid.UUID
-		meta     usecase.RequestMeta
+		meta    usecase.RequestMeta
 	)
 	uid = uuid.New()
-	hash, err = auth.HashPassword("Password1!")
+	hash, err =usecase.HashPassword("Password1!")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -126,13 +126,13 @@ func TestAuthLoginCallsUserRepoAndActivity(t *testing.T) {
 		TokenVersion: 1,
 	}
 	users.idUser = users.emailUser
-	uc = usecase.AuthUseCase{
+	uc =usecase.AuthUseCase{
 		Users:         &users,
 		RefreshTokens: &refresh,
 		Activity:      &activity,
-		Tokens:        auth.NewTokenService([]byte("01234567890123456789012345678901"), auth.DefaultAuthTTL),
+		Tokens:       usecase.NewTokenService([]byte("01234567890123456789012345678901"),usecase.DefaultAuthTTL),
 	}
-	meta = usecase.RequestMeta{IPAddress: "127.0.0.1", UserAgent: "test", RequestID: "req-1"}
+	meta =usecase.RequestMeta{IPAddress: "127.0.0.1", UserAgent: "test", RequestID: "req-1"}
 
 	res, err = uc.Login(context.Background(), users.emailUser.Email, "Password1!", meta)
 	if err != nil {
@@ -160,13 +160,13 @@ func TestAuthLoginInvalidPasswordDoesNotIssueSession(t *testing.T) {
 		users    recordingUserRepo
 		refresh  recordingRefreshRepo
 		activity recordingActivityRepo
-		uc       usecase.AuthUseCase
+		uc      usecase.AuthUseCase
 		hash     string
 		err      error
 		uid      uuid.UUID
 	)
 	uid = uuid.New()
-	hash, err = auth.HashPassword("Password1!")
+	hash, err =usecase.HashPassword("Password1!")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -177,14 +177,14 @@ func TestAuthLoginInvalidPasswordDoesNotIssueSession(t *testing.T) {
 		Role:         model.UserRoleBuyer,
 		AccountStatus: model.AccountStatusActive,
 	}
-	uc = usecase.AuthUseCase{
+	uc =usecase.AuthUseCase{
 		Users:         &users,
 		RefreshTokens: &refresh,
 		Activity:      &activity,
-		Tokens:        auth.NewTokenService([]byte("01234567890123456789012345678901"), auth.DefaultAuthTTL),
+		Tokens:       usecase.NewTokenService([]byte("01234567890123456789012345678901"),usecase.DefaultAuthTTL),
 	}
 
-	_, err = uc.Login(context.Background(), users.emailUser.Email, "WrongPass1!", usecase.RequestMeta{})
+	_, err = uc.Login(context.Background(), users.emailUser.Email, "WrongPass1!",usecase.RequestMeta{})
 	if !errors.Is(err, usecase.ErrInvalidCredentials) {
 		t.Fatalf("expected ErrInvalidCredentials, got %v", err)
 	}
@@ -203,10 +203,10 @@ func TestAuthLogoutRevokesRefreshAndLogsActivity(t *testing.T) {
 	var (
 		refresh  recordingRefreshRepo
 		activity recordingActivityRepo
-		uc       usecase.AuthUseCase
+		uc      usecase.AuthUseCase
 		plain    string
 		uid      uuid.UUID
-		meta     usecase.RequestMeta
+		meta    usecase.RequestMeta
 		err      error
 	)
 	uid = uuid.New()
@@ -214,14 +214,14 @@ func TestAuthLogoutRevokesRefreshAndLogsActivity(t *testing.T) {
 	refresh.validRow = model.RefreshToken{
 		ID:        uuid.New(),
 		UserID:    uid,
-		TokenHash: auth.OpaqueHash(plain),
+		TokenHash:usecase.OpaqueHash(plain),
 		ExpiresAt: time.Now().UTC().Add(time.Hour),
 	}
-	uc = usecase.AuthUseCase{
+	uc =usecase.AuthUseCase{
 		RefreshTokens: &refresh,
 		Activity:      &activity,
 	}
-	meta = usecase.RequestMeta{IPAddress: "127.0.0.1", UserAgent: "test", RequestID: "req-2"}
+	meta =usecase.RequestMeta{IPAddress: "127.0.0.1", UserAgent: "test", RequestID: "req-2"}
 
 	err = uc.Logout(context.Background(), plain, meta)
 	if err != nil {
@@ -245,9 +245,9 @@ func TestAuthLogoutEmptyTokenDoesNotTouchRepo(t *testing.T) {
 	var (
 		refresh  recordingRefreshRepo
 		activity recordingActivityRepo
-		uc       usecase.AuthUseCase
+		uc      usecase.AuthUseCase
 	)
-	uc = usecase.AuthUseCase{
+	uc =usecase.AuthUseCase{
 		RefreshTokens: &refresh,
 		Activity:      &activity,
 	}

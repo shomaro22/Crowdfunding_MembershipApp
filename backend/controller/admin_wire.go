@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"time"
 
-	"crowdfund-app/auth"
+	
 	"crowdfund-app/usecase"
 )
 
@@ -54,11 +54,11 @@ func sellerRegViewToJSON(apiBase string, d *usecase.SellerRegView) sellerRegView
 		User:          UserWireFrom(d.User),
 	}
 	if d.FrontAccessToken != nil {
-		url = auth.KYCAccessURL(apiBase, *d.FrontAccessToken)
+		url = usecase.KYCAccessURL(apiBase, *d.FrontAccessToken)
 		out.FrontURL = &url
 	}
 	if d.BackAccessToken != nil {
-		url = auth.KYCAccessURL(apiBase, *d.BackAccessToken)
+		url = usecase.KYCAccessURL(apiBase, *d.BackAccessToken)
 		out.BackURL = &url
 	}
 	return out
