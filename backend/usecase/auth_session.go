@@ -5,7 +5,7 @@ import (
 	"strings"
 	"time"
 
-	"crowdfund-app/auth"
+	
 	"crowdfund-app/model"
 	"crowdfund-app/repository"
 	"crowdfund-app/validator"
@@ -22,7 +22,7 @@ func (a *AuthUseCase) issueSession(ctx context.Context, u model.User, verified2F
 		now       time.Time
 		row       *model.RefreshToken
 	)
-	authToken, err = a.Tokens.Issue(auth.AuthClaims{
+	authToken, err = a.Tokens.Issue(AuthClaims{
 		UserID:        u.ID,
 		Role:          u.Role,
 		TwoFAVerified: verified2FA,
@@ -32,7 +32,7 @@ func (a *AuthUseCase) issueSession(ctx context.Context, u model.User, verified2F
 	if err != nil {
 		return nil, err
 	}
-	plain, err = auth.OpaqueHex()
+	plain, err = OpaqueHex()
 	if err != nil {
 		return nil, err
 	}
@@ -40,7 +40,7 @@ func (a *AuthUseCase) issueSession(ctx context.Context, u model.User, verified2F
 	row = &model.RefreshToken{
 		ID:        uuid.New(),
 		UserID:    u.ID,
-		TokenHash: auth.OpaqueHash(plain),
+		TokenHash: OpaqueHash(plain),
 		ExpiresAt: now.Add(refreshTokenTTL),
 		CreatedAt: now,
 	}
@@ -50,7 +50,7 @@ func (a *AuthUseCase) issueSession(ctx context.Context, u model.User, verified2F
 	return &SessionTokens{AuthToken: authToken, RefreshToken: plain}, nil
 }
 
-func (a *AuthUseCase) ValidateSession(ctx context.Context, claims auth.AuthClaims) (SessionInfo, error) {
+func (a *AuthUseCase) ValidateSession(ctx context.Context, claims AuthClaims) (SessionInfo, error) {
 	var (
 		u   model.User
 		err error
@@ -68,7 +68,7 @@ func (a *AuthUseCase) ValidateSession(ctx context.Context, claims auth.AuthClaim
 	return SessionInfo{Role: u.Role, AdminRole: u.AdminRole}, nil
 }
 
-func (a *AuthUseCase) ParseToken(raw string) (auth.AuthClaims, error) {
+func (a *AuthUseCase) ParseToken(raw string) (AuthClaims, error) {
 	return a.Tokens.Parse(raw)
 }
 
@@ -89,7 +89,7 @@ func (a *AuthUseCase) Login(ctx context.Context, email, password string, meta Re
 	if err != nil {
 		return nil, mapRepoNotFoundAs(err, ErrInvalidCredentials)
 	}
-	if auth.ComparePassword(u.PasswordHash, password) != nil {
+	if ComparePassword(u.PasswordHash, password) != nil {
 		a.logActivity(ctx, nil, model.UserLoginFail, "user", normalized, meta, nil)
 		return nil, ErrInvalidCredentials
 	}
@@ -128,7 +128,7 @@ func (a *AuthUseCase) Refresh(ctx context.Context, refreshTokenPlain string, met
 	if plain == "" {
 		return "", "", ErrInvalidToken
 	}
-	hash = auth.OpaqueHash(plain)
+	hash = OpaqueHash(plain)
 	now = time.Now().UTC()
 	row, err = a.RefreshTokens.GetValidHash(ctx, hash, now)
 	if err != nil {
@@ -167,7 +167,7 @@ func (a *AuthUseCase) Logout(ctx context.Context, refreshTokenPlain string, meta
 	if plain == "" {
 		return ErrInvalidToken
 	}
-	hash = auth.OpaqueHash(plain)
+	hash = OpaqueHash(plain)
 	now = time.Now().UTC()
 	row, err = a.RefreshTokens.GetValidHash(ctx, hash, now)
 	if err != nil {
@@ -205,7 +205,7 @@ func (a *AuthUseCase) ForgotPassword(ctx context.Context, email string) error {
 	if !u.IsActive() {
 		return nil
 	}
-	plain, err = auth.OpaqueHex()
+	plain, err = OpaqueHex()
 	if err != nil {
 		return err
 	}
@@ -213,7 +213,7 @@ func (a *AuthUseCase) ForgotPassword(ctx context.Context, email string) error {
 	row = &model.ResetToken{
 		ID:        uuid.New(),
 		UserID:    u.ID,
-		TokenHash: auth.OpaqueHash(plain),
+		TokenHash: OpaqueHash(plain),
 		ExpiresAt: now.Add(resetTokenTTL),
 		CreatedAt: now,
 	}
@@ -244,7 +244,7 @@ func (a *AuthUseCase) ResetPassword(ctx context.Context, plainToken, newPassword
 		return ErrInvalidToken
 	}
 	now = time.Now().UTC()
-	row, err = a.ResetToks.GetValidHash(ctx, auth.OpaqueHash(plainToken), now)
+	row, err = a.ResetToks.GetValidHash(ctx, OpaqueHash(plainToken), now)
 	if err != nil {
 		return mapRepoNotFoundAs(err, ErrInvalidToken)
 	}
@@ -252,7 +252,7 @@ func (a *AuthUseCase) ResetPassword(ctx context.Context, plainToken, newPassword
 	if err != nil {
 		return mapRepoNotFoundAs(err, ErrInvalidToken)
 	}
-	hash, err = auth.HashPassword(newPassword)
+	hash, err = HashPassword(newPassword)
 	if err != nil {
 		return err
 	}
@@ -293,10 +293,10 @@ func (a *AuthUseCase) ChangePassword(ctx context.Context, userID uuid.UUID, curr
 			return ErrInvalid2FACode
 		}
 	}
-	if auth.ComparePassword(u.PasswordHash, current) != nil {
+	if ComparePassword(u.PasswordHash, current) != nil {
 		return ErrInvalidCredentials
 	}
-	hash, err = auth.HashPassword(newPassword)
+	hash, err = HashPassword(newPassword)
 	if err != nil {
 		return err
 	}

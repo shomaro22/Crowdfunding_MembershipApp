@@ -1,30 +1,34 @@
 package router
 
 import (
+	"os"
+
 	"crowdfund-app/controller"
 	"crowdfund-app/model"
 	"crowdfund-app/middleware"
+	"crowdfund-app/usecase"
 
 	"github.com/labstack/echo/v4"
 )
 
 type Config struct {
-	Health            *controller.HealthController
-	Auth              *controller.AuthController
-	Projects          *controller.ProjectController
-	Connect           *controller.ConnectController
-	Seller            *controller.SellerController
-	Payments          *controller.PaymentController
-	Supporters        *controller.SupporterController
-	Messages          *controller.MessageController
-	WSToken           *controller.WSTokenController
-	WS                *controller.WSController
-	Favorites         *controller.FavoriteController
-	Reports           *controller.ReportController
-	Media             *controller.MediaController
-	Admin             *controller.AdminController
-	AdminOperations   *controller.AdminOperationsController
-	KYCFiles          *controller.KYCFileController
+	Health             controller.IHealthController
+	AuthUsecase        usecase.IAuthUsecase
+	AppPublicURL       string
+	Projects           controller.IProjectController
+	Connect            controller.IConnectController
+	Seller             controller.ISellerController
+	Payments           controller.IPaymentController
+	Supporters         controller.ISupporterController
+	Messages           controller.IMessageController
+	WSToken            controller.IWSTokenController
+	WS                 controller.IWSController
+	Favorites          controller.IFavoriteController
+	Reports            controller.IReportController
+	Media              controller.IMediaController
+	Admin              controller.IAdminController
+	AdminOperations    controller.IAdminOperationsController
+	KYCFiles           controller.IKYCFileController
 	RateLimit         *middleware.RateLimiter
 	Policy2FAChallenge middleware.RatePolicy
 	OAuthEnabled      bool
@@ -39,12 +43,13 @@ type Config struct {
 
 func New(cfg Config) *echo.Echo {
 	var (
-		e     *echo.Echo
-		mw    echo.MiddlewareFunc
-		rl    func(policy middleware.RatePolicy) echo.MiddlewareFunc
-		pm    []echo.MiddlewareFunc
-		opt   []echo.MiddlewareFunc
-		admin *echo.Group
+		e       *echo.Echo
+		mw      echo.MiddlewareFunc
+		rl      func(policy middleware.RatePolicy) echo.MiddlewareFunc
+		pm      []echo.MiddlewareFunc
+		opt     []echo.MiddlewareFunc
+		admin   *echo.Group
+		authCtl controller.IAuthController
 	)
 	e = echo.New()
 	e.HideBanner = true
@@ -66,30 +71,40 @@ func New(cfg Config) *echo.Echo {
 		e.GET("/health", cfg.Health.Health)
 	}
 
-	if cfg.Auth != nil {
-		e.POST("/auth/register", cfg.Auth.Register, rl(middleware.PolicyRegisterBuyer))
-		e.POST("/auth/register/seller", cfg.Auth.RegisterSeller, rl(middleware.PolicyRegisterSeller))
-		e.POST("/auth/login", cfg.Auth.Login, rl(middleware.PolicyLogin))
-		e.POST("/auth/forgot-password", cfg.Auth.ForgotPassword, rl(middleware.PolicyForgotPassword))
-		e.POST("/auth/reset-password", cfg.Auth.ResetPassword, rl(middleware.PolicyResetPassword))
-		e.GET("/auth/check-email", cfg.Auth.CheckEmail, rl(middleware.PolicyCheckEmail))
-		e.POST("/auth/refresh", cfg.Auth.Refresh, rl(middleware.PolicyRefresh))
-		e.POST("/auth/2fa/challenge", cfg.Auth.Challenge2FA, rl(cfg.Policy2FAChallenge))
+	if cfg.AuthUsecase != nil {
+		var (
+			secure    bool
+			cookieCfg controller.CookieCfg
+		)
+		secure = os.Getenv("COOKIE_SECURE") == "true"
+		cookieCfg = controller.NewCookieCfg(os.Getenv("REFRESH_COOKIE_NAME"), secure)
+		authCtl = controller.NewAuthController(cfg.AuthUsecase, cookieCfg, cfg.AppPublicURL)
+	}
+
+	if authCtl != nil {
+		e.POST("/auth/register", authCtl.Register, rl(middleware.PolicyRegisterBuyer))
+		e.POST("/auth/register/seller", authCtl.RegisterSeller, rl(middleware.PolicyRegisterSeller))
+		e.POST("/auth/login", authCtl.Login, rl(middleware.PolicyLogin))
+		e.POST("/auth/forgot-password", authCtl.ForgotPassword, rl(middleware.PolicyForgotPassword))
+		e.POST("/auth/reset-password", authCtl.ResetPassword, rl(middleware.PolicyResetPassword))
+		e.GET("/auth/check-email", authCtl.CheckEmail, rl(middleware.PolicyCheckEmail))
+		e.POST("/auth/refresh", authCtl.Refresh, rl(middleware.PolicyRefresh))
+		e.POST("/auth/2fa/challenge", authCtl.Challenge2FA, rl(cfg.Policy2FAChallenge))
 
 		if cfg.OAuthEnabled {
-			e.GET("/auth/google", cfg.Auth.GoogleStart, rl(middleware.PolicyGoogleOAuth))
-			e.GET("/auth/google/callback", cfg.Auth.GoogleCallback, rl(middleware.PolicyGoogleOAuth))
-			e.POST("/auth/oauth/exchange", cfg.Auth.OAuthExchange, rl(middleware.PolicyOAuthExchange))
+			e.GET("/auth/google", authCtl.GoogleStart, rl(middleware.PolicyGoogleOAuth))
+			e.GET("/auth/google/callback", authCtl.GoogleCallback, rl(middleware.PolicyGoogleOAuth))
+			e.POST("/auth/oauth/exchange", authCtl.OAuthExchange, rl(middleware.PolicyOAuthExchange))
 		}
 
-		e.POST("/auth/logout", cfg.Auth.Logout)
+		e.POST("/auth/logout", authCtl.Logout)
 		pm = cfg.Protected
-		e.GET("/me", cfg.Auth.Me, pm...)
-		e.GET("/me/profile", cfg.Auth.GetProfile, pm...)
-		e.PUT("/me/profile", cfg.Auth.UpdateProfile, pm...)
-		e.POST("/me/change-password", cfg.Auth.ChangePassword, pm...)
-		e.POST("/auth/2fa/setup", cfg.Auth.Setup2FA, pm...)
-		e.POST("/auth/2fa/verify", cfg.Auth.Verify2FA, pm...)
+		e.GET("/me", authCtl.Me, pm...)
+		e.GET("/me/profile", authCtl.GetProfile, pm...)
+		e.PUT("/me/profile", authCtl.UpdateProfile, pm...)
+		e.POST("/me/change-password", authCtl.ChangePassword, pm...)
+		e.POST("/auth/2fa/setup", authCtl.Setup2FA, pm...)
+		e.POST("/auth/2fa/verify", authCtl.Verify2FA, pm...)
 	}
 
 	if cfg.Projects != nil {

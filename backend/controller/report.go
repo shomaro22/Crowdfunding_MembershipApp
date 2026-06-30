@@ -10,15 +10,15 @@ import (
 	"github.com/labstack/echo/v4"
 )
 
-type ReportController struct {
+type reportController struct {
 	Reports usecase.IReportUsecase
 }
 
-func NewReportController(reports usecase.IReportUsecase) *ReportController {
-	return &ReportController{Reports: reports}
+func NewReportController(reports usecase.IReportUsecase) IReportController {
+	return &reportController{Reports: reports}
 }
 
-func (h *ReportController) Create(c echo.Context) error {
+func (h *reportController) Create(c echo.Context) error {
 	var (
 		userID uuid.UUID
 		body   createReportJSON
@@ -49,7 +49,7 @@ func (h *ReportController) Create(c echo.Context) error {
 	return jsonCreated(c, reportWireFrom(view))
 }
 
-func (h *ReportController) ListAdmin(c echo.Context) error {
+func (h *reportController) ListAdmin(c echo.Context) error {
 	var (
 		status *string
 		s      string
@@ -70,7 +70,7 @@ func (h *ReportController) ListAdmin(c echo.Context) error {
 	return jsonOK(c, listReportsWireFrom(result))
 }
 
-func (h *ReportController) PatchAdmin(c echo.Context) error {
+func (h *reportController) PatchAdmin(c echo.Context) error {
 	var (
 		adminID  uuid.UUID
 		reportID uuid.UUID

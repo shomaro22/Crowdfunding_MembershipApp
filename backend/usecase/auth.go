@@ -5,7 +5,7 @@ import (
 	"log/slog"
 	"time"
 
-	"crowdfund-app/auth"
+	
 	"crowdfund-app/model"
 	"crowdfund-app/repository"
 
@@ -29,34 +29,38 @@ type IAuthUsecase interface {
 	Setup2FA(ctx context.Context, userID uuid.UUID) (*TOTPSetupResult, error)
 	Verify2FASetup(ctx context.Context, userID uuid.UUID, code string) (*TOTPVerifyResult, error)
 	Challenge2FA(ctx context.Context, pendingToken, code string, meta RequestMeta) (*LoginResult, error)
+	CreatePending2FAToken(ctx context.Context, userID uuid.UUID) (string, error)
 	GoogleAuthURL(from string) (string, error)
 	GoogleCallback(ctx context.Context, code, state string, meta RequestMeta) (*OAuthCBOut, error)
 	ExchangeOAuthCode(ctx context.Context, code string, meta RequestMeta) (*LoginResult, error)
-	ParseToken(raw string) (auth.AuthClaims, error)
-	ValidateSession(ctx context.Context, claims auth.AuthClaims) (SessionInfo, error)
+	ParseToken(raw string) (AuthClaims, error)
+	ValidateSession(ctx context.Context, claims AuthClaims) (SessionInfo, error)
 	OAuthEnabled() bool
 }
 
 type AuthConfig struct {
-	Users        repository.IUserRepo
-	SellerRegs   repository.ISellerRegRepo
-	RefreshTokens repository.IRefreshTokenRepo
-	ResetToks    repository.IResetRepo
-	Activity     repository.IActivityRepo
-	OAuth        repository.IOAuthRepo
-	OAuthCache   repository.IOAuthCache
-	TOTPBackup   repository.ITOTPBackupRepo
-	KYCStore     repository.IKYCStore
-	JWTSecret    string
-	TOTPIssuer   string
-	AppPublicURL string
-	Mailer       Mailer
-	DB           *gorm.DB
+	Users             repository.IUserRepo
+	SellerRegs        repository.ISellerRegRepo
+	RefreshTokens     repository.IRefreshTokenRepo
+	ResetToks         repository.IResetRepo
+	Activity          repository.IActivityRepo
+	OAuth             repository.IOAuthRepo
+	OAuthCache        repository.IOAuthCache
+	TOTPBackup        repository.ITOTPBackupRepo
+	KYCStore          repository.IKYCStore
+	JWTSecret         string
+	TOTPEncryptionKey []byte
+	TOTPIssuer        string
+	Pending2FAKey     []byte
+	AppPublicURL      string
+	Mailer            Mailer
+	DB                *gorm.DB
 }
 
 func NewAuthUsecase(cfg AuthConfig) IAuthUsecase {
 	var (
-		tokenSvc = auth.NewTokenService([]byte(cfg.JWTSecret), auth.DefaultAuthTTL)
+		tokenSvc = NewTokenService([]byte(cfg.JWTSecret), DefaultAuthTTL)
+		totpKey  = cfg.TOTPEncryptionKey
 		uc       = &AuthUseCase{
 			Users:         cfg.Users,
 			SellerRegs:    cfg.SellerRegs,
@@ -69,15 +73,16 @@ func NewAuthUsecase(cfg AuthConfig) IAuthUsecase {
 			Tokens:        tokenSvc,
 			Mailer:        cfg.Mailer,
 			KYCStore:      cfg.KYCStore,
-			TOTPKey:       []byte(cfg.JWTSecret),
+			TOTPKey:       totpKey,
 			TOTPIssuer:    cfg.TOTPIssuer,
+			pendingSecret: cfg.Pending2FAKey,
 			DB:            cfg.DB,
 			AppPublicURL:  cfg.AppPublicURL,
 		}
-		google *auth.GoogleOAuth
+		google *GoogleOAuth
 		err    error
 	)
-	google, err = auth.GoogleFromEnv(auth.NewStateBridge(cfg.OAuthCache))
+	google, err = GoogleFromEnv(NewOAuthStateBridge(cfg.OAuthCache))
 	if err == nil {
 		uc.Google = google
 	} else {
@@ -121,12 +126,13 @@ type AuthUseCase struct {
 	OAuth         repository.IOAuthRepo
 	OAuthCache    repository.IOAuthCache
 	TOTPBackup    repository.ITOTPBackupRepo
-	Tokens        *auth.TokenService
+	Tokens        *TokenService
 	Mailer        Mailer
 	KYCStore      repository.IKYCStore
-	Google        *auth.GoogleOAuth
+	Google        *GoogleOAuth
 	TOTPKey       []byte
 	TOTPIssuer    string
+	pendingSecret []byte
 	DB            *gorm.DB
 	AppPublicURL  string
 }

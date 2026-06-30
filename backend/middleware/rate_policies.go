@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"crowdfund-app/auth"
+	"crowdfund-app/usecase"
 
 	"github.com/google/uuid"
 	"github.com/labstack/echo/v4"
@@ -53,10 +53,7 @@ func KeyRefreshCookie(c echo.Context) string {
 		name string
 		v    string
 	)
-	name = strings.TrimSpace(os.Getenv("REFRESH_COOKIE_NAME"))
-	if name == "" {
-		name = auth.DefaultRefreshCookie
-	}
+	name = refreshCookieNameFromEnv()
 	ck, err := c.Cookie(name)
 	if err != nil || ck == nil {
 		return ""
@@ -65,7 +62,7 @@ func KeyRefreshCookie(c echo.Context) string {
 	if v == "" {
 		return ""
 	}
-	return auth.OpaqueHash(v)
+	return usecase.OpaqueHash(v)
 }
 
 func KeyQueryEmail(c echo.Context) string {
@@ -79,16 +76,32 @@ func KeyPending2FAUser(secret []byte) func(c echo.Context) string {
 			uid uuid.UUID
 			err error
 		)
-		tok = auth.Pending2FAFrom(c)
+		tok = pending2FACookieFrom(c)
 		if tok == "" || len(secret) == 0 {
 			return ""
 		}
-		uid, err = auth.VerifyPending2FA(secret, tok, time.Now().UTC())
+		uid, err = usecase.VerifyPending2FA(secret, tok, time.Now().UTC())
 		if err != nil {
 			return ""
 		}
 		return uid.String()
 	}
+}
+
+func refreshCookieNameFromEnv() string {
+	name := strings.TrimSpace(os.Getenv("REFRESH_COOKIE_NAME"))
+	if name == "" {
+		return "refresh_token"
+	}
+	return name
+}
+
+func pending2FACookieFrom(c echo.Context) string {
+	ck, err := c.Cookie("2fa_pending")
+	if err != nil || ck == nil {
+		return ""
+	}
+	return strings.TrimSpace(ck.Value)
 }
 
 var (

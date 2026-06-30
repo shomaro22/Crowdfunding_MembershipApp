@@ -1,4 +1,4 @@
-package auth
+package usecase
 
 import (
 	"crypto/rand"
@@ -7,20 +7,14 @@ import (
 )
 
 func OpaqueHex() (string, error) {
-	var (
-		b   []byte
-		err error
-	)
-	b = make([]byte, 32)
-	_, err = rand.Read(b)
-	if err != nil {
+	b := make([]byte, 32)
+	if _, err := rand.Read(b); err != nil {
 		return "", err
 	}
 	return hex.EncodeToString(b), nil
 }
 
 func OpaqueHash(plain string) string {
-	var sum [32]byte
-	sum = sha256.Sum256([]byte(plain))
+	sum := sha256.Sum256([]byte(plain))
 	return hex.EncodeToString(sum[:])
 }
