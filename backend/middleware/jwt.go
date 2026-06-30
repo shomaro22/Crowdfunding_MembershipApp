@@ -3,8 +3,8 @@ package middleware
 import (
 	"strings"
 
-	"crowdfund-app/auth"
 	"crowdfund-app/model"
+	"crowdfund-app/usecase"
 
 	"github.com/google/uuid"
 	"github.com/labstack/echo/v4"
@@ -15,9 +15,9 @@ const (
 	CtxUserRole = "role"
 )
 
-type TokenParser func(raw string) (auth.AuthClaims, error)
+type TokenParser func(raw string) (usecase.AuthClaims, error)
 
-type SessionValidator func(c echo.Context, claims auth.AuthClaims) error
+type SessionValidator func(c echo.Context, claims usecase.AuthClaims) error
 
 func BearerToken(c echo.Context) string {
 	var (
@@ -73,7 +73,7 @@ func JWTAuth(parse TokenParser, validate SessionValidator) echo.MiddlewareFunc {
 		return func(c echo.Context) error {
 			var (
 				raw    string
-				claims auth.AuthClaims
+				claims usecase.AuthClaims
 				err    error
 			)
 			raw = BearerToken(c)
@@ -101,7 +101,7 @@ func OptionalJWTAuth(parse TokenParser, validate SessionValidator) echo.Middlewa
 		return func(c echo.Context) error {
 			var (
 				raw    string
-				claims auth.AuthClaims
+				claims usecase.AuthClaims
 				err    error
 			)
 			raw = BearerToken(c)

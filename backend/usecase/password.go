@@ -1,15 +1,11 @@
-package auth
+package usecase
 
 import "golang.org/x/crypto/bcrypt"
 
 const bcryptCost = 12
 
 func HashPassword(plain string) (string, error) {
-	var (
-		b   []byte
-		err error
-	)
-	b, err = bcrypt.GenerateFromPassword([]byte(plain), bcryptCost)
+	b, err := bcrypt.GenerateFromPassword([]byte(plain), bcryptCost)
 	if err != nil {
 		return "", err
 	}

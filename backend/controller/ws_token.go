@@ -7,12 +7,12 @@ import (
 	"github.com/labstack/echo/v4"
 )
 
-type WSTokenController struct {
+type wsTokenController struct {
 	Tokens usecase.IWSTokenUsecase
 }
 
-func NewWSTokenController(tokens usecase.IWSTokenUsecase) *WSTokenController {
-	return &WSTokenController{Tokens: tokens}
+func NewWSTokenController(tokens usecase.IWSTokenUsecase) IWSTokenController {
+	return &wsTokenController{Tokens: tokens}
 }
 
 type wsTokenResponseJSON struct {
@@ -20,7 +20,7 @@ type wsTokenResponseJSON struct {
 	ExpiresIn int    `json:"expires_in"`
 }
 
-func (h *WSTokenController) Issue(c echo.Context) error {
+func (h *wsTokenController) Issue(c echo.Context) error {
 	var (
 		userID uuid.UUID
 		token  string

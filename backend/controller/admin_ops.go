@@ -13,15 +13,15 @@ import (
 	"github.com/labstack/echo/v4"
 )
 
-type AdminOperationsController struct {
+type adminOperationsController struct {
 	Operations usecase.IOperationsUsecase
 }
 
-func NewAdminOperationsController(ops usecase.IOperationsUsecase) *AdminOperationsController {
-	return &AdminOperationsController{Operations: ops}
+func NewAdminOperationsController(ops usecase.IOperationsUsecase) IAdminOperationsController {
+	return &adminOperationsController{Operations: ops}
 }
 
-func (h *AdminOperationsController) ListActivity(c echo.Context) error {
+func (h *adminOperationsController) ListActivity(c echo.Context) error {
 	var (
 		result usecase.ActivityLogsResult
 		q      usecase.ActivityLogsQuery
@@ -38,7 +38,7 @@ func (h *AdminOperationsController) ListActivity(c echo.Context) error {
 	return jsonOK(c, ListActivityLogsWireFrom(result))
 }
 
-func (h *AdminOperationsController) ListAuditLogs(c echo.Context) error {
+func (h *adminOperationsController) ListAuditLogs(c echo.Context) error {
 	var (
 		result usecase.AuditLogsResult
 		q      usecase.AuditLogsQuery
@@ -55,7 +55,7 @@ func (h *AdminOperationsController) ListAuditLogs(c echo.Context) error {
 	return jsonOK(c, ListAuditLogsWireFrom(result))
 }
 
-func (h *AdminOperationsController) ListBatches(c echo.Context) error {
+func (h *adminOperationsController) ListBatches(c echo.Context) error {
 	var (
 		result usecase.BatchRunsResult
 		q      usecase.BatchRunsQuery
@@ -69,7 +69,7 @@ func (h *AdminOperationsController) ListBatches(c echo.Context) error {
 	return jsonOK(c, ListBatchJobRunsWireFrom(result))
 }
 
-func (h *AdminOperationsController) RunBatch(c echo.Context) error {
+func (h *adminOperationsController) RunBatch(c echo.Context) error {
 	var (
 		adminID uuid.UUID
 		jobName string
@@ -96,7 +96,7 @@ func (h *AdminOperationsController) RunBatch(c echo.Context) error {
 	return jsonOK(c, BatchJobRunWireFrom(*run))
 }
 
-func (h *AdminOperationsController) GetSecurity(c echo.Context) error {
+func (h *adminOperationsController) GetSecurity(c echo.Context) error {
 	var (
 		from   *time.Time
 		to     *time.Time
