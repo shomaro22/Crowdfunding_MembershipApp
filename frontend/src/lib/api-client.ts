@@ -31,7 +31,7 @@ const DEFAULT_TIMEOUT_MS = 30_000
 function apiBaseUrl(): string {
   const raw = import.meta.env.VITE_API_BASE_URL
   if (typeof raw !== 'string' || raw.trim() === '') {
-    return 'http://localhost:8080'
+    return ''
   }
   return raw.replace(/\/+$/, '')
 }

@@ -12,10 +12,10 @@ import (
 )
 
 type SellerController struct {
-	Seller ISellerUseCase
+	Seller usecase.ISellerUsecase
 }
 
-func NewSellerController(seller ISellerUseCase) *SellerController {
+func NewSellerController(seller usecase.ISellerUsecase) *SellerController {
 	return &SellerController{Seller: seller}
 }
 

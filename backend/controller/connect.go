@@ -8,10 +8,10 @@ import (
 )
 
 type ConnectController struct {
-	Connect IConnectUseCase
+	Connect usecase.IConnectUsecase
 }
 
-func NewConnectController(uc IConnectUseCase) *ConnectController {
+func NewConnectController(uc usecase.IConnectUsecase) *ConnectController {
 	return &ConnectController{Connect: uc}
 }
 
