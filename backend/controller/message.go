@@ -11,10 +11,10 @@ import (
 )
 
 type MessageController struct {
-	Messages IMessageUseCase
+	Messages usecase.IMessageUsecase
 }
 
-func NewMessageController(messages IMessageUseCase) *MessageController {
+func NewMessageController(messages usecase.IMessageUsecase) *MessageController {
 	return &MessageController{Messages: messages}
 }
 

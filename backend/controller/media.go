@@ -12,10 +12,10 @@ import (
 )
 
 type MediaController struct {
-	Media IMediaUseCase
+	Media usecase.IMediaUsecase
 }
 
-func NewMediaController(media IMediaUseCase) *MediaController {
+func NewMediaController(media usecase.IMediaUsecase) *MediaController {
 	return &MediaController{Media: media}
 }
 

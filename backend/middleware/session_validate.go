@@ -3,8 +3,8 @@ package middleware
 import (
 	"context"
 
-	"crowdfund-app/apierr"
 	"crowdfund-app/auth"
+	"crowdfund-app/httperr"
 	"crowdfund-app/usecase"
 
 	"github.com/labstack/echo/v4"
@@ -22,9 +22,9 @@ func SessionValidateHTTP(check SessionChecker) SessionValidator {
 		if err != nil {
 			var (
 				status int
-				body   apierr.Body
+				body   httperr.Body
 			)
-			status, body = apierr.MapSession(err)
+			status, body = httperr.MapSession(err)
 			return echo.NewHTTPError(status, body)
 		}
 		c.Set(CtxUserRole, string(info.Role))

@@ -16,9 +16,9 @@ import (
 	"time"
 
 	"crowdfund-app/auth"
-	"crowdfund-app/bootstrap"
 	"crowdfund-app/db"
 	"crowdfund-app/model"
+	"crowdfund-app/server"
 	"crowdfund-app/stripe"
 
 	"github.com/golang-jwt/jwt/v5"
@@ -99,15 +99,15 @@ func closeTestInfra() {
 	}
 }
 
-func appOpts(stripeClient stripe.Client) *bootstrap.Options {
-	return &bootstrap.Options{Stripe: stripeClient, DB: testGDB, Redis: testRDB}
+func appOpts(stripeClient stripe.Client) *server.Options {
+	return &server.Options{Stripe: stripeClient, DB: testGDB, Redis: testRDB}
 }
 
 func setupApp(t *testing.T) *echo.Echo {
 	return setupAppWithOpts(t, nil)
 }
 
-func setupAppWithOpts(t *testing.T, opts *bootstrap.Options) *echo.Echo {
+func setupAppWithOpts(t *testing.T, opts *server.Options) *echo.Echo {
 	var (
 		e   *echo.Echo
 		err error
@@ -120,7 +120,7 @@ func setupAppWithOpts(t *testing.T, opts *bootstrap.Options) *echo.Echo {
 	if opts == nil {
 		opts = appOpts(nil)
 	}
-	e, _, err = bootstrap.BuildHTTP(opts)
+	e, _, err = server.BuildHTTP(opts)
 	if err != nil {
 		t.Fatalf("BuildHTTP: %v", err)
 	}

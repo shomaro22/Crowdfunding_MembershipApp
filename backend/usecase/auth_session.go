@@ -72,10 +72,6 @@ func (a *AuthUseCase) ParseToken(raw string) (auth.AuthClaims, error) {
 	return a.Tokens.Parse(raw)
 }
 
-func (a *AuthUseCase) SigningKey() []byte {
-	return a.TOTPKey
-}
-
 func (a *AuthUseCase) Login(ctx context.Context, email, password string, meta RequestMeta) (*LoginResult, error) {
 	var (
 		normalized string

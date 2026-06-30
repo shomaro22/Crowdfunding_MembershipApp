@@ -1,20 +1,20 @@
 package controller
 
 import (
-	"crowdfund-app/apierr"
+	"crowdfund-app/httperr"
 
 	"github.com/labstack/echo/v4"
 )
 
 func mapUseCaseError(err error) *echo.HTTPError {
-	var (
-		status int
-		body   apierr.Body
-	)
-	status, body = apierr.MapHTTP(err)
+	status, body := httperr.MapHTTP(err)
 	return echo.NewHTTPError(status, body)
 }
 
 func apiError(msg, code string) map[string]string {
-	return map[string]string(apierr.Payload(code, msg))
+	return map[string]string(httperr.Payload(code, msg))
+}
+
+func mapWSSubscribeError(err error) (code string, internal bool) {
+	return httperr.MapWSSubscribe(err)
 }
