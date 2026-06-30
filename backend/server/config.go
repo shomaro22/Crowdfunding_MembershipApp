@@ -1,36 +1,37 @@
-package bootstrap
+package server
 
 import (
-	"database/sql"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
-
-	"crowdfund-app/db"
-
-	"github.com/redis/go-redis/v9"
-	"gorm.io/gorm"
 )
 
-type Config struct {
-	JWTSecret    string
-	Port         string
-	PublicRoot   string
-	PrivateRoot  string
-	APIPublicURL string
-	AppPublicURL string
-	TOTPIssuer   string
+type config struct {
+	JWTSecret     string
+	Pending2FAKey []byte
+	Port          string
+	PublicRoot    string
+	PrivateRoot   string
+	APIPublicURL  string
+	AppPublicURL  string
+	TOTPIssuer    string
 }
 
-func LoadConfig() (Config, error) {
+func loadConfig() (config, error) {
 	var (
-		cfg Config
+		cfg config
 		err error
 	)
 	cfg.JWTSecret = os.Getenv("JWT_SECRET")
 	if len(cfg.JWTSecret) < 32 {
-		return Config{}, fmt.Errorf("JWT_SECRET must be at least 32 characters")
+		return config{}, fmt.Errorf("JWT_SECRET must be at least 32 characters")
+	}
+	pendingKey := strings.TrimSpace(os.Getenv("PENDING_2FA_KEY"))
+	if len(pendingKey) >= 32 {
+		cfg.Pending2FAKey = []byte(pendingKey)
+	} else {
+		cfg.Pending2FAKey = []byte(cfg.JWTSecret)
 	}
 	cfg.Port = os.Getenv("PORT")
 	if cfg.Port == "" {
@@ -46,11 +47,11 @@ func LoadConfig() (Config, error) {
 	}
 	err = os.MkdirAll(filepath.Join(cfg.PublicRoot, "uploads"), 0o755)
 	if err != nil {
-		return Config{}, err
+		return config{}, err
 	}
 	err = os.MkdirAll(filepath.Join(cfg.PrivateRoot, "kyc"), 0o700)
 	if err != nil {
-		return Config{}, err
+		return config{}, err
 	}
 	cfg.APIPublicURL = strings.TrimSpace(os.Getenv("API_PUBLIC_URL"))
 	if cfg.APIPublicURL == "" {
@@ -61,35 +62,14 @@ func LoadConfig() (Config, error) {
 	return cfg, nil
 }
 
-func (c Config) ListenAddr() string {
+func (c config) listenAddr() string {
 	return ":" + c.Port
 }
 
-func OpenDB() (*gorm.DB, error) {
-	var (
-		gormDB *gorm.DB
-		sqlDB  *sql.DB
-		err    error
-	)
-	err = db.Up(DatabaseURL())
-	if err != nil {
-		return nil, err
+func databaseURL() string {
+	u := os.Getenv("DATABASE_URL")
+	if u == "" {
+		u = "postgres://postgres:postgres@localhost:5432/crowdfund?sslmode=disable"
 	}
-	gormDB, err = db.Open(DatabaseURL())
-	if err != nil {
-		return nil, err
-	}
-	sqlDB, err = gormDB.DB()
-	if err != nil {
-		return nil, err
-	}
-	err = sqlDB.Ping()
-	if err != nil {
-		return nil, err
-	}
-	return gormDB, nil
-}
-
-func OpenRedis() *redis.Client {
-	return db.OpenRedis()
+	return u
 }

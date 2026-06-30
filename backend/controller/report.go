@@ -11,10 +11,10 @@ import (
 )
 
 type ReportController struct {
-	Reports IReportUseCase
+	Reports usecase.IReportUsecase
 }
 
-func NewReportController(reports IReportUseCase) *ReportController {
+func NewReportController(reports usecase.IReportUsecase) *ReportController {
 	return &ReportController{Reports: reports}
 }
 

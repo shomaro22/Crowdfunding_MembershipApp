@@ -11,10 +11,10 @@ import (
 )
 
 type SupporterController struct {
-	Supporters ISupporterUseCase
+	Supporters usecase.ISupporterUsecase
 }
 
-func NewSupporterController(uc ISupporterUseCase) *SupporterController {
+func NewSupporterController(uc usecase.ISupporterUsecase) *SupporterController {
 	return &SupporterController{Supporters: uc}
 }
 
