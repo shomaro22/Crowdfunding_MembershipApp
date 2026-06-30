@@ -1,27 +1,23 @@
 package controller
 
 import (
-
-	"crowdfund-app/auth"
 	"crowdfund-app/usecase"
 
 	"github.com/google/uuid"
 	"github.com/labstack/echo/v4"
 )
 
-type AuthController struct {
-	Auth          usecase.IAuthUsecase
-	CookieCfg     auth.CookieCfg
-	AppPublicURL  string
-	Pending2FAKey []byte
+type authController struct {
+	Auth         usecase.IAuthUsecase
+	CookieCfg    CookieCfg
+	AppPublicURL string
 }
 
-func NewAuthController(authUC usecase.IAuthUsecase, cookieCfg auth.CookieCfg, appPublicURL string, pending2FAKey []byte) *AuthController {
-	return &AuthController{
-		Auth:          authUC,
-		CookieCfg:     cookieCfg,
-		AppPublicURL:  appPublicURL,
-		Pending2FAKey: pending2FAKey,
+func NewAuthController(authUC usecase.IAuthUsecase, cookieCfg CookieCfg, appPublicURL string) IAuthController {
+	return &authController{
+		Auth:         authUC,
+		CookieCfg:    cookieCfg,
+		AppPublicURL: appPublicURL,
 	}
 }
 
@@ -45,11 +41,12 @@ type resetPasswordRequest struct {
 	Password string `json:"password"`
 }
 
-func (h *AuthController) Login(c echo.Context) error {
+func (h *authController) Login(c echo.Context) error {
 	var (
-		body loginRequest
-		res  *usecase.LoginResult
-		err  error
+		body  loginRequest
+		res   *usecase.LoginResult
+		token string
+		err   error
 	)
 	if err = bindBody(c, &body); err != nil {
 		return err
@@ -59,49 +56,53 @@ func (h *AuthController) Login(c echo.Context) error {
 		return mapUseCaseError(err)
 	}
 	if res.Requires2FA {
-		auth.SetPending2FA(c, h.CookieCfg, h.Pending2FAKey, res.User.ID)
+		token, err = h.Auth.CreatePending2FAToken(reqCtx(c), res.User.ID)
+		if err != nil {
+			return mapUseCaseError(err)
+		}
+		SetPending2FA(c, h.CookieCfg, token)
 		return jsonOK(c, login2FAResponse{
 			Requires2FA: true,
 			User:        UserWireFrom(res.User),
 		})
 	}
-	auth.SetRefreshCookie(c, h.CookieCfg, res.RefreshToken)
+	SetRefreshCookie(c, h.CookieCfg, res.RefreshToken)
 	return jsonOK(c, authTokenResponse{
 		AuthToken: res.AuthToken,
 		User:      UserWireFrom(res.User),
 	})
 }
 
-func (h *AuthController) Refresh(c echo.Context) error {
+func (h *authController) Refresh(c echo.Context) error {
 	var (
 		plain        string
 		authToken    string
 		refreshToken string
 		err          error
 	)
-	plain = auth.RefreshTokenFrom(c, h.CookieCfg)
+	plain = RefreshTokenFrom(c, h.CookieCfg)
 	authToken, refreshToken, err = h.Auth.Refresh(reqCtx(c), plain, requestMeta(c))
 	if err != nil {
 		return mapUseCaseError(err)
 	}
-	auth.SetRefreshCookie(c, h.CookieCfg, refreshToken)
+	SetRefreshCookie(c, h.CookieCfg, refreshToken)
 	return jsonOK(c, map[string]string{"auth_token": authToken})
 }
 
-func (h *AuthController) Logout(c echo.Context) error {
+func (h *authController) Logout(c echo.Context) error {
 	var (
 		plain string
 		err   error
 	)
-	plain = auth.RefreshTokenFrom(c, h.CookieCfg)
+	plain = RefreshTokenFrom(c, h.CookieCfg)
 	if err = h.Auth.Logout(reqCtx(c), plain, requestMeta(c)); err != nil {
 		return mapUseCaseError(err)
 	}
-	auth.ClearRefreshCookie(c, h.CookieCfg)
+	ClearRefreshCookie(c, h.CookieCfg)
 	return noContent(c)
 }
 
-func (h *AuthController) ForgotPassword(c echo.Context) error {
+func (h *authController) ForgotPassword(c echo.Context) error {
 	var (
 		body forgotPasswordRequest
 		err  error
@@ -113,7 +114,7 @@ func (h *AuthController) ForgotPassword(c echo.Context) error {
 	return noContent(c)
 }
 
-func (h *AuthController) ResetPassword(c echo.Context) error {
+func (h *authController) ResetPassword(c echo.Context) error {
 	var (
 		body resetPasswordRequest
 		err  error
@@ -127,7 +128,7 @@ func (h *AuthController) ResetPassword(c echo.Context) error {
 	return noContent(c)
 }
 
-func (h *AuthController) Me(c echo.Context) error {
+func (h *authController) Me(c echo.Context) error {
 	var (
 		uid uuid.UUID
 		u   usecase.UserView
@@ -144,7 +145,7 @@ func (h *AuthController) Me(c echo.Context) error {
 	return jsonOK(c, map[string]UserWire{"user": UserWireFrom(u)})
 }
 
-func (h *AuthController) ChangePassword(c echo.Context) error {
+func (h *authController) ChangePassword(c echo.Context) error {
 	var (
 		uid  uuid.UUID
 		body changePwRequest
@@ -163,7 +164,7 @@ func (h *AuthController) ChangePassword(c echo.Context) error {
 	return noContent(c)
 }
 
-func (h *AuthController) CheckEmail(c echo.Context) error {
+func (h *authController) CheckEmail(c echo.Context) error {
 	var (
 		email     string
 		available bool
@@ -177,7 +178,7 @@ func (h *AuthController) CheckEmail(c echo.Context) error {
 	return jsonOK(c, map[string]bool{"available": available})
 }
 
-func (h *AuthController) GetProfile(c echo.Context) error {
+func (h *authController) GetProfile(c echo.Context) error {
 	var (
 		uid uuid.UUID
 		u   usecase.UserView
@@ -194,7 +195,7 @@ func (h *AuthController) GetProfile(c echo.Context) error {
 	return jsonOK(c, UserWireFrom(u))
 }
 
-func (h *AuthController) UpdateProfile(c echo.Context) error {
+func (h *authController) UpdateProfile(c echo.Context) error {
 	var (
 		uid  uuid.UUID
 		body updateProfileJSON

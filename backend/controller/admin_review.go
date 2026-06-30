@@ -10,7 +10,7 @@ import (
 	"github.com/labstack/echo/v4"
 )
 
-func (h *AdminController) ListProjects(c echo.Context) error {
+func (h *adminController) ListProjects(c echo.Context) error {
 	var (
 		status *string
 		s      string
@@ -32,7 +32,7 @@ func (h *AdminController) ListProjects(c echo.Context) error {
 	return jsonOK(c, listProjectsJSON(rows, total, limit, offset))
 }
 
-func (h *AdminController) PatchProject(c echo.Context) error {
+func (h *adminController) PatchProject(c echo.Context) error {
 	var (
 		adminID uuid.UUID
 		id      uuid.UUID
@@ -61,7 +61,7 @@ func (h *AdminController) PatchProject(c echo.Context) error {
 	return jsonOK(c, projectDetailJSON(view))
 }
 
-func (h *AdminController) DeleteProject(c echo.Context) error {
+func (h *adminController) DeleteProject(c echo.Context) error {
 	var (
 		adminID uuid.UUID
 		id      uuid.UUID
@@ -81,7 +81,7 @@ func (h *AdminController) DeleteProject(c echo.Context) error {
 	return c.NoContent(http.StatusNoContent)
 }
 
-func (h *AdminController) PatchDeleteReq(c echo.Context) error {
+func (h *adminController) PatchDeleteReq(c echo.Context) error {
 	var (
 		adminID uuid.UUID
 		id      uuid.UUID
@@ -110,7 +110,7 @@ func (h *AdminController) PatchDeleteReq(c echo.Context) error {
 	return jsonOK(c, projectDetailJSON(view))
 }
 
-func (h *AdminController) ListBuyerPending(c echo.Context) error {
+func (h *adminController) ListBuyerPending(c echo.Context) error {
 	var (
 		limit  int
 		offset int
@@ -132,7 +132,7 @@ func (h *AdminController) ListBuyerPending(c echo.Context) error {
 	return jsonOK(c, usersPageJSON{Users: items, Total: total})
 }
 
-func (h *AdminController) ApproveBuyer(c echo.Context) error {
+func (h *adminController) ApproveBuyer(c echo.Context) error {
 	var (
 		adminID uuid.UUID
 		userID  uuid.UUID
@@ -154,7 +154,7 @@ func (h *AdminController) ApproveBuyer(c echo.Context) error {
 	return jsonOK(c, UserWireFrom(u))
 }
 
-func (h *AdminController) RejectBuyer(c echo.Context) error {
+func (h *adminController) RejectBuyer(c echo.Context) error {
 	var (
 		adminID uuid.UUID
 		userID  uuid.UUID
@@ -185,7 +185,7 @@ func (h *AdminController) RejectBuyer(c echo.Context) error {
 	return jsonOK(c, UserWireFrom(u))
 }
 
-func (h *AdminController) ListSellerRegs(c echo.Context) error {
+func (h *adminController) ListSellerRegs(c echo.Context) error {
 	var (
 		status string
 		limit  int
@@ -209,7 +209,7 @@ func (h *AdminController) ListSellerRegs(c echo.Context) error {
 	return jsonOK(c, sellerRegsPageJSON{Registrations: items, Total: total})
 }
 
-func (h *AdminController) GetSellerReg(c echo.Context) error {
+func (h *adminController) GetSellerReg(c echo.Context) error {
 	var (
 		id     uuid.UUID
 		detail *usecase.SellerRegView
@@ -226,7 +226,7 @@ func (h *AdminController) GetSellerReg(c echo.Context) error {
 	return jsonOK(c, sellerRegViewToJSON(h.APIPublicURL, detail))
 }
 
-func (h *AdminController) ApproveSellerReg(c echo.Context) error {
+func (h *adminController) ApproveSellerReg(c echo.Context) error {
 	var (
 		adminID uuid.UUID
 		id      uuid.UUID
@@ -248,7 +248,7 @@ func (h *AdminController) ApproveSellerReg(c echo.Context) error {
 	return jsonOK(c, sellerRegToJSON(reg))
 }
 
-func (h *AdminController) RejectSellerReg(c echo.Context) error {
+func (h *adminController) RejectSellerReg(c echo.Context) error {
 	var (
 		adminID uuid.UUID
 		id      uuid.UUID

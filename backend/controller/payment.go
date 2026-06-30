@@ -11,14 +11,14 @@ import (
 	"github.com/labstack/echo/v4"
 )
 
-type PaymentController struct {
+type paymentController struct {
 	Payments     usecase.IPaymentUsecase
 	Purchases    usecase.IPurchaseUsecase
 	StripeAppURL string
 }
 
-func NewPaymentController(payments usecase.IPaymentUsecase, purchases usecase.IPurchaseUsecase, stripeAppURL string) *PaymentController {
-	return &PaymentController{Payments: payments, Purchases: purchases, StripeAppURL: stripeAppURL}
+func NewPaymentController(payments usecase.IPaymentUsecase, purchases usecase.IPurchaseUsecase, stripeAppURL string) IPaymentController {
+	return &paymentController{Payments: payments, Purchases: purchases, StripeAppURL: stripeAppURL}
 }
 
 type checkoutRequestJSON struct {
@@ -34,7 +34,7 @@ type intentRequestJSON struct {
 	PlanID    string `json:"plan_id"`
 }
 
-func (h *PaymentController) Checkout(c echo.Context) error {
+func (h *paymentController) Checkout(c echo.Context) error {
 	var (
 		buyerID uuid.UUID
 		body    checkoutRequestJSON
@@ -66,7 +66,7 @@ func (h *PaymentController) Checkout(c echo.Context) error {
 	})
 }
 
-func (h *PaymentController) Intent(c echo.Context) error {
+func (h *paymentController) Intent(c echo.Context) error {
 	var (
 		buyerID uuid.UUID
 		body    intentRequestJSON
@@ -96,7 +96,7 @@ func (h *PaymentController) Intent(c echo.Context) error {
 	})
 }
 
-func (h *PaymentController) Webhook(c echo.Context) error {
+func (h *paymentController) Webhook(c echo.Context) error {
 	var (
 		payload []byte
 		err     error
@@ -120,7 +120,7 @@ type verifyIntentJSON struct {
 	PaymentIntentID string `json:"payment_intent_id"`
 }
 
-func (h *PaymentController) VerifyCheckout(c echo.Context) error {
+func (h *paymentController) VerifyCheckout(c echo.Context) error {
 	var (
 		buyerID uuid.UUID
 		body    verifyCheckoutJSON
@@ -141,7 +141,7 @@ func (h *PaymentController) VerifyCheckout(c echo.Context) error {
 	return jsonOK(c, supporterToJSON(view))
 }
 
-func (h *PaymentController) VerifyIntent(c echo.Context) error {
+func (h *paymentController) VerifyIntent(c echo.Context) error {
 	var (
 		buyerID uuid.UUID
 		body    verifyIntentJSON
@@ -206,7 +206,7 @@ func (body intentRequestJSON) toInput(buyerID uuid.UUID) (usecase.IntentIn, erro
 	return usecase.IntentIn{BuyerID: buyerID, ProjectID: projectID, PlanID: planID}, nil
 }
 
-func (h *PaymentController) ListPurchases(c echo.Context) error {
+func (h *paymentController) ListPurchases(c echo.Context) error {
 	var (
 		userID uuid.UUID
 		limit  int
