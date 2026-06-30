@@ -44,7 +44,7 @@ func TestReportsCreateListPatch(t *testing.T) {
 		role    model.AdminRole
 	)
 	e = setupApp(t)
-	gdb = openDB(t)
+	gdb = testDB(t)
 	seller = seedUser(t, gdb, seedOpts{Role: model.UserRoleSeller})
 	buyer = seedUser(t, gdb, seedOpts{Role: model.UserRoleBuyer})
 	project = seedProject(t, gdb, seller.ID, model.ProjectStatusActive)
@@ -108,7 +108,7 @@ func TestReportsFinanceAdminForbidden(t *testing.T) {
 		rec  *httptest.ResponseRecorder
 	)
 	e = setupApp(t)
-	gdb = openDB(t)
+	gdb = testDB(t)
 	role = model.AdminRoleFinanceAdmin
 	u = seedUser(t, gdb, seedOpts{
 		Role:        model.UserRoleAdmin,
@@ -131,7 +131,7 @@ func TestReportsSelfUserTargetBadRequest(t *testing.T) {
 		rec    *httptest.ResponseRecorder
 	)
 	e = setupApp(t)
-	gdb = openDB(t)
+	gdb = testDB(t)
 	buyer = seedUser(t, gdb, seedOpts{Role: model.UserRoleBuyer})
 	buyTok, _ = issueToken(buyer, true)
 	rec = httpPOST(e, "/reports", buyTok, fmt.Sprintf(
