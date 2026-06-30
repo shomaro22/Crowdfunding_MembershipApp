@@ -11,10 +11,10 @@ import (
 	"testing"
 	"time"
 
-	"crowdfund-app/auth"
 	"crowdfund-app/db"
 	"crowdfund-app/model"
 	"crowdfund-app/repository"
+	"crowdfund-app/usecase"
 
 	"github.com/google/uuid"
 	"gorm.io/gorm"
@@ -67,7 +67,7 @@ func seedIntegrationUser(t *testing.T, gdb *gorm.DB, role model.UserRole, adminR
 		err  error
 	)
 	t.Helper()
-	hash, err = auth.HashPassword("password123")
+	hash, err = usecase.HashPassword("password123")
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -10,15 +10,15 @@ import (
 	"github.com/labstack/echo/v4"
 )
 
-type SupporterController struct {
+type supporterController struct {
 	Supporters usecase.ISupporterUsecase
 }
 
-func NewSupporterController(uc usecase.ISupporterUsecase) *SupporterController {
-	return &SupporterController{Supporters: uc}
+func NewSupporterController(uc usecase.ISupporterUsecase) ISupporterController {
+	return &supporterController{Supporters: uc}
 }
 
-func (h *SupporterController) List(c echo.Context) error {
+func (h *supporterController) List(c echo.Context) error {
 	var (
 		userID uuid.UUID
 		rows   []usecase.SupporterView
@@ -35,7 +35,7 @@ func (h *SupporterController) List(c echo.Context) error {
 	return jsonOK(c, listSupportersJSON(rows))
 }
 
-func (h *SupporterController) Upgrade(c echo.Context) error {
+func (h *supporterController) Upgrade(c echo.Context) error {
 	var (
 		userID      uuid.UUID
 		supporterID uuid.UUID
@@ -65,7 +65,7 @@ func (h *SupporterController) Upgrade(c echo.Context) error {
 	return jsonOK(c, upgradePlanJSONResponse(out))
 }
 
-func (h *SupporterController) UpgradeConfirm(c echo.Context) error {
+func (h *supporterController) UpgradeConfirm(c echo.Context) error {
 	var (
 		userID      uuid.UUID
 		supporterID uuid.UUID
@@ -91,7 +91,7 @@ func (h *SupporterController) UpgradeConfirm(c echo.Context) error {
 	return jsonOK(c, supporterToJSON(view))
 }
 
-func (h *SupporterController) Cancel(c echo.Context) error {
+func (h *supporterController) Cancel(c echo.Context) error {
 	var (
 		userID      uuid.UUID
 		supporterID uuid.UUID
@@ -113,7 +113,7 @@ func (h *SupporterController) Cancel(c echo.Context) error {
 	return jsonOK(c, supporterToJSON(view))
 }
 
-func (h *SupporterController) Rejoin(c echo.Context) error {
+func (h *supporterController) Rejoin(c echo.Context) error {
 	var (
 		userID      uuid.UUID
 		supporterID uuid.UUID
@@ -135,7 +135,7 @@ func (h *SupporterController) Rejoin(c echo.Context) error {
 	return jsonOK(c, supporterToJSON(view))
 }
 
-func (h *SupporterController) ChangeBilling(c echo.Context) error {
+func (h *supporterController) ChangeBilling(c echo.Context) error {
 	var (
 		userID      uuid.UUID
 		supporterID uuid.UUID

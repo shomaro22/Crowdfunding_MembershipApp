@@ -9,15 +9,15 @@ import (
 	"github.com/labstack/echo/v4"
 )
 
-type KYCFileController struct {
+type kycFileController struct {
 	KYC usecase.IKYCAccessUsecase
 }
 
-func NewKYCFileController(kyc usecase.IKYCAccessUsecase) *KYCFileController {
-	return &KYCFileController{KYC: kyc}
+func NewKYCFileController(kyc usecase.IKYCAccessUsecase) IKYCFileController {
+	return &kycFileController{KYC: kyc}
 }
 
-func (h *KYCFileController) Serve(c echo.Context) error {
+func (h *kycFileController) Serve(c echo.Context) error {
 	var (
 		token string
 		f     *os.File
