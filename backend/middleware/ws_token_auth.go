@@ -4,7 +4,7 @@ import (
 	"context"
 	"strings"
 
-	"crowdfund-app/apierr"
+	"crowdfund-app/httperr"
 	"crowdfund-app/usecase"
 
 	"github.com/google/uuid"
@@ -24,15 +24,15 @@ func WSTokenAuth(consume WSTokenConsumer) echo.MiddlewareFunc {
 			)
 			plain = strings.TrimSpace(c.QueryParam("ws_token"))
 			if plain == "" {
-				return echo.NewHTTPError(401, apierr.Unauthorized())
+				return echo.NewHTTPError(401, httperr.Unauthorized())
 			}
 			meta = wsTokenMeta(c)
 			userID, err = consume(c.Request().Context(), plain, meta)
 			if err != nil {
-				if apierr.IsTokenAuthFailure(err) {
-					return echo.NewHTTPError(401, apierr.Unauthorized())
+				if httperr.IsTokenAuthFailure(err) {
+					return echo.NewHTTPError(401, httperr.Unauthorized())
 				}
-				return echo.NewHTTPError(401, apierr.Unauthorized())
+				return echo.NewHTTPError(401, httperr.Unauthorized())
 			}
 			c.Set(CtxUserID, userID)
 			return next(c)

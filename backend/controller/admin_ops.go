@@ -14,10 +14,10 @@ import (
 )
 
 type AdminOperationsController struct {
-	Operations IOperationsUseCase
+	Operations usecase.IOperationsUsecase
 }
 
-func NewAdminOperationsController(ops IOperationsUseCase) *AdminOperationsController {
+func NewAdminOperationsController(ops usecase.IOperationsUsecase) *AdminOperationsController {
 	return &AdminOperationsController{Operations: ops}
 }
 

@@ -28,7 +28,6 @@ func (r *webhookEventRepo) dbCtx(ctx context.Context) *gorm.DB {
 	return dbFromCtx(ctx, r.db)
 }
 
-// Claim inserts a webhook event row. Returns true when this caller won deduplication.
 func (r *webhookEventRepo) Claim(ctx context.Context, stripeEventID, eventType string) (bool, error) {
 	var (
 		row model.WebhookEvent
@@ -50,7 +49,6 @@ func (r *webhookEventRepo) Claim(ctx context.Context, stripeEventID, eventType s
 	return res.RowsAffected > 0, nil
 }
 
-// Release removes a claimed row so Stripe can retry after handler failure.
 func (r *webhookEventRepo) Release(ctx context.Context, stripeEventID string) error {
 	return r.dbCtx(ctx).Where("stripe_event_id = ?", stripeEventID).Delete(&model.WebhookEvent{}).Error
 }

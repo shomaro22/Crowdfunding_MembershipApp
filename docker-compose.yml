@@ -19,12 +19,27 @@ services:
 
   redis:
     image: redis:7-alpine
-    # ホストへ 6379 を公開しない（他プロジェクトと競合しやすい）。backend は redis:6379 で接続する
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 3s
       timeout: 5s
       retries: 5
+
+  backend-seed:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: backend-runtime
+    environment:
+      DATABASE_URL: postgres://postgres:postgres@postgres:5432/crowdfund?sslmode=disable
+      JWT_SECRET: dev-only-change-me-32-chars-min!!
+      TEST_USER_PASSWORD: password123
+      SEED_TEST_USER_TEAM: "1"
+    command: ["./seed", "dev", "-team"]
+    restart: "no"
+    depends_on:
+      postgres:
+        condition: service_healthy
 
   backend:
     build:
@@ -38,9 +53,12 @@ services:
       REDIS_ADDR: redis:6379
       JWT_SECRET: dev-only-change-me-32-chars-min!!
       PUBLIC_ROOT: /app/data/public
+      PRIVATE_ROOT: /app/data/private
       PORT: "8080"
-      CORS_ALLOW_ORIGINS: http://localhost:5173,http://127.0.0.1:5173
-      PUBLIC_APP_URL: http://localhost:5173
+      API_PUBLIC_URL: http://localhost
+      PUBLIC_APP_URL: http://localhost
+      CORS_ALLOW_ORIGINS: http://localhost
+      COOKIE_SECURE: "false"
     volumes:
       - uploads:/app/data/public
     depends_on:
@@ -48,6 +66,18 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      backend-seed:
+        condition: service_completed_successfully
+
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: frontend-runtime
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
 
 volumes:
   pgdata:

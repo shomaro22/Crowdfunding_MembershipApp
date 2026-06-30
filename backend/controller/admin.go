@@ -10,11 +10,11 @@ import (
 )
 
 type AdminController struct {
-	Admin        IAdminUseCase
+	Admin        usecase.IAdminUsecase
 	APIPublicURL string
 }
 
-func NewAdminController(admin IAdminUseCase, apiPublicURL string) *AdminController {
+func NewAdminController(admin usecase.IAdminUsecase, apiPublicURL string) *AdminController {
 	return &AdminController{Admin: admin, APIPublicURL: apiPublicURL}
 }
 

@@ -1,26 +1,32 @@
 package main
 
 import (
+	"context"
 	"log"
+	"net/http"
+	"os"
+	"os/signal"
 
-	"crowdfund-app/bootstrap"
-
-	"github.com/labstack/echo/v4"
+	"crowdfund-app/server"
 )
 
 func main() {
-	var (
-		e    *echo.Echo
-		addr string
-		err  error
-	)
-	bootstrap.LoadDotEnv()
-	e, addr, err = bootstrap.BuildHTTP(nil)
+	server.LoadDotEnv()
+	e, addr, err := server.BuildHTTP(nil)
 	if err != nil {
 		log.Fatal(err)
 	}
-	err = e.Start(addr)
-	if err != nil {
-		log.Fatal(err)
-	}
+
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
+	defer stop()
+
+	go func() {
+		if err := e.Start(addr); err != nil && err != http.ErrServerClosed {
+			log.Fatal(err)
+		}
+	}()
+
+	<-ctx.Done()
+	e.Logger.Info("shutdown server")
+	_ = e.Shutdown(context.Background())
 }
