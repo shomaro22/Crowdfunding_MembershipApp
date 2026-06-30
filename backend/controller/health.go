@@ -11,12 +11,16 @@ import (
 	"gorm.io/gorm"
 )
 
-type HealthController struct {
+type healthController struct {
 	SQL *gorm.DB
 	RDB *redis.Client
 }
 
-func (h *HealthController) Health(c echo.Context) error {
+func NewHealthController(sql *gorm.DB, rdb *redis.Client) IHealthController {
+	return &healthController{SQL: sql, RDB: rdb}
+}
+
+func (h *healthController) Health(c echo.Context) error {
 	var (
 		ctx  context.Context
 		body map[string]string

@@ -18,10 +18,11 @@ import (
 	"strings"
 	"time"
 
-	"crowdfund-app/auth"
+	
 	"crowdfund-app/db"
 	"crowdfund-app/model"
 	"crowdfund-app/repository"
+	"crowdfund-app/usecase"
 
 	"github.com/google/uuid"
 	"github.com/joho/godotenv"
@@ -144,11 +145,11 @@ func runDevSeed(flagArgs []string) {
 	}
 	defer func() { _ = sqlDB.Close() }()
 
-	hash, err = auth.HashPassword(password)
+	hash, err = usecase.HashPassword(password)
 	if err != nil {
 		log.Fatalf("hash: %v", err)
 	}
-	totpEnc, err = auth.EncryptSecret([]byte(jwtSecret), devTOTPSecret)
+	totpEnc, err = usecase.EncryptSecret([]byte(jwtSecret), devTOTPSecret)
 	if err != nil {
 		log.Fatalf("totp encrypt: %v", err)
 	}
