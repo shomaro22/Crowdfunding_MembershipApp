@@ -1,4 +1,4 @@
-package apierr
+package httperr
 
 import (
 	"errors"

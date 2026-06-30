@@ -12,12 +12,12 @@ import (
 )
 
 type PaymentController struct {
-	Payments     IPaymentUseCase
-	Purchases    IPurchaseUseCase
+	Payments     usecase.IPaymentUsecase
+	Purchases    usecase.IPurchaseUsecase
 	StripeAppURL string
 }
 
-func NewPaymentController(payments IPaymentUseCase, purchases IPurchaseUseCase, stripeAppURL string) *PaymentController {
+func NewPaymentController(payments usecase.IPaymentUsecase, purchases usecase.IPurchaseUsecase, stripeAppURL string) *PaymentController {
 	return &PaymentController{Payments: payments, Purchases: purchases, StripeAppURL: stripeAppURL}
 }
 

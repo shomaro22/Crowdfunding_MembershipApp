@@ -10,13 +10,19 @@ import (
 )
 
 type AuthController struct {
-	Auth         IAuthUseCase
-	CookieCfg    auth.CookieCfg
-	AppPublicURL string
+	Auth          usecase.IAuthUsecase
+	CookieCfg     auth.CookieCfg
+	AppPublicURL  string
+	Pending2FAKey []byte
 }
 
-func NewAuthController(authUC IAuthUseCase, cookieCfg auth.CookieCfg, appPublicURL string) *AuthController {
-	return &AuthController{Auth: authUC, CookieCfg: cookieCfg, AppPublicURL: appPublicURL}
+func NewAuthController(authUC usecase.IAuthUsecase, cookieCfg auth.CookieCfg, appPublicURL string, pending2FAKey []byte) *AuthController {
+	return &AuthController{
+		Auth:          authUC,
+		CookieCfg:     cookieCfg,
+		AppPublicURL:  appPublicURL,
+		Pending2FAKey: pending2FAKey,
+	}
 }
 
 type loginRequest struct {
@@ -53,7 +59,7 @@ func (h *AuthController) Login(c echo.Context) error {
 		return mapUseCaseError(err)
 	}
 	if res.Requires2FA {
-		auth.SetPending2FA(c, h.CookieCfg, h.Auth.SigningKey(), res.User.ID)
+		auth.SetPending2FA(c, h.CookieCfg, h.Pending2FAKey, res.User.ID)
 		return jsonOK(c, login2FAResponse{
 			Requires2FA: true,
 			User:        UserWireFrom(res.User),

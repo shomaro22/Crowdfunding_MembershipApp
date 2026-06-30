@@ -10,10 +10,10 @@ import (
 )
 
 type ProjectController struct {
-	Projects IProjectUseCase
+	Projects usecase.IProjectUsecase
 }
 
-func NewProjectController(uc IProjectUseCase) *ProjectController {
+func NewProjectController(uc usecase.IProjectUsecase) *ProjectController {
 	return &ProjectController{Projects: uc}
 }
 
