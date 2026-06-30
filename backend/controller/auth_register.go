@@ -27,7 +27,7 @@ type sellerRegPayload struct {
 	PhotoPresent bool   `json:"photo_present"`
 }
 
-func (h *AuthController) Register(c echo.Context) error {
+func (h *authController) Register(c echo.Context) error {
 	var (
 		body registerRequest
 		u    usecase.UserView
@@ -46,7 +46,7 @@ func (h *AuthController) Register(c echo.Context) error {
 	})
 }
 
-func (h *AuthController) RegisterSeller(c echo.Context) error {
+func (h *authController) RegisterSeller(c echo.Context) error {
 	var (
 		regRaw    string
 		payload   sellerRegPayload

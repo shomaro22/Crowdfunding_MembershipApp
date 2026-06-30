@@ -7,7 +7,7 @@ import (
 	"os"
 	"time"
 
-	"crowdfund-app/auth"
+	
 	"crowdfund-app/repository"
 )
 
@@ -31,7 +31,7 @@ type KYCAccessUseCase struct {
 }
 
 func (k *KYCAccessUseCase) SignToken(storageKey string, now time.Time) string {
-	return auth.SignKYCAccess(k.SignSecret, storageKey, now)
+	return SignKYCAccess(k.SignSecret, storageKey, now)
 }
 
 func (k *KYCAccessUseCase) OpenWithToken(_ context.Context, token string) (*os.File, string, error) {
@@ -39,9 +39,9 @@ func (k *KYCAccessUseCase) OpenWithToken(_ context.Context, token string) (*os.F
 		key string
 		err error
 	)
-	key, err = auth.VerifyKYCAccess(k.SignSecret, token, time.Now().UTC())
+	key, err = VerifyKYCAccess(k.SignSecret, token, time.Now().UTC())
 	if err != nil {
-		if errors.Is(err, auth.ErrInvalidKYCToken) {
+		if errors.Is(err, ErrInvalidKYCToken) {
 			return nil, "", ErrInvalidToken
 		}
 		return nil, "", err

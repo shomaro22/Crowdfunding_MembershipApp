@@ -2,9 +2,9 @@ package middleware
 
 import (
 	"context"
+	"errors"
 	"strings"
 
-	"crowdfund-app/apierr"
 	"crowdfund-app/usecase"
 
 	"github.com/google/uuid"
@@ -24,20 +24,33 @@ func WSTokenAuth(consume WSTokenConsumer) echo.MiddlewareFunc {
 			)
 			plain = strings.TrimSpace(c.QueryParam("ws_token"))
 			if plain == "" {
-				return echo.NewHTTPError(401, apierr.Unauthorized())
+				return unauthorizedHTTPError()
 			}
 			meta = wsTokenMeta(c)
 			userID, err = consume(c.Request().Context(), plain, meta)
 			if err != nil {
-				if apierr.IsTokenAuthFailure(err) {
-					return echo.NewHTTPError(401, apierr.Unauthorized())
+				if isTokenAuthFailure(err) {
+					return unauthorizedHTTPError()
 				}
-				return echo.NewHTTPError(401, apierr.Unauthorized())
+				return unauthorizedHTTPError()
 			}
 			c.Set(CtxUserID, userID)
 			return next(c)
 		}
 	}
+}
+
+func isTokenAuthFailure(err error) bool {
+	return errors.Is(err, usecase.ErrInvalidToken) ||
+		errors.Is(err, usecase.ErrForbidden) ||
+		errors.Is(err, usecase.ErrInactiveUser)
+}
+
+func unauthorizedHTTPError() *echo.HTTPError {
+	return echo.NewHTTPError(401, map[string]string{
+		"error": "unauthorized",
+		"code":  "UNAUTHORIZED",
+	})
 }
 
 func wsTokenMeta(c echo.Context) usecase.RequestMeta {

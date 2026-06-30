@@ -11,15 +11,15 @@ import (
 	"github.com/labstack/echo/v4"
 )
 
-type SellerController struct {
-	Seller ISellerUseCase
+type sellerController struct {
+	Seller usecase.ISellerUsecase
 }
 
-func NewSellerController(seller ISellerUseCase) *SellerController {
-	return &SellerController{Seller: seller}
+func NewSellerController(seller usecase.ISellerUsecase) ISellerController {
+	return &sellerController{Seller: seller}
 }
 
-func (h *SellerController) DashboardStats(c echo.Context) error {
+func (h *sellerController) DashboardStats(c echo.Context) error {
 	var (
 		sellerID uuid.UUID
 		stats    usecase.SellerDashboardStatsView
@@ -36,7 +36,7 @@ func (h *SellerController) DashboardStats(c echo.Context) error {
 	return jsonOK(c, sellerDashboardStatsJSON(stats))
 }
 
-func (h *SellerController) ListSupporters(c echo.Context) error {
+func (h *sellerController) ListSupporters(c echo.Context) error {
 	var (
 		sellerID  uuid.UUID
 		projectID *uuid.UUID
@@ -61,7 +61,7 @@ func (h *SellerController) ListSupporters(c echo.Context) error {
 	return jsonOK(c, sellerListSupportersJSON(result))
 }
 
-func (h *SellerController) ExportSupporters(c echo.Context) error {
+func (h *sellerController) ExportSupporters(c echo.Context) error {
 	var (
 		sellerID  uuid.UUID
 		projectID *uuid.UUID
@@ -85,7 +85,7 @@ func (h *SellerController) ExportSupporters(c echo.Context) error {
 	return writeSupportersCSV(c.Response(), rows)
 }
 
-func (h *SellerController) ProjectAnalysis(c echo.Context) error {
+func (h *sellerController) ProjectAnalysis(c echo.Context) error {
 	var (
 		sellerID uuid.UUID
 		result   usecase.ProjectAnalysisResult

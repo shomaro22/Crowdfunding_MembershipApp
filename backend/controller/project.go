@@ -9,15 +9,15 @@ import (
 	"github.com/labstack/echo/v4"
 )
 
-type ProjectController struct {
-	Projects IProjectUseCase
+type projectController struct {
+	Projects usecase.IProjectUsecase
 }
 
-func NewProjectController(uc IProjectUseCase) *ProjectController {
-	return &ProjectController{Projects: uc}
+func NewProjectController(uc usecase.IProjectUsecase) IProjectController {
+	return &projectController{Projects: uc}
 }
 
-func (h *ProjectController) ListPublic(c echo.Context) error {
+func (h *projectController) ListPublic(c echo.Context) error {
 	var (
 		limit  int
 		offset int
@@ -33,7 +33,7 @@ func (h *ProjectController) ListPublic(c echo.Context) error {
 	return jsonOK(c, listProjectsJSON(rows, total, limit, offset))
 }
 
-func (h *ProjectController) Create(c echo.Context) error {
+func (h *projectController) Create(c echo.Context) error {
 	var (
 		sellerID uuid.UUID
 		body     createProjectJSON
@@ -59,7 +59,7 @@ func (h *ProjectController) Create(c echo.Context) error {
 	return jsonCreated(c, projectDetailJSON(view))
 }
 
-func (h *ProjectController) ListMine(c echo.Context) error {
+func (h *projectController) ListMine(c echo.Context) error {
 	var (
 		sellerID uuid.UUID
 		limit    int
@@ -80,7 +80,7 @@ func (h *ProjectController) ListMine(c echo.Context) error {
 	return jsonOK(c, listProjectsJSON(rows, total, limit, offset))
 }
 
-func (h *ProjectController) Get(c echo.Context) error {
+func (h *projectController) Get(c echo.Context) error {
 	var (
 		id   uuid.UUID
 		view *usecase.ProjectView
@@ -99,7 +99,7 @@ func (h *ProjectController) Get(c echo.Context) error {
 	return jsonOK(c, projectDetailJSON(view))
 }
 
-func (h *ProjectController) ListPlans(c echo.Context) error {
+func (h *projectController) ListPlans(c echo.Context) error {
 	var (
 		id    uuid.UUID
 		plans []usecase.ProjectPlanView
@@ -118,7 +118,7 @@ func (h *ProjectController) ListPlans(c echo.Context) error {
 	return jsonOK(c, projectPlansToJSON(plans))
 }
 
-func (h *ProjectController) Update(c echo.Context) error {
+func (h *projectController) Update(c echo.Context) error {
 	var (
 		sellerID uuid.UUID
 		id       uuid.UUID
@@ -149,7 +149,7 @@ func (h *ProjectController) Update(c echo.Context) error {
 	return jsonOK(c, projectDetailJSON(view))
 }
 
-func (h *ProjectController) RequestDelete(c echo.Context) error {
+func (h *projectController) RequestDelete(c echo.Context) error {
 	var (
 		sellerID uuid.UUID
 		id       uuid.UUID

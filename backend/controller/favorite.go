@@ -9,15 +9,15 @@ import (
 	"github.com/labstack/echo/v4"
 )
 
-type FavoriteController struct {
-	Favorites IFavoriteUseCase
+type favoriteController struct {
+	Favorites usecase.IFavoriteUsecase
 }
 
-func NewFavoriteController(favorites IFavoriteUseCase) *FavoriteController {
-	return &FavoriteController{Favorites: favorites}
+func NewFavoriteController(favorites usecase.IFavoriteUsecase) IFavoriteController {
+	return &favoriteController{Favorites: favorites}
 }
 
-func (h *FavoriteController) List(c echo.Context) error {
+func (h *favoriteController) List(c echo.Context) error {
 	var (
 		userID uuid.UUID
 		rows   []usecase.ProjectView
@@ -34,7 +34,7 @@ func (h *FavoriteController) List(c echo.Context) error {
 	return jsonOK(c, listFavoritesJSON(rows))
 }
 
-func (h *FavoriteController) Toggle(c echo.Context) error {
+func (h *favoriteController) Toggle(c echo.Context) error {
 	var (
 		userID uuid.UUID
 		body   toggleFavoriteJSON
@@ -63,7 +63,7 @@ func (h *FavoriteController) Toggle(c echo.Context) error {
 	return jsonOK(c, favoriteStatusWireFrom(out))
 }
 
-func (h *FavoriteController) Check(c echo.Context) error {
+func (h *favoriteController) Check(c echo.Context) error {
 	var (
 		userID    uuid.UUID
 		projectID uuid.UUID

@@ -4,14 +4,13 @@ import (
 	"errors"
 	"net/http"
 
-	"crowdfund-app/auth"
 	"crowdfund-app/usecase"
 
 	"github.com/google/uuid"
 	"github.com/labstack/echo/v4"
 )
 
-func (h *AuthController) GoogleStart(c echo.Context) error {
+func (h *authController) GoogleStart(c echo.Context) error {
 	var (
 		from    string
 		authURL string
@@ -25,7 +24,7 @@ func (h *AuthController) GoogleStart(c echo.Context) error {
 	return c.Redirect(http.StatusFound, authURL)
 }
 
-func (h *AuthController) GoogleCallback(c echo.Context) error {
+func (h *authController) GoogleCallback(c echo.Context) error {
 	var (
 		errMsg string
 		code   string
@@ -43,11 +42,11 @@ func (h *AuthController) GoogleCallback(c echo.Context) error {
 	if err != nil {
 		return c.Redirect(http.StatusFound, oauthCallbackURL(h.AppPublicURL, usecase.OAuthRedirectView{Error: oauthErrCode(err)}))
 	}
-	auth.SetRefreshCookie(c, h.CookieCfg, res.RefreshToken)
+	SetRefreshCookie(c, h.CookieCfg, res.RefreshToken)
 	return c.Redirect(http.StatusFound, oauthCallbackURL(h.AppPublicURL, res.Redirect))
 }
 
-func (h *AuthController) OAuthExchange(c echo.Context) error {
+func (h *authController) OAuthExchange(c echo.Context) error {
 	var (
 		body struct {
 			Code string `json:"code"`
@@ -79,7 +78,7 @@ func oauthErrCode(err error) string {
 	}
 }
 
-func (h *AuthController) Setup2FA(c echo.Context) error {
+func (h *authController) Setup2FA(c echo.Context) error {
 	var (
 		uid uuid.UUID
 		res *usecase.TOTPSetupResult
@@ -99,7 +98,7 @@ func (h *AuthController) Setup2FA(c echo.Context) error {
 	})
 }
 
-func (h *AuthController) Verify2FA(c echo.Context) error {
+func (h *authController) Verify2FA(c echo.Context) error {
 	var (
 		uid  uuid.UUID
 		body struct {
@@ -125,7 +124,7 @@ func (h *AuthController) Verify2FA(c echo.Context) error {
 	})
 }
 
-func (h *AuthController) Challenge2FA(c echo.Context) error {
+func (h *authController) Challenge2FA(c echo.Context) error {
 	var (
 		pending string
 		body    struct {
@@ -134,7 +133,7 @@ func (h *AuthController) Challenge2FA(c echo.Context) error {
 		res *usecase.LoginResult
 		err error
 	)
-	pending = auth.Pending2FAFrom(c)
+	pending = Pending2FAFrom(c)
 	if pending == "" {
 		return echo.NewHTTPError(http.StatusUnauthorized, apiError("2fa session expired", "UNAUTHORIZED"))
 	}
@@ -145,8 +144,8 @@ func (h *AuthController) Challenge2FA(c echo.Context) error {
 	if err != nil {
 		return mapUseCaseError(err)
 	}
-	auth.ClearPending2FA(c, h.CookieCfg)
-	auth.SetRefreshCookie(c, h.CookieCfg, res.RefreshToken)
+	ClearPending2FA(c, h.CookieCfg)
+	SetRefreshCookie(c, h.CookieCfg, res.RefreshToken)
 	return jsonOK(c, authTokenResponse{
 		AuthToken: res.AuthToken,
 		User:      UserWireFrom(res.User),

@@ -25,7 +25,7 @@ func TestAdminCatalogFinanceRBAC(t *testing.T) {
 		rec *httptest.ResponseRecorder
 	)
 	e = setupApp(t)
-	gdb = openDB(t)
+	gdb = testDB(t)
 	tok = issueAdminToken(t, gdb, model.AdminRoleFinanceAdmin)
 
 	rec = httpGET(e, "/admin/purchases", tok)
@@ -50,7 +50,7 @@ func TestAdminCatalogSupportUserManagement(t *testing.T) {
 		name  = "Updated Name"
 	)
 	e = setupApp(t)
-	gdb = openDB(t)
+	gdb = testDB(t)
 	buyer = seedUser(t, gdb, seedOpts{Role: model.UserRoleBuyer})
 	tok = issueAdminToken(t, gdb, model.AdminRoleSupportAdmin)
 
@@ -96,7 +96,7 @@ func TestAdminCatalogPatchPurchase(t *testing.T) {
 		now      time.Time
 	)
 	e = setupApp(t)
-	gdb = openDB(t)
+	gdb = testDB(t)
 	now = time.Now().UTC()
 	tok = issueAdminToken(t, gdb, model.AdminRoleSuperAdmin)
 	seller = seedUser(t, gdb, seedOpts{Role: model.UserRoleSeller})

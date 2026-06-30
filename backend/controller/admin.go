@@ -9,16 +9,16 @@ import (
 	"github.com/labstack/echo/v4"
 )
 
-type AdminController struct {
-	Admin        IAdminUseCase
+type adminController struct {
+	Admin        usecase.IAdminUsecase
 	APIPublicURL string
 }
 
-func NewAdminController(admin IAdminUseCase, apiPublicURL string) *AdminController {
-	return &AdminController{Admin: admin, APIPublicURL: apiPublicURL}
+func NewAdminController(admin usecase.IAdminUsecase, apiPublicURL string) IAdminController {
+	return &adminController{Admin: admin, APIPublicURL: apiPublicURL}
 }
 
-func (h *AdminController) ResetUser2FA(c echo.Context) error {
+func (h *adminController) ResetUser2FA(c echo.Context) error {
 	var (
 		adminID uuid.UUID
 		userID  uuid.UUID
@@ -44,7 +44,7 @@ func (h *AdminController) ResetUser2FA(c echo.Context) error {
 	return jsonOK(c, map[string]UserWire{"user": UserWireFrom(u)})
 }
 
-func (h *AdminController) ChangeAdminRole(c echo.Context) error {
+func (h *adminController) ChangeAdminRole(c echo.Context) error {
 	var (
 		actorID uuid.UUID
 		userID  uuid.UUID
@@ -73,7 +73,7 @@ func (h *AdminController) ChangeAdminRole(c echo.Context) error {
 	return jsonOK(c, map[string]UserWire{"user": UserWireFrom(u)})
 }
 
-func (h *AdminController) DashboardStats(c echo.Context) error {
+func (h *adminController) DashboardStats(c echo.Context) error {
 	var (
 		stats usecase.AdminStatsView
 		items []UserWire
@@ -97,7 +97,7 @@ func (h *AdminController) DashboardStats(c echo.Context) error {
 	})
 }
 
-func (h *AdminController) ListUsers(c echo.Context) error {
+func (h *adminController) ListUsers(c echo.Context) error {
 	var (
 		limit  int
 		offset int
@@ -119,7 +119,7 @@ func (h *AdminController) ListUsers(c echo.Context) error {
 	return jsonOK(c, usersPageJSON{Users: items, Total: total})
 }
 
-func (h *AdminController) UpdateUser(c echo.Context) error {
+func (h *adminController) UpdateUser(c echo.Context) error {
 	var (
 		adminID uuid.UUID
 		userID  uuid.UUID
@@ -150,7 +150,7 @@ func (h *AdminController) UpdateUser(c echo.Context) error {
 	return jsonOK(c, UserWireFrom(u))
 }
 
-func (h *AdminController) DeleteUser(c echo.Context) error {
+func (h *adminController) DeleteUser(c echo.Context) error {
 	var (
 		adminID uuid.UUID
 		userID  uuid.UUID
@@ -170,7 +170,7 @@ func (h *AdminController) DeleteUser(c echo.Context) error {
 	return c.NoContent(http.StatusNoContent)
 }
 
-func (h *AdminController) ListPurchases(c echo.Context) error {
+func (h *adminController) ListPurchases(c echo.Context) error {
 	var (
 		limit   int
 		offset  int
@@ -192,7 +192,7 @@ func (h *AdminController) ListPurchases(c echo.Context) error {
 	return jsonOK(c, listPurchasesJSON(rows, total))
 }
 
-func (h *AdminController) PatchPurchase(c echo.Context) error {
+func (h *adminController) PatchPurchase(c echo.Context) error {
 	var (
 		adminID    uuid.UUID
 		purchaseID uuid.UUID

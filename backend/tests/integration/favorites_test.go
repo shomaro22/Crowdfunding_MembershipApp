@@ -41,7 +41,7 @@ func TestFavoritesAddListCheckRemove(t *testing.T) {
 		list    favoritesListBody
 	)
 	e = setupApp(t)
-	gdb = openDB(t)
+	gdb = testDB(t)
 	seller = seedUser(t, gdb, seedOpts{Role: model.UserRoleSeller})
 	buyer = seedUser(t, gdb, seedOpts{Role: model.UserRoleBuyer})
 	project = seedProject(t, gdb, seller.ID, model.ProjectStatusActive)
@@ -105,7 +105,7 @@ func TestFavoritesPendingProjectNotFound(t *testing.T) {
 		rec     *httptest.ResponseRecorder
 	)
 	e = setupApp(t)
-	gdb = openDB(t)
+	gdb = testDB(t)
 	seller = seedUser(t, gdb, seedOpts{Role: model.UserRoleSeller})
 	buyer = seedUser(t, gdb, seedOpts{Role: model.UserRoleBuyer})
 	project = seedProject(t, gdb, seller.ID, model.ProjectStatusPending)
@@ -127,7 +127,7 @@ func TestFavoritesRemoveMissing(t *testing.T) {
 		pid   uuid.UUID
 	)
 	e = setupApp(t)
-	gdb = openDB(t)
+	gdb = testDB(t)
 	buyer = seedUser(t, gdb, seedOpts{Role: model.UserRoleBuyer})
 	tok, _ = issueToken(buyer, true)
 	pid = uuid.New()

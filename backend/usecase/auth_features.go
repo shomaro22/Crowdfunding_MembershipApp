@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"crowdfund-app/auth"
+	
 	"crowdfund-app/model"
 	"crowdfund-app/repository"
 	"crowdfund-app/validator"
@@ -55,7 +55,7 @@ func (a *AuthUseCase) RegisterBuyer(ctx context.Context, email, password string,
 	if exists {
 		return UserView{}, ErrEmailInUse
 	}
-	hash, err = auth.HashPassword(password)
+	hash, err = HashPassword(password)
 	if err != nil {
 		return UserView{}, err
 	}
@@ -147,7 +147,7 @@ func (a *AuthUseCase) RegisterSeller(ctx context.Context, in SellerRegIn, meta R
 		return nil, mapMediaStoreError(err)
 	}
 
-	hash, err = auth.HashPassword(in.Password)
+	hash, err = HashPassword(in.Password)
 	if err != nil {
 		_ = a.KYCStore.Remove(ctx, frontKey, backKey)
 		return nil, err
@@ -226,7 +226,7 @@ func (a *AuthUseCase) GoogleCallback(ctx context.Context, code, state string, me
 		from    string
 		ok      bool
 		err     error
-		profile *auth.GoogleProfile
+		profile *GoogleProfile
 		u       model.User
 		tokens  *SessionTokens
 		cbCode  string
@@ -260,7 +260,7 @@ func (a *AuthUseCase) GoogleCallback(ctx context.Context, code, state string, me
 	if err != nil {
 		return nil, err
 	}
-	cbCode, err = auth.OpaqueHex()
+	cbCode, err = OpaqueHex()
 	if err != nil {
 		return nil, err
 	}
@@ -307,7 +307,7 @@ func (a *AuthUseCase) ExchangeOAuthCode(ctx context.Context, code string, meta R
 	if !u.CanLogin() {
 		return nil, ErrInvalidToken
 	}
-	authToken, err = a.Tokens.Issue(auth.AuthClaims{
+	authToken, err = a.Tokens.Issue(AuthClaims{
 		UserID:        u.ID,
 		Role:          u.Role,
 		TwoFAVerified: twoFAVerified(u),
@@ -320,7 +320,7 @@ func (a *AuthUseCase) ExchangeOAuthCode(ctx context.Context, code string, meta R
 	return &LoginResult{User: UserViewFrom(u), AuthToken: authToken}, nil
 }
 
-func (a *AuthUseCase) resolveGoogleUser(ctx context.Context, profile *auth.GoogleProfile) (model.User, error) {
+func (a *AuthUseCase) resolveGoogleUser(ctx context.Context, profile *GoogleProfile) (model.User, error) {
 	var (
 		acc      model.OAuthAccount
 		err      error
@@ -374,11 +374,11 @@ func (a *AuthUseCase) resolveGoogleUser(ctx context.Context, profile *auth.Googl
 		}
 		return existing, nil
 	}
-	pwPlain, err = auth.OpaqueHex()
+	pwPlain, err = OpaqueHex()
 	if err != nil {
 		return model.User{}, err
 	}
-	pwHash, err = auth.HashPassword(pwPlain)
+	pwHash, err = HashPassword(pwPlain)
 	if err != nil {
 		return model.User{}, err
 	}
@@ -430,7 +430,7 @@ func (a *AuthUseCase) Setup2FA(ctx context.Context, userID uuid.UUID) (*TOTPSetu
 		u      model.User
 		err    error
 		issuer string
-		setup  *auth.TOTPSetup
+		setup  *TOTPSetup
 		enc    string
 	)
 
@@ -445,11 +445,11 @@ func (a *AuthUseCase) Setup2FA(ctx context.Context, userID uuid.UUID) (*TOTPSetu
 	if issuer == "" {
 		issuer = "Crowdfund"
 	}
-	setup, err = auth.NewTOTPSetup(issuer, u.Email)
+	setup, err = NewTOTPSetup(issuer, u.Email)
 	if err != nil {
 		return nil, err
 	}
-	enc, err = auth.EncryptSecret(a.TOTPKey, setup.Secret)
+	enc, err = EncryptSecret(a.TOTPKey, setup.Secret)
 	if err != nil {
 		return nil, err
 	}
@@ -481,7 +481,7 @@ func (a *AuthUseCase) Verify2FASetup(ctx context.Context, userID uuid.UUID, code
 	if err != nil {
 		return nil, Err2FANotConfigured
 	}
-	if !auth.VerifyTOTP(secret, code) {
+	if !VerifyTOTP(secret, code) {
 		return nil, ErrInvalid2FACode
 	}
 	now = time.Now().UTC()
@@ -500,6 +500,10 @@ func (a *AuthUseCase) Verify2FASetup(ctx context.Context, userID uuid.UUID, code
 	return &TOTPVerifyResult{BackupCodes: codes}, nil
 }
 
+func (a *AuthUseCase) CreatePending2FAToken(_ context.Context, userID uuid.UUID) (string, error) {
+	return SignPending2FA(a.pendingSecret, userID, time.Now().UTC()), nil
+}
+
 func (a *AuthUseCase) Challenge2FA(ctx context.Context, pendingToken, code string, meta RequestMeta) (*LoginResult, error) {
 	var (
 		uid    uuid.UUID
@@ -508,7 +512,7 @@ func (a *AuthUseCase) Challenge2FA(ctx context.Context, pendingToken, code strin
 		tokens *SessionTokens
 	)
 
-	uid, err = auth.VerifyPending2FA(a.TOTPKey, pendingToken, time.Now().UTC())
+	uid, err = VerifyPending2FA(a.pendingSecret, pendingToken, time.Now().UTC())
 	if err != nil {
 		return nil, ErrInvalidToken
 	}
@@ -551,7 +555,7 @@ func (a *AuthUseCase) verifyTOTPOrBackup(ctx context.Context, u model.User, code
 	)
 
 	secret, err = a.decryptTOTP(u)
-	if err == nil && auth.VerifyTOTP(secret, code) {
+	if err == nil && VerifyTOTP(secret, code) {
 		return true
 	}
 	if a.TOTPBackup == nil {
@@ -565,7 +569,7 @@ func (a *AuthUseCase) verifyTOTPOrBackup(ctx context.Context, u model.User, code
 	if err != nil {
 		return false
 	}
-	hash = auth.OpaqueHash(norm)
+	hash = OpaqueHash(norm)
 	now = time.Now().UTC()
 	for i = range rows {
 		row = rows[i]
@@ -581,7 +585,7 @@ func (a *AuthUseCase) decryptTOTP(u model.User) (string, error) {
 	if u.TOTPSecret == nil || strings.TrimSpace(*u.TOTPSecret) == "" {
 		return "", Err2FANotConfigured
 	}
-	return auth.DecryptSecret(a.TOTPKey, *u.TOTPSecret)
+	return DecryptSecret(a.TOTPKey, *u.TOTPSecret)
 }
 
 func (a *AuthUseCase) genBackupCodes(ctx context.Context, userID uuid.UUID) ([]string, error) {
@@ -610,7 +614,7 @@ func (a *AuthUseCase) genBackupCodes(ctx context.Context, userID uuid.UUID) ([]s
 		rows = append(rows, model.TOTPBackupCode{
 			ID:        uuid.New(),
 			UserID:    userID,
-			CodeHash:  auth.OpaqueHash(code),
+			CodeHash:  OpaqueHash(code),
 			CreatedAt: now,
 		})
 	}

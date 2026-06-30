@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"crowdfund-app/apierr"
+	"crowdfund-app/usecase"
 	"crowdfund-app/wshub"
 
 	"github.com/google/uuid"
@@ -15,13 +15,13 @@ import (
 	"github.com/labstack/echo/v4"
 )
 
-type WSController struct {
+type wsController struct {
 	Hub            wshub.Hub
-	Messages       IMessageProjectAccess
+	Messages       usecase.IMessageUsecase
 	allowedOrigins map[string]struct{}
 }
 
-func NewWSController(hub wshub.Hub, messages IMessageProjectAccess, allowedOrigins []string) *WSController {
+func NewWSController(hub wshub.Hub, messages usecase.IMessageUsecase, allowedOrigins []string) IWSController {
 	var allowed map[string]struct{}
 	if len(allowedOrigins) > 0 {
 		allowed = make(map[string]struct{}, len(allowedOrigins))
@@ -31,12 +31,12 @@ func NewWSController(hub wshub.Hub, messages IMessageProjectAccess, allowedOrigi
 			}
 		}
 	}
-	return &WSController{Hub: hub, Messages: messages, allowedOrigins: allowed}
+	return &wsController{Hub: hub, Messages: messages, allowedOrigins: allowed}
 }
 
 const wsDBOpTimeout = 5 * time.Second
 
-func (w *WSController) Handle(c echo.Context) error {
+func (w *wsController) Handle(c echo.Context) error {
 	var (
 		userID   uuid.UUID
 		conn     *websocket.Conn
@@ -103,7 +103,7 @@ func (w *WSController) Handle(c echo.Context) error {
 	return nil
 }
 
-func (w *WSController) checkOrigin(r *http.Request) bool {
+func (w *wsController) checkOrigin(r *http.Request) bool {
 	var origin string
 	origin = strings.TrimSpace(r.Header.Get("Origin"))
 	if origin == "" {
@@ -116,7 +116,7 @@ func (w *WSController) checkOrigin(r *http.Request) bool {
 	return ok
 }
 
-func (w *WSController) dispatchClientFrame(c echo.Context, connID, userID uuid.UUID, in wshub.ClientMessage) {
+func (w *wsController) dispatchClientFrame(c echo.Context, connID, userID uuid.UUID, in wshub.ClientMessage) {
 	var (
 		typ        string
 		projectRaw string
@@ -160,7 +160,7 @@ func (w *WSController) dispatchClientFrame(c echo.Context, connID, userID uuid.U
 	}
 }
 
-func (w *WSController) handleSubscribe(c echo.Context, connID, userID, projectID uuid.UUID, projectPtr string) {
+func (w *wsController) handleSubscribe(c echo.Context, connID, userID, projectID uuid.UUID, projectPtr string) {
 	var (
 		ctx      context.Context
 		cancel   context.CancelFunc
@@ -172,7 +172,7 @@ func (w *WSController) handleSubscribe(c echo.Context, connID, userID, projectID
 	err = w.Messages.ConfirmWSSubscribe(ctx, userID, projectID, requestMeta(c))
 	cancel()
 	if err != nil {
-		code, internal = apierr.MapWSSubscribe(err)
+		code, internal = mapWSSubscribeError(err)
 		if internal {
 			w.writeWSError(connID, wshub.CodeInternal, "internal error", &projectPtr)
 			return
@@ -192,7 +192,7 @@ func (w *WSController) handleSubscribe(c echo.Context, connID, userID, projectID
 	})
 }
 
-func (w *WSController) handleTyping(connID, userID, projectID uuid.UUID, projectPtr string, isTyping *bool) {
+func (w *wsController) handleTyping(connID, userID, projectID uuid.UUID, projectPtr string, isTyping *bool) {
 	var (
 		ctx      context.Context
 		cancel   context.CancelFunc
@@ -214,7 +214,7 @@ func (w *WSController) handleTyping(connID, userID, projectID uuid.UUID, project
 	err = w.Messages.CanSubscribeProject(ctx, projectID, userID)
 	cancel()
 	if err != nil {
-		code, internal = apierr.MapWSSubscribe(err)
+		code, internal = mapWSSubscribeError(err)
 		if internal {
 			w.writeWSError(connID, wshub.CodeInternal, "internal error", &projectPtr)
 			return
@@ -235,7 +235,7 @@ func (w *WSController) handleTyping(connID, userID, projectID uuid.UUID, project
 	w.Hub.BroadcastToProjectExceptUser(projectID, payload, userID)
 }
 
-func (w *WSController) revalidateSubscriptions(connID, userID uuid.UUID) {
+func (w *wsController) revalidateSubscriptions(connID, userID uuid.UUID) {
 	var (
 		projectID uuid.UUID
 		ctx       context.Context
@@ -252,7 +252,7 @@ func (w *WSController) revalidateSubscriptions(connID, userID uuid.UUID) {
 	}
 }
 
-func (w *WSController) pingLoop(connID, userID uuid.UUID, done <-chan struct{}) {
+func (w *wsController) pingLoop(connID, userID uuid.UUID, done <-chan struct{}) {
 	var ticker *time.Ticker
 	ticker = time.NewTicker(wshub.PingInterval)
 	defer ticker.Stop()
@@ -270,7 +270,7 @@ func (w *WSController) pingLoop(connID, userID uuid.UUID, done <-chan struct{}) 
 	}
 }
 
-func (w *WSController) writeWSError(connID uuid.UUID, code, msg string, projectID *string) {
+func (w *wsController) writeWSError(connID uuid.UUID, code, msg string, projectID *string) {
 	writeWSFrame(w.Hub, connID, wshub.ErrorOutbound{
 		Type:          wshub.EventError,
 		SchemaVersion: wshub.EventSchemaVersion,

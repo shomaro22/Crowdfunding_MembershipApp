@@ -1,26 +1,23 @@
 package controller
 
 import (
-	"context"
 	"net/http"
 	"os"
+
+	"crowdfund-app/usecase"
 
 	"github.com/labstack/echo/v4"
 )
 
-type KYCFileOpener interface {
-	OpenWithToken(ctx context.Context, token string) (*os.File, string, error)
+type kycFileController struct {
+	KYC usecase.IKYCAccessUsecase
 }
 
-type KYCFileController struct {
-	KYC KYCFileOpener
+func NewKYCFileController(kyc usecase.IKYCAccessUsecase) IKYCFileController {
+	return &kycFileController{KYC: kyc}
 }
 
-func NewKYCFileController(kyc KYCFileOpener) *KYCFileController {
-	return &KYCFileController{KYC: kyc}
-}
-
-func (h *KYCFileController) Serve(c echo.Context) error {
+func (h *kycFileController) Serve(c echo.Context) error {
 	var (
 		token string
 		f     *os.File

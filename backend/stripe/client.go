@@ -116,7 +116,11 @@ func (c *client) ConstructWebhookEvent(payload []byte, signature string) (Webhoo
 	if strings.TrimSpace(c.cfg.WebhookSecret) == "" {
 		return WebhookEvent{}, ErrWebhookNotConfigured
 	}
-	ev, err := webhook.ConstructEvent(payload, signature, c.cfg.WebhookSecret)
+	// Stripe CLI may forward events on a newer API release train (e.g. clover)
+	// than stripe-go pins (e.g. basil). Signature validation still applies.
+	ev, err := webhook.ConstructEventWithOptions(payload, signature, c.cfg.WebhookSecret, webhook.ConstructEventOptions{
+		IgnoreAPIVersionMismatch: true,
+	})
 	if err != nil {
 		return WebhookEvent{}, err
 	}

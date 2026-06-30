@@ -10,15 +10,15 @@ import (
 	"github.com/labstack/echo/v4"
 )
 
-type MessageController struct {
-	Messages IMessageUseCase
+type messageController struct {
+	Messages usecase.IMessageUsecase
 }
 
-func NewMessageController(messages IMessageUseCase) *MessageController {
-	return &MessageController{Messages: messages}
+func NewMessageController(messages usecase.IMessageUsecase) IMessageController {
+	return &messageController{Messages: messages}
 }
 
-func (h *MessageController) List(c echo.Context) error {
+func (h *messageController) List(c echo.Context) error {
 	var (
 		userID uuid.UUID
 		result usecase.ListThreadsResult
@@ -61,7 +61,7 @@ func listThreadsQueryFrom(c echo.Context) usecase.ListThreadsQuery {
 	}
 }
 
-func (h *MessageController) Send(c echo.Context) error {
+func (h *messageController) Send(c echo.Context) error {
 	var (
 		userID uuid.UUID
 		body   sendMessageRequestJSON
@@ -88,7 +88,7 @@ func (h *MessageController) Send(c echo.Context) error {
 	return jsonCreated(c, MessageItemWireFrom(out))
 }
 
-func (h *MessageController) MarkRead(c echo.Context) error {
+func (h *messageController) MarkRead(c echo.Context) error {
 	var (
 		userID    uuid.UUID
 		messageID uuid.UUID
@@ -109,7 +109,7 @@ func (h *MessageController) MarkRead(c echo.Context) error {
 	return noContent(c)
 }
 
-func (h *MessageController) Notifications(c echo.Context) error {
+func (h *messageController) Notifications(c echo.Context) error {
 	var (
 		userID uuid.UUID
 		view   usecase.NotificationsView

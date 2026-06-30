@@ -7,19 +7,19 @@ import (
 	"github.com/labstack/echo/v4"
 )
 
-type ConnectController struct {
-	Connect IConnectUseCase
+type connectController struct {
+	Connect usecase.IConnectUsecase
 }
 
-func NewConnectController(uc IConnectUseCase) *ConnectController {
-	return &ConnectController{Connect: uc}
+func NewConnectController(uc usecase.IConnectUsecase) IConnectController {
+	return &connectController{Connect: uc}
 }
 
 type connectAccountResponse struct {
 	Account *connectAccountResp `json:"account"`
 }
 
-func (h *ConnectController) GetAccount(c echo.Context) error {
+func (h *connectController) GetAccount(c echo.Context) error {
 	var (
 		sellerID uuid.UUID
 		row      *usecase.ConnectAccountView
@@ -41,7 +41,7 @@ func (h *ConnectController) GetAccount(c echo.Context) error {
 	return jsonOK(c, resp)
 }
 
-func (h *ConnectController) CreateOnboarding(c echo.Context) error {
+func (h *connectController) CreateOnboarding(c echo.Context) error {
 	var (
 		sellerID uuid.UUID
 		url      string
