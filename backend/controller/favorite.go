@@ -10,10 +10,10 @@ import (
 )
 
 type FavoriteController struct {
-	Favorites IFavoriteUseCase
+	Favorites usecase.IFavoriteUsecase
 }
 
-func NewFavoriteController(favorites IFavoriteUseCase) *FavoriteController {
+func NewFavoriteController(favorites usecase.IFavoriteUsecase) *FavoriteController {
 	return &FavoriteController{Favorites: favorites}
 }
 

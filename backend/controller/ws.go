@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"crowdfund-app/apierr"
+	"crowdfund-app/usecase"
 	"crowdfund-app/wshub"
 
 	"github.com/google/uuid"
@@ -17,11 +17,11 @@ import (
 
 type WSController struct {
 	Hub            wshub.Hub
-	Messages       IMessageProjectAccess
+	Messages       usecase.IMessageUsecase
 	allowedOrigins map[string]struct{}
 }
 
-func NewWSController(hub wshub.Hub, messages IMessageProjectAccess, allowedOrigins []string) *WSController {
+func NewWSController(hub wshub.Hub, messages usecase.IMessageUsecase, allowedOrigins []string) *WSController {
 	var allowed map[string]struct{}
 	if len(allowedOrigins) > 0 {
 		allowed = make(map[string]struct{}, len(allowedOrigins))
@@ -172,7 +172,7 @@ func (w *WSController) handleSubscribe(c echo.Context, connID, userID, projectID
 	err = w.Messages.ConfirmWSSubscribe(ctx, userID, projectID, requestMeta(c))
 	cancel()
 	if err != nil {
-		code, internal = apierr.MapWSSubscribe(err)
+		code, internal = mapWSSubscribeError(err)
 		if internal {
 			w.writeWSError(connID, wshub.CodeInternal, "internal error", &projectPtr)
 			return
@@ -214,7 +214,7 @@ func (w *WSController) handleTyping(connID, userID, projectID uuid.UUID, project
 	err = w.Messages.CanSubscribeProject(ctx, projectID, userID)
 	cancel()
 	if err != nil {
-		code, internal = apierr.MapWSSubscribe(err)
+		code, internal = mapWSSubscribeError(err)
 		if internal {
 			w.writeWSError(connID, wshub.CodeInternal, "internal error", &projectPtr)
 			return

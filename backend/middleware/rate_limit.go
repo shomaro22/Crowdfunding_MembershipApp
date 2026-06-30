@@ -24,13 +24,13 @@ type RatePolicy struct {
 }
 
 type RateLimiter struct {
-	UC       *usecase.RateLimitUseCase
+	UC       usecase.IRateLimitUsecase
 	OnDenied RateLimitDeniedHook
 }
 
 type RateLimitDeniedHook func(c echo.Context, policy RatePolicy, ruleKey string)
 
-func NewRateLimiter(uc *usecase.RateLimitUseCase) *RateLimiter {
+func NewRateLimiter(uc usecase.IRateLimitUsecase) *RateLimiter {
 	return &RateLimiter{UC: uc}
 }
 

@@ -1,15 +1,17 @@
 package controller
 
 import (
+	"crowdfund-app/usecase"
+
 	"github.com/google/uuid"
 	"github.com/labstack/echo/v4"
 )
 
 type WSTokenController struct {
-	Tokens IWSTokenUseCase
+	Tokens usecase.IWSTokenUsecase
 }
 
-func NewWSTokenController(tokens IWSTokenUseCase) *WSTokenController {
+func NewWSTokenController(tokens usecase.IWSTokenUsecase) *WSTokenController {
 	return &WSTokenController{Tokens: tokens}
 }
 

@@ -7,7 +7,7 @@ import (
 	"log"
 	"os"
 
-	"crowdfund-app/bootstrap"
+	"crowdfund-app/server"
 	"crowdfund-app/usecase"
 )
 
@@ -26,7 +26,7 @@ func main() {
 		os.Exit(2)
 	}
 	job = args[0]
-	bootstrap.LoadDotEnv()
+	server.LoadDotEnv()
 	err = runBatch(job, dryRun)
 	if err != nil {
 		log.Fatal(err)
@@ -35,13 +35,13 @@ func main() {
 
 func runBatch(job string, dryRun bool) error {
 	var (
-		ctx  context.Context
-		app  *bootstrap.BatchApp
-		run  *usecase.BatchRunView
-		err  error
+		ctx context.Context
+		app *server.BatchApp
+		run *usecase.BatchRunView
+		err error
 	)
 	ctx = context.Background()
-	app, err = bootstrap.OpenForBatch(nil)
+	app, err = server.OpenBatch(nil)
 	if err != nil {
 		return err
 	}
