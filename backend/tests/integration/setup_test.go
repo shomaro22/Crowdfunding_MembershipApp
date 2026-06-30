@@ -615,7 +615,7 @@ func setupPaymentApp(t *testing.T) (*echo.Echo, *stripe.StubClient) {
 	return setupAppWithOpts(t, appOpts(stub)), stub
 }
 
-func openDB(t *testing.T) *gorm.DB {
+func testDB(t *testing.T) *gorm.DB {
 	t.Helper()
 	if testGDB == nil {
 		t.Fatal("DATABASE_URL が未設定")

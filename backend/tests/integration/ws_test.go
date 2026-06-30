@@ -35,7 +35,7 @@ func TestWSMessageCreatedBroadcast(t *testing.T) {
 		err       error
 	)
 	e, _ = setupPaymentApp(t)
-	gdb = openDB(t)
+	gdb = testDB(t)
 	fx = seedPaymentFixture(t, gdb)
 	now = time.Now().UTC()
 	err = gdb.Create(&model.ProjectSupporter{

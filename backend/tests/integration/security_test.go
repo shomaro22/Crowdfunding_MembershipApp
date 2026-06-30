@@ -45,7 +45,7 @@ func TestSecurityTamperedJWT(t *testing.T) {
 		req   *http.Request
 	)
 	e = setupApp(t)
-	gdb = openDB(t)
+	gdb = testDB(t)
 	u = seedUser(t, gdb, seedOpts{Role: model.UserRoleBuyer})
 	tok, _ = issueToken(u, true)
 	rec = httptest.NewRecorder()
@@ -67,7 +67,7 @@ func TestSecurityExpiredJWT(t *testing.T) {
 		req *http.Request
 	)
 	e = setupApp(t)
-	gdb = openDB(t)
+	gdb = testDB(t)
 	u = seedUser(t, gdb, seedOpts{Role: model.UserRoleBuyer})
 	tok = expiredToken(u.ID)
 	rec = httptest.NewRecorder()
@@ -89,7 +89,7 @@ func TestSecurityRevokedToken(t *testing.T) {
 		req *http.Request
 	)
 	e = setupApp(t)
-	gdb = openDB(t)
+	gdb = testDB(t)
 	u = seedUser(t, gdb, seedOpts{Role: model.UserRoleBuyer})
 	tok, _ = issueToken(u, true)
 	if err := gdb.Model(&model.User{}).Where("id = ?", u.ID).
@@ -117,7 +117,7 @@ func TestSecurityBuyerCannotAccessAdmin(t *testing.T) {
 		rec *httptest.ResponseRecorder
 	)
 	e = setupApp(t)
-	gdb = openDB(t)
+	gdb = testDB(t)
 	u = seedUser(t, gdb, seedOpts{Role: model.UserRoleBuyer})
 	tok, _ = issueToken(u, true)
 	rec = httpGET(e, "/admin/reviews/users", tok)
@@ -136,7 +136,7 @@ func TestSecurityAdminRequires2FA(t *testing.T) {
 		rec   *httptest.ResponseRecorder
 	)
 	e = setupApp(t)
-	gdb = openDB(t)
+	gdb = testDB(t)
 	role = model.AdminRoleReviewAdmin
 	u = seedUser(t, gdb, seedOpts{
 		Role:      model.UserRoleAdmin,
@@ -162,7 +162,7 @@ func TestSecuritySellerWriteRequires2FA(t *testing.T) {
 		rec *httptest.ResponseRecorder
 	)
 	e = setupApp(t)
-	gdb = openDB(t)
+	gdb = testDB(t)
 	u = seedUser(t, gdb, seedOpts{
 		Role:        model.UserRoleSeller,
 		TOTPEnabled: true,
@@ -186,7 +186,7 @@ func TestSecurityChangePasswordRequiresTOTP(t *testing.T) {
 		rec *httptest.ResponseRecorder
 	)
 	e = setupApp(t)
-	gdb = openDB(t)
+	gdb = testDB(t)
 	u = seedUser(t, gdb, seedOpts{
 		Role:        model.UserRoleSeller,
 		TOTPEnabled: true,
