@@ -40,7 +40,7 @@ func TestMediaUploadAndFetch(t *testing.T) {
 		err    error
 	)
 	e = setupApp(t)
-	gdb = openDB(t)
+	gdb = testDB(t)
 	seller = seedUser(t, gdb, seedOpts{Role: model.UserRoleSeller})
 	tok, _ = issueToken(seller, true)
 
@@ -76,7 +76,7 @@ func TestMediaUploadUnsupportedType(t *testing.T) {
 		rec    *httptest.ResponseRecorder
 	)
 	e = setupApp(t)
-	gdb = openDB(t)
+	gdb = testDB(t)
 	seller = seedUser(t, gdb, seedOpts{Role: model.UserRoleSeller})
 	tok, _ = issueToken(seller, true)
 	rec = mediaUploadPOST(e, tok, []byte("not an image"), "test.txt")
