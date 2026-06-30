@@ -27,7 +27,7 @@ func TestSellerDashboardForbiddenForBuyer(t *testing.T) {
 		rec   *httptest.ResponseRecorder
 	)
 	e = setupApp(t)
-	gdb = openDB(t)
+	gdb = testDB(t)
 	buyer = seedUser(t, gdb, seedOpts{Role: model.UserRoleBuyer})
 	tok, _ = issueToken(buyer, true)
 	rec = httpGET(e, "/seller/dashboard/stats", tok)
@@ -48,7 +48,7 @@ func TestSellerDashboardStatsAndSupporters(t *testing.T) {
 		analysis sellerProjectsAnalysisBody
 	)
 	e = setupApp(t)
-	gdb = openDB(t)
+	gdb = testDB(t)
 	fx = seedSellerFixture(t, gdb)
 	tok, _ = issueToken(fx.seller, true)
 

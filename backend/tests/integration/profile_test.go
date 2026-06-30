@@ -40,7 +40,7 @@ func TestProfileGetAndUpdate(t *testing.T) {
 		body   userProfileBody
 	)
 	e = setupApp(t)
-	gdb = openDB(t)
+	gdb = testDB(t)
 	buyer = seedUser(t, gdb, seedOpts{Role: model.UserRoleBuyer})
 	tok, _ = issueToken(buyer, true)
 
@@ -92,7 +92,7 @@ func TestProfileUpdateBadRequest(t *testing.T) {
 		rec   *httptest.ResponseRecorder
 	)
 	e = setupApp(t)
-	gdb = openDB(t)
+	gdb = testDB(t)
 	buyer = seedUser(t, gdb, seedOpts{Role: model.UserRoleBuyer})
 	tok, _ = issueToken(buyer, true)
 
