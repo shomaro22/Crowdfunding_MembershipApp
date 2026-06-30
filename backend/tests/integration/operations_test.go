@@ -38,7 +38,7 @@ func TestOperationsBuyerCannotAccessActivity(t *testing.T) {
 		rec *httptest.ResponseRecorder
 	)
 	e = setupApp(t)
-	gdb = openDB(t)
+	gdb = testDB(t)
 	u = seedUser(t, gdb, seedOpts{Role: model.UserRoleBuyer})
 	tok, _ = issueToken(u, true)
 	rec = httpGET(e, "/admin/activity", tok)
@@ -57,7 +57,7 @@ func TestOperationsRequires2FA(t *testing.T) {
 		rec  *httptest.ResponseRecorder
 	)
 	e = setupApp(t)
-	gdb = openDB(t)
+	gdb = testDB(t)
 	role = model.AdminRoleSuperAdmin
 	u = seedUser(t, gdb, seedOpts{
 		Role:        model.UserRoleAdmin,
@@ -83,7 +83,7 @@ func TestOperationsSuperAdminCanAccessAll(t *testing.T) {
 		rec  *httptest.ResponseRecorder
 	)
 	e = setupApp(t)
-	gdb = openDB(t)
+	gdb = testDB(t)
 	tok = issueAdminToken(t, gdb, model.AdminRoleSuperAdmin)
 
 	for _, path = range []string{
@@ -112,7 +112,7 @@ func TestOperationsFinanceAdminRBAC(t *testing.T) {
 		rec  *httptest.ResponseRecorder
 	)
 	e = setupApp(t)
-	gdb = openDB(t)
+	gdb = testDB(t)
 	tok = issueAdminToken(t, gdb, model.AdminRoleFinanceAdmin)
 
 	for _, path := range []string{"/admin/activity", "/admin/batches"} {
@@ -143,7 +143,7 @@ func TestOperationsSupportAdminRBAC(t *testing.T) {
 		rec *httptest.ResponseRecorder
 	)
 	e = setupApp(t)
-	gdb = openDB(t)
+	gdb = testDB(t)
 	tok = issueAdminToken(t, gdb, model.AdminRoleSupportAdmin)
 
 	for _, path := range []string{"/admin/activity", "/admin/security"} {
@@ -175,7 +175,7 @@ func TestOperationsReviewAdminDenied(t *testing.T) {
 		rec  *httptest.ResponseRecorder
 	)
 	e = setupApp(t)
-	gdb = openDB(t)
+	gdb = testDB(t)
 	tok = issueAdminToken(t, gdb, model.AdminRoleReviewAdmin)
 
 	for _, path = range []string{
@@ -201,7 +201,7 @@ func TestOperationsListActivityReturnsSeededLog(t *testing.T) {
 		body   string
 	)
 	e = setupApp(t)
-	gdb = openDB(t)
+	gdb = testDB(t)
 	tok = issueAdminToken(t, gdb, model.AdminRoleSuperAdmin)
 	logID = seedOpsActivityLog(t, gdb, model.UserLoginFail, strPtr("203.0.113.55"), time.Now().UTC())
 
@@ -225,7 +225,7 @@ func TestOperationsSecurityEventsCounts(t *testing.T) {
 		now   time.Time
 	)
 	e = setupApp(t)
-	gdb = openDB(t)
+	gdb = testDB(t)
 	tok = issueAdminToken(t, gdb, model.AdminRoleSupportAdmin)
 	now = time.Now().UTC()
 	seedOpsActivityLog(t, gdb, model.UserLoginFail, strPtr("203.0.113.1"), now)
@@ -257,7 +257,7 @@ func TestOperationsSuperAdminListAuditLogs(t *testing.T) {
 		body    string
 	)
 	e = setupApp(t)
-	gdb = openDB(t)
+	gdb = testDB(t)
 	admin = seedUser(t, gdb, seedOpts{
 		Role:        model.UserRoleAdmin,
 		AdminRole:   adminRolePtr(model.AdminRoleSuperAdmin),
@@ -284,7 +284,7 @@ func TestOperationsRunBatchInvalidJob(t *testing.T) {
 		rec *httptest.ResponseRecorder
 	)
 	e = setupApp(t)
-	gdb = openDB(t)
+	gdb = testDB(t)
 	tok = issueAdminToken(t, gdb, model.AdminRoleSuperAdmin)
 
 	rec = httpPOST(e, "/admin/batches/not_a_job/run?dry_run=true", tok, "")
