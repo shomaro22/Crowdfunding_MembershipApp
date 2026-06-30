@@ -90,7 +90,7 @@ func TestPaymentKonbiniCheckoutAsyncWebhook(t *testing.T) {
 		err       error
 	)
 	e, stub = setupPaymentApp(t)
-	gdb = openDB(t)
+	gdb = testDB(t)
 	fx = seedPaymentFixture(t, gdb)
 	tok, _ = issueToken(fx.buyer, true)
 	rec = httpPOST(e, "/payments/checkout", tok, fmt.Sprintf(
@@ -147,7 +147,7 @@ func TestPaymentAutoIntentWebhook(t *testing.T) {
 		err       error
 	)
 	e, stub = setupPaymentApp(t)
-	gdb = openDB(t)
+	gdb = testDB(t)
 	fx = seedPaymentFixture(t, gdb)
 	tok, _ = issueToken(fx.buyer, true)
 	rec = httpPOST(e, "/payments/intent", tok, fmt.Sprintf(
@@ -192,7 +192,7 @@ func TestPaymentVerifyCheckoutFallback(t *testing.T) {
 		err       error
 	)
 	e, stub = setupPaymentApp(t)
-	gdb = openDB(t)
+	gdb = testDB(t)
 	fx = seedPaymentFixture(t, gdb)
 	tok, _ = issueToken(fx.buyer, true)
 	rec = httpPOST(e, "/payments/checkout", tok, fmt.Sprintf(
@@ -232,7 +232,7 @@ func TestPaymentWebhookIdempotent(t *testing.T) {
 		err       error
 	)
 	e, stub = setupPaymentApp(t)
-	gdb = openDB(t)
+	gdb = testDB(t)
 	fx = seedPaymentFixture(t, gdb)
 	tok, _ = issueToken(fx.buyer, true)
 	rec = httpPOST(e, "/payments/checkout", tok, fmt.Sprintf(
@@ -277,7 +277,7 @@ func TestPaymentKonbiniCheckoutExpired(t *testing.T) {
 		err       error
 	)
 	e, _ = setupPaymentApp(t)
-	gdb = openDB(t)
+	gdb = testDB(t)
 	fx = seedPaymentFixture(t, gdb)
 	tok, _ = issueToken(fx.buyer, true)
 	rec = httpPOST(e, "/payments/checkout", tok, fmt.Sprintf(
@@ -316,7 +316,7 @@ func TestPaymentAlreadySupportingConflict(t *testing.T) {
 		err  error
 	)
 	e, _ = setupPaymentApp(t)
-	gdb = openDB(t)
+	gdb = testDB(t)
 	fx = seedPaymentFixture(t, gdb)
 	now = time.Now().UTC()
 	err = gdb.Create(&model.ProjectSupporter{

@@ -22,7 +22,7 @@ func TestProjectBuyerCannotCreate(t *testing.T) {
 		rec *httptest.ResponseRecorder
 	)
 	e = setupApp(t)
-	gdb = openDB(t)
+	gdb = testDB(t)
 	u = seedUser(t, gdb, seedOpts{Role: model.UserRoleBuyer})
 	tok, _ = issueToken(u, true)
 	rec = httpPOST(e, "/projects", tok, `{"title":"t","description":"d"}`)
@@ -41,7 +41,7 @@ func TestProjectReviewAdminCanListProjects(t *testing.T) {
 		rec   *httptest.ResponseRecorder
 	)
 	e = setupApp(t)
-	gdb = openDB(t)
+	gdb = testDB(t)
 	role = model.AdminRoleReviewAdmin
 	u = seedUser(t, gdb, seedOpts{
 		Role:        model.UserRoleAdmin,
@@ -65,7 +65,7 @@ func TestProjectFinanceAdminCannotListProjects(t *testing.T) {
 		rec   *httptest.ResponseRecorder
 	)
 	e = setupApp(t)
-	gdb = openDB(t)
+	gdb = testDB(t)
 	role = model.AdminRoleFinanceAdmin
 	u = seedUser(t, gdb, seedOpts{
 		Role:        model.UserRoleAdmin,
@@ -88,7 +88,7 @@ func TestProjectPendingHiddenFromPublic(t *testing.T) {
 		rec     *httptest.ResponseRecorder
 	)
 	e = setupApp(t)
-	gdb = openDB(t)
+	gdb = testDB(t)
 	seller = seedUser(t, gdb, seedOpts{Role: model.UserRoleSeller})
 	project = seedProject(t, gdb, seller.ID, model.ProjectStatusPending)
 	rec = httpGET(e, "/projects/"+project.ID.String(), "")
@@ -107,7 +107,7 @@ func TestProjectSellerCanViewOwnPending(t *testing.T) {
 		rec    *httptest.ResponseRecorder
 	)
 	e = setupApp(t)
-	gdb = openDB(t)
+	gdb = testDB(t)
 	seller = seedUser(t, gdb, seedOpts{
 		Role:        model.UserRoleSeller,
 		TOTPEnabled: true,
@@ -131,7 +131,7 @@ func TestProjectRejectBuyerRequiresReason(t *testing.T) {
 		rec     *httptest.ResponseRecorder
 	)
 	e = setupApp(t)
-	gdb = openDB(t)
+	gdb = testDB(t)
 	buyer = seedUser(t, gdb, seedOpts{
 		Role:          model.UserRoleBuyer,
 		AccountStatus: model.AccountStatusPending,
@@ -161,7 +161,7 @@ func TestProjectPatchRejectRequiresReason(t *testing.T) {
 		rec    *httptest.ResponseRecorder
 	)
 	e = setupApp(t)
-	gdb = openDB(t)
+	gdb = testDB(t)
 	seller = seedUser(t, gdb, seedOpts{Role: model.UserRoleSeller})
 	project = seedProject(t, gdb, seller.ID, model.ProjectStatusPending)
 	role = model.AdminRoleReviewAdmin
@@ -189,7 +189,7 @@ func TestProjectHardDeleteActiveForbidden(t *testing.T) {
 		rec    *httptest.ResponseRecorder
 	)
 	e = setupApp(t)
-	gdb = openDB(t)
+	gdb = testDB(t)
 	seller = seedUser(t, gdb, seedOpts{Role: model.UserRoleSeller})
 	project = seedProject(t, gdb, seller.ID, model.ProjectStatusActive)
 	role = model.AdminRoleReviewAdmin
@@ -219,7 +219,7 @@ func TestProjectHardDeleteDeletedAllowed(t *testing.T) {
 		n      int64
 	)
 	e = setupApp(t)
-	gdb = openDB(t)
+	gdb = testDB(t)
 	seller = seedUser(t, gdb, seedOpts{Role: model.UserRoleSeller})
 	project = seedProject(t, gdb, seller.ID, model.ProjectStatusDeleted)
 	role = model.AdminRoleReviewAdmin
