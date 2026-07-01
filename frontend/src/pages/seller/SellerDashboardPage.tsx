@@ -12,13 +12,14 @@ import {
 import { Loading } from '@/components/common/Loading'
 import { ErrorMessage } from '@/components/common/ErrorMessage'
 import { formatCurrencyYen } from '@/lib/utils'
-import type { ConnectAccount, ProjectAnalysisItem, SellerDashboardStats } from '@/types/api'
+import type { ConnectAccount, ProjectAnalysisItem, SellerDashboardStats, SellerSupporterRow } from '@/types/api'
 
 export function SellerDashboardPage() {
   const [stats, setStats] = useState<SellerDashboardStats | null>(null)
   const [connect, setConnect] = useState<ConnectAccount | null>(null)
   const [analysis, setAnalysis] = useState<ProjectAnalysisItem[]>([])
   const [supporterTotal, setSupporterTotal] = useState(0)
+  const [supporterRows, setSupporterRows] = useState<SellerSupporterRow[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [connectMsg, setConnectMsg] = useState('')
@@ -37,6 +38,7 @@ export function SellerDashboardPage() {
       setConnect(c.account)
       setAnalysis(a.projects)
       setSupporterTotal(sup.total)
+      setSupporterRows(sup.supporters)
     } catch {
       setError('ダッシュボードの取得に失敗しました')
     } finally {
@@ -114,6 +116,18 @@ export function SellerDashboardPage() {
           <h2 className="text-lg font-semibold">支援者 ({supporterTotal})</h2>
           <button type="button" onClick={() => void onExport()} className="btn-secondary rounded-full text-sm">CSV 出力</button>
         </div>
+        {supporterRows.length === 0 ? (
+          <p className="text-sm text-gray-500">支援者はまだいません</p>
+        ) : (
+          <ul className="space-y-2 text-sm">
+            {supporterRows.map((row) => (
+              <li key={row.id} className="flex justify-between border-b border-purple-50 py-2">
+                <span>{row.project?.title ?? row.project_id}</span>
+                <span className="text-gray-600">{row.plan?.membership_type} · {row.status}</span>
+              </li>
+            ))}
+          </ul>
+        )}
       </section>
 
       <section className="card">
@@ -122,7 +136,7 @@ export function SellerDashboardPage() {
           {analysis.map((p) => (
             <li key={p.project_id} className="border-b border-purple-50 pb-3">
               <div className="mb-2 flex justify-between font-medium">
-                <span>{p.title}</span>
+                <Link to={`/projects/${p.project_id}`} className="text-purple-800 hover:underline">{p.title}</Link>
                 <span>{p.supporter_count} 人 · {formatCurrencyYen(p.revenue)}</span>
               </div>
               {p.plan_breakdown ? (

@@ -54,6 +54,7 @@ type ProjectUseCase struct {
 	Projects  repository.IProjectRepo
 	Users     repository.IUserRepo
 	Favorites repository.IFavoriteRepo
+	Reports   repository.IReportRepo
 	DB        *gorm.DB
 }
 
@@ -268,6 +269,16 @@ func (p *ProjectUseCase) FindView(ctx context.Context, id uuid.UUID, viewerID *u
 	}
 	if !canViewProject(project, viewerID, parseUserRole(viewerRole), now) {
 		return nil, ErrNotFound
+	}
+	if viewerID != nil && p.Reports != nil && parseUserRole(viewerRole) == model.UserRoleBuyer {
+		var blocked bool
+		blocked, err = p.Reports.HasOpenByReporterTarget(ctx, *viewerID, model.ReportTargetProject, id)
+		if err != nil {
+			return nil, err
+		}
+		if blocked {
+			return nil, ErrForbidden
+		}
 	}
 	u, err = p.Users.GetID(ctx, project.SellerID)
 	if err != nil {

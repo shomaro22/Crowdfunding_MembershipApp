@@ -50,13 +50,14 @@ export function FavoritesPage() {
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
           {items.map((p) => (
             <div key={p.id} className="relative">
-              <ProjectCard project={p} />
+              <ProjectCard project={p} hideFavoriteBadge />
               <button
                 type="button"
+                aria-label="お気に入り解除"
                 onClick={() => void remove(p.id)}
-                className="absolute right-3 top-3 rounded-full bg-white/90 px-3 py-1 text-xs text-red-600 shadow"
+                className="absolute right-3 top-3 flex h-9 w-9 items-center justify-center rounded-full bg-white/95 text-lg text-pink-600 shadow hover:bg-pink-50"
               >
-                解除
+                ♥
               </button>
             </div>
           ))}
