@@ -118,11 +118,31 @@ export function SellerDashboardPage() {
 
       <section className="card">
         <h2 className="mb-3 text-lg font-semibold">プロジェクト分析</h2>
-        <ul className="space-y-2 text-sm">
+        <ul className="space-y-4 text-sm">
           {analysis.map((p) => (
-            <li key={p.project_id} className="flex justify-between border-b border-purple-50 py-2">
-              <span>{p.title}</span>
-              <span>{p.supporter_count} 人 · {formatCurrencyYen(p.revenue)}</span>
+            <li key={p.project_id} className="border-b border-purple-50 pb-3">
+              <div className="mb-2 flex justify-between font-medium">
+                <span>{p.title}</span>
+                <span>{p.supporter_count} 人 · {formatCurrencyYen(p.revenue)}</span>
+              </div>
+              {p.plan_breakdown ? (
+                <div className="space-y-1 pl-2">
+                  {(['BRONZE', 'SILVER', 'GOLD'] as const).map((tier) => (
+                    <div key={tier} className="flex items-center gap-2 text-xs text-gray-600">
+                      <span className="w-14">{tier}</span>
+                      <div className="h-1.5 flex-1 rounded-full bg-gray-100">
+                        <div
+                          className="h-full rounded-full bg-purple-500"
+                          style={{
+                            width: `${Math.min(100, ((p.plan_breakdown?.[tier] ?? 0) / Math.max(p.supporter_count, 1)) * 100)}%`,
+                          }}
+                        />
+                      </div>
+                      <span className="w-6 text-right">{p.plan_breakdown?.[tier] ?? 0}</span>
+                    </div>
+                  ))}
+                </div>
+              ) : null}
             </li>
           ))}
         </ul>

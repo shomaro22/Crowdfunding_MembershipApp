@@ -109,6 +109,7 @@ func New(cfg Config) *echo.Echo {
 
 	if cfg.Projects != nil {
 		e.GET("/projects", cfg.Projects.ListPublic)
+		e.GET("/projects/featured", cfg.Projects.ListFeatured)
 		e.GET("/projects/mine", cfg.Projects.ListMine, cfg.SellerRead...)
 		e.POST("/projects", cfg.Projects.Create, cfg.SellerWrite...)
 		opt = cfg.OptionalJWT

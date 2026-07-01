@@ -4,7 +4,7 @@ export type AdminRole = 'SUPER_ADMIN' | 'REVIEW_ADMIN' | 'SUPPORT_ADMIN' | 'FINA
 
 export type MembershipType = 'BRONZE' | 'SILVER' | 'GOLD'
 
-export type ProjectStatus = 'PENDING' | 'ACTIVE' | 'REJECTED' | 'DELETED'
+export type ProjectStatus = 'PENDING' | 'ACTIVE' | 'CANCELLED' | 'DELETE_REQUESTED' | 'DELETED' | 'COMPLETED'
 
 export type DurationType = 'LIMITED' | 'UNLIMITED'
 
@@ -97,11 +97,13 @@ export interface ProjectSummary {
   target_amount: number
   current_amount: number
   supporter_count: number
+  favorite_count?: number
   duration_type: DurationType
   start_date: string
   end_date: string | null
   image_url: string | null
   status: ProjectStatus
+  delete_request?: boolean
   seller?: User
   plans: ProjectPlan[]
 }

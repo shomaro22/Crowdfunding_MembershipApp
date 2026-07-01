@@ -143,6 +143,7 @@ type ProjectItemView struct {
 	TargetAmount    int64
 	CurrentAmount   int64
 	SupporterCount  int
+	FavoriteCount   int64
 	DurationType    string
 	StartDate       time.Time
 	EndDate         *time.Time

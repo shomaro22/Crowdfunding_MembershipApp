@@ -31,10 +31,12 @@ type projectSummaryJSON struct {
 	TargetAmount   int64             `json:"target_amount"`
 	CurrentAmount  int64             `json:"current_amount"`
 	SupporterCount int               `json:"supporter_count"`
+	FavoriteCount  int64             `json:"favorite_count"`
 	DurationType   string            `json:"duration_type"`
 	StartDate      string            `json:"start_date"`
 	EndDate        *string           `json:"end_date"`
 	Status         string            `json:"status"`
+	DeleteRequest  bool              `json:"delete_request"`
 	ImageURL       *string           `json:"image_url"`
 	Plans          []projectPlanJSON `json:"plans"`
 	Seller         *UserWire  `json:"seller,omitempty"`
@@ -85,11 +87,14 @@ func projectSummaryToJSON(v *usecase.ProjectView) projectSummaryJSON {
 	var (
 		out    projectSummaryJSON
 		seller UserWire
+		item   usecase.ProjectItemView
 	)
 	if v == nil {
 		return projectSummaryJSON{}
 	}
-	out = projectItemFieldsJSON(v.Project)
+	item = v.Project
+	out = projectItemFieldsJSON(item)
+	out.FavoriteCount = item.FavoriteCount
 	out.Plans = projectPlansToJSON(v.Plans)
 	if v.Seller != nil {
 		seller = UserWireFrom(*v.Seller)
@@ -114,9 +119,11 @@ func projectItemFieldsJSON(p usecase.ProjectItemView) projectSummaryJSON {
 		TargetAmount:   p.TargetAmount,
 		CurrentAmount:  p.CurrentAmount,
 		SupporterCount: p.SupporterCount,
+		FavoriteCount:  p.FavoriteCount,
 		DurationType:   p.DurationType,
 		StartDate:      p.StartDate.UTC().Format(time.RFC3339),
 		Status:         p.Status,
+		DeleteRequest:  p.DeleteRequested,
 		ImageURL:       p.MainImageURL,
 	}
 	if p.EndDate != nil {

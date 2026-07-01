@@ -33,6 +33,20 @@ func (h *projectController) ListPublic(c echo.Context) error {
 	return jsonOK(c, listProjectsJSON(rows, total, limit, offset))
 }
 
+func (h *projectController) ListFeatured(c echo.Context) error {
+	var (
+		limit int
+		rows  []usecase.ProjectView
+		err   error
+	)
+	limit = queryLimit(c, 5, 20)
+	rows, err = h.Projects.ListFeatured(reqCtx(c), limit)
+	if err != nil {
+		return mapUseCaseError(err)
+	}
+	return jsonOK(c, listProjectsJSON(rows, int64(len(rows)), limit, 0))
+}
+
 func (h *projectController) Create(c echo.Context) error {
 	var (
 		sellerID uuid.UUID
