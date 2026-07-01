@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 
-import { exchangeOAuthCode } from '@/api/auth'
+import { exchangeOAuthCode, fetchMe } from '@/api/auth'
 import { useAuth } from '@/auth/AuthProvider'
 import { Loading } from '@/components/common/Loading'
 import { ErrorMessage } from '@/components/common/ErrorMessage'
 import { sanitizeAppPath } from '@/lib/utils'
+import { postLoginPath } from '@/lib/auth-routes'
 
 export function AuthCallbackPage() {
   const [searchParams] = useSearchParams()
@@ -38,7 +39,8 @@ export function AuthCallbackPage() {
       try {
         await exchangeOAuthCode(code)
         await refreshUser()
-        void navigate(from, { replace: true })
+        const me = await fetchMe()
+        void navigate(postLoginPath(me, from), { replace: true })
       } catch {
         setError('ログインセッションの確立に失敗しました')
       }

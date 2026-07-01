@@ -51,9 +51,10 @@ type UpdateProjectIn struct {
 }
 
 type ProjectUseCase struct {
-	Projects repository.IProjectRepo
-	Users    repository.IUserRepo
-	DB       *gorm.DB
+	Projects  repository.IProjectRepo
+	Users     repository.IUserRepo
+	Favorites repository.IFavoriteRepo
+	DB        *gorm.DB
 }
 
 func buildProjectImages(ins []ImageIn, legacyURL *string, now time.Time) ([]model.ProjectImage, *string, error) {
@@ -124,22 +125,50 @@ func imageSortOrders(inputs []model.ImageInput) []int {
 	return orders
 }
 
+func sortPlansByTier(plans []model.ProjectPlan) {
+	var order = map[model.MembershipType]int{
+		model.MembershipBronze: 0,
+		model.MembershipSilver: 1,
+		model.MembershipGold:   2,
+	}
+	for i := 0; i < len(plans); i++ {
+		for j := i + 1; j < len(plans); j++ {
+			if order[plans[j].MembershipType] < order[plans[i].MembershipType] {
+				plans[i], plans[j] = plans[j], plans[i]
+			}
+		}
+	}
+}
+
 func (p *ProjectUseCase) EnrichList(ctx context.Context, rows []model.Project, total int64) ([]ProjectView, int64, error) {
 	var (
-		out         []ProjectView
-		sellerCache map[uuid.UUID]*UserView
-		i           int
-		project     model.Project
-		seller      *UserView
-		ok          bool
-		u           model.User
-		plans       []model.ProjectPlan
-		images      []model.ProjectImage
-		err         error
+		out          []ProjectView
+		sellerCache  map[uuid.UUID]*UserView
+		favCounts    map[uuid.UUID]int64
+		projectIDs   []uuid.UUID
+		i            int
+		project      model.Project
+		seller       *UserView
+		ok           bool
+		u            model.User
+		plans        []model.ProjectPlan
+		images       []model.ProjectImage
+		v            ProjectView
+		err          error
 	)
 
 	out = make([]ProjectView, 0, len(rows))
 	sellerCache = map[uuid.UUID]*UserView{}
+	projectIDs = make([]uuid.UUID, len(rows))
+	for i = range rows {
+		projectIDs[i] = rows[i].ID
+	}
+	if p.Favorites != nil {
+		favCounts, err = p.Favorites.CountByProjects(ctx, projectIDs)
+		if err != nil {
+			return nil, 0, err
+		}
+	}
 	for i = range rows {
 		project = rows[i]
 		seller, ok = sellerCache[project.SellerID]
@@ -155,7 +184,12 @@ func (p *ProjectUseCase) EnrichList(ctx context.Context, rows []model.Project, t
 		if err != nil {
 			return nil, 0, mapRepoNotFound(err)
 		}
-		out = append(out, AssembleProjectView(project, plans, images, seller))
+		sortPlansByTier(plans)
+		v = AssembleProjectView(project, plans, images, seller)
+		if favCounts != nil {
+			v.Project.FavoriteCount = favCounts[project.ID]
+		}
+		out = append(out, v)
 	}
 	return out, total, nil
 }
@@ -178,6 +212,20 @@ func (p *ProjectUseCase) ListPublic(ctx context.Context, search, sort string, li
 		return nil, 0, err
 	}
 	return p.EnrichList(ctx, rows, total)
+}
+
+func (p *ProjectUseCase) ListFeatured(ctx context.Context, limit int) ([]ProjectView, error) {
+	var (
+		rows []model.Project
+		out  []ProjectView
+		err  error
+	)
+	rows, err = p.Projects.ListFeatured(ctx, limit, time.Now().UTC())
+	if err != nil {
+		return nil, err
+	}
+	out, _, err = p.EnrichList(ctx, rows, int64(len(rows)))
+	return out, err
 }
 
 func (p *ProjectUseCase) ListMine(ctx context.Context, sellerID uuid.UUID, limit, offset int) ([]ProjectView, int64, error) {
@@ -226,7 +274,16 @@ func (p *ProjectUseCase) FindView(ctx context.Context, id uuid.UUID, viewerID *u
 		return nil, mapRepoNotFound(err)
 	}
 	seller = UserViewPtr(u)
+	sortPlansByTier(plans)
 	v = AssembleProjectView(project, plans, images, seller)
+	if p.Favorites != nil {
+		var counts map[uuid.UUID]int64
+		counts, err = p.Favorites.CountByProjects(ctx, []uuid.UUID{project.ID})
+		if err != nil {
+			return nil, err
+		}
+		v.Project.FavoriteCount = counts[project.ID]
+	}
 	return &v, nil
 }
 

@@ -115,6 +115,10 @@ func LoadDotEnv() {
 }
 
 func stripeFromEnv() stripe.Client {
+	if strings.TrimSpace(os.Getenv("STRIPE_USE_STUB")) == "1" {
+		slog.Info("stripe using stub client for local development")
+		return stripe.NewStubClient()
+	}
 	cfg, err := stripe.ConfigFromEnv()
 	if err != nil {
 		slog.Info("stripe disabled", "reason", err.Error())
@@ -292,7 +296,7 @@ func BuildHTTP(opts *Options) (*echo.Echo, string, error) {
 		Pending2FAKey: cfg.Pending2FAKey, TOTPIssuer: cfg.TOTPIssuer, AppPublicURL: cfg.AppPublicURL, DB: gormDB,
 		Mailer: usecase.NewLogMailer(cfg.AppPublicURL),
 	})
-	projectUCRaw = usecase.NewProjectUsecase(projects, users, gormDB)
+	projectUCRaw = usecase.NewProjectUsecase(projects, users, favorites, gormDB)
 	projectUC = projectUCRaw
 	kycAccessRaw = usecase.NewKYCAccessUsecase(kycStore, string(cfg.KYCSigningKey))
 	kycAccess = kycAccessRaw

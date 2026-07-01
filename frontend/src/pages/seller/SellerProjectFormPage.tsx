@@ -154,22 +154,42 @@ export function SellerProjectFormPage() {
   }
 
   return (
-    <div className="mx-auto max-w-3xl">
-      <h1 className="mb-6 text-2xl font-bold">{isEdit ? 'プロジェクト編集' : '新規プロジェクト'}</h1>
+    <div className="mx-auto max-w-5xl">
+      <div className="grid overflow-hidden rounded-2xl bg-white shadow-xl md:grid-cols-5">
+        <div className="bg-gradient-to-br from-purple-700 to-pink-600 p-8 text-white md:col-span-2">
+          <h1 className="mb-2 text-2xl font-bold">{isEdit ? 'プロジェクト編集' : '新規プロジェクト'}</h1>
+          <p className="text-sm text-purple-100">タイトル・説明・3つのメンバーシッププラン（BRONZE / SILVER / GOLD）を設定します。</p>
+        </div>
+        <div className="p-6 md:col-span-3 md:p-8">
       {error ? <p className="mb-4 text-sm text-red-600">{error}</p> : null}
-      <form onSubmit={(e) => void onSubmit(e)} className="space-y-6">
-        <input className="input-field" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="タイトル" required />
-        <textarea className="input-field min-h-32" value={description} onChange={(e) => setDescription(e.target.value)} placeholder="説明" required />
-        <input className="input-field" type="number" min={0} value={targetAmount} onChange={(e) => setTargetAmount(e.target.value)} placeholder="目標金額" />
-        <select className="input-field" value={durationType} onChange={(e) => setDurationType(e.target.value as DurationType)}>
-          <option value="UNLIMITED">無期限</option>
-          <option value="LIMITED">期限あり</option>
-        </select>
+      <form onSubmit={(e) => void onSubmit(e)} className="space-y-5">
+        <div>
+          <label className="mb-1 block text-sm font-medium">タイトル</label>
+          <input className="input-field" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="プロジェクト名" required />
+        </div>
+        <div>
+          <label className="mb-1 block text-sm font-medium">説明</label>
+          <textarea className="input-field min-h-32" value={description} onChange={(e) => setDescription(e.target.value)} placeholder="クリエイター活動の紹介、メンバー特典など" required />
+        </div>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div>
+            <label className="mb-1 block text-sm font-medium">目標金額（円）</label>
+            <input className="input-field" type="number" min={0} value={targetAmount} onChange={(e) => setTargetAmount(e.target.value)} />
+          </div>
+          <div>
+            <label className="mb-1 block text-sm font-medium">公開期間</label>
+            <select className="input-field" value={durationType} onChange={(e) => setDurationType(e.target.value as DurationType)}>
+              <option value="UNLIMITED">無期限</option>
+              <option value="LIMITED">期限あり</option>
+            </select>
+          </div>
+        </div>
         <input className="input-field" type="datetime-local" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
         {durationType === 'LIMITED' ? (
           <input className="input-field" type="datetime-local" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
         ) : null}
         <div>
+          <label className="mb-1 block text-sm font-medium">メイン画像</label>
           <input type="file" accept="image/jpeg,image/png,image/webp,image/gif" onChange={(e) => {
             const f = e.target.files?.[0]
             if (f) {
@@ -178,25 +198,29 @@ export function SellerProjectFormPage() {
           }} />
           {imageUrl ? <img src={imageUrl} alt="" className="mt-2 h-32 rounded object-cover" /> : null}
         </div>
-        <fieldset className="space-y-4">
-          <legend className="font-semibold">プラン（3つ必須）</legend>
+        <fieldset className="space-y-3">
+          <legend className="mb-2 text-sm font-semibold">メンバーシッププラン</legend>
           {plans.map((pl, i) => (
-            <div key={pl.membership_type} className="card grid gap-2 sm:grid-cols-3">
-              <span className="font-medium">{pl.membership_type}</span>
-              <input className="input-field" type="number" value={pl.price} onChange={(e) => {
-                setPlans((prev) => prev.map((row, idx) => idx === i ? { ...row, price: e.target.value } : row))
-              }} placeholder="価格" />
-              <input className="input-field sm:col-span-2" value={pl.benefits} onChange={(e) => {
-                setPlans((prev) => prev.map((row, idx) => idx === i ? { ...row, benefits: e.target.value } : row))
-              }} placeholder="特典" />
+            <div key={pl.membership_type} className={`card border-l-4 p-4 ${pl.membership_type === 'GOLD' ? 'border-yellow-500' : pl.membership_type === 'SILVER' ? 'border-gray-400' : 'border-orange-400'}`}>
+              <p className="mb-2 font-bold text-purple-800">{pl.membership_type}</p>
+              <div className="grid gap-2 sm:grid-cols-2">
+                <input className="input-field" type="number" value={pl.price} onChange={(e) => {
+                  setPlans((prev) => prev.map((row, idx) => idx === i ? { ...row, price: e.target.value } : row))
+                }} placeholder="月額（円）" />
+                <input className="input-field sm:col-span-2" value={pl.benefits} onChange={(e) => {
+                  setPlans((prev) => prev.map((row, idx) => idx === i ? { ...row, benefits: e.target.value } : row))
+                }} placeholder="特典内容" />
+              </div>
             </div>
           ))}
         </fieldset>
-        <div className="flex gap-3">
-          <button type="submit" disabled={submitting} className="btn-primary rounded-full">{submitting ? '保存中...' : '保存'}</button>
-          <Link to="/seller/projects" className="btn-secondary rounded-full">キャンセル</Link>
+        <div className="flex gap-3 pt-2">
+          <button type="submit" disabled={submitting} className="btn-primary rounded-full px-8">{submitting ? '保存中...' : '公開申請する'}</button>
+          <Link to="/seller/projects" className="btn-secondary rounded-full px-6">キャンセル</Link>
         </div>
       </form>
+        </div>
+      </div>
     </div>
   )
 }
