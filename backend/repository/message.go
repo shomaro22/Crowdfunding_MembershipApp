@@ -71,9 +71,14 @@ func (r *messageRepo) ListThreadSummaries(ctx context.Context, userID uuid.UUID,
 	err = r.dbCtx(ctx).Raw(`
 		SELECT COUNT(*) FROM (
 			SELECT 1
-			FROM messages
-			WHERE sender_id = ? OR receiver_id = ?
-			GROUP BY project_id, CASE WHEN sender_id = ? THEN receiver_id ELSE sender_id END
+			FROM (
+				SELECT
+					project_id,
+					CASE WHEN sender_id = ? THEN receiver_id ELSE sender_id END AS partner_id
+				FROM messages
+				WHERE sender_id = ? OR receiver_id = ?
+			) threads
+			GROUP BY project_id, partner_id
 		) t
 	`, userID, userID, userID).Scan(&total).Error
 	if err != nil {
@@ -82,15 +87,23 @@ func (r *messageRepo) ListThreadSummaries(ctx context.Context, userID uuid.UUID,
 	err = r.dbCtx(ctx).Raw(`
 		SELECT
 			project_id,
-			CASE WHEN sender_id = ? THEN receiver_id ELSE sender_id END AS partner_id,
+			partner_id,
 			MAX(created_at) AS latest_at,
-			COUNT(*) FILTER (WHERE NOT is_read AND receiver_id = ?)::int AS unread_count
-		FROM messages
-		WHERE sender_id = ? OR receiver_id = ?
-		GROUP BY project_id, CASE WHEN sender_id = ? THEN receiver_id ELSE sender_id END
+			SUM(CASE WHEN NOT is_read AND receiver_id = ? THEN 1 ELSE 0 END)::int AS unread_count
+		FROM (
+			SELECT
+				project_id,
+				CASE WHEN sender_id = ? THEN receiver_id ELSE sender_id END AS partner_id,
+				created_at,
+				is_read,
+				receiver_id
+			FROM messages
+			WHERE sender_id = ? OR receiver_id = ?
+		) thread_rows
+		GROUP BY project_id, partner_id
 		ORDER BY latest_at DESC
 		OFFSET ? LIMIT ?
-	`, userID, userID, userID, userID, userID, offset, limit).Scan(&rows).Error
+	`, userID, userID, userID, userID, offset, limit).Scan(&rows).Error
 	if err != nil {
 		return nil, 0, err
 	}

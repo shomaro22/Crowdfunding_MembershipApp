@@ -98,7 +98,7 @@ func (m *MessageUseCase) ListThreads(ctx context.Context, userID uuid.UUID, q Li
 		}
 		rows, err = m.Messages.ListMessagesInThread(ctx, userID, s.ProjectID, s.PartnerID, qNorm.MessagesPerThread)
 		if err != nil {
-			return ListThreadsResult{}, err
+			continue
 		}
 		t = MessageThreadView{
 			ProjectID:   s.ProjectID,
@@ -110,7 +110,7 @@ func (m *MessageUseCase) ListThreads(ctx context.Context, userID uuid.UUID, q Li
 			t.Messages = append(t.Messages, MessageItemFrom(msg))
 		}
 		if err = m.enrichThread(ctx, &t); err != nil {
-			return ListThreadsResult{}, err
+			continue
 		}
 		out.Threads = append(out.Threads, t)
 	}

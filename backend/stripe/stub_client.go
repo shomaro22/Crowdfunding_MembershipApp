@@ -104,8 +104,10 @@ func (c *StubClient) CreateExpressAccount(ctx context.Context, email string) (st
 func (c *StubClient) CreateAccountLink(ctx context.Context, accountID, returnURL, refreshURL string) (string, error) {
 	_ = ctx
 	_ = accountID
-	_ = returnURL
 	_ = refreshURL
+	if strings.TrimSpace(returnURL) != "" {
+		return returnURL, nil
+	}
 	return "https://connect.test/onboard", nil
 }
 
@@ -145,20 +147,25 @@ func (c *StubClient) CreateCheckoutSession(ctx context.Context, in CheckoutSessi
 	var (
 		sid, pid = c.nextCheckoutIDs()
 		out      CheckoutSessionOut
+		url      string
 	)
+	url = "https://checkout.test/" + sid
+	if strings.TrimSpace(in.SuccessURL) != "" {
+		url = strings.ReplaceAll(in.SuccessURL, "{CHECKOUT_SESSION_ID}", sid)
+	}
 	out = CheckoutSessionOut{
 		SessionID:       sid,
-		URL:             "https://checkout.test/" + sid,
+		URL:             url,
 		PaymentIntentID: pid,
 	}
 	c.sessions[sid] = &stubSession{
 		out:           out,
 		in:            in,
-		paymentStatus: CheckoutPaymentStatusUnpaid,
+		paymentStatus: CheckoutPaymentStatusPaid,
 	}
 	c.intents[pid] = &stubIntent{
 		metadata: cloneStringMap(in.Metadata),
-		status:   "requires_payment_method",
+		status:   PaymentIntentStatusSucceeded,
 	}
 	return out, nil
 }
@@ -175,7 +182,7 @@ func (c *StubClient) CreateSubscriptionIntent(ctx context.Context, in Subscripti
 	)
 	c.intents[piID] = &stubIntent{
 		metadata: cloneStringMap(in.Metadata),
-		status:   "requires_payment_method",
+		status:   PaymentIntentStatusSucceeded,
 		subID:    subID,
 		custID:   custID,
 	}
@@ -213,7 +220,7 @@ func (c *StubClient) CreateUpgradePaymentIntent(ctx context.Context, in UpgradeP
 	var piID = "pi_test_" + strings.ReplaceAll(uuid.New().String(), "-", "")
 	c.intents[piID] = &stubIntent{
 		metadata: cloneStringMap(in.Metadata),
-		status:   "requires_payment_method",
+		status:   PaymentIntentStatusSucceeded,
 		custID:   in.CustomerID,
 	}
 	return UpgradePaymentOut{

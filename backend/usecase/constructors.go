@@ -7,8 +7,8 @@ import (
 	"gorm.io/gorm"
 )
 
-func NewProjectUsecase(projects repository.IProjectRepo, users repository.IUserRepo, favorites repository.IFavoriteRepo, db *gorm.DB) *ProjectUseCase {
-	return &ProjectUseCase{Projects: projects, Users: users, Favorites: favorites, DB: db}
+func NewProjectUsecase(projects repository.IProjectRepo, users repository.IUserRepo, favorites repository.IFavoriteRepo, reports repository.IReportRepo, db *gorm.DB) *ProjectUseCase {
+	return &ProjectUseCase{Projects: projects, Users: users, Favorites: favorites, Reports: reports, DB: db}
 }
 
 func NewKYCAccessUsecase(kyc repository.IKYCStore, jwtSecret string) *KYCAccessUseCase {

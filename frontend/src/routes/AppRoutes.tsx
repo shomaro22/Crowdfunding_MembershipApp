@@ -9,6 +9,7 @@ import { AuthCallbackPage } from '@/pages/AuthCallbackPage'
 import { CheckoutPage } from '@/pages/CheckoutPage'
 import { FavoritesPage } from '@/pages/FavoritesPage'
 import { ForgotPasswordPage } from '@/pages/ForgotPasswordPage'
+import { CreatorProjectsPage } from '@/pages/CreatorProjectsPage'
 import { HomePage } from '@/pages/HomePage'
 import { MessagesPage } from '@/pages/MessagesPage'
 import { NotFoundPage } from '@/pages/NotFoundPage'
@@ -65,6 +66,7 @@ export function AppRoutes() {
           <Route element={<MainLayout><ResetPasswordPage /></MainLayout>} path="/reset-password" />
 
           <Route element={<MainLayout><ProjectDetailPage /></MainLayout>} path="/projects/:projectId" />
+          <Route element={<MainLayout><CreatorProjectsPage /></MainLayout>} path="/creators/:sellerId" />
 
           <Route element={buyerGuard(<ProfilePage />)} path="/profile" />
           <Route element={buyerGuard(<FavoritesPage />)} path="/favorites" />

@@ -9,8 +9,7 @@ import { useInfiniteScroll } from '@/hooks/useInfiniteScroll'
 import { sanitizeDisplayText } from '@/lib/utils'
 import type { ProjectSummary } from '@/types/api'
 
-const PAGE_SIZE = 6
-const MAX_ITEMS = 60
+const PAGE_SIZE = 10
 
 export function HomePage() {
   const [search, setSearch] = useState('')
@@ -21,7 +20,7 @@ export function HomePage() {
   const [loadingMore, setLoadingMore] = useState(false)
   const [error, setError] = useState('')
 
-  const hasMore = projects.length < total && projects.length < MAX_ITEMS
+  const hasMore = projects.length < total
 
   const loadPage = useCallback(async (term: string, offset: number, append: boolean) => {
     if (append) {
@@ -100,9 +99,6 @@ export function HomePage() {
 
       {!error && projects.length > 0 ? (
         <>
-          <p className="mb-4 text-center text-sm text-gray-500">
-            {projects.length} / {Math.min(total, MAX_ITEMS)} 件を表示
-          </p>
           <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
             {projects.map((project) => (
               <ProjectCard key={project.id} project={project} />
@@ -110,9 +106,6 @@ export function HomePage() {
           </div>
           {loadingMore ? <Loading label="さらに読み込み中..." /> : null}
           {hasMore ? <div ref={sentinelRef} className="h-8" aria-hidden /> : null}
-          {!hasMore && projects.length >= MAX_ITEMS ? (
-            <p className="mt-6 text-center text-sm text-gray-500">これ以上は表示できません（上限 {MAX_ITEMS} 件）</p>
-          ) : null}
         </>
       ) : null}
 
