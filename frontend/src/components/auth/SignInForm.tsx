@@ -4,6 +4,7 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '@/auth/AuthProvider'
 import { ApiError } from '@/lib/api-client'
 import { googleOAuthStartUrl } from '@/lib/api-client'
+import { postLoginPath } from '@/lib/auth-routes'
 import { isValidEmail, sanitizeAppPath, sanitizeEmail } from '@/lib/utils'
 
 export function SignInForm() {
@@ -49,7 +50,7 @@ export function SignInForm() {
         void navigate('/auth/2fa', { replace: true, state: { from: callbackPath } })
         return
       }
-      void navigate(callbackPath, { replace: true })
+      void navigate(postLoginPath(result, callbackPath), { replace: true })
     } catch (err) {
       if (err instanceof ApiError) {
         setError(err.message)
@@ -190,7 +191,17 @@ export function SignInForm() {
               <li>自動的にこのサイトに戻り、ログイン完了です（新規の場合はアカウントが作成されます）。</li>
             </ol>
             <p className="mt-3 text-xs text-gray-500">
-              ※ 管理者が Google OAuth を設定済みである必要があります（GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET）。
+              ※ Google Cloud Console で OAuth クライアントを作成し、環境変数
+              {' '}
+              <code className="rounded bg-white px-1">GOOGLE_CLIENT_ID</code>
+              {' / '}
+              <code className="rounded bg-white px-1">GOOGLE_CLIENT_SECRET</code>
+              {' '}
+              を backend に設定してください。詳細はリポジトリの
+              {' '}
+              <code className="rounded bg-white px-1">docs/GOOGLE_OAUTH_SETUP.md</code>
+              {' '}
+              を参照。
             </p>
           </div>
         ) : null}

@@ -37,9 +37,23 @@ export function ForgotPasswordPage() {
     <div className="card mx-auto max-w-md">
       <h1 className="mb-4 text-2xl font-bold">パスワード再設定</h1>
       {sent ? (
-        <p className="text-gray-700">
-          入力されたメールアドレスが登録されている場合、再設定リンクを送信しました。
-        </p>
+        <div className="space-y-3 text-gray-700">
+          <p>
+            入力されたメールアドレスが登録されている場合、再設定リンクを送信しました。
+          </p>
+          <div className="rounded-lg border border-amber-100 bg-amber-50 p-3 text-sm text-amber-900">
+            <p className="font-semibold">開発環境の場合</p>
+            <p className="mt-1">
+              メールは送信されません。backend コンテナのログに
+              <code className="mx-1 rounded bg-white px-1">reset_url</code>
+              が出力されます。
+            </p>
+            <pre className="mt-2 overflow-x-auto rounded bg-white p-2 text-xs">docker compose logs backend | grep reset_url</pre>
+            <p className="mt-2 text-xs">
+              リンクのホストは <code>PUBLIC_APP_URL</code>（Docker では <code>http://localhost</code>）に合わせてください。
+            </p>
+          </div>
+        </div>
       ) : (
         <form onSubmit={(e) => void onSubmit(e)} className="space-y-4">
           {error ? <p className="text-sm text-red-600">{error}</p> : null}

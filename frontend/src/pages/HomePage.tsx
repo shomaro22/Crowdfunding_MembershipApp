@@ -3,61 +3,78 @@ import { useCallback, useEffect, useState } from 'react'
 import { listPublicProjects } from '@/api/projects'
 import { ErrorMessage } from '@/components/common/ErrorMessage'
 import { Loading } from '@/components/common/Loading'
-import { Pagination } from '@/components/common/Pagination'
+import { HeroCarousel } from '@/components/layout/HeroCarousel'
 import { ProjectCard } from '@/components/project/ProjectCard'
+import { useInfiniteScroll } from '@/hooks/useInfiniteScroll'
 import { sanitizeDisplayText } from '@/lib/utils'
 import type { ProjectSummary } from '@/types/api'
 
 const PAGE_SIZE = 6
+const MAX_ITEMS = 60
 
 export function HomePage() {
   const [search, setSearch] = useState('')
   const [query, setQuery] = useState('')
-  const [page, setPage] = useState(1)
   const [projects, setProjects] = useState<ProjectSummary[]>([])
   const [total, setTotal] = useState(0)
   const [loading, setLoading] = useState(true)
+  const [loadingMore, setLoadingMore] = useState(false)
   const [error, setError] = useState('')
 
-  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE))
+  const hasMore = projects.length < total && projects.length < MAX_ITEMS
 
-  const load = useCallback(async (term: string, pageNum: number) => {
-    setLoading(true)
+  const loadPage = useCallback(async (term: string, offset: number, append: boolean) => {
+    if (append) {
+      setLoadingMore(true)
+    } else {
+      setLoading(true)
+    }
     setError('')
     try {
-      const offset = (pageNum - 1) * PAGE_SIZE
       const res = await listPublicProjects({
         search: term || undefined,
         limit: PAGE_SIZE,
         offset,
       })
-      setProjects(res.projects)
       setTotal(res.total)
+      setProjects((prev) => (append ? [...prev, ...res.projects] : res.projects))
     } catch {
       setError('プロジェクト一覧の取得に失敗しました')
     } finally {
       setLoading(false)
+      setLoadingMore(false)
     }
   }, [])
 
   useEffect(() => {
-    void load(query, page)
-  }, [load, query, page])
+    void loadPage(query, 0, false)
+  }, [loadPage, query])
+
+  const loadMore = useCallback(() => {
+    if (loadingMore || loading || !hasMore) {
+      return
+    }
+    void loadPage(query, projects.length, true)
+  }, [hasMore, loadPage, loading, loadingMore, projects.length, query])
+
+  const sentinelRef = useInfiniteScroll(loadMore, hasMore, loading || loadingMore)
 
   const onSearch = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault()
-    setPage(1)
     setQuery(sanitizeDisplayText(search, 100))
   }
 
   return (
     <div>
+      <HeroCarousel />
+
       <section className="mb-10 text-center">
         <h1 className="text-gradient mb-4 text-4xl font-extrabold md:text-5xl">
           推しのクリエイターを、もっと近くに
         </h1>
         <p className="mx-auto max-w-2xl text-gray-600">
           月額メンバーシップで限定コンテンツ・制作裏話・コミュニティ特典を楽しもう。
+          <br />
           ファンとクリエイターをつなぐ、新しい応援の形です。
         </p>
       </section>
@@ -78,25 +95,29 @@ export function HomePage() {
         </div>
       </form>
 
-      {loading ? <Loading label="プロジェクトを読み込み中..." /> : null}
-      {error ? <ErrorMessage message={error} onRetry={() => void load(query, page)} /> : null}
+      {loading && projects.length === 0 ? <Loading label="プロジェクトを読み込み中..." /> : null}
+      {error ? <ErrorMessage message={error} onRetry={() => void loadPage(query, 0, false)} /> : null}
 
-      {!loading && !error ? (
-        projects.length === 0 ? (
-          <p className="text-center text-gray-500">公開中のプロジェクトがありません</p>
-        ) : (
-          <>
-            <p className="mb-4 text-center text-sm text-gray-500">
-              {total}件中 {(page - 1) * PAGE_SIZE + 1}〜{Math.min(page * PAGE_SIZE, total)}件を表示
-            </p>
-            <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
-              {projects.map((project) => (
-                <ProjectCard key={project.id} project={project} />
-              ))}
-            </div>
-            <Pagination page={page} totalPages={totalPages} onPageChange={setPage} />
-          </>
-        )
+      {!error && projects.length > 0 ? (
+        <>
+          <p className="mb-4 text-center text-sm text-gray-500">
+            {projects.length} / {Math.min(total, MAX_ITEMS)} 件を表示
+          </p>
+          <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
+            {projects.map((project) => (
+              <ProjectCard key={project.id} project={project} />
+            ))}
+          </div>
+          {loadingMore ? <Loading label="さらに読み込み中..." /> : null}
+          {hasMore ? <div ref={sentinelRef} className="h-8" aria-hidden /> : null}
+          {!hasMore && projects.length >= MAX_ITEMS ? (
+            <p className="mt-6 text-center text-sm text-gray-500">これ以上は表示できません（上限 {MAX_ITEMS} 件）</p>
+          ) : null}
+        </>
+      ) : null}
+
+      {!loading && !error && projects.length === 0 ? (
+        <p className="text-center text-gray-500">公開中のプロジェクトがありません</p>
       ) : null}
     </div>
   )

@@ -29,6 +29,10 @@ export async function listPublicProjects(params: ProjectSearchParams = {}): Prom
   return apiRequest<ListProjectsResponse>(`/projects${qs ? `?${qs}` : ''}`)
 }
 
+export async function listFeaturedProjects(limit = 5): Promise<ListProjectsResponse> {
+  return apiRequest<ListProjectsResponse>(`/projects/featured?limit=${limit}`)
+}
+
 export async function getProject(projectId: string): Promise<ProjectDetail> {
   return apiRequest<ProjectDetail>(`/projects/${encodeURIComponent(projectId)}`)
 }
