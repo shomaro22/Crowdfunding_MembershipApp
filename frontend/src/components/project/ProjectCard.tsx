@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom'
 
 import type { ProjectSummary } from '@/types/api'
-import { cn, formatCurrencyYen } from '@/lib/utils'
+import { cn, formatCurrencyYen, fundingProgressBarWidth, fundingProgressPercent } from '@/lib/utils'
 
 interface ProjectCardProps {
   project: ProjectSummary
@@ -38,9 +38,8 @@ export function ProjectCard({ project, className }: ProjectCardProps) {
   const prices = project.plans.map((plan) => plan.price)
   const minPrice = prices.length > 0 ? Math.min(...prices) : 0
   const maxPrice = prices.length > 0 ? Math.max(...prices) : 0
-  const progress = project.target_amount > 0
-    ? Math.min(100, Math.round((project.current_amount / project.target_amount) * 100))
-    : 0
+  const progressPercent = fundingProgressPercent(project.current_amount, project.target_amount)
+  const barWidth = fundingProgressBarWidth(progressPercent)
 
   return (
     <article
@@ -71,11 +70,11 @@ export function ProjectCard({ project, className }: ProjectCardProps) {
 
         <div className="mb-3">
           <div className="mb-1 flex justify-between text-xs text-gray-500">
-            <span>{progress}%</span>
+            <span>{progressPercent}%</span>
             <span>{formatCurrencyYen(project.current_amount)} / {formatCurrencyYen(project.target_amount)}</span>
           </div>
           <div className="h-2 overflow-hidden rounded-full bg-purple-100">
-            <div className="h-full rounded-full bg-purple-600" style={{ width: `${progress}%` }} />
+            <div className="h-full rounded-full bg-purple-600" style={{ width: `${barWidth}%` }} />
           </div>
         </div>
 
