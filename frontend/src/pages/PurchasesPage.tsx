@@ -106,9 +106,9 @@ export function PurchasesPage() {
       </section>
 
       <section>
-        <h2 className="mb-4 text-lg font-semibold">購入履歴</h2>
+        <h2 className="mb-4 text-lg font-semibold">お支払い記録</h2>
         {purchases.length === 0 ? (
-          <p className="text-gray-600">購入履歴はありません</p>
+          <p className="text-gray-600">お支払い記録はありません</p>
         ) : (
           <ul className="space-y-3">
             {purchases.map((p) => (

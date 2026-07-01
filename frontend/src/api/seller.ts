@@ -1,4 +1,5 @@
-import { apiRequest } from '@/lib/api-client'
+import { apiBaseUrl, apiRequest } from '@/lib/api-client'
+import { getAccessToken } from '@/lib/token-store'
 import type {
   ConnectAccountResponse,
   ConnectOnboardingResponse,
@@ -34,8 +35,6 @@ export async function exportSupportersCsv(projectId?: string): Promise<Blob> {
   }
   const qs = params.toString()
   const path = qs ? `/seller/supporters/export?${qs}` : '/seller/supporters/export'
-import { apiBaseUrl } from '@/lib/api-client'
-import { getAccessToken } from '@/lib/token-store'
   const token = getAccessToken()
   const headers = new Headers({ Accept: 'text/csv' })
   if (token) {
