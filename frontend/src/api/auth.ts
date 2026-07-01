@@ -47,7 +47,8 @@ export async function logout(): Promise<void> {
 }
 
 export async function fetchMe(): Promise<User> {
-  return apiRequest<User>('/me', { auth: true })
+  const res = await apiRequest<{ user: User }>('/me', { auth: true })
+  return res.user
 }
 
 export async function registerBuyer(email: string, password: string): Promise<RegisterBuyerResponse> {
@@ -122,5 +123,48 @@ export async function forgotPassword(email: string): Promise<void> {
     method: 'POST',
     body: { email },
     skipRefresh: true,
+  })
+}
+
+export async function resetPassword(token: string, password: string): Promise<void> {
+  if (!token.trim()) {
+    throw new Error('invalid token')
+  }
+  await apiRequest<void>('/auth/reset-password', {
+    method: 'POST',
+    body: { token: token.trim(), password },
+    skipRefresh: true,
+  })
+}
+
+export async function checkEmailAvailable(email: string): Promise<boolean> {
+  const q = encodeURIComponent(email.trim().toLowerCase())
+  const res = await apiRequest<{ available: boolean }>(`/auth/check-email?email=${q}`, {
+    skipRefresh: true,
+  })
+  return res.available
+}
+
+export async function fetchProfile(): Promise<User> {
+  return apiRequest<User>('/me/profile', { auth: true })
+}
+
+export async function updateProfile(body: { name?: string; avatar_url?: string }): Promise<User> {
+  return apiRequest<User>('/me/profile', { method: 'PUT', auth: true, body })
+}
+
+export async function changePassword(
+  currentPassword: string,
+  newPassword: string,
+  totpCode?: string,
+): Promise<void> {
+  await apiRequest<void>('/me/change-password', {
+    method: 'POST',
+    auth: true,
+    body: {
+      current_password: currentPassword,
+      new_password: newPassword,
+      totp_code: totpCode ?? '',
+    },
   })
 }

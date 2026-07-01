@@ -15,14 +15,16 @@ import {
   logout as logoutApi,
   refreshSession,
 } from '@/api/auth'
-import { clearAccessToken, setAccessToken } from '@/lib/token-store'
-import { isLogin2FAResponse, type User, type UserRole } from '@/types/api'
+import { clearAccessToken, getAccessToken, setAccessToken } from '@/lib/token-store'
+import { parseJWTClaims } from '@/lib/jwt-claims'
+import { isLogin2FAResponse, type AdminRole, type User, type UserRole } from '@/types/api'
 
 export type AuthStatus = 'loading' | 'anonymous' | 'authenticated' | 'pending_2fa'
 
 interface AuthContextValue {
   status: AuthStatus
   user: User | null
+  adminRole: AdminRole | null
   login: (email: string, password: string) => Promise<'ok' | '2fa'>
   complete2FA: (code: string) => Promise<void>
   logout: () => Promise<void>
@@ -35,12 +37,23 @@ const AuthContext = createContext<AuthContextValue | null>(null)
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [status, setStatus] = useState<AuthStatus>('loading')
   const [user, setUser] = useState<User | null>(null)
+  const [adminRole, setAdminRole] = useState<AdminRole | null>(null)
+
+  const syncAdminRoleFromToken = useCallback(() => {
+    const token = getAccessToken()
+    if (!token) {
+      setAdminRole(null)
+      return
+    }
+    setAdminRole(parseJWTClaims(token).adminRole)
+  }, [])
 
   const refreshUser = useCallback(async () => {
     const me = await fetchMe()
     setUser(me)
+    syncAdminRoleFromToken()
     setStatus('authenticated')
-  }, [])
+  }, [syncAdminRoleFromToken])
 
   useEffect(() => {
     let cancelled = false
@@ -52,8 +65,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
       if (!token) {
         setStatus('anonymous')
+        setAdminRole(null)
         return
       }
+      syncAdminRoleFromToken()
       try {
         const me = await fetchMe()
         if (!cancelled) {
@@ -64,6 +79,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         clearAccessToken()
         if (!cancelled) {
           setUser(null)
+          setAdminRole(null)
           setStatus('anonymous')
         }
       }
@@ -72,7 +88,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [syncAdminRoleFromToken])
 
   const login = useCallback(async (email: string, password: string): Promise<'ok' | '2fa'> => {
     const res = await loginApi(email, password)
@@ -83,15 +99,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
     setAccessToken(res.auth_token)
     setUser(res.user)
+    syncAdminRoleFromToken()
     setStatus('authenticated')
     return 'ok'
-  }, [])
+  }, [syncAdminRoleFromToken])
 
   const complete2FA = useCallback(async (code: string) => {
     const res = await challenge2FA(code)
     setUser(res.user)
+    syncAdminRoleFromToken()
     setStatus('authenticated')
-  }, [])
+  }, [syncAdminRoleFromToken])
 
   const logout = useCallback(async () => {
     try {
@@ -99,6 +117,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } finally {
       clearAccessToken()
       setUser(null)
+      setAdminRole(null)
       setStatus('anonymous')
     }
   }, [])
@@ -112,13 +131,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     () => ({
       status,
       user,
+      adminRole,
       login,
       complete2FA,
       logout,
       refreshUser,
       hasRole,
     }),
-    [status, user, login, complete2FA, logout, refreshUser, hasRole],
+    [status, user, adminRole, login, complete2FA, logout, refreshUser, hasRole],
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
