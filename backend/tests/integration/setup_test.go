@@ -300,7 +300,7 @@ func BuildHTTP(opts *Options) (*echo.Echo, string, error) {
 		Pending2FAKey: cfg.Pending2FAKey, TOTPIssuer: cfg.TOTPIssuer, AppPublicURL: cfg.AppPublicURL, DB: gormDB,
 		Mailer: usecase.NewLogMailer(cfg.AppPublicURL),
 	})
-	projectUCRaw = usecase.NewProjectUsecase(projects, users, favorites, gormDB)
+	projectUCRaw = usecase.NewProjectUsecase(projects, users, favorites, reports, gormDB)
 	projectUC = projectUCRaw
 	kycAccessRaw = usecase.NewKYCAccessUsecase(kycStore, string(cfg.KYCSigningKey))
 	kycAccess = kycAccessRaw

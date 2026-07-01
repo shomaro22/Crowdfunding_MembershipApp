@@ -149,7 +149,7 @@ export type BillingMode = 'SUBSCRIPTION' | 'ONE_TIME'
 export type PurchaseStatus = 'PENDING' | 'COMPLETED' | 'FAILED' | 'REFUNDED' | 'CANCELLED'
 export type PaymentMethod = 'CARD' | 'KONBINI'
 export type RegistrationStatus = 'PENDING' | 'APPROVED' | 'REJECTED'
-export type ReportStatus = 'OPEN' | 'RESOLVED' | 'DISMISSED'
+export type ReportStatus = 'PENDING' | 'IN_REVIEW' | 'RESOLVED' | 'DISMISSED'
 export type ReportTargetType = 'PROJECT' | 'USER' | 'MESSAGE'
 
 export interface UserProfile extends User {
