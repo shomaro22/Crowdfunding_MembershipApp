@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { useSearchParams } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 
 import {
   approveBuyer,
@@ -31,6 +31,7 @@ import {
 import { useAuth } from '@/auth/AuthProvider'
 import { Loading } from '@/components/common/Loading'
 import { ErrorMessage } from '@/components/common/ErrorMessage'
+import { ConfirmDialog, ReasonDialog } from '@/components/common/ConfirmDialog'
 import { useToast } from '@/components/common/Toast'
 import {
   ADMIN_TAB_LABELS,
@@ -159,7 +160,7 @@ function AdminUsersPanel({ onToast, onError }: { onToast: (m: string, k?: 'succe
     <ul className="space-y-2">
       {users.map((u) => (
         <li key={u.id} className="card flex flex-wrap items-center justify-between gap-2 text-sm">
-          <span>{u.email} · {u.role} · {u.is_active ? 'active' : 'inactive'}</span>
+          <span>{u.email} · {u.role === 'BUYER' ? '購入者' : u.role === 'SELLER' ? '出品者' : u.role === 'ADMIN' ? '管理者' : u.role} · {u.is_active ? '有効' : '無効'}</span>
           <div className="flex gap-2">
             <button type="button" className="btn-secondary rounded-full text-xs" onClick={() => void updateAdminUser(u.id, { is_active: !u.is_active }).then(() => onToast('更新しました')).catch(() => onError('更新失敗'))}>
               有効切替
@@ -175,97 +176,174 @@ function AdminUsersPanel({ onToast, onError }: { onToast: (m: string, k?: 'succe
 
 function AdminBuyerReviewsPanel({ onToast, onError }: { onToast: (m: string, k?: 'success' | 'error' | 'info') => void; onError: (e: string) => void }) {
   const [users, setUsers] = useState<Awaited<ReturnType<typeof listBuyerPending>>['users']>([])
+  const [rejectTarget, setRejectTarget] = useState<string | null>(null)
   const reload = () => listBuyerPending().then((r) => setUsers(r.users)).catch(() => onError('取得失敗'))
   useEffect(() => { void reload() }, [onError])
   return (
-    <ul className="space-y-2">
-      {users.map((u) => (
-        <li key={u.id} className="card flex justify-between text-sm">
-          <span>{u.email}</span>
-          <div className="flex gap-2">
-            <button type="button" className="btn-primary rounded-full text-xs" onClick={() => void approveBuyer(u.id).then(() => { onToast('承認'); void reload() }).catch(() => onError('失敗'))}>承認</button>
-            <button type="button" className="btn-secondary rounded-full text-xs" onClick={() => {
-              const reason = window.prompt('却下理由')
-              if (reason) {
-                void rejectBuyer(u.id, reason).then(() => { onToast('却下'); void reload() }).catch(() => onError('失敗'))
-              }
-            }}>却下</button>
-          </div>
-        </li>
-      ))}
-    </ul>
+    <>
+      <ReasonDialog
+        open={rejectTarget !== null}
+        title="購入者登録を却下"
+        placeholder="却下理由を入力"
+        onConfirm={(reason) => {
+          if (rejectTarget) {
+            void rejectBuyer(rejectTarget, reason).then(() => {
+              onToast('購入者登録を却下しました', 'success')
+              void reload()
+            }).catch(() => onError('却下に失敗しました'))
+          }
+          setRejectTarget(null)
+        }}
+        onCancel={() => setRejectTarget(null)}
+      />
+      <ul className="space-y-2">
+        {users.map((u) => (
+          <li key={u.id} className="card flex justify-between text-sm">
+            <span>{u.email}</span>
+            <div className="flex gap-2">
+              <button type="button" className="btn-primary rounded-full text-xs" onClick={() => void approveBuyer(u.id).then(() => { onToast('承認しました', 'success'); void reload() }).catch(() => onError('失敗'))}>承認</button>
+              <button type="button" className="btn-secondary rounded-full text-xs" onClick={() => setRejectTarget(u.id)}>却下</button>
+            </div>
+          </li>
+        ))}
+      </ul>
+    </>
   )
 }
 
 function AdminSellerReviewsPanel({ onToast, onError }: { onToast: (m: string, k?: 'success' | 'error' | 'info') => void; onError: (e: string) => void }) {
   const [rows, setRows] = useState<Awaited<ReturnType<typeof listSellerRegistrations>>['registrations']>([])
+  const [rejectTarget, setRejectTarget] = useState<string | null>(null)
   const reload = () => listSellerRegistrations().then((r) => setRows(r.registrations)).catch(() => onError('取得失敗'))
   useEffect(() => { void reload() }, [onError])
   return (
-    <ul className="space-y-2">
-      {rows.map((r) => (
-        <li key={r.id} className="card text-sm">
-          <p className="font-medium">{r.full_name} · {r.status}</p>
-          <p className="text-gray-600">{r.user?.email}</p>
-          <div className="mt-2 flex gap-2">
-            <button type="button" className="btn-secondary rounded-full text-xs" onClick={() => void getSellerRegistration(r.id).then((d) => window.open(d.identity_document_front_url, '_blank', 'noopener,noreferrer'))}>KYC 表面</button>
-            <button type="button" className="btn-primary rounded-full text-xs" onClick={() => void approveSellerRegistration(r.id).then(() => { onToast('承認'); void reload() }).catch(() => onError('失敗'))}>承認</button>
-            <button type="button" className="btn-secondary rounded-full text-xs" onClick={() => {
-              const reason = window.prompt('却下理由')
-              if (reason) {
-                void rejectSellerRegistration(r.id, reason).then(() => { onToast('却下'); void reload() }).catch(() => onError('失敗'))
-              }
-            }}>却下</button>
-          </div>
-        </li>
-      ))}
-    </ul>
+    <>
+      <ReasonDialog
+        open={rejectTarget !== null}
+        title="出品者 KYC を却下"
+        placeholder="却下理由を入力"
+        onConfirm={(reason) => {
+          if (rejectTarget) {
+            void rejectSellerRegistration(rejectTarget, reason).then(() => {
+              onToast('出品者登録を却下しました', 'success')
+              void reload()
+            }).catch(() => onError('却下に失敗しました'))
+          }
+          setRejectTarget(null)
+        }}
+        onCancel={() => setRejectTarget(null)}
+      />
+      <ul className="space-y-2">
+        {rows.map((r) => (
+          <li key={r.id} className="card text-sm">
+            <p className="font-medium">{r.full_name} · {r.status === 'PENDING' ? '審査中' : r.status}</p>
+            <p className="text-gray-600">{r.user?.email}</p>
+            <div className="mt-2 flex gap-2">
+              <button type="button" className="btn-secondary rounded-full text-xs" onClick={() => void getSellerRegistration(r.id).then((d) => window.open(d.identity_document_front_url, '_blank', 'noopener,noreferrer'))}>本人確認書類</button>
+              <button type="button" className="btn-primary rounded-full text-xs" onClick={() => void approveSellerRegistration(r.id).then(() => { onToast('出品者を承認しました', 'success'); void reload() }).catch(() => onError('失敗'))}>承認</button>
+              <button type="button" className="btn-secondary rounded-full text-xs" onClick={() => setRejectTarget(r.id)}>却下</button>
+            </div>
+          </li>
+        ))}
+      </ul>
+    </>
   )
 }
 
 function AdminProjectsPanel({ onToast, onError }: { onToast: (m: string, k?: 'success' | 'error' | 'info') => void; onError: (e: string) => void }) {
   const [projects, setProjects] = useState<Awaited<ReturnType<typeof listAdminProjects>>['projects']>([])
+  const [rejectTarget, setRejectTarget] = useState<string | null>(null)
+  const [rejectDeleteTarget, setRejectDeleteTarget] = useState<string | null>(null)
+  const [forceDeleteTarget, setForceDeleteTarget] = useState<string | null>(null)
   const reload = () => listAdminProjects().then((r) => setProjects(r.projects)).catch(() => onError('取得失敗'))
   useEffect(() => { void reload() }, [onError])
+
+  const statusLabel = (s: string) => {
+    if (s === 'PENDING') return '審査中'
+    if (s === 'ACTIVE') return '公開中'
+    if (s === 'CANCELLED') return '却下済'
+    return s
+  }
+
   return (
-    <ul className="space-y-3">
-      {projects.map((p) => (
-        <li key={p.id} className="card text-sm">
-          <p className="mb-2 font-medium">{p.title} · {p.status}{p.delete_request ? ' · 削除申請中' : ''}</p>
-          <div className="flex flex-wrap gap-2">
-            {p.status === 'PENDING' ? (
-              <>
-                <button type="button" className="btn-primary rounded-full text-xs" onClick={() => void patchAdminProject(p.id, 'ACTIVE').then(() => { onToast('プロジェクトを承認しました', 'success'); void reload() }).catch(() => onError('失敗'))}>承認</button>
-                <button type="button" className="btn-secondary rounded-full text-xs" onClick={() => {
-                  const reason = window.prompt('却下理由を入力してください')
-                  if (reason) {
-                    void patchAdminProject(p.id, 'CANCELLED', reason).then(() => { onToast('プロジェクトを却下しました', 'success'); void reload() }).catch(() => onError('却下に失敗しました'))
-                  }
-                }}>却下</button>
-              </>
-            ) : null}
-            {p.delete_request ? (
-              <div className="flex flex-col gap-1 sm:flex-row">
-                <button type="button" className="rounded-full bg-red-600 px-3 py-1 text-xs text-white" onClick={() => void patchAdminDeleteRequest(p.id, 'approve').then(() => { onToast('削除申請を承認しました', 'success'); void reload() }).catch(() => onError('失敗'))}>削除申請を承認する</button>
-                <button type="button" className="btn-secondary rounded-full text-xs" onClick={() => {
-                  const reason = window.prompt('削除申請却下の理由')
-                  if (reason) {
-                    void patchAdminDeleteRequest(p.id, 'reject', reason).then(() => { onToast('削除申請を却下しました', 'success'); void reload() }).catch(() => onError('失敗'))
-                  }
-                }}>削除申請を却下する</button>
-              </div>
-            ) : null}
-            {(p.status === 'CANCELLED' || p.status === 'PENDING') ? (
-              <button type="button" className="text-xs text-red-600 underline" onClick={() => {
-                if (window.confirm('このプロジェクトを強制削除しますか？')) {
-                  void deleteAdminProject(p.id).then(() => { onToast('強制削除しました', 'success'); void reload() }).catch(() => onError('削除失敗'))
-                }
-              }}>強制削除する</button>
-            ) : null}
-          </div>
-        </li>
-      ))}
-    </ul>
+    <>
+      <ReasonDialog
+        open={rejectTarget !== null}
+        title="プロジェクトを却下"
+        placeholder="却下理由を入力"
+        onConfirm={(reason) => {
+          if (rejectTarget) {
+            void patchAdminProject(rejectTarget, 'CANCELLED', reason).then(() => {
+              onToast('プロジェクトを却下しました', 'success')
+              void reload()
+            }).catch(() => onError('却下に失敗しました'))
+          }
+          setRejectTarget(null)
+        }}
+        onCancel={() => setRejectTarget(null)}
+      />
+      <ReasonDialog
+        open={rejectDeleteTarget !== null}
+        title="削除申請を却下"
+        placeholder="却下理由を入力"
+        onConfirm={(reason) => {
+          if (rejectDeleteTarget) {
+            void patchAdminDeleteRequest(rejectDeleteTarget, 'reject', reason).then(() => {
+              onToast('削除申請を却下しました', 'success')
+              void reload()
+            }).catch(() => onError('失敗'))
+          }
+          setRejectDeleteTarget(null)
+        }}
+        onCancel={() => setRejectDeleteTarget(null)}
+      />
+      <ConfirmDialog
+        open={forceDeleteTarget !== null}
+        title="プロジェクト強制削除"
+        message="このプロジェクトを強制削除します。元に戻せません。"
+        confirmLabel="削除する"
+        danger
+        onConfirm={() => {
+          if (forceDeleteTarget) {
+            void deleteAdminProject(forceDeleteTarget).then(() => {
+              onToast('強制削除しました', 'success')
+              void reload()
+            }).catch(() => onError('削除失敗'))
+          }
+          setForceDeleteTarget(null)
+        }}
+        onCancel={() => setForceDeleteTarget(null)}
+      />
+      <ul className="space-y-3">
+        {projects.map((p) => (
+          <li key={p.id} className="card text-sm">
+            <p className="mb-2 font-medium">
+              <Link to={`/projects/${p.id}`} className="text-purple-800 hover:underline">{p.title}</Link>
+              {' · '}
+              {statusLabel(p.status)}
+              {p.delete_request ? ' · 削除申請中' : ''}
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {p.status === 'PENDING' ? (
+                <>
+                  <button type="button" className="btn-primary rounded-full text-xs" onClick={() => void patchAdminProject(p.id, 'ACTIVE').then(() => { onToast('プロジェクトを承認しました', 'success'); void reload() }).catch(() => onError('失敗'))}>承認</button>
+                  <button type="button" className="btn-secondary rounded-full text-xs" onClick={() => setRejectTarget(p.id)}>却下</button>
+                </>
+              ) : null}
+              {p.delete_request ? (
+                <div className="flex flex-col gap-1 sm:flex-row">
+                  <button type="button" className="rounded-full bg-red-600 px-3 py-1 text-xs text-white" onClick={() => void patchAdminDeleteRequest(p.id, 'approve').then(() => { onToast('削除申請を承認しました', 'success'); void reload() }).catch(() => onError('失敗'))}>削除申請を承認</button>
+                  <button type="button" className="btn-secondary rounded-full text-xs" onClick={() => setRejectDeleteTarget(p.id)}>削除申請を却下</button>
+                </div>
+              ) : null}
+              {(p.status === 'CANCELLED' || p.status === 'PENDING') ? (
+                <button type="button" className="text-xs text-red-600 underline" onClick={() => setForceDeleteTarget(p.id)}>強制削除</button>
+              ) : null}
+            </div>
+          </li>
+        ))}
+      </ul>
+    </>
   )
 }
 
@@ -290,15 +368,38 @@ function AdminReportsPanel({ onToast, onError }: { onToast: (m: string, k?: 'suc
   const [reports, setReports] = useState<Awaited<ReturnType<typeof listAdminReports>>['reports']>([])
   const reload = () => listAdminReports().then((r) => setReports(r.reports)).catch(() => onError('取得失敗'))
   useEffect(() => { void reload() }, [onError])
+
+  const statusLabel = (s: string) => {
+    if (s === 'PENDING') return '未対応'
+    if (s === 'IN_REVIEW') return '審査中'
+    if (s === 'RESOLVED') return '解決済'
+    if (s === 'DISMISSED') return '却下済'
+    return s
+  }
+
   return (
     <ul className="space-y-2 text-sm">
       {reports.map((r) => (
-        <li key={r.id} className="card">
-          <p>{r.target_type} · {r.reason} · {r.status}</p>
-          <div className="mt-2 flex gap-2">
-            <button type="button" className="btn-primary rounded-full text-xs" onClick={() => void patchAdminReport(r.id, 'RESOLVED').then(() => { onToast('解決'); void reload() }).catch(() => onError('失敗'))}>解決</button>
-            <button type="button" className="btn-secondary rounded-full text-xs" onClick={() => void patchAdminReport(r.id, 'DISMISSED').then(() => { onToast('却下'); void reload() }).catch(() => onError('失敗'))}>却下</button>
-          </div>
+        <li key={r.id} className={`card ${r.status === 'PENDING' || r.status === 'IN_REVIEW' ? '' : 'opacity-80'}`}>
+          <p>
+            <span className="font-medium">{r.target_type === 'PROJECT' ? 'プロジェクト' : r.target_type}</span>
+            {' · '}
+            {r.reason}
+          </p>
+          {r.target_type === 'PROJECT' ? (
+            <p className="mt-1">
+              <Link to={`/projects/${r.target_id}`} className="text-sm text-purple-700 hover:underline">
+                対象プロジェクトを見る
+              </Link>
+            </p>
+          ) : null}
+          <p className="mt-1 text-xs text-gray-500">状態: {statusLabel(r.status)}</p>
+          {r.status === 'PENDING' || r.status === 'IN_REVIEW' ? (
+            <div className="mt-2 flex gap-2">
+              <button type="button" className="btn-primary rounded-full text-xs" onClick={() => void patchAdminReport(r.id, 'RESOLVED').then(() => { onToast('通報を解決済みにしました', 'success'); void reload() }).catch(() => onError('失敗'))}>解決</button>
+              <button type="button" className="btn-secondary rounded-full text-xs" onClick={() => void patchAdminReport(r.id, 'DISMISSED').then(() => { onToast('通報を却下しました', 'success'); void reload() }).catch(() => onError('失敗'))}>却下</button>
+            </div>
+          ) : null}
         </li>
       ))}
     </ul>
@@ -311,11 +412,19 @@ function AdminActivityPanel({ onError }: { onError: (e: string) => void }) {
     void listActivityLogs().then((r) => setLogs(r.logs)).catch(() => onError('取得失敗'))
   }, [onError])
   return (
-    <ul className="max-h-96 space-y-1 overflow-y-auto font-mono text-xs">
-      {logs.map((l) => (
-        <li key={l.id}>{l.created_at} {l.action} {l.resource}/{l.resource_id}</li>
-      ))}
-    </ul>
+    <div className="card">
+      <h2 className="mb-4 text-lg font-semibold">活動ログ ({logs.length}件)</h2>
+      <ul className="max-h-[28rem] space-y-2 overflow-y-auto text-sm">
+        {logs.length === 0 ? <li className="text-gray-500">ログがありません</li> : null}
+        {logs.map((l) => (
+          <li key={l.id} className="rounded-lg border border-purple-50 p-3">
+            <p className="font-medium text-purple-900">{l.action}</p>
+            <p className="text-xs text-gray-500">{new Date(l.created_at).toLocaleString('ja-JP')}</p>
+            <p className="text-xs text-gray-600">{l.resource} / {l.resource_id}</p>
+          </li>
+        ))}
+      </ul>
+    </div>
   )
 }
 
@@ -365,10 +474,18 @@ function AdminAuditPanel({ onError }: { onError: (e: string) => void }) {
     void listAuditLogs().then((r) => setLogs(r.logs)).catch(() => onError('取得失敗'))
   }, [onError])
   return (
-    <ul className="max-h-96 space-y-1 overflow-y-auto text-xs">
-      {logs.map((l) => (
-        <li key={l.id}>{l.created_at} {l.admin_email} {l.action} {sanitizeDisplayText(l.resource, 64)}</li>
-      ))}
-    </ul>
+    <div className="card">
+      <h2 className="mb-4 text-lg font-semibold">監査ログ ({logs.length}件)</h2>
+      <ul className="max-h-[28rem] space-y-2 overflow-y-auto text-sm">
+        {logs.length === 0 ? <li className="text-gray-500">ログがありません</li> : null}
+        {logs.map((l) => (
+          <li key={l.id} className="rounded-lg border border-purple-50 p-3">
+            <p className="font-medium">{l.action}</p>
+            <p className="text-xs text-gray-500">{new Date(l.created_at).toLocaleString('ja-JP')} · {l.admin_email}</p>
+            <p className="text-xs text-gray-600">{sanitizeDisplayText(l.resource, 64)}</p>
+          </li>
+        ))}
+      </ul>
+    </div>
   )
 }

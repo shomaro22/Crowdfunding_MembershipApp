@@ -29,6 +29,19 @@ export function planHoverClass(type: string): string {
   }
 }
 
+export function planSelectedClass(type: string): string {
+  switch (type) {
+    case 'BRONZE':
+      return 'border-2 border-orange-500 bg-gradient-to-br from-orange-50 to-orange-100 ring-2 ring-orange-300'
+    case 'SILVER':
+      return 'border-2 border-gray-500 bg-gradient-to-br from-gray-50 to-gray-200 ring-2 ring-gray-400'
+    case 'GOLD':
+      return 'border-2 border-amber-500 bg-gradient-to-br from-yellow-50 to-amber-100 ring-2 ring-amber-400'
+    default:
+      return 'border-2 border-purple-600 bg-purple-50 ring-2 ring-purple-300'
+  }
+}
+
 export function planBarClass(type: string): string {
   switch (type) {
     case 'BRONZE':

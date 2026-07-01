@@ -56,6 +56,7 @@ export function AppHeader() {
                 <>
                   <NavLink to="/seller/dashboard" className={navLinkClass}>ダッシュボード</NavLink>
                   <NavLink to="/seller/projects" className={navLinkClass}>プロジェクト</NavLink>
+                  <NavLink to="/messages" className={navLinkClass}>メッセージ</NavLink>
                 </>
               ) : null}
 
