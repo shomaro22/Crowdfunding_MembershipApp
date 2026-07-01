@@ -11,9 +11,29 @@ import { useAuth } from '@/auth/AuthProvider'
 import { Loading } from '@/components/common/Loading'
 import { ErrorMessage } from '@/components/common/ErrorMessage'
 import { ApiError } from '@/lib/api-client'
+import { planSelectedClass, planTierLabel, sortPlansByTier } from '@/lib/plans'
 import { formatCurrencyYen } from '@/lib/utils'
 import { isValidUUID, parseUUID } from '@/lib/validation'
-import type { PaymentMethod, ProjectDetail, ProjectPlan } from '@/types/api'
+import type { PaymentMethod, ProjectDetail } from '@/types/api'
+
+function checkoutErrorMessage(err: unknown): string {
+  if (err instanceof ApiError) {
+    if (err.code === 'ALREADY_SUPPORTING' || (err.status === 409 && err.message.includes('already supporting'))) {
+      return 'このプロジェクトは既に応援中です。応援履歴からプラン変更・解約ができます。'
+    }
+    if (err.code === 'PENDING_CHECKOUT') {
+      return '未完了の決済があります。しばらく待ってから再度お試しください。'
+    }
+    if (err.status === 409) {
+      return 'このプロジェクトは現在応援できません。応援履歴をご確認ください。'
+    }
+    if (err.status === 503) {
+      return '決済サービスが一時的に利用できません。しばらくしてからお試しください。'
+    }
+    return err.message
+  }
+  return 'チェックアウトの開始に失敗しました'
+}
 
 export function CheckoutPage() {
   const { projectId } = useParams<{ projectId: string }>()
@@ -41,7 +61,7 @@ export function CheckoutPage() {
         if (planFromQuery && detail.plans.some((p) => p.id === planFromQuery)) {
           setSelectedPlanId(planFromQuery)
         } else {
-          const first = detail.plans[0]
+          const first = detail.plans.find((p) => p.is_active)
           if (first) {
             setSelectedPlanId(first.id)
           }
@@ -77,11 +97,7 @@ export function CheckoutPage() {
       }
       window.location.assign(session.url)
     } catch (err) {
-      if (err instanceof ApiError) {
-        setError(err.message)
-      } else {
-        setError('チェックアウトの開始に失敗しました')
-      }
+      setError(checkoutErrorMessage(err))
     } finally {
       setSubmitting(false)
     }
@@ -97,28 +113,46 @@ export function CheckoutPage() {
     return <ErrorMessage message="プロジェクトが見つかりません" />
   }
 
+  const activePlans = sortPlansByTier(project.plans.filter((p) => p.is_active))
+
   return (
     <div className="mx-auto max-w-2xl">
       <h1 className="mb-2 text-2xl font-bold">応援する</h1>
       <p className="mb-6 text-gray-600">{project.title}</p>
-      {error ? <p className="mb-4 text-sm text-red-600">{error}</p> : null}
+      {error ? <p className="mb-4 rounded-lg bg-red-50 px-4 py-2 text-sm text-red-600">{error}</p> : null}
 
       <div className="mb-6 space-y-3">
-        {project.plans.filter((p) => p.is_active).map((plan: ProjectPlan) => (
-          <label key={plan.id} className={`card flex cursor-pointer gap-3 ${selectedPlanId === plan.id ? 'ring-2 ring-purple-500' : ''}`}>
-            <input
-              type="radio"
-              name="plan"
-              checked={selectedPlanId === plan.id}
-              onChange={() => setSelectedPlanId(plan.id)}
-            />
-            <div>
-              <p className="font-bold">{plan.membership_type}</p>
-              <p>{formatCurrencyYen(plan.price)}</p>
-              <p className="text-sm text-gray-600">{plan.benefits}</p>
-            </div>
-          </label>
-        ))}
+        {activePlans.map((plan) => {
+          const selected = selectedPlanId === plan.id
+          return (
+            <label
+              key={plan.id}
+              className={`card flex cursor-pointer gap-3 transition-all ${
+                selected
+                  ? planSelectedClass(plan.membership_type)
+                  : 'border border-purple-100 hover:border-purple-300'
+              }`}
+            >
+              <input
+                type="radio"
+                name="plan"
+                checked={selected}
+                onChange={() => setSelectedPlanId(plan.id)}
+                className="mt-1 accent-purple-700"
+              />
+              <div>
+                <p className={`font-bold ${selected ? 'text-purple-900' : 'text-gray-800'}`}>
+                  {planTierLabel(plan.membership_type)}
+                </p>
+                <p className={`text-xl font-extrabold ${selected ? 'text-purple-700' : ''}`}>
+                  {formatCurrencyYen(plan.price)}
+                  <span className="text-sm font-normal text-gray-500">/月</span>
+                </p>
+                <p className="text-sm text-gray-600">{plan.benefits}</p>
+              </div>
+            </label>
+          )
+        })}
       </div>
 
       <div className="mb-6">

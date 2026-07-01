@@ -7,10 +7,15 @@ import {
   updateProfile,
   verify2FA,
 } from '@/api/auth'
+import { uploadImage } from '@/api/media'
 import { useAuth } from '@/auth/AuthProvider'
 import { ApiError } from '@/lib/api-client'
 import { Loading } from '@/components/common/Loading'
+import { PasswordInput } from '@/components/common/PasswordInput'
+import { UserAvatar } from '@/components/common/UserAvatar'
 import { useToast } from '@/components/common/Toast'
+import { validateImageFile } from '@/lib/upload'
+import { normalizeMediaUrl } from '@/lib/media-url'
 import { sanitizeDisplayText, validatePassword } from '@/lib/utils'
 import { validateTOTPCode } from '@/lib/validation'
 
@@ -20,6 +25,7 @@ export function ProfilePage() {
   const [name, setName] = useState('')
   const [avatarUrl, setAvatarUrl] = useState('')
   const [loading, setLoading] = useState(true)
+  const [uploading, setUploading] = useState(false)
 
   const [currentPw, setCurrentPw] = useState('')
   const [newPw, setNewPw] = useState('')
@@ -42,15 +48,35 @@ export function ProfilePage() {
         setLoading(false)
       }
     })()
-  }, [])
+  }, [toast])
+
+  const onAvatarUpload = async (file: File) => {
+    const check = validateImageFile(file)
+    if (!check.valid) {
+      toast(check.error ?? '画像が無効です', 'error')
+      return
+    }
+    setUploading(true)
+    try {
+      const res = await uploadImage(file)
+      setAvatarUrl(normalizeMediaUrl(res.url))
+      toast('画像をアップロードしました', 'success')
+    } catch {
+      toast('画像のアップロードに失敗しました', 'error')
+    } finally {
+      setUploading(false)
+    }
+  }
 
   const saveProfile = async (e: FormEvent) => {
     e.preventDefault()
     try {
-      await updateProfile({
+      const updated = await updateProfile({
         name: sanitizeDisplayText(name, 100),
-        avatar_url: avatarUrl.trim().slice(0, 2048),
+        avatar_url: normalizeMediaUrl(avatarUrl.trim()).slice(0, 2048),
       })
+      setName(updated.name ?? '')
+      setAvatarUrl(updated.avatar_url ?? '')
       await refreshUser()
       toast('プロフィールを更新しました', 'success')
     } catch (error) {
@@ -112,8 +138,28 @@ export function ProfilePage() {
       <section className="card">
         <h2 className="mb-4 text-lg font-semibold">基本情報</h2>
         <form onSubmit={(e) => void saveProfile(e)} className="space-y-4">
+          <div className="flex items-center gap-4">
+            <UserAvatar name={name} avatarUrl={avatarUrl || undefined} size="lg" />
+            <div>
+              <label className="btn-secondary inline-block cursor-pointer rounded-full px-4 py-2 text-sm">
+                {uploading ? 'アップロード中...' : '画像を選択'}
+                <input
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp,image/gif"
+                  className="hidden"
+                  disabled={uploading}
+                  onChange={(e) => {
+                    const f = e.target.files?.[0]
+                    if (f) {
+                      void onAvatarUpload(f)
+                    }
+                  }}
+                />
+              </label>
+              <p className="mt-1 text-xs text-gray-500">JPEG / PNG / WebP / GIF（最大 5MB）</p>
+            </div>
+          </div>
           <input className="input-field" value={name} onChange={(e) => setName(e.target.value)} placeholder="表示名" />
-          <input className="input-field" value={avatarUrl} onChange={(e) => setAvatarUrl(e.target.value)} placeholder="アバター URL（https）" />
           <button type="submit" className="btn-primary rounded-full">保存</button>
         </form>
       </section>
@@ -121,8 +167,20 @@ export function ProfilePage() {
       <section className="card">
         <h2 className="mb-4 text-lg font-semibold">パスワード変更</h2>
         <form onSubmit={(e) => void onChangePassword(e)} className="space-y-4">
-          <input type="password" autoComplete="current-password" className="input-field" value={currentPw} onChange={(e) => setCurrentPw(e.target.value)} placeholder="現在のパスワード" />
-          <input type="password" autoComplete="new-password" className="input-field" value={newPw} onChange={(e) => setNewPw(e.target.value)} placeholder="新しいパスワード" />
+          <PasswordInput
+            id="current-password"
+            value={currentPw}
+            onChange={setCurrentPw}
+            autoComplete="current-password"
+            placeholder="現在のパスワード"
+          />
+          <PasswordInput
+            id="new-password"
+            value={newPw}
+            onChange={setNewPw}
+            autoComplete="new-password"
+            placeholder="新しいパスワード"
+          />
           <input className="input-field" value={totpForPw} onChange={(e) => setTotpForPw(e.target.value)} placeholder="2FA コード（有効時）" inputMode="numeric" />
           <button type="submit" className="btn-primary rounded-full">パスワード変更</button>
         </form>
@@ -149,9 +207,14 @@ export function ProfilePage() {
           </div>
         )}
         {backupCodes.length > 0 ? (
-          <ul className="mt-4 list-inside list-disc font-mono text-sm">
-            {backupCodes.map((c) => <li key={c}>{c}</li>)}
-          </ul>
+          <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-4">
+            <p className="mb-2 text-sm font-semibold text-amber-900">バックアップコード（安全な場所に保管してください）</p>
+            <div className="grid grid-cols-2 gap-2 font-mono text-sm text-gray-800 sm:grid-cols-3">
+              {backupCodes.map((c) => (
+                <span key={c} className="rounded bg-white px-2 py-1 text-center">{c}</span>
+              ))}
+            </div>
+          </div>
         ) : null}
       </section>
     </div>

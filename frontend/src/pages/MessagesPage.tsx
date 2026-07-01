@@ -133,7 +133,10 @@ export function MessagesPage() {
   return (
     <div className="grid gap-4 md:grid-cols-3">
       <aside className="card md:col-span-1">
-        <h1 className="mb-4 text-lg font-bold">スレッド</h1>
+        <h1 className="mb-4 text-lg font-bold">メッセージ</h1>
+        {threads.length === 0 ? (
+          <p className="text-sm text-gray-500">会話はまだありません。応援中のプロジェクトでクリエイターとやり取りできます。</p>
+        ) : (
         <ul className="space-y-2">
           {threads.map((t) => (
             <li key={`${t.project_id}-${t.partner.id}`}>
@@ -151,6 +154,7 @@ export function MessagesPage() {
             </li>
           ))}
         </ul>
+        )}
       </aside>
 
       <section className="card md:col-span-2 flex min-h-[24rem] flex-col">

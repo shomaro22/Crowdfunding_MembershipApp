@@ -1,5 +1,5 @@
 import { useCallback, useState, type FormEvent } from 'react'
-import { Link, useNavigate, useSearchParams } from 'react-router-dom'
+import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 
 import { useAuth } from '@/auth/AuthProvider'
 import { ApiError } from '@/lib/api-client'
@@ -9,6 +9,7 @@ import { isValidEmail, sanitizeAppPath, sanitizeEmail } from '@/lib/utils'
 
 export function SignInForm() {
   const navigate = useNavigate()
+  const location = useLocation()
   const [searchParams] = useSearchParams()
   const { login } = useAuth()
 
@@ -20,7 +21,11 @@ export function SignInForm() {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [showGoogleHelp, setShowGoogleHelp] = useState(false)
 
-  const callbackPath = sanitizeAppPath(searchParams.get('from'), '/')
+  const fromState =
+    typeof location.state === 'object' && location.state !== null && 'from' in location.state
+      ? String(location.state.from)
+      : null
+  const callbackPath = sanitizeAppPath(fromState ?? searchParams.get('from'), '/')
 
   const validate = useCallback((): boolean => {
     const next: { email?: string; password?: string } = {}
