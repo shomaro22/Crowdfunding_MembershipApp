@@ -2,6 +2,7 @@ import { useState, type FormEvent } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 
 import { registerSeller } from '@/api/auth'
+import { PasswordInput } from '@/components/common/PasswordInput'
 import {
   isValidEmail,
   sanitizeDisplayText,
@@ -103,7 +104,12 @@ export function SellerSignUpForm() {
         </div>
         <div>
           <label htmlFor="password" className="mb-2 block text-sm font-medium text-gray-700">パスワード</label>
-          <input id="password" type="password" autoComplete="new-password" className="input-field" value={password} onChange={(e) => setPassword(e.target.value)} />
+          <PasswordInput
+            id="password"
+            value={password}
+            onChange={setPassword}
+            autoComplete="new-password"
+          />
         </div>
         <div>
           <label htmlFor="fullName" className="mb-2 block text-sm font-medium text-gray-700">氏名</label>
