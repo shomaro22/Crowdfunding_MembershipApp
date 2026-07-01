@@ -95,9 +95,16 @@ export function sanitizeAppPath(input: string | null | undefined, fallback = '/'
 }
 
 export function formatCurrencyYen(amount: number): string {
-  return new Intl.NumberFormat('ja-JP', {
-    style: 'currency',
-    currency: 'JPY',
-    maximumFractionDigits: 0,
-  }).format(amount)
+  return `${amount.toLocaleString('ja-JP')}円`
+}
+
+export function fundingProgressPercent(current: number, target: number): number {
+  if (target <= 0) {
+    return 0
+  }
+  return Math.round((current / target) * 100)
+}
+
+export function fundingProgressBarWidth(percent: number): number {
+  return Math.min(100, Math.max(0, percent))
 }

@@ -2,6 +2,7 @@ import { useState, type FormEvent } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 
 import { registerBuyer } from '@/api/auth'
+import { PasswordInput } from '@/components/common/PasswordInput'
 import { ApiError } from '@/lib/api-client'
 import {
   evaluatePasswordStrength,
@@ -60,37 +61,77 @@ export function BuyerSignUpForm() {
   }
 
   return (
-    <div className="card mx-auto max-w-md">
-      <div className="mb-8 text-center">
-        <h2 className="mb-2 text-2xl font-bold text-gray-800">購入者 新規登録</h2>
-        <p className="text-gray-600">管理者承認後にログインできます</p>
+    <div className="mx-auto grid max-w-4xl overflow-hidden rounded-2xl bg-white shadow-xl md:grid-cols-5">
+      <div className="flex flex-col justify-center bg-gradient-to-br from-purple-700 via-purple-600 to-pink-600 p-8 text-white md:col-span-2 md:p-10">
+        <p className="mb-2 text-sm font-semibold uppercase tracking-wider text-purple-200">FanFunding</p>
+        <h2 className="mb-4 text-2xl font-extrabold md:text-3xl">ファンアカウント作成</h2>
+        <p className="text-sm leading-relaxed text-purple-100">
+          お気に入りのクリエイターを応援し、限定コンテンツやメンバー特典を楽しもう。
+        </p>
+        <ul className="mt-6 space-y-2 text-sm text-purple-100">
+          <li>・ メンバーシッププランに応援</li>
+          <li>・ お気に入り・メッセージ機能</li>
+          <li>・ Google アカウントでも登録可能</li>
+        </ul>
       </div>
 
-      {error ? <p className="mb-4 text-sm text-red-600">{error}</p> : null}
-      {success ? <p className="mb-4 text-sm text-green-700">{success}</p> : null}
+      <div className="p-8 md:col-span-3 md:p-10">
+        <div className="mb-6">
+          <h3 className="text-xl font-bold text-gray-800">新規登録</h3>
+          <p className="mt-1 text-sm text-gray-600">メールアドレスでアカウントを作成します</p>
+        </div>
 
-      <form onSubmit={(e) => void onSubmit(e)} className="space-y-4">
-        <div>
-          <label htmlFor="email" className="mb-2 block text-sm font-medium text-gray-700">メールアドレス</label>
-          <input id="email" type="email" autoComplete="email" className="input-field" value={email} onChange={(e) => setEmail(e.target.value)} />
-        </div>
-        <div>
-          <label htmlFor="password" className="mb-2 block text-sm font-medium text-gray-700">パスワード</label>
-          <input id="password" type="password" autoComplete="new-password" className="input-field" value={password} onChange={(e) => setPassword(e.target.value)} />
-          <p className="mt-1 text-xs text-gray-500">強度: {strength}</p>
-        </div>
-        <div>
-          <label htmlFor="confirm" className="mb-2 block text-sm font-medium text-gray-700">パスワード（確認）</label>
-          <input id="confirm" type="password" autoComplete="new-password" className="input-field" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} />
-        </div>
-        <button type="submit" disabled={isSubmitting} className="btn-primary w-full rounded-full font-bold">
-          {isSubmitting ? '登録中...' : '登録する'}
-        </button>
-      </form>
+        {error ? <p className="mb-4 text-sm text-red-600">{error}</p> : null}
+        {success ? <p className="mb-4 text-sm text-green-700">{success}</p> : null}
 
-      <p className="mt-6 text-center text-sm text-gray-600">
-        出品者の方は <Link to="/signup/seller" className="text-purple-700">こちら</Link>
-      </p>
+        <form onSubmit={(e) => void onSubmit(e)} className="space-y-4">
+          <div>
+            <label htmlFor="email" className="mb-2 block text-sm font-medium text-gray-700">メールアドレス</label>
+            <input
+              id="email"
+              type="email"
+              autoComplete="email"
+              className="input-field"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="example@email.com"
+            />
+          </div>
+          <div>
+            <label htmlFor="password" className="mb-2 block text-sm font-medium text-gray-700">パスワード</label>
+            <PasswordInput
+              id="password"
+              value={password}
+              onChange={setPassword}
+              autoComplete="new-password"
+              placeholder="8文字以上・英数字記号"
+            />
+            <p className="mt-1 text-xs text-gray-500">強度: {strength}</p>
+          </div>
+          <div>
+            <label htmlFor="confirm" className="mb-2 block text-sm font-medium text-gray-700">パスワード（確認）</label>
+            <PasswordInput
+              id="confirm"
+              value={confirmPassword}
+              onChange={setConfirmPassword}
+              autoComplete="new-password"
+              placeholder="もう一度入力"
+            />
+          </div>
+          <button type="submit" disabled={isSubmitting} className="btn-primary w-full rounded-full font-bold">
+            {isSubmitting ? '登録中...' : 'アカウントを作成'}
+          </button>
+        </form>
+
+        <p className="mt-6 text-center text-sm text-gray-600">
+          すでにアカウントをお持ちの方は{' '}
+          <Link to="/signin" className="font-medium text-purple-700">ログイン</Link>
+        </p>
+        <p className="mt-2 text-center text-sm text-gray-600">
+          クリエイター（出品者）の方は{' '}
+          <Link to="/signup/seller" className="font-medium text-purple-700">こちら</Link>
+        </p>
+      </div>
     </div>
   )
 }

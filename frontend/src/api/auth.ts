@@ -1,4 +1,4 @@
-import { apiRequest } from '@/lib/api-client'
+import { apiRequest, apiUpload } from '@/lib/api-client'
 import { setAccessToken } from '@/lib/token-store'
 import type {
   AuthTokenResponse,
@@ -81,19 +81,7 @@ export async function registerSeller(payload: SellerRegistrationPayload): Promis
   form.append('identity_document_front', payload.identity_document_front)
   form.append('identity_document_back', payload.identity_document_back)
 
-  const base = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8080'
-  const response = await fetch(`${String(base).replace(/\/+$/, '')}/auth/register/seller`, {
-    method: 'POST',
-    credentials: 'include',
-    body: form,
-  })
-
-  if (!response.ok) {
-    const text = await response.text()
-    throw new Error(text || 'Registration failed')
-  }
-
-  return (await response.json()) as RegisterSellerResponse
+  return apiUpload<RegisterSellerResponse>('/auth/register/seller', form, false)
 }
 
 export async function exchangeOAuthCode(code: string): Promise<AuthTokenResponse> {
