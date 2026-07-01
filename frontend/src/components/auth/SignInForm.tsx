@@ -106,6 +106,9 @@ export function SignInForm() {
           <label htmlFor="password" className="mb-2 block text-sm font-medium text-gray-700">
             パスワード
           </label>
+          <div className="mb-2 text-right">
+            <Link to="/forgot-password" className="text-sm text-purple-700 hover:text-purple-900">パスワードを忘れた方</Link>
+          </div>
           <div className="relative">
             <input
               id="password"
