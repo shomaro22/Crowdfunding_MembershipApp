@@ -126,11 +126,14 @@ func (r *sellerRepo) ListProjectAnalysis(ctx context.Context, sellerID uuid.UUID
 			projects.id AS project_id,
 			projects.title AS title,
 			projects.supporter_count AS supporter_count,
-			COALESCE(SUM(CASE WHEN purchases.status = ? THEN purchases.total_price ELSE 0 END), 0) AS revenue`,
+			GREATEST(
+				COALESCE(SUM(CASE WHEN purchases.status = ? THEN purchases.total_price ELSE 0 END), 0),
+				projects.current_amount
+			) AS revenue`,
 			model.PurchaseStatusPaid).
 		Joins("LEFT JOIN purchases ON purchases.project_id = projects.id").
 		Where("projects.seller_id = ?", sellerID).
-		Group("projects.id, projects.title, projects.supporter_count").
+		Group("projects.id, projects.title, projects.supporter_count, projects.current_amount").
 		Order("projects.created_at DESC").
 		Scan(&rows).Error
 	return rows, err

@@ -342,8 +342,8 @@ func TestPaymentAlreadySupportingConflict(t *testing.T) {
 	if rec.Code != http.StatusConflict {
 		t.Fatalf("status=%d want 409 body=%s", rec.Code, rec.Body.String())
 	}
-	if bodyCode(rec) != "CONFLICT" {
-		t.Fatalf("code=%q want CONFLICT", bodyCode(rec))
+	if bodyCode(rec) != "ALREADY_SUPPORTING" {
+		t.Fatalf("code=%q want ALREADY_SUPPORTING", bodyCode(rec))
 	}
 }
 

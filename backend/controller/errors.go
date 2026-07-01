@@ -64,9 +64,9 @@ func mapUseCaseHTTP(err error) (int, map[string]string) {
 	case errors.Is(err, usecase.ErrNotFound):
 		return http.StatusNotFound, errorPayload("NOT_FOUND", "not found")
 	case errors.Is(err, usecase.ErrPendingCheckout):
-		return http.StatusConflict, errorPayload("CONFLICT", "pending checkout exists")
+		return http.StatusConflict, errorPayload("PENDING_CHECKOUT", "pending checkout exists")
 	case errors.Is(err, usecase.ErrAlreadySupporting):
-		return http.StatusConflict, errorPayload("CONFLICT", "already supporting")
+		return http.StatusConflict, errorPayload("ALREADY_SUPPORTING", "already supporting")
 	case errors.Is(err, usecase.ErrEmailInUse):
 		return http.StatusConflict, errorPayload("CONFLICT", "email already in use")
 	case errors.Is(err, usecase.ErrFavoriteExists):
