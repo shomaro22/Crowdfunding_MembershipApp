@@ -28,7 +28,7 @@ export interface ApiRequestOptions {
 
 const DEFAULT_TIMEOUT_MS = 30_000
 
-function apiBaseUrl(): string {
+export function apiBaseUrl(): string {
   const raw = import.meta.env.VITE_API_BASE_URL
   if (typeof raw !== 'string' || raw.trim() === '') {
     return ''
@@ -173,4 +173,57 @@ export async function apiRequest<T>(
 export function googleOAuthStartUrl(fromPath: string): string {
   const from = encodeURIComponent(fromPath)
   return `${apiBaseUrl()}/auth/google?from=${from}`
+}
+
+export async function apiUpload<T>(
+  path: string,
+  formData: FormData,
+  auth = true,
+): Promise<T> {
+  const controller = new AbortController()
+  const timer = window.setTimeout(() => controller.abort(), DEFAULT_TIMEOUT_MS)
+  const headers = new Headers({ Accept: 'application/json' })
+
+  if (auth) {
+    const token = getAccessToken()
+    if (token) {
+      headers.set('Authorization', `Bearer ${token}`)
+    }
+  }
+
+  try {
+    let response = await fetch(`${apiBaseUrl()}${path}`, {
+      method: 'POST',
+      credentials: 'include',
+      headers,
+      body: formData,
+      signal: controller.signal,
+    })
+
+    if (response.status === 401 && auth) {
+      const newToken = await refreshAccessToken()
+      if (newToken) {
+        headers.set('Authorization', `Bearer ${newToken}`)
+        response = await fetch(`${apiBaseUrl()}${path}`, {
+          method: 'POST',
+          credentials: 'include',
+          headers,
+          body: formData,
+          signal: controller.signal,
+        })
+      }
+    }
+
+    if (response.status === 204) {
+      return undefined as T
+    }
+
+    const payload = await parseJsonSafe(response)
+    if (!response.ok) {
+      throw errorFromResponse(response.status, payload)
+    }
+    return payload as T
+  } finally {
+    window.clearTimeout(timer)
+  }
 }
