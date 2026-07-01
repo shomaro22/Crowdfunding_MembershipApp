@@ -25,8 +25,8 @@ interface AuthContextValue {
   status: AuthStatus
   user: User | null
   adminRole: AdminRole | null
-  login: (email: string, password: string) => Promise<'ok' | '2fa'>
-  complete2FA: (code: string) => Promise<void>
+  login: (email: string, password: string) => Promise<User | '2fa'>
+  complete2FA: (code: string) => Promise<User>
   logout: () => Promise<void>
   refreshUser: () => Promise<void>
   hasRole: (role: UserRole) => boolean
@@ -90,7 +90,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [syncAdminRoleFromToken])
 
-  const login = useCallback(async (email: string, password: string): Promise<'ok' | '2fa'> => {
+  const login = useCallback(async (email: string, password: string): Promise<User | '2fa'> => {
     const res = await loginApi(email, password)
     if (isLogin2FAResponse(res)) {
       setUser(res.user)
@@ -101,14 +101,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(res.user)
     syncAdminRoleFromToken()
     setStatus('authenticated')
-    return 'ok'
+    return res.user
   }, [syncAdminRoleFromToken])
 
-  const complete2FA = useCallback(async (code: string) => {
+  const complete2FA = useCallback(async (code: string): Promise<User> => {
     const res = await challenge2FA(code)
     setUser(res.user)
     syncAdminRoleFromToken()
     setStatus('authenticated')
+    return res.user
   }, [syncAdminRoleFromToken])
 
   const logout = useCallback(async () => {
