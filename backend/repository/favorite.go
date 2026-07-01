@@ -15,6 +15,7 @@ type IFavoriteRepo interface {
 	Exists(ctx context.Context, userID, projectID uuid.UUID) (bool, error)
 	Create(ctx context.Context, row *model.Favorite) error
 	Delete(ctx context.Context, userID, projectID uuid.UUID) (bool, error)
+	CountByProjects(ctx context.Context, projectIDs []uuid.UUID) (map[uuid.UUID]int64, error)
 }
 
 type favoriteRepo struct {
@@ -77,4 +78,33 @@ func (r *favoriteRepo) Delete(ctx context.Context, userID, projectID uuid.UUID) 
 
 func IsFavoriteDuplicate(err error) bool {
 	return errors.Is(err, gorm.ErrDuplicatedKey)
+}
+
+type favoriteCountRow struct {
+	ProjectID uuid.UUID `gorm:"column:project_id"`
+	Count     int64     `gorm:"column:count"`
+}
+
+func (r *favoriteRepo) CountByProjects(ctx context.Context, projectIDs []uuid.UUID) (map[uuid.UUID]int64, error) {
+	var (
+		out  = make(map[uuid.UUID]int64, len(projectIDs))
+		rows []favoriteCountRow
+		err  error
+		i    int
+	)
+	if len(projectIDs) == 0 {
+		return out, nil
+	}
+	err = r.dbCtx(ctx).Model(&model.Favorite{}).
+		Select("project_id, COUNT(*) AS count").
+		Where("project_id IN ?", projectIDs).
+		Group("project_id").
+		Scan(&rows).Error
+	if err != nil {
+		return nil, err
+	}
+	for i = range rows {
+		out[rows[i].ProjectID] = rows[i].Count
+	}
+	return out, nil
 }

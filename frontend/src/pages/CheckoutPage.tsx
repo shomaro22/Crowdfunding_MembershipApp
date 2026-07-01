@@ -71,7 +71,7 @@ export function CheckoutPage() {
         successUrl: success,
         cancelUrl: cancel,
       })
-      if (!session.url.startsWith('https://')) {
+      if (!session.url.startsWith('http://') && !session.url.startsWith('https://')) {
         setError('決済 URL が無効です')
         return
       }

@@ -15,6 +15,7 @@ type IProjectRepo interface {
 	Create(ctx context.Context, p *model.Project, plans []model.ProjectPlan, images []model.ProjectImage) error
 	GetID(ctx context.Context, id uuid.UUID) (model.Project, []model.ProjectPlan, []model.ProjectImage, error)
 	ListPublic(ctx context.Context, f ProjectListFilter) ([]model.Project, int64, error)
+	ListFeatured(ctx context.Context, limit int, asOf time.Time) ([]model.Project, error)
 	ListSeller(ctx context.Context, sellerID uuid.UUID, limit, offset int) ([]model.Project, int64, error)
 	ListAll(ctx context.Context, status *model.ProjectStatus, limit, offset int) ([]model.Project, int64, error)
 	Update(ctx context.Context, p *model.Project) error
@@ -213,6 +214,30 @@ func (r *projectRepo) ListPublic(ctx context.Context, f ProjectListFilter) ([]mo
 	order = publicSort(f.Sort)
 	err = q.Order(order).Limit(limit).Offset(offset).Find(&rows).Error
 	return rows, total, err
+}
+
+func (r *projectRepo) ListFeatured(ctx context.Context, limit int, asOf time.Time) ([]model.Project, error) {
+	var (
+		rows []model.Project
+		err  error
+	)
+	if limit <= 0 {
+		limit = 5
+	}
+	if limit > 20 {
+		limit = 20
+	}
+	if asOf.IsZero() {
+		asOf = time.Now().UTC()
+	}
+	err = r.dbCtx(ctx).Model(&model.Project{}).
+		Where("status = ?", model.ProjectStatusActive).
+		Where("(duration_type = ? OR (duration_type = ? AND end_date >= ?))",
+			model.DurationUnlimited, model.DurationLimited, asOf).
+		Order("current_amount DESC, supporter_count DESC, created_at DESC").
+		Limit(limit).
+		Find(&rows).Error
+	return rows, err
 }
 
 func publicSort(sort string) string {

@@ -53,6 +53,21 @@ func queryPage(c echo.Context) (limit, offset int) {
 	return limit, offset
 }
 
+func queryLimit(c echo.Context, defaultLimit, maxLimit int) int {
+	var (
+		limit int
+		err   error
+	)
+	limit, err = strconv.Atoi(c.QueryParam("limit"))
+	if err != nil || limit <= 0 {
+		return defaultLimit
+	}
+	if limit > maxLimit {
+		return maxLimit
+	}
+	return limit
+}
+
 func queryOptionalString(c echo.Context, key string) *string {
 	var (
 		s   string
