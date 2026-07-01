@@ -1,0 +1,240 @@
+import { useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
+
+import { getProject } from '@/api/projects'
+import { listPurchases } from '@/api/payments'
+import {
+  cancelSupporter,
+  confirmUpgrade,
+  listSupporters,
+  rejoinSupporter,
+  upgradeSupporter,
+} from '@/api/supporters'
+import { ConfirmDialog } from '@/components/common/ConfirmDialog'
+import { Loading } from '@/components/common/Loading'
+import { ErrorMessage } from '@/components/common/ErrorMessage'
+import { useToast } from '@/components/common/Toast'
+import { planTierLabel, sortPlansByTier } from '@/lib/plans'
+import { formatCurrencyYen } from '@/lib/utils'
+import type { ProjectDetail, Purchase, Supporter } from '@/types/api'
+import { ApiError } from '@/lib/api-client'
+
+export function PurchasesPage() {
+  const { toast } = useToast()
+  const [purchases, setPurchases] = useState<Purchase[]>([])
+  const [supporters, setSupporters] = useState<Supporter[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+  const [cancelTarget, setCancelTarget] = useState<string | null>(null)
+  const [planChangeTarget, setPlanChangeTarget] = useState<Supporter | null>(null)
+  const [planChangeProject, setPlanChangeProject] = useState<ProjectDetail | null>(null)
+  const [planChangeLoading, setPlanChangeLoading] = useState(false)
+
+  const load = async () => {
+    setLoading(true)
+    setError('')
+    try {
+      const [p, s] = await Promise.all([listPurchases(), listSupporters()])
+      setPurchases(p.purchases)
+      setSupporters(s.supporters)
+    } catch {
+      setError('履歴の取得に失敗しました')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    void load()
+  }, [])
+
+  useEffect(() => {
+    if (!planChangeTarget) {
+      setPlanChangeProject(null)
+      return
+    }
+    void (async () => {
+      setPlanChangeLoading(true)
+      try {
+        const detail = await getProject(planChangeTarget.project_id)
+        setPlanChangeProject(detail)
+      } catch {
+        toast('プラン情報の取得に失敗しました', 'error')
+        setPlanChangeTarget(null)
+      } finally {
+        setPlanChangeLoading(false)
+      }
+    })()
+  }, [planChangeTarget, toast])
+
+  const onCancel = async (id: string) => {
+    try {
+      await cancelSupporter(id)
+      await load()
+      toast('解約手続きを受け付けました', 'success')
+    } catch (err) {
+      toast(err instanceof ApiError ? err.message : '操作に失敗しました', 'error')
+    } finally {
+      setCancelTarget(null)
+    }
+  }
+
+  const onRejoin = async (id: string) => {
+    try {
+      await rejoinSupporter(id)
+      await load()
+      toast('再参加しました', 'success')
+    } catch (err) {
+      toast(err instanceof ApiError ? err.message : '操作に失敗しました', 'error')
+    }
+  }
+
+  const onUpgradePlan = async (supporterId: string, planId: string) => {
+    try {
+      const res = await upgradeSupporter(supporterId, planId)
+      if (res.payment_intent_client_secret) {
+        const match = /pi_[a-zA-Z0-9_]+/.exec(res.payment_intent_client_secret)
+        if (match?.[0]) {
+          await confirmUpgrade(supporterId, match[0])
+        }
+      }
+      await load()
+      toast('プラン変更を受け付けました', 'success')
+      setPlanChangeTarget(null)
+    } catch (err) {
+      const msg = err instanceof ApiError ? err.message : 'プラン変更に失敗しました'
+      toast(msg, 'error')
+    }
+  }
+
+  if (loading) {
+    return <Loading />
+  }
+  if (error) {
+    return <ErrorMessage message={error} onRetry={() => void load()} />
+  }
+
+  const changePlans = planChangeProject
+    ? sortPlansByTier(planChangeProject.plans.filter((p) => p.is_active))
+    : []
+
+  return (
+    <div className="space-y-10">
+      <h1 className="text-2xl font-bold">応援履歴</h1>
+
+      <ConfirmDialog
+        open={cancelTarget !== null}
+        title="メンバーシップ解約"
+        message="メンバーシップを解約しますか？"
+        confirmLabel="解約する"
+        danger
+        onConfirm={() => {
+          if (cancelTarget) {
+            void onCancel(cancelTarget)
+          }
+        }}
+        onCancel={() => setCancelTarget(null)}
+      />
+
+      {planChangeTarget ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-xl">
+            <h2 className="mb-4 text-lg font-bold">プラン変更</h2>
+            <p className="mb-4 text-sm text-gray-600">
+              {planChangeTarget.project?.title ?? 'プロジェクト'} — 現在: {planChangeTarget.plan?.membership_type}
+            </p>
+            {planChangeLoading ? (
+              <Loading label="プラン読み込み中..." />
+            ) : (
+              <ul className="mb-4 space-y-2">
+                {changePlans.map((plan) => (
+                  <li key={plan.id}>
+                    <button
+                      type="button"
+                      disabled={plan.id === planChangeTarget.plan_id}
+                      onClick={() => void onUpgradePlan(planChangeTarget.id, plan.id)}
+                      className={`w-full rounded-lg border p-3 text-left text-sm ${
+                        plan.id === planChangeTarget.plan_id
+                          ? 'cursor-not-allowed border-gray-200 bg-gray-50 text-gray-400'
+                          : 'border-purple-200 hover:bg-purple-50'
+                      }`}
+                    >
+                      <span className="font-bold">{planTierLabel(plan.membership_type)}</span>
+                      {' · '}
+                      {formatCurrencyYen(plan.price)}/月
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+            <button type="button" onClick={() => setPlanChangeTarget(null)} className="btn-secondary w-full rounded-full">
+              閉じる
+            </button>
+          </div>
+        </div>
+      ) : null}
+
+      <section>
+        <h2 className="mb-4 text-lg font-semibold">メンバーシップ</h2>
+        {supporters.length === 0 ? (
+          <p className="text-gray-600">応援中のプロジェクトはありません</p>
+        ) : (
+          <ul className="space-y-4">
+            {supporters.map((s) => (
+              <li key={s.id} className="card flex flex-wrap items-center justify-between gap-4">
+                <div>
+                  <Link to={`/projects/${s.project_id}`} className="font-bold text-purple-800 hover:underline">
+                    {s.project?.title ?? s.project_id}
+                  </Link>
+                  <p className="text-sm text-gray-600">
+                    {s.plan?.membership_type} · {s.status} · 〜{new Date(s.end_date).toLocaleDateString('ja-JP')}
+                  </p>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {s.status === 'ACTIVE' ? (
+                    <>
+                      <button type="button" onClick={() => setPlanChangeTarget(s)} className="btn-primary rounded-full text-sm">
+                        プラン変更
+                      </button>
+                      <button type="button" onClick={() => setCancelTarget(s.id)} className="btn-secondary rounded-full text-sm">
+                        解約
+                      </button>
+                    </>
+                  ) : null}
+                  {s.status === 'CANCELLED' || s.status === 'EXPIRED' ? (
+                    <button type="button" onClick={() => void onRejoin(s.id)} className="btn-primary rounded-full text-sm">
+                      再参加
+                    </button>
+                  ) : null}
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+
+      <section>
+        <h2 className="mb-4 text-lg font-semibold">お支払い記録</h2>
+        {purchases.length === 0 ? (
+          <p className="text-gray-600">お支払い記録はありません</p>
+        ) : (
+          <ul className="space-y-3">
+            {purchases.map((p) => (
+              <li key={p.id} className="card text-sm">
+                <Link to={`/projects/${p.project_id}`} className="font-medium text-purple-800 hover:underline">
+                  {p.project?.title ?? p.project_id}
+                </Link>
+                {' · '}
+                {formatCurrencyYen(p.total_price)}
+                {' · '}
+                {p.status}
+                {' · '}
+                {new Date(p.created_at).toLocaleString('ja-JP')}
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+    </div>
+  )
+}

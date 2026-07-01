@@ -30,6 +30,7 @@ type IAuthController interface {
 
 type IProjectController interface {
 	ListPublic(c echo.Context) error
+	ListFeatured(c echo.Context) error
 	ListMine(c echo.Context) error
 	Create(c echo.Context) error
 	Get(c echo.Context) error

@@ -1,13 +1,15 @@
 import { useCallback, useState, type FormEvent } from 'react'
-import { Link, useNavigate, useSearchParams } from 'react-router-dom'
+import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 
 import { useAuth } from '@/auth/AuthProvider'
 import { ApiError } from '@/lib/api-client'
 import { googleOAuthStartUrl } from '@/lib/api-client'
+import { postLoginPath } from '@/lib/auth-routes'
 import { isValidEmail, sanitizeAppPath, sanitizeEmail } from '@/lib/utils'
 
 export function SignInForm() {
   const navigate = useNavigate()
+  const location = useLocation()
   const [searchParams] = useSearchParams()
   const { login } = useAuth()
 
@@ -17,8 +19,13 @@ export function SignInForm() {
   const [fieldErrors, setFieldErrors] = useState<{ email?: string; password?: string }>({})
   const [error, setError] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [showGoogleHelp, setShowGoogleHelp] = useState(false)
 
-  const callbackPath = sanitizeAppPath(searchParams.get('from'), '/')
+  const fromState =
+    typeof location.state === 'object' && location.state !== null && 'from' in location.state
+      ? String(location.state.from)
+      : null
+  const callbackPath = sanitizeAppPath(fromState ?? searchParams.get('from'), '/')
 
   const validate = useCallback((): boolean => {
     const next: { email?: string; password?: string } = {}
@@ -48,7 +55,7 @@ export function SignInForm() {
         void navigate('/auth/2fa', { replace: true, state: { from: callbackPath } })
         return
       }
-      void navigate(callbackPath, { replace: true })
+      void navigate(postLoginPath(result, callbackPath), { replace: true })
     } catch (err) {
       if (err instanceof ApiError) {
         setError(err.message)
@@ -106,6 +113,9 @@ export function SignInForm() {
           <label htmlFor="password" className="mb-2 block text-sm font-medium text-gray-700">
             パスワード
           </label>
+          <div className="mb-2 text-right">
+            <Link to="/forgot-password" className="text-sm text-purple-700 hover:text-purple-900">パスワードを忘れた方</Link>
+          </div>
           <div className="relative">
             <input
               id="password"
@@ -119,10 +129,10 @@ export function SignInForm() {
             <button
               type="button"
               onClick={() => setShowPassword((v) => !v)}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700"
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-500 hover:text-gray-800"
               aria-label={showPassword ? 'パスワードを隠す' : 'パスワードを表示'}
             >
-              {showPassword ? '🙈' : '👁️'}
+              {showPassword ? '非表示' : '表示'}
             </button>
           </div>
           {fieldErrors.password ? (
@@ -142,6 +152,19 @@ export function SignInForm() {
         </button>
       </form>
 
+      <div className="mt-6 rounded-xl border border-amber-100 bg-amber-50 p-4 text-sm text-amber-900">
+        <p className="font-semibold">出品者（Seller）の方へ — 二段階認証について</p>
+        <p className="mt-2 leading-relaxed">
+          出品者・管理者アカウントはログイン後に<strong>6桁の認証コード</strong>の入力が必要です。
+          Google Authenticator などの認証アプリを使い、表示されたコードを入力してください。
+        </p>
+        <p className="mt-2 text-xs text-amber-800">
+          デモ環境: seller@example.com / password123 → 認証アプリにシークレット
+          <code className="mx-1 rounded bg-white px-1">JBSWY3DPEHPK3PXP</code>
+          を登録
+        </p>
+      </div>
+
       <div className="mt-8">
         <div className="relative">
           <div className="absolute inset-0 flex items-center">
@@ -153,8 +176,40 @@ export function SignInForm() {
         </div>
 
         <button type="button" onClick={onGoogleSignIn} className="btn-secondary mt-6 w-full rounded-full font-medium">
-          Googleでログイン
+          Google でログイン
         </button>
+
+        <button
+          type="button"
+          onClick={() => setShowGoogleHelp((v) => !v)}
+          className="mt-3 w-full text-center text-sm text-purple-700 hover:text-purple-900"
+        >
+          {showGoogleHelp ? 'Google ログインの説明を閉じる' : 'Google ログインのやり方を見る'}
+        </button>
+
+        {showGoogleHelp ? (
+          <div className="mt-3 rounded-xl border border-purple-100 bg-purple-50 p-4 text-sm text-gray-700">
+            <ol className="list-decimal space-y-2 pl-5">
+              <li>上の「Google でログイン」ボタンをクリックします。</li>
+              <li>Google のアカウント選択画面が開くので、使う Google アカウントを選びます。</li>
+              <li>初回は FanFunding へのアクセス許可を「続行」で承認してください。</li>
+              <li>自動的にこのサイトに戻り、ログイン完了です（新規の場合はアカウントが作成されます）。</li>
+            </ol>
+            <p className="mt-3 text-xs text-gray-500">
+              ※ Google Cloud Console で OAuth クライアントを作成し、環境変数
+              {' '}
+              <code className="rounded bg-white px-1">GOOGLE_CLIENT_ID</code>
+              {' / '}
+              <code className="rounded bg-white px-1">GOOGLE_CLIENT_SECRET</code>
+              {' '}
+              を backend に設定してください。詳細はリポジトリの
+              {' '}
+              <code className="rounded bg-white px-1">docs/GOOGLE_OAUTH_SETUP.md</code>
+              {' '}
+              を参照。
+            </p>
+          </div>
+        ) : null}
       </div>
 
       <div className="mt-8 text-center">

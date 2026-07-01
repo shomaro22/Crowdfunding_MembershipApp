@@ -1,51 +1,30 @@
 import { Link } from 'react-router-dom'
 
 import type { ProjectSummary } from '@/types/api'
-import { cn, formatCurrencyYen } from '@/lib/utils'
+import { planBarClass, sortPlansByTier } from '@/lib/plans'
+import { cn, formatCurrencyYen, fundingProgressBarWidth, fundingProgressPercent } from '@/lib/utils'
 
 interface ProjectCardProps {
   project: ProjectSummary
   className?: string
+  hideFavoriteBadge?: boolean
 }
 
-function membershipLabel(type: string): string {
-  switch (type) {
-    case 'BRONZE':
-      return 'ブロンズ'
-    case 'SILVER':
-      return 'シルバー'
-    case 'GOLD':
-      return 'ゴールド'
-    default:
-      return 'メンバーシップ'
-  }
-}
-
-function membershipColor(type: string): string {
-  switch (type) {
-    case 'BRONZE':
-      return 'bg-gradient-to-r from-orange-400 to-orange-500 text-white'
-    case 'SILVER':
-      return 'bg-gradient-to-r from-gray-400 to-gray-500 text-white'
-    case 'GOLD':
-      return 'bg-gradient-to-r from-yellow-400 to-yellow-500 text-white'
-    default:
-      return 'bg-gradient-to-r from-purple-400 to-purple-500 text-white'
-  }
-}
-
-export function ProjectCard({ project, className }: ProjectCardProps) {
-  const prices = project.plans.map((plan) => plan.price)
+export function ProjectCard({ project, className, hideFavoriteBadge = false }: ProjectCardProps) {
+  const sortedPlans = sortPlansByTier(project.plans)
+  const prices = sortedPlans.map((plan) => plan.price)
   const minPrice = prices.length > 0 ? Math.min(...prices) : 0
   const maxPrice = prices.length > 0 ? Math.max(...prices) : 0
-  const progress = project.target_amount > 0
-    ? Math.min(100, Math.round((project.current_amount / project.target_amount) * 100))
-    : 0
+  const progressPercent = fundingProgressPercent(project.current_amount, project.target_amount)
+  const barWidth = fundingProgressBarWidth(progressPercent)
+  const favoriteCount = project.favorite_count ?? 0
+  const isOverfunded = progressPercent > 100
 
   return (
     <article
       className={cn(
         'flex h-full flex-col overflow-hidden rounded-lg bg-white shadow-md transition-shadow hover:shadow-lg',
+        isOverfunded && 'ring-2 ring-amber-300',
         className,
       )}
     >
@@ -63,6 +42,17 @@ export function ProjectCard({ project, className }: ProjectCardProps) {
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
           </svg>
         )}
+        {isOverfunded ? (
+          <span className="absolute left-3 top-3 rounded-full bg-amber-500 px-2.5 py-1 text-xs font-bold text-white shadow">
+            目標達成
+          </span>
+        ) : null}
+        {!hideFavoriteBadge ? (
+          <div className="absolute right-3 top-3 flex items-center gap-1 rounded-full bg-white/90 px-2.5 py-1 text-sm font-bold text-pink-600 shadow">
+            <span aria-hidden>♥</span>
+            <span>{favoriteCount}</span>
+          </div>
+        ) : null}
       </div>
 
       <div className="flex flex-1 flex-col p-4">
@@ -71,23 +61,35 @@ export function ProjectCard({ project, className }: ProjectCardProps) {
 
         <div className="mb-3">
           <div className="mb-1 flex justify-between text-xs text-gray-500">
-            <span>{progress}%</span>
+            <span className="flex items-center gap-1">
+              <span className={`text-base font-extrabold ${isOverfunded ? 'text-amber-600' : 'text-purple-800'}`}>
+                {progressPercent}%
+              </span>
+              · 支援者 {project.supporter_count}人
+            </span>
             <span>{formatCurrencyYen(project.current_amount)} / {formatCurrencyYen(project.target_amount)}</span>
           </div>
-          <div className="h-2 overflow-hidden rounded-full bg-purple-100">
-            <div className="h-full rounded-full bg-purple-600" style={{ width: `${progress}%` }} />
+          <div className={`h-2 overflow-hidden rounded-full ${isOverfunded ? 'bg-amber-100' : 'bg-purple-100'}`}>
+            <div
+              className={`h-full rounded-full ${isOverfunded ? 'bg-gradient-to-r from-amber-500 to-orange-500' : 'bg-purple-600'}`}
+              style={{ width: `${barWidth}%` }}
+            />
           </div>
         </div>
 
-        {project.plans.length > 0 ? (
-          <div className="mb-4 flex flex-wrap gap-2">
-            {project.plans.slice(0, 3).map((plan) => (
-              <span
-                key={plan.id}
-                className={cn('rounded-full px-2 py-1 text-xs font-medium shadow', membershipColor(plan.membership_type))}
-              >
-                {membershipLabel(plan.membership_type)} {formatCurrencyYen(plan.price)}
-              </span>
+        {sortedPlans.length > 0 ? (
+          <div className="mb-4 space-y-1">
+            {sortedPlans.map((plan) => (
+              <div key={plan.id} className="flex items-center gap-2 text-xs">
+                <span className="w-14 shrink-0 font-semibold text-gray-700">{plan.membership_type}</span>
+                <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-gray-100">
+                  <div
+                    className={cn('h-full rounded-full', planBarClass(plan.membership_type))}
+                    style={{ width: `${Math.min(100, (plan.supporter_count / Math.max(project.supporter_count, 1)) * 100)}%` }}
+                  />
+                </div>
+                <span className="w-8 text-right text-gray-500">{plan.supporter_count}</span>
+              </div>
             ))}
           </div>
         ) : null}
