@@ -4,6 +4,7 @@ import { useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '@/auth/AuthProvider'
 import { ApiError } from '@/lib/api-client'
 import { sanitizeAppPath } from '@/lib/utils'
+import { postLoginPath } from '@/lib/auth-routes'
 
 export function TwoFactorForm() {
   const { complete2FA, status } = useAuth()
@@ -35,8 +36,8 @@ export function TwoFactorForm() {
 
     setIsSubmitting(true)
     try {
-      await complete2FA(normalized)
-      void navigate(from, { replace: true })
+      const loggedIn = await complete2FA(normalized)
+      void navigate(postLoginPath(loggedIn, from), { replace: true })
     } catch (err) {
       if (err instanceof ApiError) {
         setError(err.message)
