@@ -3,6 +3,7 @@ import { useLocation, useNavigate } from 'react-router-dom'
 
 import { useAuth } from '@/auth/AuthProvider'
 import { ApiError } from '@/lib/api-client'
+import { normalizeOtpCode, validateTOTPCode } from '@/lib/validation'
 import { sanitizeAppPath } from '@/lib/utils'
 import { postLoginPath } from '@/lib/auth-routes'
 
@@ -28,8 +29,8 @@ export function TwoFactorForm() {
     event.preventDefault()
     setError('')
 
-    const normalized = code.trim().replace(/\s+/g, '')
-    if (normalized.length < 6) {
+    const normalized = normalizeOtpCode(code)
+    if (!validateTOTPCode(normalized)) {
       setError('認証コードを入力してください')
       return
     }
@@ -80,7 +81,7 @@ export function TwoFactorForm() {
             autoComplete="one-time-code"
             className="input-field text-center text-2xl tracking-[0.4em]"
             value={code}
-            onChange={(e) => setCode(e.target.value.replace(/[^\dA-Za-z-]/g, '').slice(0, 12))}
+            onChange={(e) => setCode(normalizeOtpCode(e.target.value).slice(0, 12))}
             placeholder="000000"
           />
         </div>
