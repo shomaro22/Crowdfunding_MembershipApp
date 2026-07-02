@@ -12,6 +12,7 @@ type IAuthController interface {
 	RegisterSeller(c echo.Context) error
 	Login(c echo.Context) error
 	Logout(c echo.Context) error
+	LogoutAllDevices(c echo.Context) error
 	ForgotPassword(c echo.Context) error
 	ResetPassword(c echo.Context) error
 	CheckEmail(c echo.Context) error

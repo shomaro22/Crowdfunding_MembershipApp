@@ -6,8 +6,6 @@ import (
 	"github.com/labstack/echo/v4"
 )
 
-const CtxAdminRole = "admin_role"
-
 func AuthAdminRole(c echo.Context) (model.AdminRole, bool) {
 	var (
 		r  string

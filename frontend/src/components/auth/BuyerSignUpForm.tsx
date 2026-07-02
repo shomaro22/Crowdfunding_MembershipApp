@@ -1,7 +1,8 @@
 import { useState, type FormEvent } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 
-import { registerBuyer } from '@/api/auth'
+import { checkEmailAvailable, registerBuyer } from '@/api/auth'
+import { googleOAuthStartUrl } from '@/lib/api-client'
 import { PasswordInput } from '@/components/common/PasswordInput'
 import { ApiError } from '@/lib/api-client'
 import {
@@ -20,8 +21,22 @@ export function BuyerSignUpForm() {
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [emailTaken, setEmailTaken] = useState(false)
 
   const strength = evaluatePasswordStrength(password)
+
+  const onEmailBlur = async () => {
+    if (!isValidEmail(email)) {
+      setEmailTaken(false)
+      return
+    }
+    try {
+      const available = await checkEmailAvailable(sanitizeEmail(email))
+      setEmailTaken(!available)
+    } catch {
+      setEmailTaken(false)
+    }
+  }
 
   const onSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
@@ -30,6 +45,11 @@ export function BuyerSignUpForm() {
 
     if (!isValidEmail(email)) {
       setError('有効なメールアドレスを入力してください')
+      return
+    }
+
+    if (emailTaken) {
+      setError('このメールアドレスは既に登録されています')
       return
     }
 
@@ -93,9 +113,19 @@ export function BuyerSignUpForm() {
               autoComplete="email"
               className="input-field"
               value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              onChange={(e) => {
+                setEmail(e.target.value)
+                setEmailTaken(false)
+              }}
+              onBlur={() => void onEmailBlur()}
               placeholder="example@email.com"
             />
+            {emailTaken ? (
+              <p className="mt-1 text-sm text-amber-700">
+                このメールアドレスは既に登録されています。
+                <Link to="/signin" className="ml-1 font-medium text-purple-700 underline">ログインはこちら</Link>
+              </p>
+            ) : null}
           </div>
           <div>
             <label htmlFor="password" className="mb-2 block text-sm font-medium text-gray-700">パスワード</label>
@@ -118,10 +148,24 @@ export function BuyerSignUpForm() {
               placeholder="もう一度入力"
             />
           </div>
-          <button type="submit" disabled={isSubmitting} className="btn-primary w-full rounded-full font-bold">
+          <button type="submit" disabled={isSubmitting || emailTaken} className="btn-primary w-full rounded-full font-bold">
             {isSubmitting ? '登録中...' : 'アカウントを作成'}
           </button>
         </form>
+
+        <div className="my-6 flex items-center gap-3">
+          <div className="h-px flex-1 bg-gray-200" />
+          <span className="text-xs text-gray-500">または</span>
+          <div className="h-px flex-1 bg-gray-200" />
+        </div>
+
+        <button
+          type="button"
+          onClick={() => { window.location.assign(googleOAuthStartUrl('/')) }}
+          className="btn-secondary w-full rounded-full font-bold"
+        >
+          Google でアカウント作成
+        </button>
 
         <p className="mt-6 text-center text-sm text-gray-600">
           すでにアカウントをお持ちの方は{' '}

@@ -63,9 +63,9 @@ func NewRateLimitUsecase(repo repository.IRateLimitRepo) IRateLimitUsecase {
 	return &RateLimitUseCase{Repo: repo}
 }
 
-func NewMessageUsecase(messages repository.IMessageRepo, projects repository.IProjectRepo, supporters repository.ISupporterRepo, users repository.IUserRepo, activity repository.IActivityRepo) *MessageUseCase {
+func NewMessageUsecase(messages repository.IMessageRepo, projects repository.IProjectRepo, supporters repository.ISupporterRepo, sellers repository.ISellerRepo, users repository.IUserRepo, activity repository.IActivityRepo) *MessageUseCase {
 	return &MessageUseCase{
-		Messages: messages, Projects: projects, Supporters: supporters, Users: users, Activity: activity,
+		Messages: messages, Projects: projects, Supporters: supporters, Sellers: sellers, Users: users, Activity: activity,
 	}
 }
 

@@ -52,6 +52,33 @@ export async function verifyCheckout(sessionId: string): Promise<Supporter> {
   })
 }
 
+export interface PaymentIntentResponse {
+  client_secret: string
+  payment_intent_id: string
+}
+
+export async function createPaymentIntent(projectId: string, planId: string): Promise<PaymentIntentResponse> {
+  if (!isValidUUID(projectId) || !isValidUUID(planId)) {
+    throw new Error('invalid ids')
+  }
+  return apiRequest<PaymentIntentResponse>('/payments/intent', {
+    method: 'POST',
+    auth: true,
+    body: { project_id: projectId, plan_id: planId },
+  })
+}
+
+export async function verifyPaymentIntent(paymentIntentId: string): Promise<Supporter> {
+  if (!paymentIntentId.trim()) {
+    throw new Error('invalid payment intent id')
+  }
+  return apiRequest<Supporter>('/payments/verify/intent', {
+    method: 'POST',
+    auth: true,
+    body: { payment_intent_id: paymentIntentId.trim() },
+  })
+}
+
 export async function listPurchases(limit = 20, offset = 0): Promise<ListPurchasesResponse> {
   const safeLimit = Math.min(100, Math.max(1, limit))
   const safeOffset = Math.max(0, offset)
@@ -62,7 +89,10 @@ export async function listPurchases(limit = 20, offset = 0): Promise<ListPurchas
 }
 
 export function checkoutSuccessPath(projectId: string): string {
-  return sanitizeAppPath(`/support/success?project_id=${encodeURIComponent(projectId)}`, '/purchases')
+  return sanitizeAppPath(
+    `/support/success?project_id=${encodeURIComponent(projectId)}&session_id={CHECKOUT_SESSION_ID}`,
+    '/purchases',
+  )
 }
 
 export function checkoutCancelPath(projectId: string): string {

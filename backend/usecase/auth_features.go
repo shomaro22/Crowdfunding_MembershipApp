@@ -208,7 +208,7 @@ type OAuthCBOut struct {
 	Redirect     OAuthRedirectView
 }
 
-func (a *AuthUseCase) GoogleAuthURL(from string) (string, error) {
+func (a *AuthUseCase) GoogleAuthURL(from string, meta RequestMeta) (string, error) {
 	var (
 		authURL string
 		err     error
@@ -217,32 +217,40 @@ func (a *AuthUseCase) GoogleAuthURL(from string) (string, error) {
 	if a.Google == nil {
 		return "", ErrOAuthUnavailable
 	}
-	_, authURL, err = a.Google.AuthURL(from)
+	_, authURL, err = a.Google.AuthURL(from, meta)
 	return authURL, err
 }
 
 func (a *AuthUseCase) GoogleCallback(ctx context.Context, code, state string, meta RequestMeta) (*OAuthCBOut, error) {
 	var (
-		from    string
-		ok      bool
-		err     error
-		profile *GoogleProfile
-		u       model.User
-		tokens  *SessionTokens
-		cbCode  string
+		from      string
+		ok        bool
+		err       error
+		stateData repository.OAuthStateData
+		profile   *GoogleProfile
+		u         model.User
+		tokens    *SessionTokens
+		cbCode    string
 	)
 
 	if a.Google == nil || a.OAuthCache == nil || a.OAuth == nil {
 		return nil, ErrOAuthUnavailable
 	}
-	from, ok, err = a.OAuthCache.PopState(ctx, state)
+	stateData, ok, err = a.OAuthCache.PopOAuthState(ctx, state)
 	if err != nil {
 		return nil, err
 	}
 	if !ok {
 		return nil, ErrInvalidToken
 	}
-	profile, err = a.Google.Exchange(ctx, code)
+	from = stateData.From
+	if stateData.IP != "" && meta.IPAddress != "" && stateData.IP != meta.IPAddress {
+		return nil, ErrInvalidToken
+	}
+	if stateData.UserAgent != "" && meta.UserAgent != "" && stateData.UserAgent != meta.UserAgent {
+		return nil, ErrInvalidToken
+	}
+	profile, err = a.Google.Exchange(ctx, code, stateData)
 	if err != nil {
 		return nil, err
 	}
@@ -392,7 +400,7 @@ func (a *AuthUseCase) resolveGoogleUser(ctx context.Context, profile *GoogleProf
 		Name:          name,
 		PasswordHash:  pwHash,
 		Role:          model.UserRoleBuyer,
-		AccountStatus: model.AccountStatusPending,
+		AccountStatus: model.AccountStatusActive,
 		SellerStatus:  model.SellerStatusNotApplicable,
 		CreatedAt:     now,
 		UpdatedAt:     now,

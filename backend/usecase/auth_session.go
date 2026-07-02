@@ -115,13 +115,14 @@ func (a *AuthUseCase) Login(ctx context.Context, email, password string, meta Re
 
 func (a *AuthUseCase) Refresh(ctx context.Context, refreshTokenPlain string, meta RequestMeta) (string, string, error) {
 	var (
-		plain  string
-		hash   string
-		now    time.Time
-		row    model.RefreshToken
-		err    error
-		u      model.User
-		tokens *SessionTokens
+		plain      string
+		hash       string
+		now        time.Time
+		row        model.RefreshToken
+		revokedRow model.RefreshToken
+		err        error
+		u          model.User
+		tokens     *SessionTokens
 	)
 
 	plain = strings.TrimSpace(refreshTokenPlain)
@@ -132,6 +133,13 @@ func (a *AuthUseCase) Refresh(ctx context.Context, refreshTokenPlain string, met
 	now = time.Now().UTC()
 	row, err = a.RefreshTokens.GetValidHash(ctx, hash, now)
 	if err != nil {
+		revokedRow, err = a.RefreshTokens.GetByHash(ctx, hash)
+		if err == nil && revokedRow.IsRevoked() {
+			_ = InvalidateUserSessions(ctx, a.DB, a.Users, a.RefreshTokens, revokedRow.UserID)
+			a.logActivity(ctx, &revokedRow.UserID, model.UserLoginFail, "user", revokedRow.UserID.String(), meta,
+				model.StepMeta("refresh_token_reuse"))
+			return "", "", ErrTokenRevoked
+		}
 		return "", "", mapRepoNotFoundAs(err, ErrInvalidToken)
 	}
 	u, err = a.Users.GetID(ctx, row.UserID)
@@ -177,6 +185,21 @@ func (a *AuthUseCase) Logout(ctx context.Context, refreshTokenPlain string, meta
 		return err
 	}
 	a.logActivity(ctx, &row.UserID, model.UserLogout, "user", row.UserID.String(), meta, nil)
+	return nil
+}
+
+func (a *AuthUseCase) LogoutAllDevices(ctx context.Context, userID uuid.UUID, meta RequestMeta) error {
+	var (
+		err error
+	)
+	if userID == uuid.Nil {
+		return ErrInvalidToken
+	}
+	err = InvalidateUserSessions(ctx, a.DB, a.Users, a.RefreshTokens, userID)
+	if err != nil {
+		return err
+	}
+	a.logActivity(ctx, &userID, model.UserLogout, "user", userID.String(), meta, model.StepMeta("all_devices"))
 	return nil
 }
 

@@ -15,6 +15,7 @@ import (
 type UpgradeOut struct {
 	Supporter                 SupporterView
 	PaymentIntentClientSecret *string
+	PaymentIntentID           *string
 }
 
 type SupporterUseCase struct {
@@ -251,14 +252,17 @@ func (s *SupporterUseCase) startPaidUpgrade(
 	now time.Time,
 ) (UpgradeOut, error) {
 	var (
-		diff     int64
-		meta     map[string]string
-		pi       stripe.UpgradePaymentOut
-		purchase model.Purchase
-		key      string
-		client   *string
-		out      UpgradeOut
-		err      error
+		diff      int64
+		meta      map[string]string
+		pi        stripe.UpgradePaymentOut
+		purchase  model.Purchase
+		key       string
+		client    *string
+		pid       string
+		piSnap    stripe.PaymentIntentSnapshot
+		finalized SupporterView
+		out       UpgradeOut
+		err       error
 	)
 	diff = int64(target.Price - current.Price)
 	if diff <= 0 {
@@ -316,8 +320,24 @@ func (s *SupporterUseCase) startPaidUpgrade(
 	}
 	client = &pi.ClientSecret
 	out.PaymentIntentClientSecret = client
+	pid = pi.PaymentIntentID
+	out.PaymentIntentID = &pid
 	out.Supporter, err = s.enrichView(ctx, supporter)
-	return out, err
+	if err != nil {
+		return UpgradeOut{}, err
+	}
+	piSnap, err = s.Stripe.GetPaymentIntent(ctx, pi.PaymentIntentID)
+	if err != nil {
+		return out, nil
+	}
+	if piSnap.Status == stripe.PaymentIntentStatusSucceeded {
+		finalized, err = s.finalizePaidUpgrade(ctx, supporter, purchase, now)
+		if err == nil {
+			out.Supporter = finalized
+			out.PaymentIntentClientSecret = nil
+		}
+	}
+	return out, nil
 }
 
 func (s *SupporterUseCase) UpgradeConfirm(ctx context.Context, userID, supporterID uuid.UUID, intentID string) (SupporterView, error) {

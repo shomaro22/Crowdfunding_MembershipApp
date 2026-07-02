@@ -38,6 +38,8 @@ services:
       SEED_TEST_USER_TEAM: "1"
       SEED_TEST_USER_RESET: "1"
       PRIVATE_ROOT: /app/data/private
+    volumes:
+      - private_data:/app/data/private
     command: ["dev", "-team", "-reset"]
     restart: "no"
     depends_on:
@@ -67,11 +69,12 @@ services:
       STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-whsec_test}
       STRIPE_CONNECT_RETURN_URL: ${STRIPE_CONNECT_RETURN_URL:-http://localhost/seller/connect/return}
       STRIPE_CONNECT_REFRESH_URL: ${STRIPE_CONNECT_REFRESH_URL:-http://localhost/seller/connect/refresh}
-      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
-      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-230753630723-i3ap0modn4mcvhjkl2l8kpoku11flscu.apps.googleusercontent.com}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-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}
       GOOGLE_REDIRECT_URI: ${GOOGLE_REDIRECT_URI:-http://localhost/auth/google/callback}
     volumes:
       - uploads:/app/data/public
+      - private_data:/app/data/private
     depends_on:
       backend-seed:
         condition: service_completed_successfully
@@ -93,3 +96,4 @@ services:
 volumes:
   pgdata:
   uploads:
+  private_data:

@@ -14,7 +14,7 @@ import { ConfirmDialog } from '@/components/common/ConfirmDialog'
 import { Loading } from '@/components/common/Loading'
 import { ErrorMessage } from '@/components/common/ErrorMessage'
 import { useToast } from '@/components/common/Toast'
-import { planTierLabel, sortPlansByTier } from '@/lib/plans'
+import { planSelectedClass, planTierLabel, sortPlansByTier } from '@/lib/plans'
 import { formatCurrencyYen } from '@/lib/utils'
 import type { ProjectDetail, Purchase, Supporter } from '@/types/api'
 import { ApiError } from '@/lib/api-client'
@@ -29,6 +29,8 @@ export function PurchasesPage() {
   const [planChangeTarget, setPlanChangeTarget] = useState<Supporter | null>(null)
   const [planChangeProject, setPlanChangeProject] = useState<ProjectDetail | null>(null)
   const [planChangeLoading, setPlanChangeLoading] = useState(false)
+  const [pendingPlanId, setPendingPlanId] = useState<string | null>(null)
+  const [rejoinTarget, setRejoinTarget] = useState<string | null>(null)
 
   const load = async () => {
     setLoading(true)
@@ -92,11 +94,8 @@ export function PurchasesPage() {
   const onUpgradePlan = async (supporterId: string, planId: string) => {
     try {
       const res = await upgradeSupporter(supporterId, planId)
-      if (res.payment_intent_client_secret) {
-        const match = /pi_[a-zA-Z0-9_]+/.exec(res.payment_intent_client_secret)
-        if (match?.[0]) {
-          await confirmUpgrade(supporterId, match[0])
-        }
+      if (res.payment_intent_id && res.payment_intent_client_secret) {
+        await confirmUpgrade(supporterId, res.payment_intent_id)
       }
       await load()
       toast('プラン変更を受け付けました', 'success')
@@ -136,6 +135,34 @@ export function PurchasesPage() {
         onCancel={() => setCancelTarget(null)}
       />
 
+      <ConfirmDialog
+        open={pendingPlanId !== null && planChangeTarget !== null}
+        title="プラン変更の確認"
+        message="選択したプランに変更しますか？差額の決済が発生する場合があります。"
+        confirmLabel="変更する"
+        onConfirm={() => {
+          if (planChangeTarget && pendingPlanId) {
+            void onUpgradePlan(planChangeTarget.id, pendingPlanId)
+          }
+          setPendingPlanId(null)
+        }}
+        onCancel={() => setPendingPlanId(null)}
+      />
+
+      <ConfirmDialog
+        open={rejoinTarget !== null}
+        title="再参加の確認"
+        message="このプロジェクトに再参加しますか？月額料金が発生します。"
+        confirmLabel="再参加する"
+        onConfirm={() => {
+          if (rejoinTarget) {
+            void onRejoin(rejoinTarget)
+          }
+          setRejoinTarget(null)
+        }}
+        onCancel={() => setRejoinTarget(null)}
+      />
+
       {planChangeTarget ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
           <div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-xl">
@@ -152,11 +179,11 @@ export function PurchasesPage() {
                     <button
                       type="button"
                       disabled={plan.id === planChangeTarget.plan_id}
-                      onClick={() => void onUpgradePlan(planChangeTarget.id, plan.id)}
+                      onClick={() => setPendingPlanId(plan.id)}
                       className={`w-full rounded-lg border p-3 text-left text-sm ${
                         plan.id === planChangeTarget.plan_id
                           ? 'cursor-not-allowed border-gray-200 bg-gray-50 text-gray-400'
-                          : 'border-purple-200 hover:bg-purple-50'
+                          : `border-purple-200 hover:bg-purple-50 ${planSelectedClass(plan.membership_type)}`
                       }`}
                     >
                       <span className="font-bold">{planTierLabel(plan.membership_type)}</span>
@@ -202,7 +229,11 @@ export function PurchasesPage() {
                     </>
                   ) : null}
                   {s.status === 'CANCELLED' || s.status === 'EXPIRED' ? (
-                    <button type="button" onClick={() => void onRejoin(s.id)} className="btn-primary rounded-full text-sm">
+                    <button
+                      type="button"
+                      onClick={() => setRejoinTarget(s.id)}
+                      className="rounded-full bg-purple-700 px-4 py-2 text-sm font-medium text-white hover:bg-purple-800"
+                    >
                       再参加
                     </button>
                   ) : null}
