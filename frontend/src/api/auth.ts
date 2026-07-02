@@ -95,6 +95,16 @@ export async function exchangeOAuthCode(code: string): Promise<AuthTokenResponse
   return res
 }
 
+export async function confirmOAuthLink(linkCode: string): Promise<AuthTokenResponse> {
+  const res = await apiRequest<AuthTokenResponse>('/auth/oauth/link-confirm', {
+    method: 'POST',
+    body: { link_code: linkCode },
+    skipRefresh: true,
+  })
+  setAccessToken(res.auth_token)
+  return res
+}
+
 export async function setup2FA(): Promise<Setup2FAResponse> {
   return apiRequest<Setup2FAResponse>('/auth/2fa/setup', { method: 'POST', auth: true })
 }

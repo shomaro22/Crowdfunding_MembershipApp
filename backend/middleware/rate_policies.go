@@ -150,8 +150,8 @@ var (
 		Name:   "auth_refresh",
 		Period: time.Minute,
 		Rules: []RateRule{
-			{Limit: 30, Key: KeyIP},
-			{Limit: 60, Key: KeyRefreshCookie},
+			{Limit: 120, Key: KeyIP},
+			{Limit: 120, Key: KeyRefreshCookie},
 		},
 	}
 	PolicyMessageSend = RatePolicy{

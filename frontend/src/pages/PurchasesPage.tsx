@@ -13,6 +13,7 @@ import {
 import { ConfirmDialog } from '@/components/common/ConfirmDialog'
 import { Loading } from '@/components/common/Loading'
 import { ErrorMessage } from '@/components/common/ErrorMessage'
+import { CheckoutPaymentForm } from '@/components/stripe/CheckoutPaymentForm'
 import { useToast } from '@/components/common/Toast'
 import { planSelectedClass, planTierLabel, sortPlansByTier } from '@/lib/plans'
 import { formatCurrencyYen } from '@/lib/utils'
@@ -31,6 +32,13 @@ export function PurchasesPage() {
   const [planChangeLoading, setPlanChangeLoading] = useState(false)
   const [pendingPlanId, setPendingPlanId] = useState<string | null>(null)
   const [rejoinTarget, setRejoinTarget] = useState<string | null>(null)
+  const [upgradePayment, setUpgradePayment] = useState<{
+    supporterId: string
+    planId: string
+    clientSecret: string
+    paymentIntentId: string
+    amountLabel: string
+  } | null>(null)
 
   const load = async () => {
     setLoading(true)
@@ -95,14 +103,45 @@ export function PurchasesPage() {
     try {
       const res = await upgradeSupporter(supporterId, planId)
       if (res.payment_intent_id && res.payment_intent_client_secret) {
-        await confirmUpgrade(supporterId, res.payment_intent_id)
+        const plan = planChangeProject?.plans.find((p) => p.id === planId)
+        setUpgradePayment({
+          supporterId,
+          planId,
+          clientSecret: res.payment_intent_client_secret,
+          paymentIntentId: res.payment_intent_id,
+          amountLabel: plan ? `${formatCurrencyYen(plan.price)}/月（差額）` : '差額',
+        })
+        setPlanChangeTarget(null)
+        return
       }
       await load()
       toast('プラン変更を受け付けました', 'success')
       setPlanChangeTarget(null)
     } catch (err) {
-      const msg = err instanceof ApiError ? err.message : 'プラン変更に失敗しました'
+      let msg = err instanceof ApiError ? err.message : 'プラン変更に失敗しました'
+      if (err instanceof ApiError) {
+        if (err.code === 'FORBIDDEN') {
+          msg = '出品者の Stripe 設定が未完了のため、プラン変更できません'
+        } else if (err.code === 'BAD_REQUEST' && err.message.includes('bad request')) {
+          msg = 'プラン変更の処理中です。しばらく待ってから再度お試しください'
+        }
+      }
       toast(msg, 'error')
+    }
+  }
+
+  const onUpgradePaymentSuccess = async () => {
+    if (!upgradePayment) {
+      return
+    }
+    try {
+      await confirmUpgrade(upgradePayment.supporterId, upgradePayment.paymentIntentId)
+      await load()
+      toast('プラン変更が完了しました', 'success')
+    } catch (err) {
+      toast(err instanceof ApiError ? err.message : 'プラン変更の確定に失敗しました', 'error')
+    } finally {
+      setUpgradePayment(null)
     }
   }
 
@@ -196,6 +235,29 @@ export function PurchasesPage() {
             )}
             <button type="button" onClick={() => setPlanChangeTarget(null)} className="btn-secondary w-full rounded-full">
               閉じる
+            </button>
+          </div>
+        </div>
+      ) : null}
+
+      {upgradePayment ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl bg-white p-6 shadow-xl">
+            <h2 className="mb-4 text-lg font-bold">プラン変更のお支払い</h2>
+            <CheckoutPaymentForm
+              clientSecret={upgradePayment.clientSecret}
+              paymentIntentId={upgradePayment.paymentIntentId}
+              amountLabel={upgradePayment.amountLabel}
+              paymentPurpose="plan-upgrade"
+              onSuccess={() => void onUpgradePaymentSuccess()}
+              onError={(msg) => toast(msg, 'error')}
+            />
+            <button
+              type="button"
+              className="btn-secondary mt-4 w-full rounded-full"
+              onClick={() => setUpgradePayment(null)}
+            >
+              キャンセル
             </button>
           </div>
         </div>

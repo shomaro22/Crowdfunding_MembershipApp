@@ -34,7 +34,7 @@ func (h *connectController) GetAccount(c echo.Context) error {
 	if err != nil {
 		return mapUseCaseError(err)
 	}
-	if row != nil {
+	if row != nil && row.StripeAccountID != "" {
 		acct := toConnectAccountJSON(row)
 		resp.Account = &acct
 	}

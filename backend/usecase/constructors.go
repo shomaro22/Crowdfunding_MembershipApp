@@ -34,7 +34,7 @@ func NewPaymentUsecase(db *gorm.DB, users repository.IUserRepo, projects reposit
 	return &PaymentUseCase{
 		DB: db, Users: users, Projects: projects, Purchases: purchases, Supporters: supporters,
 		Connect: connect, Webhooks: webhooks, Activity: activity, Stripe: stripeClient,
-		ConnectSync: connectSync, SupporterViewer: supporterViewer,
+		ConnectSync: connectSync, SupporterViewer: supporterViewer, PlanUpgrades: supporterViewer,
 	}
 }
 

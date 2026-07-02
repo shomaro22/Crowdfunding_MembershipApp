@@ -95,6 +95,7 @@ func New(cfg Config) *echo.Echo {
 			e.GET("/auth/google", authCtl.GoogleStart, rl(middleware.PolicyGoogleOAuth))
 			e.GET("/auth/google/callback", authCtl.GoogleCallback, rl(middleware.PolicyGoogleOAuth))
 			e.POST("/auth/oauth/exchange", authCtl.OAuthExchange, rl(middleware.PolicyOAuthExchange))
+			e.POST("/auth/oauth/link-confirm", authCtl.OAuthLinkConfirm, rl(middleware.PolicyOAuthExchange))
 		}
 
 		e.POST("/auth/logout", authCtl.Logout)

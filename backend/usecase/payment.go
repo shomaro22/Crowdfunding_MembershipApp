@@ -4,6 +4,7 @@ import (
 	"context"
 	"time"
 
+	"crowdfund-app/events"
 	"crowdfund-app/model"
 	"crowdfund-app/repository"
 	"crowdfund-app/stripe"
@@ -26,6 +27,8 @@ type PaymentUseCase struct {
 	Stripe          stripe.Client
 	ConnectSync     ConnectSyncer
 	SupporterViewer SupporterViewer
+	PlanUpgrades    PlanUpgradeConfirmer
+	supportEvents   *events.Bus
 }
 
 type CheckoutIn struct {
@@ -327,6 +330,25 @@ func (p *PaymentUseCase) VerifyIntent(ctx context.Context, buyerID uuid.UUID, in
 	if err != nil {
 		return SupporterView{}, ErrBadRequest
 	}
+	if pi.Metadata[stripe.MetaCheckoutPurpose] == stripe.PurposePlanUpgrade {
+		if p.PlanUpgrades == nil {
+			return SupporterView{}, ErrNotFound
+		}
+		purchase, err = p.Purchases.GetIntentID(ctx, intentID)
+		if err != nil {
+			return SupporterView{}, mapRepoNotFound(err)
+		}
+		if err = verifyPurchaseBuyer(purchase, buyerID); err != nil {
+			return SupporterView{}, err
+		}
+		if purchase.SupporterID == nil {
+			return SupporterView{}, ErrBadRequest
+		}
+		if pi.Status != stripe.PaymentIntentStatusSucceeded {
+			return SupporterView{}, ErrBadRequest
+		}
+		return p.PlanUpgrades.UpgradeConfirm(ctx, buyerID, *purchase.SupporterID, intentID)
+	}
 	purchase, err = p.Purchases.GetIntentID(ctx, intentID)
 	if err != nil {
 		return SupporterView{}, mapRepoNotFound(err)
@@ -604,7 +626,12 @@ func (p *PaymentUseCase) fulfillFirstSupport(
 	period periodRange,
 	customerID, subscriptionID, invoiceID *string,
 ) error {
-	return repository.WithTx(ctx, p.DB, func(txCtx context.Context) error {
+	var (
+		completed *events.SupportCompleted
+		err       error
+	)
+
+	err = repository.WithTx(ctx, p.DB, func(txCtx context.Context) error {
 		var (
 			membership model.ProjectSupporter
 			hasMember  bool
@@ -612,11 +639,11 @@ func (p *PaymentUseCase) fulfillFirstSupport(
 			resolved   uuid.UUID
 			plans      []model.ProjectPlan
 			now        time.Time
-			err        error
+			txErr      error
 		)
-		purchase, err = p.Purchases.GetIDLock(txCtx, purchase.ID)
-		if err != nil {
-			return mapRepoNotFound(err)
+		purchase, txErr = p.Purchases.GetIDLock(txCtx, purchase.ID)
+		if txErr != nil {
+			return mapRepoNotFound(txErr)
 		}
 		if purchase.Status == model.PurchaseStatusPaid {
 			return nil
@@ -625,20 +652,30 @@ func (p *PaymentUseCase) fulfillFirstSupport(
 			return nil
 		}
 		now = time.Now().UTC()
-		membership, err = p.Supporters.GetMembership(txCtx, purchase.ProjectID, purchase.BuyerID)
-		if isRepoNotFound(err) {
+		membership, txErr = p.Supporters.GetMembership(txCtx, purchase.ProjectID, purchase.BuyerID)
+		if isRepoNotFound(txErr) {
 			hasMember = false
-		} else if err != nil {
-			return err
+		} else if txErr != nil {
+			return txErr
 		} else {
 			hasMember = true
 		}
 		if hasMember {
+			completed = &events.SupportCompleted{
+				PurchaseID:  purchase.ID,
+				ProjectID:   purchase.ProjectID,
+				BuyerID:     purchase.BuyerID,
+				SupporterID: membership.ID,
+				PlanID:      membership.PlanID,
+				Amount:      int64(purchase.TotalPrice),
+				PeriodStart: period.start,
+				PeriodEnd:   period.end,
+			}
 			return p.markPurchasePaid(txCtx, purchase, membership.ID, period, invoiceID)
 		}
-		_, plans, _, err = p.Projects.GetID(txCtx, purchase.ProjectID)
-		if err != nil {
-			return mapRepoNotFound(err)
+		_, plans, _, txErr = p.Projects.GetID(txCtx, purchase.ProjectID)
+		if txErr != nil {
+			return mapRepoNotFound(txErr)
 		}
 		resolved = planID
 		if resolved == uuid.Nil {
@@ -661,14 +698,31 @@ func (p *PaymentUseCase) fulfillFirstSupport(
 			CreatedAt:            now,
 			UpdatedAt:            now,
 		}
-		if err = p.Supporters.Create(txCtx, &supporter); err != nil {
-			return err
+		if txErr = p.Supporters.Create(txCtx, &supporter); txErr != nil {
+			return txErr
 		}
-		if err = p.Projects.IncrementSupportCounts(txCtx, purchase.ProjectID, resolved); err != nil {
-			return err
+		if txErr = p.Projects.IncrementSupportCounts(txCtx, purchase.ProjectID, resolved); txErr != nil {
+			return txErr
+		}
+		completed = &events.SupportCompleted{
+			PurchaseID:  purchase.ID,
+			ProjectID:   purchase.ProjectID,
+			BuyerID:     purchase.BuyerID,
+			SupporterID: supporter.ID,
+			PlanID:      resolved,
+			Amount:      int64(purchase.TotalPrice),
+			PeriodStart: period.start,
+			PeriodEnd:   period.end,
 		}
 		return p.markPurchasePaid(txCtx, purchase, supporter.ID, period, invoiceID)
 	})
+	if err != nil {
+		return err
+	}
+	if completed != nil && p.supportEvents != nil {
+		return p.supportEvents.Publish(ctx, *completed)
+	}
+	return nil
 }
 
 func billingModeForPurchase(purchase model.Purchase) model.BillingMode {
@@ -910,6 +964,9 @@ func (p *PaymentUseCase) fulfillPaymentIntent(ctx context.Context, pi stripe.Pay
 		planID uuid.UUID
 		err    error
 	)
+	if pi.Metadata[stripe.MetaCheckoutPurpose] == stripe.PurposePlanUpgrade {
+		return nil
+	}
 	if pi.Metadata[stripe.MetaBillingMode] == string(model.BillingModeAuto) {
 		planID, err = uuid.Parse(pi.Metadata[stripe.MetaPlanID])
 		if err != nil {
