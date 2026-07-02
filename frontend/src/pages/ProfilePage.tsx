@@ -17,9 +17,9 @@ import { useToast } from '@/components/common/Toast'
 import { validateImageFile } from '@/lib/upload'
 import { normalizeMediaUrl } from '@/lib/media-url'
 import { sanitizeDisplayText, validatePassword } from '@/lib/utils'
-import { validateTOTPCode } from '@/lib/validation'
+import { normalizeOtpCode, validateTOTPCode } from '@/lib/validation'
 
-export function ProfilePage() {
+export function ProfilePage({ heading = 'プロフィール' }: { heading?: string }) {
   const { refreshUser } = useAuth()
   const { toast } = useToast()
   const [name, setName] = useState('')
@@ -35,6 +35,7 @@ export function ProfilePage() {
   const [setupUrl, setSetupUrl] = useState('')
   const [verifyCode, setVerifyCode] = useState('')
   const [backupCodes, setBackupCodes] = useState<string[]>([])
+  const [totpEnabled, setTotpEnabled] = useState(false)
 
   useEffect(() => {
     void (async () => {
@@ -42,6 +43,7 @@ export function ProfilePage() {
         const p = await fetchProfile()
         setName(p.name ?? '')
         setAvatarUrl(p.avatar_url ?? '')
+        setTotpEnabled(Boolean(p.totp_enabled))
       } catch {
         toast('プロフィールの取得に失敗しました', 'error')
       } finally {
@@ -98,7 +100,7 @@ export function ProfilePage() {
       return
     }
     try {
-      await changePassword(currentPw, newPw, totpForPw || undefined)
+      await changePassword(currentPw, newPw, normalizeOtpCode(totpForPw) || undefined)
       setCurrentPw('')
       setNewPw('')
       setTotpForPw('')
@@ -109,11 +111,20 @@ export function ProfilePage() {
   }
 
   const onSetup2FA = async () => {
+    if (totpEnabled) {
+      toast('二要素認証は既に有効です', 'error')
+      return
+    }
     try {
       const res = await setup2FA()
       setSetupSecret(res.secret)
       setSetupUrl(res.otpauth_url)
     } catch (error) {
+      if (error instanceof ApiError && error.code === '2FA_ALREADY_ENABLED') {
+        setTotpEnabled(true)
+        toast('二要素認証は既に有効です', 'error')
+        return
+      }
       toast(error instanceof ApiError ? error.message : '2FA 設定の開始に失敗しました', 'error')
     }
   }
@@ -125,8 +136,10 @@ export function ProfilePage() {
       return
     }
     try {
-      const res = await verify2FA(verifyCode.trim())
+      const res = await verify2FA(normalizeOtpCode(verifyCode))
       setBackupCodes(res.backup_codes)
+      setTotpEnabled(true)
+      setSetupSecret('')
       toast('2FA を有効化しました', 'success')
     } catch (error) {
       toast(error instanceof ApiError ? error.message : '2FA 確認に失敗しました', 'error')
@@ -139,7 +152,7 @@ export function ProfilePage() {
 
   return (
     <div className="mx-auto max-w-2xl space-y-8">
-      <h1 className="text-2xl font-bold">プロフィール</h1>
+      <h1 className="text-2xl font-bold">{heading}</h1>
 
       <section className="card">
         <h2 className="mb-4 text-lg font-semibold">基本情報</h2>
@@ -187,14 +200,16 @@ export function ProfilePage() {
             autoComplete="new-password"
             placeholder="新しいパスワード"
           />
-          <input className="input-field" value={totpForPw} onChange={(e) => setTotpForPw(e.target.value)} placeholder="2FA コード（有効時）" inputMode="numeric" />
+          <input className="input-field" value={totpForPw} onChange={(e) => setTotpForPw(normalizeOtpCode(e.target.value))} placeholder="2FA コード（有効時）" inputMode="numeric" />
           <button type="submit" className="btn-primary rounded-full">パスワード変更</button>
         </form>
       </section>
 
       <section className="card">
         <h2 className="mb-4 text-lg font-semibold">二要素認証 (2FA)</h2>
-        {!setupSecret ? (
+        {totpEnabled ? (
+          <p className="text-sm text-gray-600">二要素認証は有効です。認証アプリのコードがログイン時に必要になります。</p>
+        ) : !setupSecret ? (
           <button type="button" onClick={() => void onSetup2FA()} className="btn-secondary rounded-full px-6 py-2 text-sm">
             2FA を設定
           </button>
@@ -206,7 +221,7 @@ export function ProfilePage() {
             <form onSubmit={(e) => void onVerify2FA(e)} className="flex flex-wrap items-end gap-2">
               <div className="min-w-[12rem] flex-1">
                 <label htmlFor="verify-code" className="mb-1 block text-xs text-gray-500">6桁コード</label>
-                <input id="verify-code" className="input-field w-full" value={verifyCode} onChange={(e) => setVerifyCode(e.target.value)} placeholder="000000" inputMode="numeric" maxLength={10} />
+                <input id="verify-code" className="input-field w-full" value={verifyCode} onChange={(e) => setVerifyCode(normalizeOtpCode(e.target.value))} placeholder="000000" inputMode="numeric" maxLength={10} />
               </div>
               <button type="submit" className="btn-primary shrink-0 rounded-full px-6 py-2.5 text-sm">有効化</button>
             </form>

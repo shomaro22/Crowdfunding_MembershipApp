@@ -21,6 +21,7 @@ type IAuthController interface {
 	GoogleStart(c echo.Context) error
 	GoogleCallback(c echo.Context) error
 	OAuthExchange(c echo.Context) error
+	OAuthLinkConfirm(c echo.Context) error
 	Me(c echo.Context) error
 	GetProfile(c echo.Context) error
 	UpdateProfile(c echo.Context) error

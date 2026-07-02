@@ -332,10 +332,12 @@ func (s *SupporterUseCase) startPaidUpgrade(
 	}
 	if piSnap.Status == stripe.PaymentIntentStatusSucceeded {
 		finalized, err = s.finalizePaidUpgrade(ctx, supporter, purchase, now)
-		if err == nil {
-			out.Supporter = finalized
-			out.PaymentIntentClientSecret = nil
+		if err != nil {
+			return UpgradeOut{}, err
 		}
+		out.Supporter = finalized
+		out.PaymentIntentClientSecret = nil
+		out.PaymentIntentID = nil
 	}
 	return out, nil
 }

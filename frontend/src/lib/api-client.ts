@@ -75,6 +75,9 @@ async function refreshAccessToken(): Promise<string | null> {
       })
 
       if (!response.ok) {
+        if (response.status === 429) {
+          return null
+        }
         clearAccessToken()
         return null
       }
