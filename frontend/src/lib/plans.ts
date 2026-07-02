@@ -80,3 +80,31 @@ export function planBarClass(type: string): string {
 export function maxPlanSupporters(plans: ProjectPlan[]): number {
   return Math.max(1, ...plans.map((p) => p.supporter_count))
 }
+
+const TIER_ORDER_LIST = ['BRONZE', 'SILVER', 'GOLD'] as const
+
+/** ブロンズのみ / ブロンズ+シルバー / ブロンズ+シルバー+ゴールド のみ許可 */
+export function validateMembershipTierCombo(enabled: Record<string, boolean>): string | null {
+  const hasBronze = Boolean(enabled.BRONZE)
+  const hasSilver = Boolean(enabled.SILVER)
+  const hasGold = Boolean(enabled.GOLD)
+  if (!hasBronze) {
+    return 'ブロンズプランは必須です'
+  }
+  if (hasGold && !hasSilver) {
+    return 'ゴールドを選ぶ場合はシルバーも有効にしてください'
+  }
+  if (hasSilver && !hasBronze) {
+    return 'シルバーを選ぶ場合はブロンズも有効にしてください'
+  }
+  const active = TIER_ORDER_LIST.filter((t) => enabled[t])
+  if (active.length === 0) {
+    return '少なくとも1つのメンバーシッププランを選択してください'
+  }
+  for (let i = 0; i < active.length; i++) {
+    if (active[i] !== TIER_ORDER_LIST[i]) {
+      return 'プランはブロンズ → シルバー → ゴールドの順で連続して選択してください'
+    }
+  }
+  return null
+}

@@ -356,6 +356,11 @@ func runDevSeed(flagArgs []string) {
 		}
 	}
 
+	allDemoCatalog := append(demoProjects(), extendedDemoProjects()...)
+	if err = repairAllCorruptedDemoText(ctx, gormDB, allDemoCatalog, now); err != nil {
+		log.Fatalf("repair all demo text: %v", err)
+	}
+
 	fmt.Println()
 	fmt.Println("シード完了:")
 	fmt.Printf("  ユーザー: 作成/更新=%d スキップ=%d\n", createdUsers+updatedUsers, skippedUsers)
@@ -500,8 +505,16 @@ func upsertConnect(ctx context.Context, connect repository.IConnectRepo, sellerI
 		err error
 	)
 
-	_, err = connect.GetUserID(ctx, sellerID)
+	row, err = connect.GetUserID(ctx, sellerID)
 	if err == nil {
+		row.ChargesEnabled = true
+		row.PayoutsEnabled = true
+		row.DetailsSubmitted = true
+		row.UpdatedAt = now
+		if err = connect.Update(ctx, &row); err != nil {
+			return err
+		}
+		fmt.Println("更新: Stripe Connect（デモ）")
 		return nil
 	}
 	if !errors.Is(err, repository.ErrNotFound) {
@@ -658,7 +671,19 @@ func upsertProject(
 	for i = range rows {
 		if rows[i].Title == dp.title {
 			if !reset {
-				fmt.Printf("skip (exists): project %q\n", dp.title)
+				if projectTextCorrupted(rows[i]) {
+					rows[i].Description = dp.description
+					rows[i].UpdatedAt = now
+					if err = repo.Update(ctx, &rows[i]); err != nil {
+						return false, err
+					}
+					if err = syncDemoPlanCounts(ctx, gormDB, rows[i].ID, dp.plans, now); err != nil {
+						return false, err
+					}
+					fmt.Printf("repaired: project %q\n", dp.title)
+				} else {
+					fmt.Printf("skip (exists): project %q\n", dp.title)
+				}
 				return false, nil
 			}
 			rows[i].Description = dp.description
@@ -791,6 +816,23 @@ func syncDemoPlanCounts(ctx context.Context, gormDB *gorm.DB, projectID uuid.UUI
 	return nil
 }
 
+func projectTextCorrupted(p model.Project) bool {
+	if strings.Contains(p.Description, "%!(EXTRA") {
+		return true
+	}
+	return false
+}
+
+func planBenefitsCorrupted(plans []model.ProjectPlan) bool {
+	var i int
+	for i = range plans {
+		if strings.Contains(plans[i].Benefits, "%!(EXTRA") {
+			return true
+		}
+	}
+	return false
+}
+
 func repairCorruptedDemoText(ctx context.Context, gormDB *gorm.DB, sellerID uuid.UUID, allProjects []demoProject, now time.Time) error {
 	var (
 		rows []model.Project
@@ -805,7 +847,59 @@ func repairCorruptedDemoText(ctx context.Context, gormDB *gorm.DB, sellerID uuid
 		return err
 	}
 	for i = range rows {
-		if !strings.Contains(rows[i].Description, "%!(EXTRA") {
+		if !projectTextCorrupted(rows[i]) {
+			var plans []model.ProjectPlan
+			err = gormDB.WithContext(ctx).Where("project_id = ?", rows[i].ID).Find(&plans).Error
+			if err != nil {
+				return err
+			}
+			if !planBenefitsCorrupted(plans) {
+				continue
+			}
+		}
+		found = false
+		for j = range allProjects {
+			if allProjects[j].title == rows[i].Title {
+				dp = allProjects[j]
+				found = true
+				break
+			}
+		}
+		if !found {
+			continue
+		}
+		rows[i].Description = dp.description
+		rows[i].UpdatedAt = now
+		if err = gormDB.WithContext(ctx).Save(&rows[i]).Error; err != nil {
+			return err
+		}
+		if err = syncDemoPlanCounts(ctx, gormDB, rows[i].ID, dp.plans, now); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func repairAllCorruptedDemoText(ctx context.Context, gormDB *gorm.DB, allProjects []demoProject, now time.Time) error {
+	var (
+		rows  []model.Project
+		err   error
+		i     int
+		j     int
+		dp    demoProject
+		found bool
+		plans []model.ProjectPlan
+	)
+	err = gormDB.WithContext(ctx).Find(&rows).Error
+	if err != nil {
+		return err
+	}
+	for i = range rows {
+		err = gormDB.WithContext(ctx).Where("project_id = ?", rows[i].ID).Find(&plans).Error
+		if err != nil {
+			return err
+		}
+		if !projectTextCorrupted(rows[i]) && !planBenefitsCorrupted(plans) {
 			continue
 		}
 		found = false
@@ -827,6 +921,7 @@ func repairCorruptedDemoText(ctx context.Context, gormDB *gorm.DB, sellerID uuid
 		if err = syncDemoPlanCounts(ctx, gormDB, rows[i].ID, dp.plans, now); err != nil {
 			return err
 		}
+		fmt.Printf("repaired: project %q\n", rows[i].Title)
 	}
 	return nil
 }

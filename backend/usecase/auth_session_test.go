@@ -6,7 +6,6 @@ import (
 	"testing"
 	"time"
 
-	
 	"crowdfund-app/model"
 	"crowdfund-app/repository"
 	"crowdfund-app/usecase"
@@ -107,39 +106,43 @@ func (r *recordingActivityRepo) TopIPsBetween(_ context.Context, _, _ time.Time,
 	return nil, nil
 }
 
+func newTestAuth(users *recordingUserRepo, refresh *recordingRefreshRepo, activity *recordingActivityRepo) usecase.IAuthUsecase {
+	return usecase.NewAuthUsecase(usecase.AuthConfig{
+		Users:         users,
+		RefreshTokens: refresh,
+		Activity:      activity,
+		JWTSecret:     "01234567890123456789012345678901",
+	})
+}
+
 func TestAuthLoginCallsUserRepoAndActivity(t *testing.T) {
 	var (
 		users    recordingUserRepo
 		refresh  recordingRefreshRepo
 		activity recordingActivityRepo
-		uc      usecase.AuthUseCase
+		uc       usecase.IAuthUsecase
 		hash     string
 		res      *usecase.LoginResult
 		err      error
 		uid      uuid.UUID
-		meta    usecase.RequestMeta
+		meta     usecase.RequestMeta
 	)
 	uid = uuid.New()
-	hash, err =usecase.HashPassword("Password1!")
+	hash, err = usecase.HashPassword("Password1!")
 	if err != nil {
 		t.Fatal(err)
 	}
 	users.emailUser = model.User{
-		ID:           uid,
-		Email:        "buyer@example.com",
-		PasswordHash: hash,
-		Role:         model.UserRoleBuyer,
+		ID:            uid,
+		Email:         "buyer@example.com",
+		PasswordHash:  hash,
+		Role:          model.UserRoleBuyer,
 		AccountStatus: model.AccountStatusActive,
-		TokenVersion: 1,
+		TokenVersion:  1,
 	}
 	users.idUser = users.emailUser
-	uc =usecase.AuthUseCase{
-		Users:         &users,
-		RefreshTokens: &refresh,
-		Activity:      &activity,
-		Tokens:       usecase.NewTokenService([]byte("01234567890123456789012345678901"),usecase.DefaultAuthTTL),
-	}
-	meta =usecase.RequestMeta{IPAddress: "127.0.0.1", UserAgent: "test", RequestID: "req-1"}
+	uc = newTestAuth(&users, &refresh, &activity)
+	meta = usecase.RequestMeta{IPAddress: "127.0.0.1", UserAgent: "test", RequestID: "req-1"}
 
 	res, err = uc.Login(context.Background(), users.emailUser.Email, "Password1!", meta)
 	if err != nil {
@@ -167,31 +170,26 @@ func TestAuthLoginInvalidPasswordDoesNotIssueSession(t *testing.T) {
 		users    recordingUserRepo
 		refresh  recordingRefreshRepo
 		activity recordingActivityRepo
-		uc      usecase.AuthUseCase
+		uc       usecase.IAuthUsecase
 		hash     string
 		err      error
 		uid      uuid.UUID
 	)
 	uid = uuid.New()
-	hash, err =usecase.HashPassword("Password1!")
+	hash, err = usecase.HashPassword("Password1!")
 	if err != nil {
 		t.Fatal(err)
 	}
 	users.emailUser = model.User{
-		ID:           uid,
-		Email:        "buyer@example.com",
-		PasswordHash: hash,
-		Role:         model.UserRoleBuyer,
+		ID:            uid,
+		Email:         "buyer@example.com",
+		PasswordHash:  hash,
+		Role:          model.UserRoleBuyer,
 		AccountStatus: model.AccountStatusActive,
 	}
-	uc =usecase.AuthUseCase{
-		Users:         &users,
-		RefreshTokens: &refresh,
-		Activity:      &activity,
-		Tokens:       usecase.NewTokenService([]byte("01234567890123456789012345678901"),usecase.DefaultAuthTTL),
-	}
+	uc = newTestAuth(&users, &refresh, &activity)
 
-	_, err = uc.Login(context.Background(), users.emailUser.Email, "WrongPass1!",usecase.RequestMeta{})
+	_, err = uc.Login(context.Background(), users.emailUser.Email, "WrongPass1!", usecase.RequestMeta{})
 	if !errors.Is(err, usecase.ErrInvalidCredentials) {
 		t.Fatalf("expected ErrInvalidCredentials, got %v", err)
 	}
@@ -210,10 +208,10 @@ func TestAuthLogoutRevokesRefreshAndLogsActivity(t *testing.T) {
 	var (
 		refresh  recordingRefreshRepo
 		activity recordingActivityRepo
-		uc      usecase.AuthUseCase
+		uc       usecase.IAuthUsecase
 		plain    string
 		uid      uuid.UUID
-		meta    usecase.RequestMeta
+		meta     usecase.RequestMeta
 		err      error
 	)
 	uid = uuid.New()
@@ -221,14 +219,11 @@ func TestAuthLogoutRevokesRefreshAndLogsActivity(t *testing.T) {
 	refresh.validRow = model.RefreshToken{
 		ID:        uuid.New(),
 		UserID:    uid,
-		TokenHash:usecase.OpaqueHash(plain),
+		TokenHash: usecase.OpaqueHash(plain),
 		ExpiresAt: time.Now().UTC().Add(time.Hour),
 	}
-	uc =usecase.AuthUseCase{
-		RefreshTokens: &refresh,
-		Activity:      &activity,
-	}
-	meta =usecase.RequestMeta{IPAddress: "127.0.0.1", UserAgent: "test", RequestID: "req-2"}
+	uc = newTestAuth(&recordingUserRepo{}, &refresh, &activity)
+	meta = usecase.RequestMeta{IPAddress: "127.0.0.1", UserAgent: "test", RequestID: "req-2"}
 
 	err = uc.Logout(context.Background(), plain, meta)
 	if err != nil {
@@ -252,12 +247,9 @@ func TestAuthLogoutEmptyTokenDoesNotTouchRepo(t *testing.T) {
 	var (
 		refresh  recordingRefreshRepo
 		activity recordingActivityRepo
-		uc      usecase.AuthUseCase
+		uc       usecase.IAuthUsecase
 	)
-	uc =usecase.AuthUseCase{
-		RefreshTokens: &refresh,
-		Activity:      &activity,
-	}
+	uc = newTestAuth(&recordingUserRepo{}, &refresh, &activity)
 	if err := uc.Logout(context.Background(), "  ", usecase.RequestMeta{}); !errors.Is(err, usecase.ErrInvalidToken) {
 		t.Fatalf("expected ErrInvalidToken, got %v", err)
 	}

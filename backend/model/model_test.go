@@ -110,6 +110,22 @@ func TestValidatePassword(t *testing.T) {
 	}
 }
 
+func TestValidateBuyerReg(t *testing.T) {
+	var (
+		email string
+		err   error
+	)
+
+	email, err = ValidateBuyerReg("buyer@example.com", "longenough")
+	if err != nil || email != "buyer@example.com" {
+		t.Fatalf("buyer reg: %v %q", err, email)
+	}
+	_, err = ValidateBuyerReg("bad", "longenough")
+	if err == nil {
+		t.Fatal("expected invalid email")
+	}
+}
+
 func TestUserIsActive(t *testing.T) {
 	var u User
 
@@ -303,10 +319,12 @@ func TestDurationDates(t *testing.T) {
 		start time.Time
 		end   time.Time
 		err   error
+		now   time.Time
 	)
 
-	start = time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
-	end = time.Date(2026, 12, 31, 0, 0, 0, 0, time.UTC)
+	now = time.Now().UTC()
+	start = now.Add(24 * time.Hour)
+	end = start.AddDate(0, 6, 0)
 
 	if err = ValidateDuration(DurationLimited, start, &end); err != nil {
 		t.Fatalf("limited with end: %v", err)
@@ -316,6 +334,9 @@ func TestDurationDates(t *testing.T) {
 	}
 	if err = ValidateDuration(DurationUnlimited, start, &end); err == nil {
 		t.Fatal("unlimited with end should fail")
+	}
+	if err = ValidateDuration(DurationLimited, now.Add(-48*time.Hour), &end); err == nil {
+		t.Fatal("past start should fail")
 	}
 }
 

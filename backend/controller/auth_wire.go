@@ -88,6 +88,15 @@ func oauthCallbackURL(appPublicURL string, v usecase.OAuthRedirectView) string {
 	if v.Code != "" {
 		q.Set("code", v.Code)
 	}
+	if v.LinkCode != "" {
+		q.Set("link_code", v.LinkCode)
+	}
+	if v.AccountEmail != "" {
+		q.Set("account_email", v.AccountEmail)
+	}
+	if v.GoogleEmail != "" {
+		q.Set("google_email", v.GoogleEmail)
+	}
 	if len(q) == 0 {
 		return base
 	}

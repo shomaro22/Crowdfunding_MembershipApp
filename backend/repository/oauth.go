@@ -53,6 +53,14 @@ func (r *oauthRepo) GetUserID(ctx context.Context, userID uuid.UUID, provider mo
 	)
 }
 
+// OAuthLinkPending は既存メールアカウントへの Google 連携確認待ちデータ。
+type OAuthLinkPending struct {
+	UserID      uuid.UUID `json:"user_id"`
+	ProviderSub string    `json:"provider_sub"`
+	GoogleEmail string    `json:"google_email"`
+	GoogleName  string    `json:"google_name"`
+}
+
 type IOAuthCache interface {
 	SetState(ctx context.Context, state, from string, ttl time.Duration) error
 	PopState(ctx context.Context, state string) (from string, ok bool, err error)
@@ -60,6 +68,8 @@ type IOAuthCache interface {
 	PopOAuthState(ctx context.Context, state string) (OAuthStateData, bool, error)
 	SetCallbackCode(ctx context.Context, code string, userID uuid.UUID, ttl time.Duration) error
 	PopCallback(ctx context.Context, code string) (uuid.UUID, bool, error)
+	SetLinkCode(ctx context.Context, code string, pending OAuthLinkPending, ttl time.Duration) error
+	PopLinkCode(ctx context.Context, code string) (OAuthLinkPending, bool, error)
 }
 
 type redisOAuthCache struct {
@@ -155,4 +165,41 @@ func (c *redisOAuthCache) PopCallback(ctx context.Context, code string) (uuid.UU
 		return uuid.Nil, false, nil
 	}
 	return id, true, nil
+}
+
+func (c *redisOAuthCache) SetLinkCode(ctx context.Context, code string, pending OAuthLinkPending, ttl time.Duration) error {
+	var (
+		raw []byte
+		err error
+	)
+	if c.rdb == nil {
+		return fmt.Errorf("redis unavailable")
+	}
+	raw, err = json.Marshal(pending)
+	if err != nil {
+		return err
+	}
+	return c.rdb.Set(ctx, "oauth:link:"+code, raw, ttl).Err()
+}
+
+func (c *redisOAuthCache) PopLinkCode(ctx context.Context, code string) (OAuthLinkPending, bool, error) {
+	var (
+		raw     string
+		pending OAuthLinkPending
+		err     error
+	)
+	if c.rdb == nil {
+		return OAuthLinkPending{}, false, fmt.Errorf("redis unavailable")
+	}
+	raw, err = c.rdb.GetDel(ctx, "oauth:link:"+code).Result()
+	if errors.Is(err, redis.Nil) {
+		return OAuthLinkPending{}, false, nil
+	}
+	if err != nil {
+		return OAuthLinkPending{}, false, err
+	}
+	if err = json.Unmarshal([]byte(raw), &pending); err != nil {
+		return OAuthLinkPending{}, false, nil
+	}
+	return pending, true, nil
 }

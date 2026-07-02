@@ -61,10 +61,12 @@ func NewUseCases(repos Repositories, cfg AppConfig, gormDB *gorm.DB, stripeClien
 	ucs.Supporter = ucs.SupporterRaw
 	ucs.PurchaseRaw = usecase.NewPurchaseUsecase(repos.Users, repos.Projects, repos.Purchases)
 	ucs.Purchase = ucs.PurchaseRaw
-	ucs.Payment = usecase.NewPaymentUsecase(
+	paymentRaw := usecase.NewPaymentUsecase(
 		gormDB, repos.Users, repos.Projects, repos.Purchases, repos.Supporters,
 		repos.Connect, repos.Webhooks, repos.Activity, stripeClient, ucs.ConnectRaw, ucs.SupporterRaw,
 	)
+	ucs.Payment = paymentRaw
+	AttachSupportEvents(paymentRaw, NewSupportEventBus(repos.Activity))
 	ucs.Batch = usecase.NewBatchUsecase(gormDB, repos.Batch, ucs.SupporterRaw, repos.WSTokens)
 	ucs.Admin = usecase.NewAdminUsecase(gormDB, usecase.AdminRepos{
 		Users: repos.Users, SellerRegs: repos.SellerRegs, Projects: repos.Projects, Audit: repos.Audit,

@@ -35,8 +35,12 @@ func (c *ConnectUseCase) GetAccount(ctx context.Context, sellerID uuid.UUID) (*C
 	}
 	row, err = c.Connect.GetUserID(ctx, sellerID)
 	if isRepoNotFound(err) {
-		return ConnectAccountViewFrom(model.ConnectAccount{}), nil
+		return nil, nil
 	}
+	if err != nil {
+		return nil, err
+	}
+	row, err = c.syncConnectRow(ctx, row)
 	if err != nil {
 		return nil, err
 	}
@@ -107,10 +111,8 @@ func (c *ConnectUseCase) CreateOnboardingLink(ctx context.Context, sellerID uuid
 
 func (c *ConnectUseCase) SyncFromStripeAccountID(ctx context.Context, stripeAccountID string) (*ConnectAccountView, error) {
 	var (
-		row  model.ConnectAccount
-		snap stripe.AccountSnapshot
-		now  time.Time
-		err  error
+		row model.ConnectAccount
+		err error
 	)
 	if c.Stripe == nil {
 		return nil, ErrStripeUnavailable
@@ -119,9 +121,22 @@ func (c *ConnectUseCase) SyncFromStripeAccountID(ctx context.Context, stripeAcco
 	if err != nil {
 		return nil, mapRepoNotFound(err)
 	}
-	snap, err = c.Stripe.GetAccount(ctx, stripeAccountID)
+	row, err = c.syncConnectRow(ctx, row)
 	if err != nil {
 		return nil, err
+	}
+	return ConnectAccountViewFrom(row), nil
+}
+
+func (c *ConnectUseCase) syncConnectRow(ctx context.Context, row model.ConnectAccount) (model.ConnectAccount, error) {
+	var (
+		snap stripe.AccountSnapshot
+		now  time.Time
+		err  error
+	)
+	snap, err = c.Stripe.GetAccount(ctx, row.StripeAccountID)
+	if err != nil {
+		return model.ConnectAccount{}, err
 	}
 	now = time.Now().UTC()
 	row.ChargesEnabled = snap.ChargesEnabled
@@ -129,9 +144,9 @@ func (c *ConnectUseCase) SyncFromStripeAccountID(ctx context.Context, stripeAcco
 	row.DetailsSubmitted = snap.DetailsSubmitted
 	row.UpdatedAt = now
 	if err = c.Connect.Update(ctx, &row); err != nil {
-		return nil, err
+		return model.ConnectAccount{}, err
 	}
-	return ConnectAccountViewFrom(row), nil
+	return row, nil
 }
 
 type ConnectSyncer interface {
@@ -140,4 +155,8 @@ type ConnectSyncer interface {
 
 type SupporterViewer interface {
 	ViewForSupporter(ctx context.Context, supporter model.ProjectSupporter) (SupporterView, error)
+}
+
+type PlanUpgradeConfirmer interface {
+	UpgradeConfirm(ctx context.Context, userID, supporterID uuid.UUID, intentID string) (SupporterView, error)
 }
