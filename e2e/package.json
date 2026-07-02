@@ -1,0 +1,16 @@
+{
+  "name": "crowdfund-e2e",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "playwright test",
+    "test:parallel": "E2E_PARALLEL=1 playwright test tests/parallel.spec.ts --workers=3",
+    "test:ui": "playwright test --ui",
+    "test:headed": "playwright test --headed",
+    "report": "playwright show-report"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.51.0",
+    "otplib": "^12.0.1"
+  }
+}
