@@ -69,6 +69,13 @@ func (r *recordingRefreshRepo) GetValidHash(_ context.Context, hash string, _ ti
 	}
 	return r.validRow, nil
 }
+func (r *recordingRefreshRepo) GetByHash(_ context.Context, hash string) (model.RefreshToken, error) {
+	if hash != r.validRow.TokenHash {
+		return model.RefreshToken{}, gorm.ErrRecordNotFound
+	}
+	return r.validRow, nil
+}
+
 func (r *recordingRefreshRepo) Revoke(_ context.Context, id uuid.UUID, _ time.Time) error {
 	r.revokeCalls++
 	if id != r.validRow.ID {

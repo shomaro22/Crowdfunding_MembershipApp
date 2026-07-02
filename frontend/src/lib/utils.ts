@@ -98,6 +98,23 @@ export function formatCurrencyYen(amount: number): string {
   return `${amount.toLocaleString('ja-JP')}円`
 }
 
+/** 目標金額など: 半角数字のみ受け付け、表示はカンマ区切り */
+export function formatYenInput(raw: string): string {
+  const digits = raw.replace(/\D/g, '').slice(0, 12)
+  if (digits === '') {
+    return ''
+  }
+  return Number(digits).toLocaleString('ja-JP')
+}
+
+export function parseYenInput(formatted: string): number {
+  const digits = formatted.replace(/\D/g, '')
+  if (digits === '') {
+    return 0
+  }
+  return Number.parseInt(digits, 10)
+}
+
 export function fundingProgressPercent(current: number, target: number): number {
   if (target <= 0) {
     return 0

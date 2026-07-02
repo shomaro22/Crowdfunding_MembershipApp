@@ -1,4 +1,5 @@
 import { cn } from '@/lib/utils'
+import { normalizeMediaUrl } from '@/lib/media-url'
 
 interface UserAvatarProps {
   name?: string | null
@@ -23,10 +24,11 @@ function initials(name: string | null | undefined, email: string | null | undefi
 }
 
 export function UserAvatar({ name, email, avatarUrl, size = 'md' }: UserAvatarProps) {
-  if (avatarUrl) {
+  const src = avatarUrl ? normalizeMediaUrl(avatarUrl) : ''
+  if (src) {
     return (
       <img
-        src={avatarUrl}
+        src={src}
         alt=""
         className={cn('rounded-full object-cover', sizeClass[size])}
         referrerPolicy="no-referrer"

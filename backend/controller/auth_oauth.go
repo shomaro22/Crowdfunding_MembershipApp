@@ -17,7 +17,7 @@ func (h *authController) GoogleStart(c echo.Context) error {
 		err     error
 	)
 	from = c.QueryParam("from")
-	authURL, err = h.Auth.GoogleAuthURL(from)
+	authURL, err = h.Auth.GoogleAuthURL(from, requestMeta(c))
 	if err != nil {
 		return mapUseCaseError(err)
 	}

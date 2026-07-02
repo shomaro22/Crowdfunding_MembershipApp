@@ -1,8 +1,8 @@
 package controller
 
 import (
+	"io"
 	"net/http"
-	"os"
 
 	"crowdfund-app/usecase"
 
@@ -20,8 +20,9 @@ func NewKYCFileController(kyc usecase.IKYCAccessUsecase) IKYCFileController {
 func (h *kycFileController) Serve(c echo.Context) error {
 	var (
 		token string
-		f     *os.File
+		f     io.ReadCloser
 		ct    string
+		data  []byte
 		err   error
 	)
 	token = c.QueryParam("token")
@@ -30,5 +31,9 @@ func (h *kycFileController) Serve(c echo.Context) error {
 		return mapUseCaseError(err)
 	}
 	defer f.Close()
-	return c.Stream(http.StatusOK, ct, f)
+	data, err = io.ReadAll(f)
+	if err != nil {
+		return mapUseCaseError(err)
+	}
+	return c.Blob(http.StatusOK, ct, data)
 }
