@@ -7,7 +7,7 @@ import { Loading } from '@/components/common/Loading'
 import { ApiError } from '@/lib/api-client'
 import { normalizeMediaUrl } from '@/lib/media-url'
 import { planTierLabel } from '@/lib/plans'
-import { formatCurrencyYen, sanitizeDisplayText } from '@/lib/utils'
+import { formatCurrencyYen, formatYenInput, parseYenInput, sanitizeDisplayText } from '@/lib/utils'
 import {
   validatePlanPrice,
   validatePositiveAmount,
@@ -19,6 +19,33 @@ import type { DurationType, MembershipType, UpdateProjectPayload } from '@/types
 
 const MEMBERSHIP_TYPES: MembershipType[] = ['BRONZE', 'SILVER', 'GOLD']
 const STEPS = ['基本情報', '募集設定', 'メンバーシップ', '確認'] as const
+
+const YEARS = Array.from({ length: 5 }, (_, i) => String(new Date().getFullYear() + i))
+const MONTHS = Array.from({ length: 12 }, (_, i) => String(i + 1).padStart(2, '0'))
+const DAYS = Array.from({ length: 31 }, (_, i) => String(i + 1).padStart(2, '0'))
+const HOURS = Array.from({ length: 24 }, (_, i) => String(i).padStart(2, '0'))
+const MINUTES = ['00', '15', '30', '45']
+
+function toISO(year: string, month: string, day: string, hour: string, minute: string): string {
+  return new Date(
+    Number(year),
+    Number(month) - 1,
+    Number(day),
+    Number(hour),
+    Number(minute),
+  ).toISOString()
+}
+
+function fromISO(iso: string): { year: string; month: string; day: string; hour: string; minute: string } {
+  const d = new Date(iso)
+  return {
+    year: String(d.getFullYear()),
+    month: String(d.getMonth() + 1).padStart(2, '0'),
+    day: String(d.getDate()).padStart(2, '0'),
+    hour: String(d.getHours()).padStart(2, '0'),
+    minute: String(Math.floor(d.getMinutes() / 15) * 15).padStart(2, '0'),
+  }
+}
 
 interface PlanForm {
   membership_type: MembershipType
@@ -38,18 +65,36 @@ export function SellerProjectFormPage() {
 
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
-  const [targetAmount, setTargetAmount] = useState('100000')
+  const [targetAmount, setTargetAmount] = useState('100,000')
   const [durationType, setDurationType] = useState<DurationType>('UNLIMITED')
-  const [startDate, setStartDate] = useState('')
-  const [endDate, setEndDate] = useState('')
+  const [startYear, setStartYear] = useState(String(new Date().getFullYear()))
+  const [startMonth, setStartMonth] = useState(String(new Date().getMonth() + 1).padStart(2, '0'))
+  const [startDay, setStartDay] = useState(String(new Date().getDate()).padStart(2, '0'))
+  const [startHour, setStartHour] = useState(String(new Date().getHours()).padStart(2, '0'))
+  const [startMinute, setStartMinute] = useState('00')
+  const [endYear, setEndYear] = useState(String(new Date().getFullYear() + 1))
+  const [endMonth, setEndMonth] = useState('12')
+  const [endDay, setEndDay] = useState('31')
+  const [endHour, setEndHour] = useState('23')
+  const [endMinute, setEndMinute] = useState('59')
   const [imageUrl, setImageUrl] = useState('')
+  const [planEnabled, setPlanEnabled] = useState<Record<MembershipType, boolean>>({
+    BRONZE: true,
+    SILVER: false,
+    GOLD: false,
+  })
   const [plans, setPlans] = useState<PlanForm[]>(
     MEMBERSHIP_TYPES.map((t) => ({ membership_type: t, price: '500', benefits: '', max_supporters: '' })),
   )
 
   useEffect(() => {
     if (!isEdit) {
-      setStartDate(new Date().toISOString().slice(0, 16))
+      const now = fromISO(new Date().toISOString())
+      setStartYear(now.year)
+      setStartMonth(now.month)
+      setStartDay(now.day)
+      setStartHour(now.hour)
+      setStartMinute(now.minute)
       return
     }
     const id = parseUUID(projectId)
@@ -63,18 +108,39 @@ export function SellerProjectFormPage() {
         const p = await getProject(id)
         setTitle(p.title)
         setDescription(p.description)
-        setTargetAmount(String(p.target_amount))
+        setTargetAmount(formatYenInput(String(p.target_amount)))
         setDurationType(p.duration_type)
-        setStartDate(p.start_date.slice(0, 16))
-        setEndDate(p.end_date?.slice(0, 16) ?? '')
+        const start = fromISO(p.start_date)
+        setStartYear(start.year)
+        setStartMonth(start.month)
+        setStartDay(start.day)
+        setStartHour(start.hour)
+        setStartMinute(start.minute)
+        if (p.end_date) {
+          const end = fromISO(p.end_date)
+          setEndYear(end.year)
+          setEndMonth(end.month)
+          setEndDay(end.day)
+          setEndHour(end.hour)
+          setEndMinute(end.minute)
+        }
         setImageUrl(p.image_url ?? '')
-        if (p.plans.length >= 3) {
-          setPlans(p.plans.slice(0, 3).map((pl) => ({
-            membership_type: pl.membership_type,
-            price: String(pl.price),
-            benefits: pl.benefits,
-            max_supporters: pl.max_supporters ? String(pl.max_supporters) : '',
-          })))
+        if (p.plans.length > 0) {
+          const enabled: Record<MembershipType, boolean> = { BRONZE: false, SILVER: false, GOLD: false }
+          const formPlans = MEMBERSHIP_TYPES.map((t) => {
+            const found = p.plans.find((pl) => pl.membership_type === t)
+            if (found) {
+              enabled[t] = true
+            }
+            return {
+              membership_type: t,
+              price: found ? String(found.price) : '500',
+              benefits: found?.benefits ?? '',
+              max_supporters: found?.max_supporters ? String(found.max_supporters) : '',
+            }
+          })
+          setPlanEnabled(enabled)
+          setPlans(formPlans)
         }
       } catch {
         setError('プロジェクトの取得に失敗しました')
@@ -109,20 +175,24 @@ export function SellerProjectFormPage() {
       }
     }
     if (targetStep === 1) {
-      const target = Number.parseInt(targetAmount, 10)
+      const target = parseYenInput(targetAmount)
       const targetErr = validatePositiveAmount(target, '目標金額')
       if (targetErr) {
         return targetErr
       }
-      if (!startDate) {
+      if (!startYear || !startMonth || !startDay) {
         return '開始日時を入力してください'
       }
-      if (durationType === 'LIMITED' && !endDate) {
+      if (durationType === 'LIMITED' && (!endYear || !endMonth || !endDay)) {
         return '終了日時を入力してください'
       }
     }
     if (targetStep === 2 && !isEdit) {
-      for (const pl of plans) {
+      const activePlans = plans.filter((pl) => planEnabled[pl.membership_type])
+      if (activePlans.length === 0) {
+        return '少なくとも1つのメンバーシッププランを選択してください'
+      }
+      for (const pl of activePlans) {
         const price = Number.parseInt(pl.price, 10)
         const priceErr = validatePlanPrice(price)
         if (priceErr) {
@@ -163,7 +233,11 @@ export function SellerProjectFormPage() {
       }
     }
 
-    const target = Number.parseInt(targetAmount, 10)
+    const target = parseYenInput(targetAmount)
+    const startISO = toISO(startYear, startMonth, startDay, startHour, startMinute)
+    const endISO = durationType === 'LIMITED'
+      ? toISO(endYear, endMonth, endDay, endHour, endMinute)
+      : null
     setSubmitting(true)
     try {
       if (isEdit && projectId) {
@@ -172,14 +246,16 @@ export function SellerProjectFormPage() {
           description: sanitizeDisplayText(description, 10000),
           target_amount: target,
           duration_type: durationType,
-          start_date: new Date(startDate).toISOString(),
-          end_date: durationType === 'LIMITED' && endDate ? new Date(endDate).toISOString() : null,
+          start_date: startISO,
+          end_date: endISO,
           image_url: imageUrl ? normalizeMediaUrl(imageUrl) : undefined,
           images: imageUrl ? [{ image_url: normalizeMediaUrl(imageUrl), is_main: true, order: 0 }] : undefined,
         }
         await updateProject(projectId, updateBody)
       } else {
-        const planPayload = plans.map((pl) => {
+        const planPayload = plans
+          .filter((pl) => planEnabled[pl.membership_type])
+          .map((pl) => {
           const price = Number.parseInt(pl.price, 10)
           const max = pl.max_supporters ? Number.parseInt(pl.max_supporters, 10) : undefined
           return {
@@ -194,8 +270,8 @@ export function SellerProjectFormPage() {
           description: sanitizeDisplayText(description, 10000),
           target_amount: target,
           duration_type: durationType,
-          start_date: new Date(startDate).toISOString(),
-          end_date: durationType === 'LIMITED' && endDate ? new Date(endDate).toISOString() : null,
+          start_date: startISO,
+          end_date: endISO,
           image_url: imageUrl ? normalizeMediaUrl(imageUrl) : undefined,
           images: imageUrl ? [{ image_url: normalizeMediaUrl(imageUrl), is_main: true, order: 0 }] : undefined,
           plans: planPayload,
@@ -272,7 +348,13 @@ export function SellerProjectFormPage() {
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div>
                     <label className="mb-1 block text-sm font-medium">目標金額（円）</label>
-                    <input className="input-field" type="number" min={0} value={targetAmount} onChange={(e) => setTargetAmount(e.target.value)} />
+                    <input
+                      className="input-field"
+                      inputMode="numeric"
+                      value={targetAmount}
+                      onChange={(e) => setTargetAmount(formatYenInput(e.target.value))}
+                      placeholder="例: 100,000"
+                    />
                   </div>
                   <div>
                     <label className="mb-1 block text-sm font-medium">公開期間</label>
@@ -284,12 +366,24 @@ export function SellerProjectFormPage() {
                 </div>
                 <div>
                   <label className="mb-1 block text-sm font-medium">開始日時</label>
-                  <input className="input-field" type="datetime-local" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
+                  <div className="grid grid-cols-5 gap-2">
+                    <select className="input-field" value={startYear} onChange={(e) => setStartYear(e.target.value)}>{YEARS.map((y) => <option key={y} value={y}>{y}年</option>)}</select>
+                    <select className="input-field" value={startMonth} onChange={(e) => setStartMonth(e.target.value)}>{MONTHS.map((m) => <option key={m} value={m}>{m}月</option>)}</select>
+                    <select className="input-field" value={startDay} onChange={(e) => setStartDay(e.target.value)}>{DAYS.map((d) => <option key={d} value={d}>{d}日</option>)}</select>
+                    <select className="input-field" value={startHour} onChange={(e) => setStartHour(e.target.value)}>{HOURS.map((h) => <option key={h} value={h}>{h}時</option>)}</select>
+                    <select className="input-field" value={startMinute} onChange={(e) => setStartMinute(e.target.value)}>{MINUTES.map((m) => <option key={m} value={m}>{m}分</option>)}</select>
+                  </div>
                 </div>
                 {durationType === 'LIMITED' ? (
                   <div>
                     <label className="mb-1 block text-sm font-medium">終了日時</label>
-                    <input className="input-field" type="datetime-local" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
+                    <div className="grid grid-cols-5 gap-2">
+                      <select className="input-field" value={endYear} onChange={(e) => setEndYear(e.target.value)}>{YEARS.map((y) => <option key={y} value={y}>{y}年</option>)}</select>
+                      <select className="input-field" value={endMonth} onChange={(e) => setEndMonth(e.target.value)}>{MONTHS.map((m) => <option key={m} value={m}>{m}月</option>)}</select>
+                      <select className="input-field" value={endDay} onChange={(e) => setEndDay(e.target.value)}>{DAYS.map((d) => <option key={d} value={d}>{d}日</option>)}</select>
+                      <select className="input-field" value={endHour} onChange={(e) => setEndHour(e.target.value)}>{HOURS.map((h) => <option key={h} value={h}>{h}時</option>)}</select>
+                      <select className="input-field" value={endMinute} onChange={(e) => setEndMinute(e.target.value)}>{MINUTES.map((m) => <option key={m} value={m}>{m}分</option>)}</select>
+                    </div>
                   </div>
                 ) : null}
               </>
@@ -301,10 +395,22 @@ export function SellerProjectFormPage() {
                 {isEdit ? (
                   <p className="mb-3 text-sm text-amber-700">公開後のプラン価格・特典の変更はできません。表示のみです。</p>
                 ) : null}
+                {!isEdit ? (
+                  <p className="mb-3 text-sm text-gray-600">提供するプランにチェックを入れ、内容を入力してください（1つ以上必須）。</p>
+                ) : null}
                 {plans.map((pl, i) => (
                   <div key={pl.membership_type} className={`card border-l-4 p-4 ${pl.membership_type === 'GOLD' ? 'border-yellow-500' : pl.membership_type === 'SILVER' ? 'border-gray-400' : 'border-orange-400'}`}>
-                    <p className="mb-2 font-bold text-purple-800">{planTierLabel(pl.membership_type)}</p>
-                    <div className="grid gap-2 sm:grid-cols-2">
+                    <label className="mb-2 flex items-center gap-2 font-bold text-purple-800">
+                      {!isEdit ? (
+                        <input
+                          type="checkbox"
+                          checked={planEnabled[pl.membership_type]}
+                          onChange={(e) => setPlanEnabled((prev) => ({ ...prev, [pl.membership_type]: e.target.checked }))}
+                        />
+                      ) : null}
+                      {planTierLabel(pl.membership_type)}
+                    </label>
+                    <div className={`grid gap-2 sm:grid-cols-2 ${!isEdit && !planEnabled[pl.membership_type] ? 'pointer-events-none opacity-40' : ''}`}>
                       <input className="input-field" type="number" value={pl.price} disabled={isEdit} onChange={(e) => {
                         setPlans((prev) => prev.map((row, idx) => idx === i ? { ...row, price: e.target.value } : row))
                       }} placeholder="月額（円）" />
@@ -324,10 +430,10 @@ export function SellerProjectFormPage() {
               <div className="space-y-3 rounded-xl border border-purple-100 bg-purple-50/50 p-4 text-sm">
                 <p className="font-semibold text-purple-900">{title}</p>
                 <p className="line-clamp-3 text-gray-600">{description}</p>
-                <p>目標: {formatCurrencyYen(Number.parseInt(targetAmount, 10) || 0)} · {durationType === 'UNLIMITED' ? '無期限' : '期限あり'}</p>
+                <p>目標: {formatCurrencyYen(parseYenInput(targetAmount))} · {durationType === 'UNLIMITED' ? '無期限' : '期限あり'}</p>
                 {!isEdit ? (
                   <ul className="space-y-1 border-t border-purple-100 pt-3">
-                    {plans.map((pl) => (
+                    {plans.filter((pl) => planEnabled[pl.membership_type]).map((pl) => (
                       <li key={pl.membership_type}>
                         {planTierLabel(pl.membership_type)}: {formatCurrencyYen(Number.parseInt(pl.price, 10) || 0)}/月 — {pl.benefits}
                       </li>

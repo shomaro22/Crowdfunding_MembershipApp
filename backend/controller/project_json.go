@@ -1,6 +1,7 @@
 package controller
 
 import (
+	"strings"
 	"time"
 
 	"crowdfund-app/usecase"
@@ -88,6 +89,8 @@ func projectSummaryToJSON(v *usecase.ProjectView) projectSummaryJSON {
 		out    projectSummaryJSON
 		seller UserWire
 		item   usecase.ProjectItemView
+		i      int
+		url    string
 	)
 	if v == nil {
 		return projectSummaryJSON{}
@@ -96,6 +99,19 @@ func projectSummaryToJSON(v *usecase.ProjectView) projectSummaryJSON {
 	out = projectItemFieldsJSON(item)
 	out.FavoriteCount = item.FavoriteCount
 	out.Plans = projectPlansToJSON(v.Plans)
+	if (out.ImageURL == nil || strings.TrimSpace(*out.ImageURL) == "") && len(v.Images) > 0 {
+		for i = range v.Images {
+			if v.Images[i].IsMain {
+				url = v.Images[i].ImageURL
+				out.ImageURL = &url
+				break
+			}
+		}
+		if out.ImageURL == nil {
+			url = v.Images[0].ImageURL
+			out.ImageURL = &url
+		}
+	}
 	if v.Seller != nil {
 		seller = UserWireFrom(*v.Seller)
 		out.Seller = &seller

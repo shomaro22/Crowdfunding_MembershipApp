@@ -78,7 +78,7 @@ export function SellerProjectsPage() {
             <div>
               <Link to={`/seller/projects/${p.id}/edit`} className="font-bold text-purple-800">{p.title}</Link>
               <p className="text-sm text-gray-600">
-                {p.status === 'PENDING' ? '審査中' : p.status === 'ACTIVE' ? '公開中' : p.status === 'DELETED' ? '削除済' : p.status}
+                {p.status === 'PENDING' ? '審査中' : p.status === 'ACTIVE' ? '公開中' : p.status === 'CANCELLED' ? '却下済' : p.status === 'DELETED' ? '削除済' : p.status}
                 {' · '}
                 支援 {p.supporter_count}
                 {p.delete_request ? ' · 削除申請中' : ''}
@@ -88,7 +88,7 @@ export function SellerProjectsPage() {
               <Link to={`/seller/projects/${p.id}/edit`} className="btn-primary rounded-full text-sm">
                 商品ページを編集
               </Link>
-              {(p.status === 'ACTIVE' || p.status === 'PENDING' || p.status === 'DELETED') ? (
+              {(p.status === 'ACTIVE' || p.status === 'PENDING' || p.status === 'CANCELLED' || p.status === 'DELETED') ? (
                 <Link to={`/projects/${p.id}`} className="btn-secondary rounded-full text-sm">公開ページ</Link>
               ) : null}
               {p.status === 'ACTIVE' ? (

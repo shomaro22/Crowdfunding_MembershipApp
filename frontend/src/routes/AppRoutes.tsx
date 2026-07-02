@@ -2,6 +2,7 @@ import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import type { ReactNode } from 'react'
 
 import { AuthProvider } from '@/auth/AuthProvider'
+import { AdminRoute, MemberRoute, SellerRoute } from '@/components/auth/RoleRoutes'
 import { AuthGuard } from '@/components/auth/AuthGuard'
 import { MainLayout } from '@/components/layout/MainLayout'
 import { AdminPage } from '@/pages/admin/AdminPage'
@@ -30,7 +31,7 @@ import { SellerProjectsPage } from '@/pages/seller/SellerProjectsPage'
 function buyerGuard(children: ReactNode) {
   return (
     <MainLayout>
-      <AuthGuard requiredRole="BUYER">{children}</AuthGuard>
+      <MemberRoute>{children}</MemberRoute>
     </MainLayout>
   )
 }
@@ -38,7 +39,7 @@ function buyerGuard(children: ReactNode) {
 function sellerGuard(children: ReactNode) {
   return (
     <MainLayout>
-      <AuthGuard requiredRole="SELLER">{children}</AuthGuard>
+      <SellerRoute>{children}</SellerRoute>
     </MainLayout>
   )
 }
@@ -46,7 +47,7 @@ function sellerGuard(children: ReactNode) {
 function adminGuard(children: ReactNode) {
   return (
     <MainLayout>
-      <AuthGuard requiredRole="ADMIN">{children}</AuthGuard>
+      <AdminRoute>{children}</AdminRoute>
     </MainLayout>
   )
 }

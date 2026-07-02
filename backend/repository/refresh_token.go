@@ -13,6 +13,7 @@ import (
 type IRefreshTokenRepo interface {
 	Create(ctx context.Context, row *model.RefreshToken) error
 	GetValidHash(ctx context.Context, hash string, now time.Time) (model.RefreshToken, error)
+	GetByHash(ctx context.Context, hash string) (model.RefreshToken, error)
 	Revoke(ctx context.Context, id uuid.UUID, at time.Time) error
 	RevokeAllByUser(ctx context.Context, userID uuid.UUID, at time.Time) error
 }
@@ -32,6 +33,10 @@ func (r *refreshTokenRepo) Create(ctx context.Context, row *model.RefreshToken) 
 func (r *refreshTokenRepo) GetValidHash(ctx context.Context, hash string, now time.Time) (model.RefreshToken, error) {
 	return getOne[model.RefreshToken](dbFromCtx(ctx, r.db).
 		Where("token_hash = ? AND revoked_at IS NULL AND expires_at > ?", hash, now))
+}
+
+func (r *refreshTokenRepo) GetByHash(ctx context.Context, hash string) (model.RefreshToken, error) {
+	return getOne[model.RefreshToken](dbFromCtx(ctx, r.db).Where("token_hash = ?", hash))
 }
 
 func (r *refreshTokenRepo) Revoke(ctx context.Context, id uuid.UUID, at time.Time) error {

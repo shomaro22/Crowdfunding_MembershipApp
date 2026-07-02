@@ -126,7 +126,8 @@ export function ProjectDetailPage() {
       await createReport('PROJECT', project.id, reason)
       setReportOpen(false)
       setReportReason('')
-      toast('通報を受け付けました', 'success')
+      toast('通報を受け付けました。このプロジェクトは表示できなくなります', 'success')
+      void navigate('/')
     } catch (err) {
       toast(err instanceof ApiError ? err.message : '通報に失敗しました', 'error')
     }

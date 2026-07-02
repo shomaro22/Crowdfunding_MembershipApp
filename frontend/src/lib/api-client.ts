@@ -79,6 +79,11 @@ async function refreshAccessToken(): Promise<string | null> {
         return null
       }
 
+      if (response.status === 204) {
+        clearAccessToken()
+        return null
+      }
+
       const payload = await parseJsonSafe(response)
       if (!isRecord(payload) || typeof payload.auth_token !== 'string') {
         clearAccessToken()

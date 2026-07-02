@@ -77,6 +77,7 @@ export async function registerSeller(payload: SellerRegistrationPayload): Promis
     full_name: payload.full_name,
     birth_date: payload.birth_date,
     address: payload.address,
+    photo_present: true,
   }))
   form.append('identity_document_front', payload.identity_document_front)
   form.append('identity_document_back', payload.identity_document_back)

@@ -8,9 +8,10 @@ interface ProjectCardProps {
   project: ProjectSummary
   className?: string
   hideFavoriteBadge?: boolean
+  isFavorited?: boolean
 }
 
-export function ProjectCard({ project, className, hideFavoriteBadge = false }: ProjectCardProps) {
+export function ProjectCard({ project, className, hideFavoriteBadge = false, isFavorited = false }: ProjectCardProps) {
   const sortedPlans = sortPlansByTier(project.plans)
   const prices = sortedPlans.map((plan) => plan.price)
   const minPrice = prices.length > 0 ? Math.min(...prices) : 0
@@ -48,9 +49,12 @@ export function ProjectCard({ project, className, hideFavoriteBadge = false }: P
           </span>
         ) : null}
         {!hideFavoriteBadge ? (
-          <div className="absolute right-3 top-3 flex items-center gap-1 rounded-full bg-white/90 px-2.5 py-1 text-sm font-bold text-pink-600 shadow">
-            <span aria-hidden>♥</span>
+          <div className={`absolute right-3 top-3 flex items-center gap-1 rounded-full px-2.5 py-1 text-sm font-bold shadow ${
+            isFavorited ? 'bg-pink-600 text-white' : 'bg-white/90 text-pink-600'
+          }`}>
+            <span aria-hidden>{isFavorited ? '♥' : '♡'}</span>
             <span>{favoriteCount}</span>
+            {isFavorited ? <span className="sr-only">いいね済み</span> : null}
           </div>
         ) : null}
       </div>
