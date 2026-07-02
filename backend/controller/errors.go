@@ -3,6 +3,7 @@ package controller
 import (
 	"errors"
 	"net/http"
+	"os"
 
 	"crowdfund-app/usecase"
 
@@ -87,6 +88,8 @@ func mapUseCaseHTTP(err error) (int, map[string]string) {
 		return http.StatusRequestEntityTooLarge, errorPayload("FILE_TOO_LARGE", "file too large")
 	case errors.Is(err, usecase.ErrBatchJobFailed):
 		return http.StatusUnprocessableEntity, errorPayload("BATCH_JOB_FAILED", "batch job failed")
+	case errors.Is(err, os.ErrNotExist):
+		return http.StatusNotFound, errorPayload("NOT_FOUND", "not found")
 	default:
 		return http.StatusInternalServerError, errorPayload("INTERNAL_ERROR", "internal error")
 	}

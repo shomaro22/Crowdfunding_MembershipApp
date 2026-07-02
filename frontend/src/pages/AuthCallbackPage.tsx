@@ -23,7 +23,15 @@ export function AuthCallbackPage() {
 
     const oauthError = searchParams.get('error')
     if (oauthError) {
-      setError('Google ログインに失敗しました')
+      if (oauthError === 'user_inactive') {
+        setError('アカウントが有効化されていません。メール登録の場合は管理者の承認をお待ちください。')
+      } else if (oauthError === 'oauth_failed') {
+        setError('Google ログインに失敗しました。しばらくしてから再度お試しください。')
+      } else if (oauthError === 'oauth_forbidden') {
+        setError('この Google アカウントではログインできません（出品者アカウント等）。')
+      } else {
+        setError('Google ログインに失敗しました')
+      }
       return
     }
 

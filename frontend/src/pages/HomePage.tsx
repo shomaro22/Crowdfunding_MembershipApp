@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useState } from 'react'
 
 import { listPublicProjects } from '@/api/projects'
+import { listFavorites } from '@/api/supporters'
+import { useAuth } from '@/auth/AuthProvider'
 import { ErrorMessage } from '@/components/common/ErrorMessage'
 import { Loading } from '@/components/common/Loading'
 import { HeroCarousel } from '@/components/layout/HeroCarousel'
@@ -12,13 +14,25 @@ import type { ProjectSummary } from '@/types/api'
 const PAGE_SIZE = 10
 
 export function HomePage() {
+  const { status, hasRole } = useAuth()
   const [search, setSearch] = useState('')
   const [query, setQuery] = useState('')
   const [projects, setProjects] = useState<ProjectSummary[]>([])
+  const [favoriteIds, setFavoriteIds] = useState<Set<string>>(new Set())
   const [total, setTotal] = useState(0)
   const [loading, setLoading] = useState(true)
   const [loadingMore, setLoadingMore] = useState(false)
   const [error, setError] = useState('')
+
+  useEffect(() => {
+    if (status !== 'authenticated' || !hasRole('BUYER')) {
+      setFavoriteIds(new Set())
+      return
+    }
+    void listFavorites()
+      .then((res) => setFavoriteIds(new Set(res.favorites.map((f) => f.id))))
+      .catch(() => setFavoriteIds(new Set()))
+  }, [hasRole, status])
 
   const hasMore = projects.length < total
 
@@ -101,7 +115,11 @@ export function HomePage() {
         <>
           <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
             {projects.map((project) => (
-              <ProjectCard key={project.id} project={project} />
+              <ProjectCard
+                key={project.id}
+                project={project}
+                isFavorited={favoriteIds.has(project.id)}
+              />
             ))}
           </div>
           {loadingMore ? <Loading label="さらに読み込み中..." /> : null}

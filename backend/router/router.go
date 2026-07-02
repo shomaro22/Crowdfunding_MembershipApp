@@ -99,6 +99,7 @@ func New(cfg Config) *echo.Echo {
 
 		e.POST("/auth/logout", authCtl.Logout)
 		pm = cfg.Protected
+		e.POST("/auth/logout-all", authCtl.LogoutAllDevices, pm...)
 		e.GET("/me", authCtl.Me, pm...)
 		e.GET("/me/profile", authCtl.GetProfile, pm...)
 		e.PUT("/me/profile", authCtl.UpdateProfile, pm...)

@@ -169,7 +169,6 @@ func ValidateProject(title, description string, targetAmount int64, duration Dur
 	var (
 		seen map[MembershipType]bool
 		p    PlanInput
-		mt   MembershipType
 		err  error
 	)
 	err = ValidateTitle(title)
@@ -186,7 +185,7 @@ func ValidateProject(title, description string, targetAmount int64, duration Dur
 	if err != nil {
 		return err
 	}
-	if len(plans) != 3 {
+	if len(plans) < 1 || len(plans) > 3 {
 		return ErrBadProject
 	}
 	seen = map[MembershipType]bool{}
@@ -204,11 +203,6 @@ func ValidateProject(title, description string, targetAmount int64, duration Dur
 		err = ValidatePrice(p.Price)
 		if err != nil {
 			return err
-		}
-	}
-	for _, mt = range []MembershipType{MembershipBronze, MembershipSilver, MembershipGold} {
-		if !seen[mt] {
-			return ErrBadProject
 		}
 	}
 	return nil

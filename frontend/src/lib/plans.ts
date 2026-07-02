@@ -13,7 +13,29 @@ export function sortPlansByTier<T extends { membership_type: string }>(plans: T[
 }
 
 export function planTierLabel(type: string): string {
-  return type
+  switch (type) {
+    case 'BRONZE':
+      return 'ブロンズ'
+    case 'SILVER':
+      return 'シルバー'
+    case 'GOLD':
+      return 'ゴールド'
+    default:
+      return type
+  }
+}
+
+export function planTierTextClass(type: string): string {
+  switch (type) {
+    case 'BRONZE':
+      return 'text-orange-600 font-semibold'
+    case 'SILVER':
+      return 'text-slate-600 font-semibold'
+    case 'GOLD':
+      return 'text-amber-600 font-semibold'
+    default:
+      return 'text-purple-700 font-semibold'
+  }
 }
 
 export function planHoverClass(type: string): string {

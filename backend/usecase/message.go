@@ -31,6 +31,7 @@ type MessageUseCase struct {
 	Messages   repository.IMessageRepo
 	Projects   repository.IProjectRepo
 	Supporters repository.ISupporterRepo
+	Sellers    repository.ISellerRepo
 	Users      repository.IUserRepo
 	Activity   repository.IActivityRepo
 	events     MessageEventHook
@@ -68,18 +69,35 @@ func normalizeListThreadsQuery(q ListThreadsQuery) ListThreadsQuery {
 
 func (m *MessageUseCase) ListThreads(ctx context.Context, userID uuid.UUID, q ListThreadsQuery) (ListThreadsResult, error) {
 	var (
-		qNorm    ListThreadsQuery
+		qNorm ListThreadsQuery
+		u     model.User
+		err   error
+	)
+	qNorm = normalizeListThreadsQuery(q)
+	u, err = m.Users.GetID(ctx, userID)
+	if err != nil {
+		return ListThreadsResult{}, mapRepoNotFound(err)
+	}
+	if u.Role == model.UserRoleSeller && m.Sellers != nil {
+		return m.listSellerThreads(ctx, userID, qNorm)
+	}
+	return m.listBuyerThreads(ctx, userID, qNorm)
+}
+
+func (m *MessageUseCase) listBuyerThreads(ctx context.Context, userID uuid.UUID, qNorm ListThreadsQuery) (ListThreadsResult, error) {
+	var (
 		summaries []repository.MessageThreadSummary
 		total    int64
 		offset   int
 		rows     []model.Message
 		out      ListThreadsResult
 		i        int
+		j        int
 		s        repository.MessageThreadSummary
 		t        MessageThreadView
+		msg      model.Message
 		err      error
 	)
-	qNorm = normalizeListThreadsQuery(q)
 	offset = (qNorm.Page - 1) * qNorm.PerPage
 	summaries, total, err = m.Messages.ListThreadSummaries(ctx, userID, offset, qNorm.PerPage)
 	if err != nil {
@@ -106,7 +124,70 @@ func (m *MessageUseCase) ListThreads(ctx context.Context, userID uuid.UUID, q Li
 			UnreadCount: s.UnreadCount,
 			Messages:    make([]MessageItemView, 0, len(rows)),
 		}
-		for _, msg := range rows {
+		for j = range rows {
+			msg = rows[j]
+			t.Messages = append(t.Messages, MessageItemFrom(msg))
+		}
+		if err = m.enrichThread(ctx, &t); err != nil {
+			continue
+		}
+		out.Threads = append(out.Threads, t)
+	}
+	return out, nil
+}
+
+func (m *MessageUseCase) listSellerThreads(ctx context.Context, sellerID uuid.UUID, qNorm ListThreadsQuery) (ListThreadsResult, error) {
+	var (
+		supporters []model.ProjectSupporter
+		total      int64
+		offset     int
+		rows       []model.Message
+		out        ListThreadsResult
+		now        time.Time
+		i          int
+		j          int
+		sup        model.ProjectSupporter
+		t          MessageThreadView
+		msg        model.Message
+		unread     int
+		err        error
+	)
+	offset = (qNorm.Page - 1) * qNorm.PerPage
+	supporters, total, err = m.Sellers.ListSupporters(ctx, sellerID, nil, qNorm.PerPage, offset)
+	if err != nil {
+		return ListThreadsResult{}, err
+	}
+	now = time.Now().UTC()
+	out = ListThreadsResult{
+		Total:   total,
+		Page:    qNorm.Page,
+		PerPage: qNorm.PerPage,
+		Threads: make([]MessageThreadView, 0, len(supporters)),
+	}
+	for i = range supporters {
+		sup = supporters[i]
+		if !sup.HasBenefits(now) {
+			continue
+		}
+		rows, err = m.Messages.ListMessagesInThread(ctx, sellerID, sup.ProjectID, sup.UserID, qNorm.MessagesPerThread)
+		if err != nil {
+			rows = nil
+		}
+		unread = 0
+		for j = range rows {
+			msg = rows[j]
+			if !msg.IsRead && msg.ReceiverID == sellerID {
+				unread++
+			}
+		}
+		t = MessageThreadView{
+			ProjectID:   sup.ProjectID,
+			Partner:     UserView{ID: sup.UserID},
+			UnreadCount: unread,
+			Messages:    make([]MessageItemView, 0, len(rows)),
+		}
+		for j = range rows {
+			msg = rows[j]
 			t.Messages = append(t.Messages, MessageItemFrom(msg))
 		}
 		if err = m.enrichThread(ctx, &t); err != nil {

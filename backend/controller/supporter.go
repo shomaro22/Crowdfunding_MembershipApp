@@ -201,6 +201,7 @@ type listSupportersResponse struct {
 type upgradePlanResponse struct {
 	Supporter                 supporterJSON `json:"supporter"`
 	PaymentIntentClientSecret *string       `json:"payment_intent_client_secret"`
+	PaymentIntentID           *string       `json:"payment_intent_id"`
 }
 
 type purchaseJSON struct {
@@ -238,6 +239,7 @@ func upgradePlanJSONResponse(out usecase.UpgradeOut) upgradePlanResponse {
 	return upgradePlanResponse{
 		Supporter:                 supporterToJSON(out.Supporter),
 		PaymentIntentClientSecret: out.PaymentIntentClientSecret,
+		PaymentIntentID:           out.PaymentIntentID,
 	}
 }
 

@@ -14,6 +14,13 @@ import { validateMessageContent } from '@/lib/validation'
 import type { Message, MessageThread } from '@/types/api'
 import { useAuth } from '@/auth/AuthProvider'
 
+function appendUniqueMessage(messages: Message[], msg: Message): Message[] {
+  if (messages.some((m) => m.id === msg.id)) {
+    return messages
+  }
+  return [...messages, msg]
+}
+
 export function MessagesPage() {
   const { user } = useAuth()
   const [threads, setThreads] = useState<MessageThread[]>([])
@@ -59,7 +66,7 @@ export function MessagesPage() {
               if (!cur || cur.project_id !== ev.project_id) {
                 return cur
               }
-              return { ...cur, messages: [...cur.messages, ev.message] }
+              return { ...cur, messages: appendUniqueMessage(cur.messages, ev.message) }
             })
             void load()
           }
@@ -116,7 +123,7 @@ export function MessagesPage() {
         if (!cur) {
           return cur
         }
-        return { ...cur, messages: [...cur.messages, msg] }
+        return { ...cur, messages: appendUniqueMessage(cur.messages, msg) }
       })
     } catch {
       setSendError('送信に失敗しました')

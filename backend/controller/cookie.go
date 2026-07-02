@@ -92,12 +92,15 @@ func NewCookieCfg(refreshCookieName string, secure bool) CookieCfg {
 	if strings.TrimSpace(refreshCookieName) == "" {
 		refreshCookieName = DefaultRefreshCookie
 	}
+	if secure && !strings.HasPrefix(refreshCookieName, "__Secure-") && !strings.HasPrefix(refreshCookieName, "__Host-") {
+		refreshCookieName = "__Secure-" + refreshCookieName
+	}
 
 	return CookieCfg{
 		Name:     refreshCookieName,
 		Secure:   secure,
 		SameSite: http.SameSiteStrictMode,
-		Path:     "/",
+		Path:     "/auth",
 	}
 }
 

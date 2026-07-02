@@ -65,6 +65,9 @@ func (h *authController) RegisterSeller(c echo.Context) error {
 	if err = json.Unmarshal([]byte(regRaw), &payload); err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, apiError("invalid registration json", "BAD_REQUEST"))
 	}
+	if !payload.PhotoPresent && frontFile != nil && backFile != nil {
+		payload.PhotoPresent = true
+	}
 	frontFile, err = c.FormFile("identity_document_front")
 	if err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, apiError("identity_document_front required", "BAD_REQUEST"))

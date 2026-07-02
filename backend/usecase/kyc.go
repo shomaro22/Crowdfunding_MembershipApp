@@ -34,9 +34,11 @@ func (k *KYCAccessUseCase) SignToken(storageKey string, now time.Time) string {
 	return SignKYCAccess(k.SignSecret, storageKey, now)
 }
 
-func (k *KYCAccessUseCase) OpenWithToken(_ context.Context, token string) (*os.File, string, error) {
+func (k *KYCAccessUseCase) OpenWithToken(_ context.Context, token string) (io.ReadCloser, string, error) {
 	var (
 		key string
+		f   *os.File
+		ct  string
 		err error
 	)
 	key, err = VerifyKYCAccess(k.SignSecret, token, time.Now().UTC())
@@ -46,5 +48,12 @@ func (k *KYCAccessUseCase) OpenWithToken(_ context.Context, token string) (*os.F
 		}
 		return nil, "", err
 	}
-	return k.KYC.Open(key)
+	f, ct, err = k.KYC.Open(key)
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return nil, "", ErrNotFound
+		}
+		return nil, "", err
+	}
+	return f, ct, nil
 }
