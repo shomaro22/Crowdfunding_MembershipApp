@@ -14,6 +14,28 @@ import { ErrorMessage } from '@/components/common/ErrorMessage'
 import { formatCurrencyYen } from '@/lib/utils'
 import { planBarClass, planTierLabel, planTierTextClass } from '@/lib/plans'
 import type { ConnectAccount, ProjectAnalysisItem, SellerDashboardStats, SellerSupporterRow } from '@/types/api'
+import { ApiError } from '@/lib/api-client'
+
+function normalizeConnectURL(url: string): string {
+  try {
+    const parsed = new URL(url, window.location.origin)
+    if (parsed.pathname.startsWith('/seller/connect/')) {
+      return `${window.location.origin}${parsed.pathname}${parsed.search}`
+    }
+    return parsed.toString()
+  } catch {
+    return url
+  }
+}
+
+function isLocalConnectReturnURL(url: string): boolean {
+  try {
+    const parsed = new URL(url, window.location.origin)
+    return parsed.pathname === '/seller/connect/return' || parsed.pathname === '/seller/connect/refresh'
+  } catch {
+    return false
+  }
+}
 
 export function SellerDashboardPage() {
   const [stats, setStats] = useState<SellerDashboardStats | null>(null)
@@ -56,13 +78,26 @@ export function SellerDashboardPage() {
     setConnectMsg('')
     try {
       const { url } = await startConnectOnboarding()
-      if (!url.startsWith('https://')) {
+      const target = normalizeConnectURL(url)
+      if (!target.startsWith('http://') && !target.startsWith('https://')) {
         setConnectMsg('Connect URL が無効です')
         return
       }
-      window.location.assign(url)
-    } catch {
-      setConnectMsg('Connect  onboarding の開始に失敗しました')
+      if (isLocalConnectReturnURL(target)) {
+        await load()
+        setConnectMsg('Stripe Connect の設定を更新しました')
+        return
+      }
+      window.location.assign(target)
+    } catch (err) {
+      const msg = err instanceof ApiError
+        ? err.code === 'FORBIDDEN'
+          ? '出品者アカウントが有効化されていないか、Connect を利用できません'
+          : err.code === 'STRIPE_UNAVAILABLE'
+            ? '決済サービスが利用できません'
+            : err.message
+        : 'Connect onboarding の開始に失敗しました'
+      setConnectMsg(msg)
     }
   }
 
@@ -98,7 +133,7 @@ export function SellerDashboardPage() {
 
       <section className="card">
         <h2 className="mb-3 text-lg font-semibold">Stripe Connect</h2>
-        {connect ? (
+        {connect?.stripe_account_id ? (
           <ul className="text-sm text-gray-700">
             <li>charges: {connect.charges_enabled ? '有効' : '未設定'}</li>
             <li>payouts: {connect.payouts_enabled ? '有効' : '未設定'}</li>
@@ -108,9 +143,13 @@ export function SellerDashboardPage() {
           <p className="text-sm text-gray-600">Connect アカウント未連携</p>
         )}
         <button type="button" onClick={() => void onConnect()} className="btn-primary mt-4 rounded-full text-sm">
-          {connect ? '設定を更新' : 'Connect を開始'}
+          {connect?.stripe_account_id ? '設定を更新' : 'Connect を開始'}
         </button>
-        {connectMsg ? <p className="mt-2 text-sm text-red-600">{connectMsg}</p> : null}
+        {connectMsg ? (
+          <p className={`mt-2 text-sm ${connectMsg.includes('更新しました') ? 'text-green-700' : 'text-red-600'}`}>
+            {connectMsg}
+          </p>
+        ) : null}
       </section>
 
       <section className="card">

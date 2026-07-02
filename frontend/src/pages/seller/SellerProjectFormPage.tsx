@@ -6,7 +6,7 @@ import { uploadImage } from '@/api/media'
 import { Loading } from '@/components/common/Loading'
 import { ApiError } from '@/lib/api-client'
 import { normalizeMediaUrl } from '@/lib/media-url'
-import { planTierLabel } from '@/lib/plans'
+import { planTierLabel, validateMembershipTierCombo } from '@/lib/plans'
 import { formatCurrencyYen, formatYenInput, parseYenInput, sanitizeDisplayText } from '@/lib/utils'
 import {
   validatePlanPrice,
@@ -183,11 +183,25 @@ export function SellerProjectFormPage() {
       if (!startYear || !startMonth || !startDay) {
         return '開始日時を入力してください'
       }
+      const startAt = new Date(
+        Number(startYear),
+        Number(startMonth) - 1,
+        Number(startDay),
+        Number(startHour),
+        Number(startMinute),
+      )
+      if (startAt.getTime() < Date.now() - 5 * 60 * 1000) {
+        return '開始日時は現在以降を選択してください'
+      }
       if (durationType === 'LIMITED' && (!endYear || !endMonth || !endDay)) {
         return '終了日時を入力してください'
       }
     }
     if (targetStep === 2 && !isEdit) {
+      const tierErr = validateMembershipTierCombo(planEnabled)
+      if (tierErr) {
+        return tierErr
+      }
       const activePlans = plans.filter((pl) => planEnabled[pl.membership_type])
       if (activePlans.length === 0) {
         return '少なくとも1つのメンバーシッププランを選択してください'

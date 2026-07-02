@@ -86,23 +86,32 @@ func (m *MessageUseCase) ListThreads(ctx context.Context, userID uuid.UUID, q Li
 
 func (m *MessageUseCase) listBuyerThreads(ctx context.Context, userID uuid.UUID, qNorm ListThreadsQuery) (ListThreadsResult, error) {
 	var (
-		summaries []repository.MessageThreadSummary
-		total    int64
-		offset   int
-		rows     []model.Message
-		out      ListThreadsResult
-		i        int
-		j        int
-		s        repository.MessageThreadSummary
-		t        MessageThreadView
-		msg      model.Message
-		err      error
+		summaries   []repository.MessageThreadSummary
+		total       int64
+		offset      int
+		rows        []model.Message
+		out         ListThreadsResult
+		i           int
+		j           int
+		s           repository.MessageThreadSummary
+		t           MessageThreadView
+		msg         model.Message
+		seen        map[string]struct{}
+		key         string
+		memberships []model.ProjectSupporter
+		k           int
+		sup         model.ProjectSupporter
+		project     model.Project
+		now         time.Time
+		ok          bool
+		err         error
 	)
 	offset = (qNorm.Page - 1) * qNorm.PerPage
 	summaries, total, err = m.Messages.ListThreadSummaries(ctx, userID, offset, qNorm.PerPage)
 	if err != nil {
 		return ListThreadsResult{}, err
 	}
+	seen = make(map[string]struct{}, len(summaries))
 	out = ListThreadsResult{
 		Total:   total,
 		Page:    qNorm.Page,
@@ -114,6 +123,8 @@ func (m *MessageUseCase) listBuyerThreads(ctx context.Context, userID uuid.UUID,
 		if err = m.CanSubscribeProject(ctx, s.ProjectID, userID); err != nil {
 			continue
 		}
+		key = s.ProjectID.String() + ":" + s.PartnerID.String()
+		seen[key] = struct{}{}
 		rows, err = m.Messages.ListMessagesInThread(ctx, userID, s.ProjectID, s.PartnerID, qNorm.MessagesPerThread)
 		if err != nil {
 			continue
@@ -132,6 +143,36 @@ func (m *MessageUseCase) listBuyerThreads(ctx context.Context, userID uuid.UUID,
 			continue
 		}
 		out.Threads = append(out.Threads, t)
+	}
+	now = time.Now().UTC()
+	memberships, err = m.Supporters.ListByUserID(ctx, userID)
+	if err != nil {
+		return out, nil
+	}
+	for k = range memberships {
+		sup = memberships[k]
+		if !sup.HasBenefits(now) {
+			continue
+		}
+		project, _, _, err = m.Projects.GetID(ctx, sup.ProjectID)
+		if err != nil {
+			continue
+		}
+		key = sup.ProjectID.String() + ":" + project.SellerID.String()
+		if _, ok = seen[key]; ok {
+			continue
+		}
+		seen[key] = struct{}{}
+		t = MessageThreadView{
+			ProjectID: sup.ProjectID,
+			Partner:   UserView{ID: project.SellerID},
+			Messages:  []MessageItemView{},
+		}
+		if err = m.enrichThread(ctx, &t); err != nil {
+			continue
+		}
+		out.Threads = append(out.Threads, t)
+		out.Total++
 	}
 	return out, nil
 }
