@@ -10,11 +10,6 @@ import (
 	"github.com/labstack/echo/v4"
 )
 
-const (
-	CtxUserID   = "userID"
-	CtxUserRole = "role"
-)
-
 type TokenParser func(raw string) (usecase.AuthClaims, error)
 
 type SessionValidator func(c echo.Context, claims usecase.AuthClaims) error

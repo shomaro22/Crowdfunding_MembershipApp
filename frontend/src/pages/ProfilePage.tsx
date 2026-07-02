@@ -59,8 +59,14 @@ export function ProfilePage() {
     setUploading(true)
     try {
       const res = await uploadImage(file)
-      setAvatarUrl(normalizeMediaUrl(res.url))
-      toast('画像をアップロードしました', 'success')
+      const url = normalizeMediaUrl(res.url)
+      setAvatarUrl(url)
+      const updated = await updateProfile({
+        avatar_url: url.slice(0, 2048),
+      })
+      setAvatarUrl(updated.avatar_url ?? url)
+      await refreshUser()
+      toast('アバターを更新しました', 'success')
     } catch {
       toast('画像のアップロードに失敗しました', 'error')
     } finally {

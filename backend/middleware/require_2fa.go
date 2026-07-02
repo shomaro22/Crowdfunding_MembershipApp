@@ -4,8 +4,6 @@ import (
 	"github.com/labstack/echo/v4"
 )
 
-const CtxTwoFAVerified = "2fa_verified"
-
 func Require2FA() echo.MiddlewareFunc {
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(c echo.Context) error {

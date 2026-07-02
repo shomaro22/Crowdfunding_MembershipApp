@@ -478,14 +478,10 @@ func (p *PaymentUseCase) loadCheckoutBase(ctx context.Context, buyerID, projectI
 	} else if err != nil {
 		return sc, err
 	} else if pend.ID != uuid.Nil {
-		if pend.CreatedAt.Add(30 * time.Minute).Before(sc.now) {
-			pend.Status = model.PurchaseStatusCancelled
-			pend.UpdatedAt = sc.now
-			if err = p.Purchases.Update(ctx, &pend); err != nil {
-				return sc, err
-			}
-		} else {
-			return sc, ErrPendingCheckout
+		pend.Status = model.PurchaseStatusCancelled
+		pend.UpdatedAt = sc.now
+		if err = p.Purchases.Update(ctx, &pend); err != nil {
+			return sc, err
 		}
 	}
 	return sc, nil

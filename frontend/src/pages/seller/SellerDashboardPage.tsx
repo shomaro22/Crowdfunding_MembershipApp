@@ -12,6 +12,7 @@ import {
 import { Loading } from '@/components/common/Loading'
 import { ErrorMessage } from '@/components/common/ErrorMessage'
 import { formatCurrencyYen } from '@/lib/utils'
+import { planBarClass, planTierLabel, planTierTextClass } from '@/lib/plans'
 import type { ConnectAccount, ProjectAnalysisItem, SellerDashboardStats, SellerSupporterRow } from '@/types/api'
 
 export function SellerDashboardPage() {
@@ -20,6 +21,7 @@ export function SellerDashboardPage() {
   const [analysis, setAnalysis] = useState<ProjectAnalysisItem[]>([])
   const [supporterTotal, setSupporterTotal] = useState(0)
   const [supporterRows, setSupporterRows] = useState<SellerSupporterRow[]>([])
+  const [supporterVisible, setSupporterVisible] = useState(10)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [connectMsg, setConnectMsg] = useState('')
@@ -32,7 +34,7 @@ export function SellerDashboardPage() {
         getDashboardStats(),
         getConnectAccount(),
         getProjectAnalysis(),
-        listSellerSupporters(undefined, 5, 0),
+        listSellerSupporters(undefined, 200, 0),
       ])
       setStats(s)
       setConnect(c.account)
@@ -119,14 +121,25 @@ export function SellerDashboardPage() {
         {supporterRows.length === 0 ? (
           <p className="text-sm text-gray-500">支援者はまだいません</p>
         ) : (
-          <ul className="space-y-2 text-sm">
-            {supporterRows.map((row) => (
-              <li key={row.id} className="flex justify-between border-b border-purple-50 py-2">
-                <span>{row.project?.title ?? row.project_id}</span>
-                <span className="text-gray-600">{row.plan?.membership_type} · {row.status}</span>
-              </li>
-            ))}
-          </ul>
+          <>
+            <ul className="space-y-2 text-sm">
+              {supporterRows.slice(0, supporterVisible).map((row) => (
+                <li key={row.id} className="flex justify-between border-b border-purple-50 py-2">
+                  <span>{row.project?.title ?? row.project_id}</span>
+                  <span className="text-gray-600">{planTierLabel(row.plan?.membership_type ?? '')} · {row.status}</span>
+                </li>
+              ))}
+            </ul>
+            {supporterRows.length > supporterVisible ? (
+              <button
+                type="button"
+                onClick={() => setSupporterVisible((n) => n + 20)}
+                className="mt-3 text-sm font-medium text-purple-700 hover:underline"
+              >
+                さらに表示（残り {supporterRows.length - supporterVisible} 件）
+              </button>
+            ) : null}
+          </>
         )}
       </section>
 
@@ -142,11 +155,11 @@ export function SellerDashboardPage() {
               {p.plan_breakdown ? (
                 <div className="space-y-1 pl-2">
                   {(['BRONZE', 'SILVER', 'GOLD'] as const).map((tier) => (
-                    <div key={tier} className="flex items-center gap-2 text-xs text-gray-600">
-                      <span className="w-14">{tier}</span>
+                    <div key={tier} className="flex items-center gap-2 text-xs">
+                      <span className={`w-14 ${planTierTextClass(tier)}`}>{planTierLabel(tier)}</span>
                       <div className="h-1.5 flex-1 rounded-full bg-gray-100">
                         <div
-                          className="h-full rounded-full bg-purple-500"
+                          className={`h-full rounded-full ${planBarClass(tier)}`}
                           style={{
                             width: `${Math.min(100, ((p.plan_breakdown?.[tier] ?? 0) / Math.max(p.supporter_count, 1)) * 100)}%`,
                           }}

@@ -1,6 +1,10 @@
 package controller
 
 import (
+	"net/http"
+	"strings"
+
+	"crowdfund-app/middleware"
 	"crowdfund-app/usecase"
 
 	"github.com/google/uuid"
@@ -81,6 +85,9 @@ func (h *authController) Refresh(c echo.Context) error {
 		err          error
 	)
 	plain = RefreshTokenFrom(c, h.CookieCfg)
+	if strings.TrimSpace(plain) == "" {
+		return c.NoContent(http.StatusNoContent)
+	}
 	authToken, refreshToken, err = h.Auth.Refresh(reqCtx(c), plain, requestMeta(c))
 	if err != nil {
 		return mapUseCaseError(err)
@@ -96,6 +103,23 @@ func (h *authController) Logout(c echo.Context) error {
 	)
 	plain = RefreshTokenFrom(c, h.CookieCfg)
 	if err = h.Auth.Logout(reqCtx(c), plain, requestMeta(c)); err != nil {
+		return mapUseCaseError(err)
+	}
+	ClearRefreshCookie(c, h.CookieCfg)
+	return noContent(c)
+}
+
+func (h *authController) LogoutAllDevices(c echo.Context) error {
+	var (
+		userID uuid.UUID
+		ok     bool
+		err    error
+	)
+	userID, ok = middleware.AuthUserID(c)
+	if !ok {
+		return echo.NewHTTPError(http.StatusUnauthorized, map[string]string{"error": "unauthorized", "code": "UNAUTHORIZED"})
+	}
+	if err = h.Auth.LogoutAllDevices(reqCtx(c), userID, requestMeta(c)); err != nil {
 		return mapUseCaseError(err)
 	}
 	ClearRefreshCookie(c, h.CookieCfg)

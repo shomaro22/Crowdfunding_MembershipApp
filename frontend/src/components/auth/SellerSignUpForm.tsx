@@ -1,7 +1,9 @@
 import { useState, type FormEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
 
-import { registerSeller } from "@/api/auth";
+import { checkEmailAvailable, registerSeller } from "@/api/auth";
+import { ApiError } from "@/lib/api-client";
+import { lookupJapaneseAddress } from "@/lib/postal-jp";
 import { PasswordInput } from "@/components/common/PasswordInput";
 import {
   isValidEmail,
@@ -42,15 +44,19 @@ export function SellerSignUpForm() {
   const [step, setStep] = useState(0);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [fullName, setFullName] = useState("");
   const [birthYear, setBirthYear] = useState("");
   const [birthMonth, setBirthMonth] = useState("");
   const [birthDay, setBirthDay] = useState("");
+  const [postalCode, setPostalCode] = useState("");
   const [address, setAddress] = useState("");
   const [frontFile, setFrontFile] = useState<File | null>(null);
   const [backFile, setBackFile] = useState<File | null>(null);
   const [error, setError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [emailTaken, setEmailTaken] = useState(false);
+  const [postalLoading, setPostalLoading] = useState(false);
 
   const birthDate =
     birthYear && birthMonth && birthDay
@@ -62,9 +68,15 @@ export function SellerSignUpForm() {
       if (!isValidEmail(email)) {
         return "有効なメールアドレスを入力してください";
       }
+      if (emailTaken) {
+        return "このメールアドレスは既に登録されています";
+      }
       const pwCheck = validatePassword(password);
       if (!pwCheck.valid) {
         return pwCheck.errors[0] ?? "パスワードが無効です";
+      }
+      if (password !== confirmPassword) {
+        return "確認用パスワードが一致しません";
       }
     }
     if (targetStep === 1) {
@@ -89,6 +101,37 @@ export function SellerSignUpForm() {
       }
     }
     return null;
+  };
+
+  const onEmailBlur = async () => {
+    if (!isValidEmail(email)) {
+      setEmailTaken(false);
+      return;
+    }
+    try {
+      const available = await checkEmailAvailable(sanitizeEmail(email));
+      setEmailTaken(!available);
+    } catch {
+      setEmailTaken(false);
+    }
+  };
+
+  const onPostalBlur = async () => {
+    const digits = postalCode.replace(/\D/g, "");
+    if (digits.length !== 7) {
+      return;
+    }
+    setPostalLoading(true);
+    try {
+      const found = await lookupJapaneseAddress(digits);
+      if (found) {
+        setAddress(found);
+      }
+    } catch {
+      /* 手入力で続行 */
+    } finally {
+      setPostalLoading(false);
+    }
   };
 
   const goNext = () => {
@@ -140,8 +183,18 @@ export function SellerSignUpForm() {
           message: "出品者登録を受け付けました。審査完了までお待ちください。",
         },
       });
-    } catch {
-      setError("出品者登録に失敗しました");
+    } catch (err) {
+      if (err instanceof ApiError) {
+        if (err.code === 'BAD_SELLER_KYC') {
+          setError('本人情報が不足しています。氏名・生年月日・住所を確認してください。')
+        } else if (err.code === 'CONFLICT') {
+          setError('このメールアドレスは既に登録されています')
+        } else {
+          setError(err.message)
+        }
+      } else {
+        setError("出品者登録に失敗しました");
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -208,8 +261,18 @@ export function SellerSignUpForm() {
                   autoComplete="email"
                   className="input-field"
                   value={email}
-                  onChange={(e) => setEmail(e.target.value)}
+                  onChange={(e) => {
+                    setEmail(e.target.value);
+                    setEmailTaken(false);
+                  }}
+                  onBlur={() => void onEmailBlur()}
                 />
+                {emailTaken ? (
+                  <p className="mt-1 text-sm text-amber-700">
+                    このメールアドレスは既に登録されています。
+                    <Link to="/signin" className="ml-1 font-medium text-purple-700 underline">ログインはこちら</Link>
+                  </p>
+                ) : null}
               </div>
               <div>
                 <label
@@ -222,6 +285,20 @@ export function SellerSignUpForm() {
                   id="password"
                   value={password}
                   onChange={setPassword}
+                  autoComplete="new-password"
+                />
+              </div>
+              <div>
+                <label
+                  htmlFor="confirmPassword"
+                  className="mb-1 block text-sm font-medium text-gray-700"
+                >
+                  パスワード（確認）
+                </label>
+                <PasswordInput
+                  id="confirmPassword"
+                  value={confirmPassword}
+                  onChange={setConfirmPassword}
                   autoComplete="new-password"
                 />
               </div>
@@ -287,6 +364,26 @@ export function SellerSignUpForm() {
                     ))}
                   </select>
                 </div>
+              </div>
+              <div>
+                <label
+                  htmlFor="postalCode"
+                  className="mb-1 block text-sm font-medium text-gray-700"
+                >
+                  郵便番号（ハイフンなし）
+                </label>
+                <input
+                  id="postalCode"
+                  inputMode="numeric"
+                  className="input-field"
+                  value={postalCode}
+                  onChange={(e) => setPostalCode(e.target.value.replace(/\D/g, "").slice(0, 7))}
+                  onBlur={() => void onPostalBlur()}
+                  placeholder="例: 1000001"
+                />
+                {postalLoading ? (
+                  <p className="mt-1 text-xs text-gray-500">住所を検索中...</p>
+                ) : null}
               </div>
               <div>
                 <label
@@ -397,7 +494,7 @@ export function SellerSignUpForm() {
             ) : (
               <button
                 type="submit"
-                disabled={isSubmitting}
+                disabled={isSubmitting || emailTaken}
                 className="btn-primary flex-1 rounded-full font-bold"
               >
                 {isSubmitting ? "送信中..." : "登録申請する"}

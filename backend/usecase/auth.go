@@ -20,6 +20,7 @@ type IAuthUsecase interface {
 	Login(ctx context.Context, email, password string, meta RequestMeta) (*LoginResult, error)
 	Refresh(ctx context.Context, refreshTokenPlain string, meta RequestMeta) (authToken, refreshToken string, err error)
 	Logout(ctx context.Context, refreshTokenPlain string, meta RequestMeta) error
+	LogoutAllDevices(ctx context.Context, userID uuid.UUID, meta RequestMeta) error
 	ForgotPassword(ctx context.Context, email string) error
 	ResetPassword(ctx context.Context, plainToken, newPassword string) error
 	ChangePassword(ctx context.Context, userID uuid.UUID, current, newPassword, totpCode string) error
@@ -30,7 +31,7 @@ type IAuthUsecase interface {
 	Verify2FASetup(ctx context.Context, userID uuid.UUID, code string) (*TOTPVerifyResult, error)
 	Challenge2FA(ctx context.Context, pendingToken, code string, meta RequestMeta) (*LoginResult, error)
 	CreatePending2FAToken(ctx context.Context, userID uuid.UUID) (string, error)
-	GoogleAuthURL(from string) (string, error)
+	GoogleAuthURL(from string, meta RequestMeta) (string, error)
 	GoogleCallback(ctx context.Context, code, state string, meta RequestMeta) (*OAuthCBOut, error)
 	ExchangeOAuthCode(ctx context.Context, code string, meta RequestMeta) (*LoginResult, error)
 	ParseToken(raw string) (AuthClaims, error)

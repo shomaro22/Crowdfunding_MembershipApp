@@ -108,6 +108,7 @@ type demoProject struct {
 	targetAmount  int64
 	currentAmount int64
 	favoriteCount int
+	imageURL      string
 	plans         []demoPlan
 }
 
@@ -306,7 +307,7 @@ func runDevSeed(flagArgs []string) {
 				log.Fatalf("connect: %v", err)
 			}
 		}
-		allDemo := demoProjects()
+		allDemo := append(demoProjects(), extendedDemoProjects()...)
 		for i, dp := range allDemo {
 			sellerID := sellerIDs[i%len(sellerIDs)]
 			var created bool
@@ -322,6 +323,11 @@ func runDevSeed(flagArgs []string) {
 		}
 		if err = seedReviewProjects(ctx, gormDB, projects, sellerIDs[0], adminID, now, reset); err != nil {
 			log.Fatalf("review projects: %v", err)
+		}
+		for _, sellerID := range sellerIDs {
+			if err = repairCorruptedDemoText(ctx, gormDB, sellerID, allDemo, now); err != nil {
+				log.Fatalf("repair demo text: %v", err)
+			}
 		}
 		if err = seedPendingSellerRegs(ctx, gormDB, users, sellerRegs, hash, now, reset); err != nil {
 			log.Fatalf("pending kyc: %v", err)
@@ -526,6 +532,7 @@ func demoProjects() []demoProject {
 			targetAmount:  300_000,
 			currentAmount: 450_000,
 			favoriteCount: 328,
+			imageURL:      "https://picsum.photos/seed/crowdfund-demo-1/800/600",
 			plans: []demoPlan{
 				{model.MembershipBronze, 500, "限定壁紙＋制作メモ", 12},
 				{model.MembershipSilver, 1_500, "ラフ画配布＋Discord参加", 5},
@@ -538,6 +545,7 @@ func demoProjects() []demoProject {
 			targetAmount:  300_000,
 			currentAmount: 180_000,
 			favoriteCount: 156,
+			imageURL:      "https://picsum.photos/seed/crowdfund-demo-2/800/600",
 			plans: []demoPlan{
 				{model.MembershipBronze, 300, "未公開音源プレビュー", 8},
 				{model.MembershipSilver, 900, "月例ミニライブ参加", 3},
@@ -550,6 +558,7 @@ func demoProjects() []demoProject {
 			targetAmount:  500_000,
 			currentAmount: 520_000,
 			favoriteCount: 412,
+			imageURL:      "https://picsum.photos/seed/crowdfund-demo-3/800/600",
 			plans: []demoPlan{
 				{model.MembershipBronze, 500, "開発ニュースレター", 20},
 				{model.MembershipSilver, 1_500, "ベータ版アクセス", 8},
@@ -562,6 +571,7 @@ func demoProjects() []demoProject {
 			targetAmount:  200_000,
 			currentAmount: 85_000,
 			favoriteCount: 89,
+			imageURL:      "https://picsum.photos/seed/crowdfund-demo-4/800/600",
 			plans: []demoPlan{
 				{model.MembershipBronze, 500, "限定Vlog＋レシピ", 5},
 				{model.MembershipSilver, 1_200, "週次ライブアーカイブ", 2},
@@ -574,6 +584,7 @@ func demoProjects() []demoProject {
 			targetAmount:  250_000,
 			currentAmount: 310_000,
 			favoriteCount: 245,
+			imageURL:      "https://picsum.photos/seed/crowdfund-demo-5/800/600",
 			plans: []demoPlan{
 				{model.MembershipBronze, 400, "限定ギャラリー閲覧", 10},
 				{model.MembershipSilver, 1_000, "撮影メイキング動画", 4},
@@ -586,6 +597,7 @@ func demoProjects() []demoProject {
 			targetAmount:  150_000,
 			currentAmount: 42_000,
 			favoriteCount: 67,
+			imageURL:      "https://picsum.photos/seed/crowdfund-demo-6/800/600",
 			plans: []demoPlan{
 				{model.MembershipBronze, 300, "限定エピソード", 4},
 				{model.MembershipSilver, 800, "アフタートーク付き", 2},
@@ -598,6 +610,7 @@ func demoProjects() []demoProject {
 			targetAmount:  180_000,
 			currentAmount: 195_000,
 			favoriteCount: 178,
+			imageURL:      "https://picsum.photos/seed/crowdfund-demo-7/800/600",
 			plans: []demoPlan{
 				{model.MembershipBronze, 600, "制作過程ストーリー", 7},
 				{model.MembershipSilver, 1_400, "先行販売アクセス", 3},
@@ -632,6 +645,7 @@ func upsertProject(
 		j     int
 		p     *model.Project
 		plans []model.ProjectPlan
+		images []model.ProjectImage
 		totalSupporters int
 	)
 
@@ -653,10 +667,17 @@ func upsertProject(
 			rows[i].SupporterCount = totalSupporters
 			rows[i].Status = model.ProjectStatusActive
 			rows[i].UpdatedAt = now
+			if dp.imageURL != "" {
+				img := dp.imageURL
+				rows[i].MainImageURL = &img
+			}
 			if err = repo.Update(ctx, &rows[i]); err != nil {
 				return false, err
 			}
 			if err = syncDemoPlanCounts(ctx, gormDB, rows[i].ID, dp.plans, now); err != nil {
+				return false, err
+			}
+			if err = syncDemoImages(ctx, repo, rows[i].ID, dp.imageURL, now); err != nil {
 				return false, err
 			}
 			fmt.Printf("reset: project %q\n", dp.title)
@@ -678,6 +699,10 @@ func upsertProject(
 		CreatedAt:      now,
 		UpdatedAt:      now,
 	}
+	if dp.imageURL != "" {
+		img := dp.imageURL
+		p.MainImageURL = &img
+	}
 	plans = make([]model.ProjectPlan, len(dp.plans))
 	for i, pl := range dp.plans {
 		plans[i] = model.ProjectPlan{
@@ -692,11 +717,50 @@ func upsertProject(
 		}
 	}
 	_ = j
-	if err = repo.Create(ctx, p, plans, nil); err != nil {
+	if dp.imageURL != "" {
+		images = []model.ProjectImage{{
+			ID:        uuid.New(),
+			ImageURL:  dp.imageURL,
+			IsMain:    true,
+			SortOrder: 0,
+			CreatedAt: now,
+		}}
+	}
+	if err = repo.Create(ctx, p, plans, images); err != nil {
 		return false, err
 	}
 	fmt.Printf("created: project %q\n", dp.title)
 	return true, nil
+}
+
+func syncDemoImages(ctx context.Context, repo repository.IProjectRepo, projectID uuid.UUID, imageURL string, now time.Time) error {
+	var (
+		images []model.ProjectImage
+		project model.Project
+		err    error
+	)
+	if imageURL == "" {
+		return nil
+	}
+	images = []model.ProjectImage{{
+		ID:        uuid.New(),
+		ImageURL:  imageURL,
+		IsMain:    true,
+		SortOrder: 0,
+		CreatedAt: now,
+	}}
+	err = repo.ReplaceImages(ctx, projectID, images)
+	if err != nil {
+		return err
+	}
+	project, _, _, err = repo.GetID(ctx, projectID)
+	if err != nil {
+		return err
+	}
+	img := imageURL
+	project.MainImageURL = &img
+	project.UpdatedAt = now
+	return repo.Update(ctx, &project)
 }
 
 func syncDemoPlanCounts(ctx context.Context, gormDB *gorm.DB, projectID uuid.UUID, demoPlans []demoPlan, now time.Time) error {
@@ -714,12 +778,54 @@ func syncDemoPlanCounts(ctx context.Context, gormDB *gorm.DB, projectID uuid.UUI
 		for j = range demoPlans {
 			if plans[i].MembershipType == demoPlans[j].membership {
 				plans[i].SupporterCount = demoPlans[j].supporters
+				plans[i].Benefits = demoPlans[j].benefits
+				plans[i].Price = demoPlans[j].price
 				plans[i].UpdatedAt = now
 				if err = gormDB.WithContext(ctx).Save(&plans[i]).Error; err != nil {
 					return err
 				}
 				break
 			}
+		}
+	}
+	return nil
+}
+
+func repairCorruptedDemoText(ctx context.Context, gormDB *gorm.DB, sellerID uuid.UUID, allProjects []demoProject, now time.Time) error {
+	var (
+		rows []model.Project
+		err  error
+		i    int
+		j    int
+		dp   demoProject
+		found bool
+	)
+	err = gormDB.WithContext(ctx).Where("seller_id = ?", sellerID).Find(&rows).Error
+	if err != nil {
+		return err
+	}
+	for i = range rows {
+		if !strings.Contains(rows[i].Description, "%!(EXTRA") {
+			continue
+		}
+		found = false
+		for j = range allProjects {
+			if allProjects[j].title == rows[i].Title {
+				dp = allProjects[j]
+				found = true
+				break
+			}
+		}
+		if !found {
+			continue
+		}
+		rows[i].Description = dp.description
+		rows[i].UpdatedAt = now
+		if err = gormDB.WithContext(ctx).Save(&rows[i]).Error; err != nil {
+			return err
+		}
+		if err = syncDemoPlanCounts(ctx, gormDB, rows[i].ID, dp.plans, now); err != nil {
+			return err
 		}
 	}
 	return nil
@@ -1111,6 +1217,8 @@ func seedReviewProjects(
 		items = []reviewProject{
 			{title: "【審査中】新規ファンクラブ開設のお知らせ", status: model.ProjectStatusPending},
 			{title: "【審査中】写真集メンバーシップ", status: model.ProjectStatusPending},
+			{title: "【編集申請】タイトル変更の審査", status: model.ProjectStatusPending},
+			{title: "【削除申請】終了予定プロジェクト", status: model.ProjectStatusDeleteRequested},
 			{title: "【棄却】規約違反コンテンツのプロジェクト", status: model.ProjectStatusCancelled},
 		}
 		dp    demoProject
@@ -1175,6 +1283,7 @@ func upsertReviewProject(
 	for i = range rows {
 		if rows[i].Title == dp.title {
 			rows[i].Status = status
+			rows[i].DeleteRequested = status == model.ProjectStatusDeleteRequested
 			rows[i].UpdatedAt = now
 			if err = repo.Update(ctx, &rows[i]); err != nil {
 				return false, err
@@ -1193,6 +1302,7 @@ func upsertReviewProject(
 		DurationType:   model.DurationUnlimited,
 		StartDate:      now,
 		Status:         status,
+		DeleteRequested: status == model.ProjectStatusDeleteRequested,
 		CreatedAt:      now,
 		UpdatedAt:      now,
 	}

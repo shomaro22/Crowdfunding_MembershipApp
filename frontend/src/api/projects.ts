@@ -34,7 +34,7 @@ export async function listFeaturedProjects(limit = 5): Promise<ListProjectsRespo
 }
 
 export async function getProject(projectId: string): Promise<ProjectDetail> {
-  return apiRequest<ProjectDetail>(`/projects/${encodeURIComponent(projectId)}`)
+  return apiRequest<ProjectDetail>(`/projects/${encodeURIComponent(projectId)}`, { auth: true })
 }
 
 export async function listProjectPlans(projectId: string): Promise<{ plans: ProjectDetail['plans'] }> {
