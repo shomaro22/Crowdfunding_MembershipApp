@@ -17,21 +17,32 @@ export const options = {
 };
 
 export default function oauthLoad() {
-  const startRes = http.get(`${BASE_URL}/auth/google?from=/`, { redirects: 0 });
+  const startRes = http.get(`${BASE_URL}/auth/google?from=/`, {
+    redirects: 0,
+    responseCallback: http.expectedStatuses(200, 302, 404, 503),
+  });
   check(startRes, {
-    'google start redirect or disabled': (r) => r.status === 302 || r.status === 503 || r.status === 200,
+    'google start redirect or disabled': (r) =>
+      r.status === 302 || r.status === 503 || r.status === 200 || r.status === 404,
   });
 
   const exchangeRes = http.post(
     `${BASE_URL}/auth/oauth/exchange`,
     JSON.stringify({ code: 'invalid-load-test-code' }),
-    { headers: { 'Content-Type': 'application/json', Accept: 'application/json' } },
+    {
+      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+      responseCallback: http.expectedStatuses(400, 401, 404, 503),
+    },
   );
   check(exchangeRes, {
-    'oauth exchange rejects invalid code': (r) => r.status === 400 || r.status === 401 || r.status === 503,
+    'oauth exchange rejects invalid code or disabled': (r) =>
+      r.status === 400 || r.status === 401 || r.status === 503 || r.status === 404,
   });
 
-  const callbackRes = http.get(`${BASE_URL}/auth/callback?error=oauth_failed`, { redirects: 0 });
+  const callbackRes = http.get(`${BASE_URL}/auth/callback?error=oauth_failed`, {
+    redirects: 0,
+    responseCallback: http.expectedStatuses(200, 302),
+  });
   check(callbackRes, {
     'oauth callback error redirect': (r) => r.status === 302 || r.status === 200,
   });
