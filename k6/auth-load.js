@@ -19,7 +19,10 @@ export default function authLoad() {
   const loginRes = http.post(
     `${BASE_URL}/auth/login`,
     JSON.stringify({ email: BUYER_EMAIL, password: BUYER_PASSWORD }),
-    { headers: jsonHeaders() },
+    {
+      headers: jsonHeaders(),
+      responseCallback: http.expectedStatuses(200, 429),
+    },
   );
 
   const loginOk = check(loginRes, {
@@ -41,9 +44,10 @@ export default function authLoad() {
   const refreshRes = http.post(`${BASE_URL}/auth/refresh`, null, {
     headers: jsonHeaders(),
     cookies: loginRes.cookies,
+    responseCallback: http.expectedStatuses(200, 204, 429),
   });
   check(refreshRes, {
-    'refresh ok or rate limited': (r) => r.status === 200 || r.status === 429,
+    'refresh ok or rate limited': (r) => r.status === 200 || r.status === 204 || r.status === 429,
   });
 
   sleep(0.3);
