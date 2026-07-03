@@ -62,6 +62,9 @@ func (r *passwordUserRepo) ListRoleStatus(_ context.Context, _ model.UserRole, _
 func (r *passwordUserRepo) ListAdmin(_ context.Context, _ repository.AdminUserListFilter) ([]model.User, int64, error) {
 	return nil, 0, nil
 }
+func (r *passwordUserRepo) ListByIDs(_ context.Context, _ []uuid.UUID) (map[uuid.UUID]model.User, error) {
+	return map[uuid.UUID]model.User{}, nil
+}
 
 type noopMailer struct{}
 

@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"crowdfund-app/model"
-	"crowdfund-app/repository"
 
 	"github.com/google/uuid"
 )
@@ -172,7 +171,7 @@ func (a *AdminUseCase) ApproveSellerReg(ctx context.Context, adminID, regID uuid
 		return SellerRegItemView{}, mapRepoNotFound(err)
 	}
 	now = time.Now().UTC()
-	err = repository.WithTx(ctx, a.DB, func(txCtx context.Context) error {
+	err = a.Tx.WithTx(ctx, func(txCtx context.Context) error {
 		var txErr error
 
 		u.AccountStatus = model.AccountStatusActive

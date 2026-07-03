@@ -3,7 +3,6 @@ package bootstrap
 import (
 	"log/slog"
 	"os"
-	"path/filepath"
 
 	"crowdfund-app/db"
 	"crowdfund-app/stripe"
@@ -74,7 +73,7 @@ func BuildApplication(opts *Options) (*Application, error) {
 	ctls = NewControllers(ucs, ucs.KYCAccess, gormDB, rdb, repos.WSHub, cfg, stripeClient, origins)
 	mw = BuildMiddlewares(ucs.Auth, repos.Activity, ucs.RateLimit, cfg, origins)
 	e = BuildRouter(ctls, ucs, mw, cfg)
-	e.Static("/uploads", filepath.Join(cfg.Storage.PublicRoot, "uploads"))
+	RegisterUploads(e, cfg.Storage.PublicRoot)
 
 	return &Application{
 		Echo:   e,

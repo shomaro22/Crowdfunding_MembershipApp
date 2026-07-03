@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"crowdfund-app/model"
-	"crowdfund-app/repository"
 	"crowdfund-app/validator"
 
 	"github.com/google/uuid"
@@ -112,7 +111,7 @@ func (r *RegistrationUseCase) RegisterSeller(ctx context.Context, in SellerRegIn
 		reg        *model.SellerReg
 	)
 
-	if r.deps.KYCStore == nil || r.deps.SellerRegs == nil || r.deps.DB == nil {
+	if r.deps.KYCStore == nil || r.deps.SellerRegs == nil || r.deps.Tx == nil {
 		return nil, ErrNotFound
 	}
 
@@ -174,7 +173,7 @@ func (r *RegistrationUseCase) RegisterSeller(ctx context.Context, in SellerRegIn
 		UpdatedAt:    now,
 	}
 
-	err = repository.WithTx(ctx, r.deps.DB, func(txCtx context.Context) error {
+	err = r.deps.Tx.WithTx(ctx, func(txCtx context.Context) error {
 		var txErr error
 
 		if txErr = r.deps.Users.Create(txCtx, u); txErr != nil {

@@ -10,13 +10,12 @@ import (
 	"crowdfund-app/stripe"
 
 	"github.com/google/uuid"
-	"gorm.io/gorm"
 )
 
 const supportPeriodDays = 30
 
 type PaymentUseCase struct {
-	DB              *gorm.DB
+	Tx              repository.TxBeginner
 	Users           repository.IUserRepo
 	Projects        repository.IProjectRepo
 	Purchases       repository.IPurchaseRepo
@@ -141,8 +140,8 @@ func (p *PaymentUseCase) newPendingPurchase(
 	return row
 }
 
-func (p *PaymentUseCase) savePendingAfterStripe(ctx context.Context, purchase model.Purchase) error {
-	return repository.WithTx(ctx, p.DB, func(txCtx context.Context) error {
+func (p *PaymentUseCase) persistPendingPurchase(ctx context.Context, purchase model.Purchase) error {
+	return p.Tx.WithTx(ctx, func(txCtx context.Context) error {
 		return p.Purchases.Create(txCtx, &purchase)
 	})
 }
@@ -225,6 +224,9 @@ func (p *PaymentUseCase) CreateCheckout(ctx context.Context, in CheckoutIn) (Che
 		return CheckoutOut{}, err
 	}
 	purchase = p.newPendingPurchase(sc, pm, nil, nil)
+	if err = p.persistPendingPurchase(ctx, purchase); err != nil {
+		return CheckoutOut{}, err
+	}
 	meta = checkoutMetadata(sc, purchase.ID, pm)
 	sess, err = p.Stripe.CreateCheckoutSession(ctx, stripe.CheckoutSessionIn{
 		ProductName:      sc.project.Title,
@@ -237,6 +239,7 @@ func (p *PaymentUseCase) CreateCheckout(ctx context.Context, in CheckoutIn) (Che
 		Metadata:         meta,
 	})
 	if err != nil {
+		_ = p.markPurchaseCancelled(ctx, purchase, "stripe_checkout_failed")
 		return CheckoutOut{}, err
 	}
 	purchase.StripeCheckoutID = &sess.SessionID
@@ -244,7 +247,7 @@ func (p *PaymentUseCase) CreateCheckout(ctx context.Context, in CheckoutIn) (Che
 		purchase.StripeIntentID = &sess.PaymentIntentID
 	}
 	purchase.UpdatedAt = sc.now
-	if err = p.savePendingAfterStripe(ctx, purchase); err != nil {
+	if err = p.Purchases.Update(ctx, &purchase); err != nil {
 		return CheckoutOut{}, err
 	}
 	p.logPaymentCheckoutStarted(ctx, purchase, in.Meta, "checkout")
@@ -268,6 +271,9 @@ func (p *PaymentUseCase) CreateIntent(ctx context.Context, in IntentIn) (IntentO
 		return IntentOut{}, err
 	}
 	purchase = p.newPendingPurchase(sc, model.PaymentMethodCard, nil, nil)
+	if err = p.persistPendingPurchase(ctx, purchase); err != nil {
+		return IntentOut{}, err
+	}
 	meta = paymentMetadata(purchase.ID, in.ProjectID, in.PlanID, in.BuyerID, model.BillingModeAuto)
 	sub, err = p.Stripe.CreateSubscriptionIntent(ctx, stripe.SubscriptionIntentIn{
 		ProductName:      sc.project.Title,
@@ -277,11 +283,12 @@ func (p *PaymentUseCase) CreateIntent(ctx context.Context, in IntentIn) (IntentO
 		Metadata:         meta,
 	})
 	if err != nil {
+		_ = p.markPurchaseCancelled(ctx, purchase, "stripe_intent_failed")
 		return IntentOut{}, err
 	}
 	purchase.StripeIntentID = &sub.PaymentIntentID
 	purchase.UpdatedAt = sc.now
-	if err = p.savePendingAfterStripe(ctx, purchase); err != nil {
+	if err = p.Purchases.Update(ctx, &purchase); err != nil {
 		return IntentOut{}, err
 	}
 	p.logPaymentCheckoutStarted(ctx, purchase, in.Meta, "intent")
@@ -631,7 +638,7 @@ func (p *PaymentUseCase) fulfillFirstSupport(
 		err       error
 	)
 
-	err = repository.WithTx(ctx, p.DB, func(txCtx context.Context) error {
+	err = p.Tx.WithTx(ctx, func(txCtx context.Context) error {
 		var (
 			membership model.ProjectSupporter
 			hasMember  bool
@@ -756,28 +763,16 @@ func stripeString(s string) *string {
 
 func (p *PaymentUseCase) markPurchasePaid(ctx context.Context, purchase model.Purchase, supporterID uuid.UUID, period periodRange, invoiceID *string) error {
 	var (
-		from model.PurchaseStatus
-		err  error
+		supID = supporterID
+		start = period.start
+		end   = period.end
 	)
-	from = purchase.Status
-	purchase.Status = model.PurchaseStatusPaid
-	purchase.SupporterID = &supporterID
-	purchase.PeriodStart = &period.start
-	purchase.PeriodEnd = &period.end
-	purchase.StripeInvoiceID = invoiceID
-	purchase.UpdatedAt = time.Now().UTC()
-	if err = p.Purchases.Update(ctx, &purchase); err != nil {
-		return err
-	}
-	if err = p.Projects.AddCurrentAmount(ctx, purchase.ProjectID, int64(purchase.TotalPrice)); err != nil {
-		return err
-	}
-	return p.Purchases.RecordEvent(ctx, &model.PurchaseEvent{
-		ID:         uuid.New(),
-		PurchaseID: purchase.ID,
-		FromStatus: &from,
-		ToStatus:   model.PurchaseStatusPaid,
-		CreatedAt:  time.Now().UTC(),
+	return MarkPurchasePaid(ctx, p.Purchases, p.Projects, purchase, MarkPaidOptions{
+		SupporterID: &supID,
+		PeriodStart: &start,
+		PeriodEnd:   &end,
+		InvoiceID:   invoiceID,
+		AddFunding:  true,
 	})
 }
 
@@ -855,7 +850,7 @@ func (p *PaymentUseCase) fulfillKonbiniFirstSupport(ctx context.Context, purchas
 }
 
 func (p *PaymentUseCase) fulfillKonbiniRenewal(ctx context.Context, purchase model.Purchase, planID uuid.UUID, paidAt time.Time) error {
-	return repository.WithTx(ctx, p.DB, func(txCtx context.Context) error {
+	return p.Tx.WithTx(ctx, func(txCtx context.Context) error {
 		var (
 			supporter model.ProjectSupporter
 			period    periodRange
@@ -915,7 +910,7 @@ func (p *PaymentUseCase) handleKonbiniCheckoutUnpaid(ctx context.Context, purcha
 }
 
 func (p *PaymentUseCase) failKonbiniRenewal(ctx context.Context, purchase model.Purchase, reason string, cancelled bool) error {
-	return repository.WithTx(ctx, p.DB, func(txCtx context.Context) error {
+	return p.Tx.WithTx(ctx, func(txCtx context.Context) error {
 		var (
 			supporter model.ProjectSupporter
 			err       error

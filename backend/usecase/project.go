@@ -10,7 +10,6 @@ import (
 	"crowdfund-app/validator"
 
 	"github.com/google/uuid"
-	"gorm.io/gorm"
 )
 
 type PlanIn struct {
@@ -55,7 +54,7 @@ type ProjectUseCase struct {
 	Users     repository.IUserRepo
 	Favorites repository.IFavoriteRepo
 	Reports   repository.IReportRepo
-	DB        *gorm.DB
+	Tx        repository.TxBeginner
 }
 
 func buildProjectImages(ins []ImageIn, legacyURL *string, now time.Time) ([]model.ProjectImage, *string, error) {
@@ -143,26 +142,31 @@ func sortPlansByTier(plans []model.ProjectPlan) {
 
 func (p *ProjectUseCase) EnrichList(ctx context.Context, rows []model.Project, total int64) ([]ProjectView, int64, error) {
 	var (
-		out          []ProjectView
-		sellerCache  map[uuid.UUID]*UserView
-		favCounts    map[uuid.UUID]int64
-		projectIDs   []uuid.UUID
-		i            int
-		project      model.Project
-		seller       *UserView
-		ok           bool
-		u            model.User
-		plans        []model.ProjectPlan
-		images       []model.ProjectImage
-		v            ProjectView
-		err          error
+		out        []ProjectView
+		favCounts  map[uuid.UUID]int64
+		projectIDs []uuid.UUID
+		sellerIDs  []uuid.UUID
+		sellerSet  map[uuid.UUID]struct{}
+		sellers    map[uuid.UUID]model.User
+		plansByID  map[uuid.UUID][]model.ProjectPlan
+		imagesByID map[uuid.UUID][]model.ProjectImage
+		i          int
+		project    model.Project
+		seller     *UserView
+		u          model.User
+		ok         bool
+		plans      []model.ProjectPlan
+		images     []model.ProjectImage
+		v          ProjectView
+		err        error
 	)
 
 	out = make([]ProjectView, 0, len(rows))
-	sellerCache = map[uuid.UUID]*UserView{}
 	projectIDs = make([]uuid.UUID, len(rows))
+	sellerSet = map[uuid.UUID]struct{}{}
 	for i = range rows {
 		projectIDs[i] = rows[i].ID
+		sellerSet[rows[i].SellerID] = struct{}{}
 	}
 	if p.Favorites != nil {
 		favCounts, err = p.Favorites.CountByProjects(ctx, projectIDs)
@@ -170,21 +174,31 @@ func (p *ProjectUseCase) EnrichList(ctx context.Context, rows []model.Project, t
 			return nil, 0, err
 		}
 	}
+	sellerIDs = make([]uuid.UUID, 0, len(sellerSet))
+	for id := range sellerSet {
+		sellerIDs = append(sellerIDs, id)
+	}
+	sellers, err = p.Users.ListByIDs(ctx, sellerIDs)
+	if err != nil {
+		return nil, 0, err
+	}
+	plansByID, err = p.Projects.ListPlansByProjectIDs(ctx, projectIDs)
+	if err != nil {
+		return nil, 0, err
+	}
+	imagesByID, err = p.Projects.ListImagesByProjectIDs(ctx, projectIDs)
+	if err != nil {
+		return nil, 0, err
+	}
 	for i = range rows {
 		project = rows[i]
-		seller, ok = sellerCache[project.SellerID]
+		u, ok = sellers[project.SellerID]
 		if !ok {
-			u, err = p.Users.GetID(ctx, project.SellerID)
-			if err != nil {
-				return nil, 0, mapRepoNotFound(err)
-			}
-			seller = UserViewPtr(u)
-			sellerCache[project.SellerID] = seller
+			return nil, 0, ErrNotFound
 		}
-		_, plans, images, err = p.Projects.GetID(ctx, project.ID)
-		if err != nil {
-			return nil, 0, mapRepoNotFound(err)
-		}
+		seller = UserViewPtr(u)
+		plans = plansByID[project.ID]
+		images = imagesByID[project.ID]
 		sortPlansByTier(plans)
 		v = AssembleProjectView(project, plans, images, seller)
 		if favCounts != nil {
@@ -482,7 +496,7 @@ func (p *ProjectUseCase) Update(ctx context.Context, sellerID, projectID uuid.UU
 		project.Status = model.ProjectStatusPending
 	}
 	project.UpdatedAt = now
-	err = repository.WithTx(ctx, p.DB, func(txCtx context.Context) error {
+	err = p.Tx.WithTx(ctx, func(txCtx context.Context) error {
 		if err = p.Projects.Update(txCtx, &project); err != nil {
 			return err
 		}
