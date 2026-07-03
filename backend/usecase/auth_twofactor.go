@@ -87,7 +87,7 @@ func (t *TwoFactorUseCase) Verify2FASetup(ctx context.Context, userID uuid.UUID,
 	if err != nil {
 		return nil, err
 	}
-	if err = InvalidateUserSessions(ctx, t.deps.DB, t.deps.Users, t.deps.RefreshTokens, u.ID); err != nil {
+	if err = InvalidateUserSessions(ctx, t.deps.Tx, t.deps.Users, t.deps.RefreshTokens, u.ID); err != nil {
 		return nil, err
 	}
 	return &TOTPVerifyResult{BackupCodes: codes}, nil

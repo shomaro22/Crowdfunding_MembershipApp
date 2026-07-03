@@ -39,6 +39,9 @@ func (r *regUserRepo) ListRoleStatus(_ context.Context, _ model.UserRole, _ mode
 func (r *regUserRepo) ListAdmin(_ context.Context, _ repository.AdminUserListFilter) ([]model.User, int64, error) {
 	return nil, 0, nil
 }
+func (r *regUserRepo) ListByIDs(_ context.Context, _ []uuid.UUID) (map[uuid.UUID]model.User, error) {
+	return map[uuid.UUID]model.User{}, nil
+}
 
 func TestRegisterBuyerCreatesActiveBuyer(t *testing.T) {
 	var (
