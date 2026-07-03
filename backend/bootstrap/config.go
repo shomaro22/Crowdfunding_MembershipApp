@@ -49,23 +49,28 @@ func (c AppConfig) ListenAddr() string {
 	return ":" + c.Port
 }
 
-func secretBytes(envKey string, fallback string, label string) []byte {
-	v := strings.TrimSpace(os.Getenv(envKey))
+func secretBytes(envKey string, fallback string, label string) ([]byte, error) {
+	var v string
+	v = strings.TrimSpace(os.Getenv(envKey))
 	if len(v) >= 32 {
-		return []byte(v)
+		return []byte(v), nil
 	}
 	if isProduction() {
-		panic(fmt.Sprintf("%s must be at least 32 characters in production", envKey))
+		return nil, fmt.Errorf("%s must be at least 32 characters when APP_ENV=production", envKey)
 	}
 	if len(fallback) >= 32 {
 		slog.Warn("security: using JWT_SECRET fallback for key; set distinct secret in production", "key", label)
-		return []byte(fallback)
+		return []byte(fallback), nil
 	}
-	panic(fmt.Sprintf("%s: fallback too short", label))
+	return nil, fmt.Errorf("%s: not set and fallback too short", label)
 }
 
 func isProduction() bool {
 	return strings.EqualFold(strings.TrimSpace(os.Getenv("APP_ENV")), "production")
+}
+
+func isCloudDeploy() bool {
+	return isProduction() || strings.TrimSpace(os.Getenv("RENDER")) != ""
 }
 
 // LoadConfig は環境変数から設定を読み込む。
@@ -78,10 +83,22 @@ func LoadConfig() (AppConfig, error) {
 	if len(cfg.Security.JWTSecret) < 32 {
 		return AppConfig{}, fmt.Errorf("JWT_SECRET must be at least 32 characters")
 	}
-	cfg.Security.RefreshSecret = secretBytes("REFRESH_SECRET", cfg.Security.JWTSecret, "REFRESH_SECRET")
-	cfg.Security.TOTPEncryptionKey = secretBytes("TOTP_ENCRYPTION_KEY", cfg.Security.JWTSecret, "TOTP_ENCRYPTION_KEY")
-	cfg.Security.KYCSigningKey = secretBytes("KYC_SIGNING_KEY", cfg.Security.JWTSecret, "KYC_SIGNING_KEY")
-	cfg.Security.Pending2FAKey = secretBytes("PENDING_2FA_KEY", cfg.Security.JWTSecret, "PENDING_2FA_KEY")
+	cfg.Security.RefreshSecret, err = secretBytes("REFRESH_SECRET", cfg.Security.JWTSecret, "REFRESH_SECRET")
+	if err != nil {
+		return AppConfig{}, err
+	}
+	cfg.Security.TOTPEncryptionKey, err = secretBytes("TOTP_ENCRYPTION_KEY", cfg.Security.JWTSecret, "TOTP_ENCRYPTION_KEY")
+	if err != nil {
+		return AppConfig{}, err
+	}
+	cfg.Security.KYCSigningKey, err = secretBytes("KYC_SIGNING_KEY", cfg.Security.JWTSecret, "KYC_SIGNING_KEY")
+	if err != nil {
+		return AppConfig{}, err
+	}
+	cfg.Security.Pending2FAKey, err = secretBytes("PENDING_2FA_KEY", cfg.Security.JWTSecret, "PENDING_2FA_KEY")
+	if err != nil {
+		return AppConfig{}, err
+	}
 	cfg.Security.TOTPIssuer = strings.TrimSpace(os.Getenv("TOTP_ISSUER"))
 
 	cfg.Port = strings.TrimSpace(os.Getenv("PORT"))
@@ -107,6 +124,9 @@ func LoadConfig() (AppConfig, error) {
 	}
 
 	cfg.Database.URL = DatabaseURL()
+	if cfg.Database.URL == "" {
+		return AppConfig{}, fmt.Errorf("DATABASE_URL is required on Render/production (Neon の接続文字列を設定)")
+	}
 
 	cfg.OAuth.APIPublicURL = strings.TrimSpace(os.Getenv("API_PUBLIC_URL"))
 	if cfg.OAuth.APIPublicURL == "" {
@@ -119,11 +139,15 @@ func LoadConfig() (AppConfig, error) {
 
 // DatabaseURL は DATABASE_URL を返す（未設定時はローカルデフォルト）。
 func DatabaseURL() string {
-	u := strings.TrimSpace(os.Getenv("DATABASE_URL"))
+	var u string
+	u = strings.TrimSpace(os.Getenv("DATABASE_URL"))
 	if u == "" {
+		if isCloudDeploy() {
+			return ""
+		}
 		u = "postgres://postgres:postgres@localhost:5432/crowdfund?sslmode=disable"
 	}
-	return u
+	return NormalizeDatabaseURL(u)
 }
 
 // CORSOrigins は許可オリジン一覧を返す。
@@ -134,17 +158,31 @@ func CORSOrigins() []string {
 		parts   []string
 		i       int
 		s       string
+		appURL  string
 	)
 	raw = strings.TrimSpace(os.Getenv("CORS_ALLOW_ORIGINS"))
-	if raw == "" {
-		return nil
-	}
-	parts = strings.Split(raw, ",")
-	for i = range parts {
-		s = strings.TrimSpace(parts[i])
-		if s != "" {
-			origins = append(origins, s)
+	if raw != "" {
+		parts = strings.Split(raw, ",")
+		for i = range parts {
+			s = strings.TrimSpace(parts[i])
+			if s != "" {
+				origins = append(origins, s)
+			}
 		}
 	}
+	appURL = strings.TrimSpace(os.Getenv("PUBLIC_APP_URL"))
+	if appURL != "" && !originListed(origins, appURL) {
+		origins = append(origins, appURL)
+	}
 	return origins
+}
+
+func originListed(origins []string, target string) bool {
+	var i int
+	for i = range origins {
+		if origins[i] == target {
+			return true
+		}
+	}
+	return false
 }

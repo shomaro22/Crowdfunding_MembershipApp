@@ -36,7 +36,7 @@ test.describe('チェックアウト', () => {
     const projectId = href.replace('/projects/', '')
     await page.goto(`/checkout/${projectId}`)
 
-    const payButton = page.getByRole('button', { name: /応援する|決済|次へ/ })
+    const payButton = page.getByRole('button', { name: /カード決済に進む|応援する|決済|次へ/ })
     if (await payButton.count() > 0) {
       await payButton.first().click()
     }
@@ -48,8 +48,8 @@ test.describe('チェックアウト', () => {
     }
 
     await cardInput.fill('4242424242424242')
-    await expect(cardInput).toHaveValue('4242424242424242')
+    await expect(cardInput).toHaveValue('4242 4242 4242 4242')
     await page.getByPlaceholder('MM / YY').fill('12 / 30')
-    await page.getByPlaceholder('CVC').fill('123')
+    await page.getByPlaceholder('•••').fill('123')
   })
 })

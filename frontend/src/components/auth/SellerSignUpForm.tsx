@@ -5,6 +5,7 @@ import { checkEmailAvailable, registerSeller } from "@/api/auth";
 import { ApiError } from "@/lib/api-client";
 import { lookupJapaneseAddress } from "@/lib/postal-jp";
 import { PasswordInput } from "@/components/common/PasswordInput";
+import { digitsOnly } from "@/lib/validation";
 import {
   isValidEmail,
   sanitizeDisplayText,
@@ -136,9 +137,9 @@ export function SellerSignUpForm() {
 
   const goNext = () => {
     setError("");
-    const err = validateStep(step);
-    if (err) {
-      setError(err);
+    const validationMessage = validateStep(step);
+    if (validationMessage !== null) {
+      setError(validationMessage);
       return;
     }
     setStep((s) => Math.min(s + 1, STEPS.length - 1));
@@ -153,9 +154,9 @@ export function SellerSignUpForm() {
     event.preventDefault();
     setError("");
     for (let i = 0; i < STEPS.length - 1; i++) {
-      const err = validateStep(i);
-      if (err) {
-        setError(err);
+      const validationMessage = validateStep(i);
+      if (validationMessage !== null) {
+        setError(validationMessage);
         setStep(i);
         return;
       }
@@ -185,12 +186,14 @@ export function SellerSignUpForm() {
       });
     } catch (err) {
       if (err instanceof ApiError) {
-        if (err.code === 'BAD_SELLER_KYC') {
-          setError('本人情報が不足しています。氏名・生年月日・住所を確認してください。')
-        } else if (err.code === 'CONFLICT') {
-          setError('このメールアドレスは既に登録されています')
+        if (err.code === "BAD_SELLER_KYC") {
+          setError(
+            "本人情報が不足しています。氏名・生年月日・住所を確認してください。",
+          );
+        } else if (err.code === "CONFLICT") {
+          setError("このメールアドレスは既に登録されています");
         } else {
-          setError(err.message)
+          setError(err.message);
         }
       } else {
         setError("出品者登録に失敗しました");
@@ -270,7 +273,12 @@ export function SellerSignUpForm() {
                 {emailTaken ? (
                   <p className="mt-1 text-sm text-amber-700">
                     このメールアドレスは既に登録されています。
-                    <Link to="/signin" className="ml-1 font-medium text-purple-700 underline">ログインはこちら</Link>
+                    <Link
+                      to="/signin"
+                      className="ml-1 font-medium text-purple-700 underline"
+                    >
+                      ログインはこちら
+                    </Link>
                   </p>
                 ) : null}
               </div>
@@ -377,7 +385,7 @@ export function SellerSignUpForm() {
                   inputMode="numeric"
                   className="input-field"
                   value={postalCode}
-                  onChange={(e) => setPostalCode(e.target.value.replace(/\D/g, "").slice(0, 7))}
+                  onChange={(e) => setPostalCode(digitsOnly(e.target.value, 7))}
                   onBlur={() => void onPostalBlur()}
                   placeholder="例: 1000001"
                 />
@@ -447,6 +455,12 @@ export function SellerSignUpForm() {
 
           {step === 3 ? (
             <div className="space-y-3 rounded-xl border border-purple-100 bg-purple-50/50 p-4 text-sm">
+              <p className="text-base font-bold text-gray-800">
+                入力内容の確認
+              </p>
+              <p className="text-xs text-gray-500">
+                以下の内容で出品者登録を申請します。修正があれば「戻る」で編集してください。
+              </p>
               <p>
                 <span className="font-medium text-gray-700">メール:</span>{" "}
                 {email}
@@ -489,7 +503,7 @@ export function SellerSignUpForm() {
                 onClick={goNext}
                 className="btn-primary flex-1 rounded-full font-bold"
               >
-                次へ
+                {step === STEPS.length - 2 ? "確認画面へ" : "次へ"}
               </button>
             ) : (
               <button
@@ -497,7 +511,7 @@ export function SellerSignUpForm() {
                 disabled={isSubmitting || emailTaken}
                 className="btn-primary flex-1 rounded-full font-bold"
               >
-                {isSubmitting ? "送信中..." : "登録申請する"}
+                {isSubmitting ? "送信中..." : "この内容で登録申請する"}
               </button>
             )}
           </div>

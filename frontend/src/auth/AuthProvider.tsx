@@ -29,6 +29,7 @@ interface AuthContextValue {
   complete2FA: (code: string) => Promise<User>
   logout: () => Promise<void>
   refreshUser: () => Promise<void>
+  acceptAuthenticatedUser: (user: User) => void
   hasRole: (role: UserRole) => boolean
 }
 
@@ -51,6 +52,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const refreshUser = useCallback(async () => {
     const me = await fetchMe()
     setUser(me)
+    syncAdminRoleFromToken()
+    setStatus('authenticated')
+  }, [syncAdminRoleFromToken])
+
+  const acceptAuthenticatedUser = useCallback((nextUser: User) => {
+    setUser(nextUser)
     syncAdminRoleFromToken()
     setStatus('authenticated')
   }, [syncAdminRoleFromToken])
@@ -137,9 +144,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       complete2FA,
       logout,
       refreshUser,
+      acceptAuthenticatedUser,
       hasRole,
     }),
-    [status, user, adminRole, login, complete2FA, logout, refreshUser, hasRole],
+    [status, user, adminRole, login, complete2FA, logout, refreshUser, acceptAuthenticatedUser, hasRole],
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
