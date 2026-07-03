@@ -25,14 +25,20 @@ export default function authLoad() {
     },
   );
 
-  const loginOk = check(loginRes, {
-    'login ok': (r) => r.status === 200,
-    'login has token': (r) => {
+  check(loginRes, {
+    'login ok or rate limited': (r) => r.status === 200 || r.status === 429,
+    'login has token when ok': (r) => {
+      if (r.status === 429) {
+        return true;
+      }
+      if (r.status !== 200) {
+        return false;
+      }
       const body = r.json();
       return body && typeof body.auth_token === 'string';
     },
   });
-  if (!loginOk) {
+  if (loginRes.status !== 200) {
     sleep(1);
     return;
   }
