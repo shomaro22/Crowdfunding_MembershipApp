@@ -9,7 +9,6 @@ import (
 	"crowdfund-app/stripe"
 
 	"github.com/google/uuid"
-	"gorm.io/gorm"
 )
 
 type UpgradeOut struct {
@@ -19,7 +18,7 @@ type UpgradeOut struct {
 }
 
 type SupporterUseCase struct {
-	DB         *gorm.DB
+	Tx         repository.TxBeginner
 	Users      repository.IUserRepo
 	Projects   repository.IProjectRepo
 	Supporters repository.ISupporterRepo
@@ -384,7 +383,7 @@ func (s *SupporterUseCase) finalizePaidUpgrade(ctx context.Context, supporter mo
 		newPlanID uuid.UUID
 		err       error
 	)
-	err = repository.WithTx(ctx, s.DB, func(txCtx context.Context) error {
+	err = s.Tx.WithTx(ctx, func(txCtx context.Context) error {
 		locked, err = s.Supporters.GetID(txCtx, supporter.ID)
 		if err != nil {
 			return mapRepoNotFound(err)
@@ -394,7 +393,7 @@ func (s *SupporterUseCase) finalizePaidUpgrade(ctx context.Context, supporter mo
 		}
 		newPlanID = *locked.PendingPlanID
 		if purchase.Status != model.PurchaseStatusPaid {
-			if err = markPurchasePaidSimple(txCtx, s.Purchases, purchase); err != nil {
+			if err = MarkPurchasePaid(txCtx, s.Purchases, nil, purchase, MarkPaidOptions{}); err != nil {
 				return err
 			}
 		}
@@ -481,7 +480,7 @@ func (s *SupporterUseCase) applyPendingChanges(ctx context.Context, supporter mo
 	if !due {
 		return false, nil
 	}
-	err = repository.WithTx(ctx, s.DB, func(txCtx context.Context) error {
+	err = s.Tx.WithTx(ctx, func(txCtx context.Context) error {
 		var locked model.ProjectSupporter
 		locked, err = s.Supporters.GetID(txCtx, supporter.ID)
 		if err != nil {

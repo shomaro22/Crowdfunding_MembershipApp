@@ -7,19 +7,18 @@ import (
 	"crowdfund-app/repository"
 
 	"github.com/google/uuid"
-	"gorm.io/gorm"
 )
 
 func InvalidateUserSessions(
 	ctx context.Context,
-	db *gorm.DB,
+	txBeginner repository.TxBeginner,
 	users repository.IUserRepo,
 	refresh repository.IRefreshTokenRepo,
 	userID uuid.UUID,
 ) error {
 	var err error
 
-	return repository.WithTx(ctx, db, func(txCtx context.Context) error {
+	return txBeginner.WithTx(ctx, func(txCtx context.Context) error {
 		if _, err = users.BumpTokenVer(txCtx, userID); err != nil {
 			return err
 		}

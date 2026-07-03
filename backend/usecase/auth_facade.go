@@ -124,7 +124,7 @@ func newAuthDeps(cfg AuthConfig) *authDeps {
 		TOTPKey:       cfg.TOTPEncryptionKey,
 		TOTPIssuer:    cfg.TOTPIssuer,
 		pendingSecret: cfg.Pending2FAKey,
-		DB:            cfg.DB,
+		Tx:            cfg.Tx,
 		AppPublicURL:  cfg.AppPublicURL,
 	}
 }

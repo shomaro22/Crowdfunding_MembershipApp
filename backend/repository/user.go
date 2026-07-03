@@ -17,6 +17,7 @@ type IUserRepo interface {
 	EmailExists(ctx context.Context, email string) (bool, error)
 	ListRoleStatus(ctx context.Context, role model.UserRole, status model.AccountStatus, limit, offset int) ([]model.User, int64, error)
 	ListAdmin(ctx context.Context, f AdminUserListFilter) ([]model.User, int64, error)
+	ListByIDs(ctx context.Context, ids []uuid.UUID) (map[uuid.UUID]model.User, error)
 	BumpTokenVer(ctx context.Context, userID uuid.UUID) (int64, error)
 }
 
@@ -120,4 +121,25 @@ func (r *userRepo) BumpTokenVer(ctx context.Context, userID uuid.UUID) (int64, e
 		return 0, err
 	}
 	return u.TokenVersion, nil
+}
+
+func (r *userRepo) ListByIDs(ctx context.Context, ids []uuid.UUID) (map[uuid.UUID]model.User, error) {
+	var (
+		rows []model.User
+		out  map[uuid.UUID]model.User
+		i    int
+		err  error
+	)
+	out = map[uuid.UUID]model.User{}
+	if len(ids) == 0 {
+		return out, nil
+	}
+	err = dbFromCtx(ctx, r.db).Where("id IN ?", ids).Find(&rows).Error
+	if err != nil {
+		return nil, err
+	}
+	for i = range rows {
+		out[rows[i].ID] = rows[i]
+	}
+	return out, nil
 }

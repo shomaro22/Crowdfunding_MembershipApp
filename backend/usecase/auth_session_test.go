@@ -47,6 +47,9 @@ func (r *recordingUserRepo) ListRoleStatus(_ context.Context, _ model.UserRole, 
 func (r *recordingUserRepo) ListAdmin(_ context.Context, _ repository.AdminUserListFilter) ([]model.User, int64, error) {
 	return nil, 0, nil
 }
+func (r *recordingUserRepo) ListByIDs(_ context.Context, _ []uuid.UUID) (map[uuid.UUID]model.User, error) {
+	return map[uuid.UUID]model.User{}, nil
+}
 
 type recordingRefreshRepo struct {
 	createCalls int

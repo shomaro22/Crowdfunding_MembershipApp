@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"crowdfund-app/model"
-	"crowdfund-app/repository"
 
 	"github.com/google/uuid"
 )
@@ -96,7 +95,7 @@ func (s *SessionAuthUseCase) Refresh(ctx context.Context, refreshTokenPlain stri
 	if err != nil {
 		revokedRow, err = s.deps.RefreshTokens.GetByHash(ctx, hash)
 		if err == nil && revokedRow.IsRevoked() {
-			_ = InvalidateUserSessions(ctx, s.deps.DB, s.deps.Users, s.deps.RefreshTokens, revokedRow.UserID)
+			_ = InvalidateUserSessions(ctx, s.deps.Tx, s.deps.Users, s.deps.RefreshTokens, revokedRow.UserID)
 			s.deps.logActivity(ctx, &revokedRow.UserID, model.UserLoginFail, "user", revokedRow.UserID.String(), meta,
 				model.StepMeta("refresh_token_reuse"))
 			return "", "", ErrTokenRevoked
@@ -110,7 +109,7 @@ func (s *SessionAuthUseCase) Refresh(ctx context.Context, refreshTokenPlain stri
 	if !u.CanLogin() {
 		return "", "", ErrInvalidToken
 	}
-	err = repository.WithTx(ctx, s.deps.DB, func(txCtx context.Context) error {
+	err = s.deps.Tx.WithTx(ctx, func(txCtx context.Context) error {
 		if err = s.deps.RefreshTokens.Revoke(txCtx, row.ID, now); err != nil {
 			return err
 		}
@@ -156,7 +155,7 @@ func (s *SessionAuthUseCase) LogoutAllDevices(ctx context.Context, userID uuid.U
 	if userID == uuid.Nil {
 		return ErrInvalidToken
 	}
-	err = InvalidateUserSessions(ctx, s.deps.DB, s.deps.Users, s.deps.RefreshTokens, userID)
+	err = InvalidateUserSessions(ctx, s.deps.Tx, s.deps.Users, s.deps.RefreshTokens, userID)
 	if err != nil {
 		return err
 	}
