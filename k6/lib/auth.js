@@ -24,7 +24,10 @@ export function loginAdminWithTotp(totpCode) {
   const loginRes = http.post(
     `${BASE_URL}/auth/login`,
     JSON.stringify({ email: __ENV.ADMIN_EMAIL || 'admin@example.com', password: __ENV.ADMIN_PASSWORD || 'password123' }),
-    { headers: jsonHeaders() },
+    {
+      headers: jsonHeaders(),
+      responseCallback: http.expectedStatuses(200, 429),
+    },
   );
   if (loginRes.status !== 200) {
     return null;
@@ -39,7 +42,11 @@ export function loginAdminWithTotp(totpCode) {
   const challengeRes = http.post(
     `${BASE_URL}/auth/2fa/challenge`,
     JSON.stringify({ code: totpCode }),
-    { headers: jsonHeaders(), cookies: loginRes.cookies },
+    {
+      headers: jsonHeaders(),
+      cookies: loginRes.cookies,
+      responseCallback: http.expectedStatuses(200, 429),
+    },
   );
   if (challengeRes.status !== 200) {
     return null;
