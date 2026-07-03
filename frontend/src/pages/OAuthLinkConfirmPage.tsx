@@ -10,7 +10,7 @@ import { sanitizeAppPath } from '@/lib/utils'
 export function OAuthLinkConfirmPage() {
   const [searchParams] = useSearchParams()
   const navigate = useNavigate()
-  const { refreshUser } = useAuth()
+  const { acceptAuthenticatedUser } = useAuth()
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
 
@@ -33,7 +33,7 @@ export function OAuthLinkConfirmPage() {
     setError('')
     try {
       const res = await confirmOAuthLink(linkCode)
-      await refreshUser()
+      acceptAuthenticatedUser(res.user)
       void navigate(postLoginPath(res.user, from), { replace: true })
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'アカウント連携に失敗しました')

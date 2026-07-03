@@ -4,6 +4,7 @@ package integration
 
 import (
 	"bytes"
+	"context"
 	"database/sql"
 	"fmt"
 	"io"
@@ -71,9 +72,22 @@ func TestMain(m *testing.M) {
 			fmt.Fprintf(os.Stderr, "integration infra: %v\n", err)
 			os.Exit(1)
 		}
-		defer closeTestInfra()
+		err = cleanupIntegrationArtifacts()
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "integration cleanup(before): %v\n", err)
+			closeTestInfra()
+			os.Exit(1)
+		}
 	}
 	code = m.Run()
+	if testGDB != nil {
+		err = cleanupIntegrationArtifacts()
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "integration cleanup(after): %v\n", err)
+			code = 1
+		}
+		closeTestInfra()
+	}
 	os.Exit(code)
 }
 
@@ -115,6 +129,75 @@ func closeTestInfra() {
 		_ = testRDB.Close()
 		testRDB = nil
 	}
+}
+
+func cleanupIntegrationArtifacts() error {
+	var (
+		ctx         context.Context
+		projectIDs  []uuid.UUID
+		purchaseIDs []uuid.UUID
+		err         error
+	)
+	if testGDB == nil {
+		return nil
+	}
+	ctx = context.Background()
+	err = testGDB.WithContext(ctx).
+		Model(&model.Project{}).
+		Where("description = ? OR title LIKE ?", "integration test project", "project-%").
+		Pluck("id", &projectIDs).Error
+	if err != nil {
+		return err
+	}
+	if len(projectIDs) == 0 {
+		return nil
+	}
+	err = testGDB.WithContext(ctx).
+		Model(&model.Purchase{}).
+		Where("project_id IN ?", projectIDs).
+		Pluck("id", &purchaseIDs).Error
+	if err != nil {
+		return err
+	}
+	if len(purchaseIDs) > 0 {
+		err = testGDB.WithContext(ctx).Where("purchase_id IN ?", purchaseIDs).Delete(&model.PurchaseEvent{}).Error
+		if err != nil {
+			return err
+		}
+	}
+	err = testGDB.WithContext(ctx).Where("project_id IN ?", projectIDs).Delete(&model.Message{}).Error
+	if err != nil {
+		return err
+	}
+	err = testGDB.WithContext(ctx).Where("target_type = ? AND target_id IN ?", model.ReportTargetProject, projectIDs).Delete(&model.Report{}).Error
+	if err != nil {
+		return err
+	}
+	err = testGDB.WithContext(ctx).Where("project_id IN ?", projectIDs).Delete(&model.Favorite{}).Error
+	if err != nil {
+		return err
+	}
+	err = testGDB.WithContext(ctx).Where("project_id IN ?", projectIDs).Delete(&model.Purchase{}).Error
+	if err != nil {
+		return err
+	}
+	err = testGDB.WithContext(ctx).Where("project_id IN ?", projectIDs).Delete(&model.ProjectSupporter{}).Error
+	if err != nil {
+		return err
+	}
+	err = testGDB.WithContext(ctx).Where("project_id IN ?", projectIDs).Delete(&model.ProjectImage{}).Error
+	if err != nil {
+		return err
+	}
+	err = testGDB.WithContext(ctx).Where("project_id IN ?", projectIDs).Delete(&model.ProjectPlan{}).Error
+	if err != nil {
+		return err
+	}
+	err = testGDB.WithContext(ctx).Where("id IN ?", projectIDs).Delete(&model.Project{}).Error
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 func appOpts(stripeClient stripe.Client) *Options {

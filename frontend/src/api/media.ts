@@ -5,7 +5,7 @@ import { validateImageFile } from '@/lib/upload'
 export async function uploadImage(file: File): Promise<MediaUploadResponse> {
   const check = validateImageFile(file)
   if (!check.valid) {
-    throw new Error(check.error ?? 'invalid file')
+    throw new Error(check.message ?? 'invalid file')
   }
   const form = new FormData()
   form.append('file', file)

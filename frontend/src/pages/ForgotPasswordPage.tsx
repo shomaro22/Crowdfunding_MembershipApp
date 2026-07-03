@@ -15,9 +15,9 @@ export function ForgotPasswordPage() {
   const onSubmit = async (e: FormEvent) => {
     e.preventDefault()
     setError('')
-    const emailErr = validateEmail(email)
-    if (emailErr) {
-      setError(emailErr)
+    const emailValidationMessage = validateEmail(email)
+    if (emailValidationMessage !== null) {
+      setError(emailValidationMessage)
       return
     }
     setLoading(true)

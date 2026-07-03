@@ -26,7 +26,7 @@ func main() {
 	LoadDotEnv()
 	app, err := bootstrap.BuildApplication(nil)
 	if err != nil {
-		log.Fatal(err)
+		log.Fatalf("startup failed: %v — Render Environment に DATABASE_URL, JWT_SECRET, REFRESH_SECRET, TOTP_ENCRYPTION_KEY, KYC_SIGNING_KEY, PENDING_2FA_KEY を設定してください", err)
 	}
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
