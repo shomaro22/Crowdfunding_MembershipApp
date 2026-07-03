@@ -105,8 +105,11 @@ func TestAuthRegisterLoginRefreshLogout(t *testing.T) {
 	}
 
 	rec = httpPOSTWithCookies(e, "/auth/refresh", "", "", []*http.Cookie{refresh})
-	if rec.Code != http.StatusUnauthorized {
-		t.Fatalf("refresh after logout status=%d want 401", rec.Code)
+	if rec.Code != http.StatusNoContent {
+		t.Fatalf("refresh after logout status=%d want 204", rec.Code)
+	}
+	if rec.Body.Len() > 0 {
+		t.Fatalf("refresh after logout body=%s want empty", rec.Body.String())
 	}
 }
 
