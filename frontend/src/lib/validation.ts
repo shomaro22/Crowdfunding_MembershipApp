@@ -44,6 +44,9 @@ export function validateMessageContent(content: string): { valid: boolean; error
 
 export function validateReportDetail(detail: string): { valid: boolean; error?: string } {
   const trimmed = detail.trim()
+  if (trimmed.length === 0) {
+    return { valid: false, error: '通報理由を入力してください' }
+  }
   if (trimmed.length > 2000) {
     return { valid: false, error: '詳細は2000文字以内で入力してください' }
   }
@@ -117,6 +120,22 @@ export function validatePositiveAmount(amount: number, label: string, max = 100_
 export function validatePlanPrice(price: number): string | null {
   if (!Number.isInteger(price) || price < 1 || price > 100_000) {
     return 'プラン価格は1〜100,000円で入力してください'
+  }
+  return null
+}
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+
+export function validateEmail(email: string): string | null {
+  const trimmed = email.trim().toLowerCase()
+  if (!trimmed) {
+    return 'メールアドレスを入力してください'
+  }
+  if (trimmed.length > 255) {
+    return 'メールアドレスが長すぎます'
+  }
+  if (!EMAIL_RE.test(trimmed)) {
+    return '有効なメールアドレスを入力してください'
   }
   return null
 }

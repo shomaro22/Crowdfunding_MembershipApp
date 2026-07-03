@@ -8,7 +8,6 @@ import (
 	"crowdfund-app/repository"
 
 	"github.com/google/uuid"
-	"gorm.io/gorm"
 )
 
 // authDeps は認証系ユースケースが共有する依存とヘルパー。
@@ -28,7 +27,7 @@ type authDeps struct {
 	TOTPKey       []byte
 	TOTPIssuer    string
 	pendingSecret []byte
-	DB            *gorm.DB
+	Tx            repository.TxBeginner
 	AppPublicURL  string
 }
 

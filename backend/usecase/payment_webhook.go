@@ -5,7 +5,6 @@ import (
 	"time"
 
 	"crowdfund-app/model"
-	"crowdfund-app/repository"
 	"crowdfund-app/stripe"
 
 	"github.com/google/uuid"
@@ -215,7 +214,7 @@ func (p *PaymentUseCase) fulfillAutoRenewal(ctx context.Context, inv stripe.Invo
 		start: time.Unix(inv.PeriodStart, 0).UTC(),
 		end:   time.Unix(inv.PeriodEnd, 0).UTC(),
 	}
-	return repository.WithTx(ctx, p.DB, func(txCtx context.Context) error {
+	return p.Tx.WithTx(ctx, func(txCtx context.Context) error {
 		var (
 			now      time.Time
 			invID    string

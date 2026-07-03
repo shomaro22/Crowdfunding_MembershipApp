@@ -1,6 +1,7 @@
 package bootstrap
 
 import (
+	"crowdfund-app/repository"
 	"crowdfund-app/stripe"
 	"crowdfund-app/usecase"
 
@@ -38,6 +39,7 @@ type UseCases struct {
 func NewUseCases(repos Repositories, cfg AppConfig, gormDB *gorm.DB, stripeClient stripe.Client) UseCases {
 	var (
 		ucs UseCases
+		tx  = repository.NewTxBeginner(gormDB)
 	)
 	ucs.Auth = usecase.NewAuthUsecase(usecase.AuthConfig{
 		Users: repos.Users, SellerRegs: repos.SellerRegs, RefreshTokens: repos.RefreshTokens,
@@ -45,30 +47,30 @@ func NewUseCases(repos Repositories, cfg AppConfig, gormDB *gorm.DB, stripeClien
 		OAuthCache: repos.OAuthCache, TOTPBackup: repos.TOTPBackup, KYCStore: repos.KYCStore,
 		JWTSecret: cfg.Security.JWTSecret, TOTPEncryptionKey: cfg.Security.TOTPEncryptionKey,
 		Pending2FAKey: cfg.Security.Pending2FAKey, TOTPIssuer: cfg.Security.TOTPIssuer,
-		AppPublicURL: cfg.OAuth.AppPublicURL, DB: gormDB,
+		AppPublicURL: cfg.OAuth.AppPublicURL, Tx: tx,
 		Mailer: usecase.NewLogMailer(cfg.OAuth.AppPublicURL),
 	})
-	ucs.ProjectRaw = usecase.NewProjectUsecase(repos.Projects, repos.Users, repos.Favorites, repos.Reports, gormDB)
+	ucs.ProjectRaw = usecase.NewProjectUsecase(repos.Projects, repos.Users, repos.Favorites, repos.Reports, tx)
 	ucs.Project = ucs.ProjectRaw
 	ucs.KYCRaw = usecase.NewKYCAccessUsecase(repos.KYCStore, string(cfg.Security.KYCSigningKey))
 	ucs.KYCAccess = ucs.KYCRaw
 	ucs.ConnectRaw = usecase.NewConnectUsecase(repos.Users, repos.Connect, stripeClient)
 	ucs.Connect = ucs.ConnectRaw
 	ucs.SupporterRaw = usecase.NewSupporterUsecase(
-		gormDB, repos.Users, repos.Projects, repos.Supporters, repos.Purchases,
+		tx, repos.Users, repos.Projects, repos.Supporters, repos.Purchases,
 		repos.Connect, repos.Activity, stripeClient,
 	)
 	ucs.Supporter = ucs.SupporterRaw
 	ucs.PurchaseRaw = usecase.NewPurchaseUsecase(repos.Users, repos.Projects, repos.Purchases)
 	ucs.Purchase = ucs.PurchaseRaw
 	paymentRaw := usecase.NewPaymentUsecase(
-		gormDB, repos.Users, repos.Projects, repos.Purchases, repos.Supporters,
+		tx, repos.Users, repos.Projects, repos.Purchases, repos.Supporters,
 		repos.Connect, repos.Webhooks, repos.Activity, stripeClient, ucs.ConnectRaw, ucs.SupporterRaw,
 	)
 	ucs.Payment = paymentRaw
 	AttachSupportEvents(paymentRaw, NewSupportEventBus(repos.Activity))
-	ucs.Batch = usecase.NewBatchUsecase(gormDB, repos.Batch, ucs.SupporterRaw, repos.WSTokens)
-	ucs.Admin = usecase.NewAdminUsecase(gormDB, usecase.AdminRepos{
+	ucs.Batch = usecase.NewBatchUsecase(repos.Batch, ucs.SupporterRaw, repos.WSTokens)
+	ucs.Admin = usecase.NewAdminUsecase(tx, usecase.AdminRepos{
 		Users: repos.Users, SellerRegs: repos.SellerRegs, Projects: repos.Projects, Audit: repos.Audit,
 		ReviewDecisions: repos.ReviewDecisions, RefreshTokens: repos.RefreshTokens, TOTPBackup: repos.TOTPBackup,
 		Admin: repos.Admin, Purchases: repos.Purchases,

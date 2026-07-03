@@ -16,7 +16,7 @@ import {
   fundingProgressPercent,
   sanitizeDisplayText,
 } from '@/lib/utils'
-import { parseUUID } from '@/lib/validation'
+import { parseUUID, validateReportDetail } from '@/lib/validation'
 import type { ProjectDetail, ProjectSummary } from '@/types/api'
 
 const RELATED_LIMIT = 4
@@ -118,6 +118,11 @@ export function ProjectDetailPage() {
       return
     }
     const reason = sanitizeDisplayText(reportReason, 200)
+    const reportCheck = validateReportDetail(reason)
+    if (!reportCheck.valid) {
+      toast(reportCheck.error ?? '通報理由が無効です', 'error')
+      return
+    }
     if (!reason) {
       toast('通報理由を入力してください', 'error')
       return

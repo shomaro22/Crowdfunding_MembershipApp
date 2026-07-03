@@ -9,7 +9,6 @@ import (
 	"crowdfund-app/repository"
 
 	"github.com/google/uuid"
-	"gorm.io/gorm"
 )
 
 // IAuthUsecase — controller/auth*.go と middleware が依存する認証ユースケース
@@ -55,7 +54,7 @@ type AuthConfig struct {
 	Pending2FAKey     []byte
 	AppPublicURL      string
 	Mailer            Mailer
-	DB                *gorm.DB
+	Tx                repository.TxBeginner
 }
 
 func NewAuthUsecase(cfg AuthConfig) IAuthUsecase {

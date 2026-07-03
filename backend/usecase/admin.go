@@ -12,7 +12,6 @@ import (
 	"crowdfund-app/validator"
 
 	"github.com/google/uuid"
-	"gorm.io/gorm"
 )
 
 type AdminUseCase struct {
@@ -29,7 +28,7 @@ type AdminUseCase struct {
 	AdminStats      repository.IAdminRepo
 	Purchases       repository.IPurchaseRepo
 	PurchaseViews   PurchaseEnricher
-	DB              *gorm.DB
+	Tx              repository.TxBeginner
 }
 
 type SellerRegView struct {
@@ -108,7 +107,7 @@ func (a *AdminUseCase) ResetUser2FA(ctx context.Context, adminID, targetUserID u
 			return UserView{}, err
 		}
 	}
-	if err = InvalidateUserSessions(ctx, a.DB, a.Users, a.RefreshTokens, targetUserID); err != nil {
+	if err = InvalidateUserSessions(ctx, a.Tx, a.Users, a.RefreshTokens, targetUserID); err != nil {
 		return UserView{}, err
 	}
 	WriteAudit(ctx, a.Audit, adminID, "user.reset_2fa", "user", u.ID.String(), reason, nil)
@@ -158,7 +157,7 @@ func (a *AdminUseCase) ChangeAdminRole(ctx context.Context, actorID, targetUserI
 	if err = a.Users.Update(ctx, &u); err != nil {
 		return UserView{}, err
 	}
-	if err = InvalidateUserSessions(ctx, a.DB, a.Users, a.RefreshTokens, targetUserID); err != nil {
+	if err = InvalidateUserSessions(ctx, a.Tx, a.Users, a.RefreshTokens, targetUserID); err != nil {
 		return UserView{}, err
 	}
 	details = fmt.Sprintf("%s -> %s", oldRole, role)
@@ -334,7 +333,7 @@ func (a *AdminUseCase) DeleteUser(ctx context.Context, adminID, userID uuid.UUID
 	if err = a.Users.Update(ctx, &u); err != nil {
 		return err
 	}
-	if err = InvalidateUserSessions(ctx, a.DB, a.Users, a.RefreshTokens, userID); err != nil {
+	if err = InvalidateUserSessions(ctx, a.Tx, a.Users, a.RefreshTokens, userID); err != nil {
 		return err
 	}
 	WriteAudit(ctx, a.Audit, adminID, "user.delete", "user", u.ID.String(), nil, nil)
