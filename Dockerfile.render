@@ -1,0 +1,21 @@
+# Render 用: API（Go）のみ。最終ステージが backend-runtime になるよう frontend は含めない。
+# syntax=docker/dockerfile:1
+
+FROM golang:1.25-alpine AS backend-build
+WORKDIR /src/backend
+RUN apk add --no-cache git ca-certificates
+COPY backend/go.mod backend/go.sum ./
+RUN go mod download
+COPY backend/ ./
+RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /out/crowdfund-app .
+RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /out/seed ./cmd/seed
+
+FROM alpine:3.21
+RUN apk add --no-cache ca-certificates tzdata
+WORKDIR /app
+RUN mkdir -p /app/data/public /app/data/private
+COPY --from=backend-build /out/crowdfund-app .
+COPY --from=backend-build /out/seed .
+ENV PORT=8080
+EXPOSE 8080
+CMD ["./crowdfund-app"]
