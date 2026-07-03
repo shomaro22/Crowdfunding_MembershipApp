@@ -15,9 +15,11 @@ export const options = {
 };
 
 export function setup() {
+  const totpCode = __ENV.ADMIN_TOTP_CODE || '';
+  const adminToken = loginAdminWithTotp(totpCode);
   return {
-    adminToken: __ENV.ADMIN_AUTH_TOKEN || '',
-    totpCode: __ENV.ADMIN_TOTP_CODE || '',
+    adminToken: __ENV.ADMIN_AUTH_TOKEN || adminToken || '',
+    totpCode,
   };
 }
 
