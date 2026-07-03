@@ -1,7 +1,6 @@
 import http from 'k6/http';
 import { check, sleep } from 'k6';
 import { BASE_URL, DEFAULT_THRESHOLDS, checkOK, summaryHandler } from './lib/config.js';
-import { loginBuyer } from './lib/auth.js';
 import { rampUpStages } from './lib/scenarios.js';
 
 export const options = {
@@ -17,10 +16,7 @@ export const options = {
 const searchTerms = ['デモ', 'ファン', 'クラブ', 'イラスト'];
 
 export default function projectListLoad() {
-  const token = loginBuyer();
-  const headers = token
-    ? { Accept: 'application/json', Authorization: `Bearer ${token}` }
-    : { Accept: 'application/json' };
+  const headers = { Accept: 'application/json' };
 
   const listRes = http.get(`${BASE_URL}/projects?limit=10&offset=0`, { headers });
   checkOK(listRes, 'projects page 1');
