@@ -3,6 +3,7 @@ package controller
 import (
 	"errors"
 	"net/http"
+	"strings"
 
 	"crowdfund-app/usecase"
 
@@ -17,7 +18,7 @@ func (h *authController) GoogleStart(c echo.Context) error {
 		err     error
 	)
 	from = c.QueryParam("from")
-	authURL, err = h.Auth.GoogleAuthURL(from)
+	authURL, err = h.Auth.GoogleAuthURL(from, requestMeta(c))
 	if err != nil {
 		return mapUseCaseError(err)
 	}
@@ -42,7 +43,9 @@ func (h *authController) GoogleCallback(c echo.Context) error {
 	if err != nil {
 		return c.Redirect(http.StatusFound, oauthCallbackURL(h.AppPublicURL, usecase.OAuthRedirectView{Error: oauthErrCode(err)}))
 	}
-	SetRefreshCookie(c, h.CookieCfg, res.RefreshToken)
+	if res.RefreshToken != "" {
+		SetRefreshCookie(c, h.CookieCfg, res.RefreshToken)
+	}
 	return c.Redirect(http.StatusFound, oauthCallbackURL(h.AppPublicURL, res.Redirect))
 }
 
@@ -61,6 +64,28 @@ func (h *authController) OAuthExchange(c echo.Context) error {
 	if err != nil {
 		return mapUseCaseError(err)
 	}
+	return jsonOK(c, authTokenResponse{
+		AuthToken: res.AuthToken,
+		User:      UserWireFrom(res.User),
+	})
+}
+
+func (h *authController) OAuthLinkConfirm(c echo.Context) error {
+	var (
+		body struct {
+			LinkCode string `json:"link_code"`
+		}
+		res *usecase.LoginResult
+		err error
+	)
+	if err = bindBody(c, &body); err != nil || strings.TrimSpace(body.LinkCode) == "" {
+		return badRequest(c, "link_code required")
+	}
+	res, err = h.Auth.ConfirmOAuthLink(reqCtx(c), body.LinkCode, requestMeta(c))
+	if err != nil {
+		return mapUseCaseError(err)
+	}
+	SetRefreshCookie(c, h.CookieCfg, res.RefreshToken)
 	return jsonOK(c, authTokenResponse{
 		AuthToken: res.AuthToken,
 		User:      UserWireFrom(res.User),

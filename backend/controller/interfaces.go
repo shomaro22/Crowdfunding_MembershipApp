@@ -12,6 +12,7 @@ type IAuthController interface {
 	RegisterSeller(c echo.Context) error
 	Login(c echo.Context) error
 	Logout(c echo.Context) error
+	LogoutAllDevices(c echo.Context) error
 	ForgotPassword(c echo.Context) error
 	ResetPassword(c echo.Context) error
 	CheckEmail(c echo.Context) error
@@ -20,6 +21,7 @@ type IAuthController interface {
 	GoogleStart(c echo.Context) error
 	GoogleCallback(c echo.Context) error
 	OAuthExchange(c echo.Context) error
+	OAuthLinkConfirm(c echo.Context) error
 	Me(c echo.Context) error
 	GetProfile(c echo.Context) error
 	UpdateProfile(c echo.Context) error

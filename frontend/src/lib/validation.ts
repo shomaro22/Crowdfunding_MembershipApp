@@ -17,8 +17,18 @@ export function parseUUID(value: string | undefined | null): string | null {
 }
 
 export function validateTOTPCode(code: string): boolean {
-  const trimmed = code.trim()
+  const trimmed = normalizeOtpCode(code)
   return TOTP_RE.test(trimmed) || TOTP_BACKUP_RE.test(trimmed)
+}
+
+/** 全角数字・空白を半角 OTP 用に正規化 */
+export function normalizeOtpCode(value: string): string {
+  return value
+    .replace(/[\uFF10-\uFF19]/g, (ch) => String.fromCharCode(ch.charCodeAt(0) - 0xff10 + 0x30))
+    .replace(/[\uFF21-\uFF3A]/g, (ch) => String.fromCharCode(ch.charCodeAt(0) - 0xff21 + 0x41))
+    .replace(/[\uFF41-\uFF5A]/g, (ch) => String.fromCharCode(ch.charCodeAt(0) - 0xff41 + 0x61))
+    .replace(/\s+/g, '')
+    .replace(/[^\dA-Za-z-]/g, '')
 }
 
 export function validateMessageContent(content: string): { valid: boolean; error?: string } {
@@ -34,6 +44,9 @@ export function validateMessageContent(content: string): { valid: boolean; error
 
 export function validateReportDetail(detail: string): { valid: boolean; error?: string } {
   const trimmed = detail.trim()
+  if (trimmed.length === 0) {
+    return { valid: false, error: '通報理由を入力してください' }
+  }
   if (trimmed.length > 2000) {
     return { valid: false, error: '詳細は2000文字以内で入力してください' }
   }
@@ -107,6 +120,22 @@ export function validatePositiveAmount(amount: number, label: string, max = 100_
 export function validatePlanPrice(price: number): string | null {
   if (!Number.isInteger(price) || price < 1 || price > 100_000) {
     return 'プラン価格は1〜100,000円で入力してください'
+  }
+  return null
+}
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+
+export function validateEmail(email: string): string | null {
+  const trimmed = email.trim().toLowerCase()
+  if (!trimmed) {
+    return 'メールアドレスを入力してください'
+  }
+  if (trimmed.length > 255) {
+    return 'メールアドレスが長すぎます'
+  }
+  if (!EMAIL_RE.test(trimmed)) {
+    return '有効なメールアドレスを入力してください'
   }
   return null
 }

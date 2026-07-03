@@ -95,10 +95,12 @@ func New(cfg Config) *echo.Echo {
 			e.GET("/auth/google", authCtl.GoogleStart, rl(middleware.PolicyGoogleOAuth))
 			e.GET("/auth/google/callback", authCtl.GoogleCallback, rl(middleware.PolicyGoogleOAuth))
 			e.POST("/auth/oauth/exchange", authCtl.OAuthExchange, rl(middleware.PolicyOAuthExchange))
+			e.POST("/auth/oauth/link-confirm", authCtl.OAuthLinkConfirm, rl(middleware.PolicyOAuthExchange))
 		}
 
 		e.POST("/auth/logout", authCtl.Logout)
 		pm = cfg.Protected
+		e.POST("/auth/logout-all", authCtl.LogoutAllDevices, pm...)
 		e.GET("/me", authCtl.Me, pm...)
 		e.GET("/me/profile", authCtl.GetProfile, pm...)
 		e.PUT("/me/profile", authCtl.UpdateProfile, pm...)

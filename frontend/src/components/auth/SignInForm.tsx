@@ -1,75 +1,90 @@
-import { useCallback, useState, type FormEvent } from 'react'
-import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
+import { useCallback, useState, type FormEvent } from "react";
+import {
+  Link,
+  useLocation,
+  useNavigate,
+  useSearchParams,
+} from "react-router-dom";
 
-import { useAuth } from '@/auth/AuthProvider'
-import { ApiError } from '@/lib/api-client'
-import { googleOAuthStartUrl } from '@/lib/api-client'
-import { postLoginPath } from '@/lib/auth-routes'
-import { isValidEmail, sanitizeAppPath, sanitizeEmail } from '@/lib/utils'
+import { useAuth } from "@/auth/AuthProvider";
+import { ApiError } from "@/lib/api-client";
+import { googleOAuthStartUrl } from "@/lib/api-client";
+import { postLoginPath } from "@/lib/auth-routes";
+import { validateEmail } from "@/lib/validation";
+import { sanitizeAppPath, sanitizeEmail } from "@/lib/utils";
 
 export function SignInForm() {
-  const navigate = useNavigate()
-  const location = useLocation()
-  const [searchParams] = useSearchParams()
-  const { login } = useAuth()
+  const navigate = useNavigate();
+  const location = useLocation();
+  const [searchParams] = useSearchParams();
+  const { login } = useAuth();
 
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
-  const [showPassword, setShowPassword] = useState(false)
-  const [fieldErrors, setFieldErrors] = useState<{ email?: string; password?: string }>({})
-  const [error, setError] = useState('')
-  const [isSubmitting, setIsSubmitting] = useState(false)
-  const [showGoogleHelp, setShowGoogleHelp] = useState(false)
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [fieldErrors, setFieldErrors] = useState<{
+    email?: string;
+    password?: string;
+  }>({});
+  const [error, setError] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const fromState =
-    typeof location.state === 'object' && location.state !== null && 'from' in location.state
+    typeof location.state === "object" &&
+    location.state !== null &&
+    "from" in location.state
       ? String(location.state.from)
-      : null
-  const callbackPath = sanitizeAppPath(fromState ?? searchParams.get('from'), '/')
+      : null;
+  const callbackPath = sanitizeAppPath(
+    fromState ?? searchParams.get("from"),
+    "/",
+  );
 
   const validate = useCallback((): boolean => {
-    const next: { email?: string; password?: string } = {}
-    if (!email.trim()) {
-      next.email = 'メールアドレスを入力してください'
-    } else if (!isValidEmail(email)) {
-      next.email = '有効なメールアドレスを入力してください'
+    const next: { email?: string; password?: string } = {};
+    const emailErr = validateEmail(email);
+    if (emailErr) {
+      next.email = emailErr;
     }
     if (!password) {
-      next.password = 'パスワードを入力してください'
+      next.password = "パスワードを入力してください";
     }
-    setFieldErrors(next)
-    return Object.keys(next).length === 0
-  }, [email, password])
+    setFieldErrors(next);
+    return Object.keys(next).length === 0;
+  }, [email, password]);
 
   const onSubmit = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault()
-    setError('')
+    event.preventDefault();
+    setError("");
     if (!validate()) {
-      return
+      return;
     }
 
-    setIsSubmitting(true)
+    setIsSubmitting(true);
     try {
-      const result = await login(sanitizeEmail(email), password)
-      if (result === '2fa') {
-        void navigate('/auth/2fa', { replace: true, state: { from: callbackPath } })
-        return
+      const result = await login(sanitizeEmail(email), password);
+      if (result === "2fa") {
+        void navigate("/auth/2fa", {
+          replace: true,
+          state: { from: callbackPath },
+        });
+        return;
       }
-      void navigate(postLoginPath(result, callbackPath), { replace: true })
+      void navigate(postLoginPath(result, callbackPath), { replace: true });
     } catch (err) {
       if (err instanceof ApiError) {
-        setError(err.message)
+        setError(err.message);
       } else {
-        setError('ログインに失敗しました')
+        setError("ログインに失敗しました");
       }
     } finally {
-      setIsSubmitting(false)
+      setIsSubmitting(false);
     }
-  }
+  };
 
   const onGoogleSignIn = () => {
-    window.location.assign(googleOAuthStartUrl(callbackPath))
-  }
+    window.location.assign(googleOAuthStartUrl(callbackPath));
+  };
 
   return (
     <div className="card mx-auto max-w-md">
@@ -81,7 +96,10 @@ export function SignInForm() {
       {error ? (
         <div className="mb-6 rounded-2xl border border-red-200 bg-red-50 p-4 text-red-700">
           <div className="flex items-center">
-            <span className="mr-3 inline-block h-2 w-2 rounded-full bg-red-500" aria-hidden />
+            <span
+              className="mr-3 inline-block h-2 w-2 rounded-full bg-red-500"
+              aria-hidden
+            />
             {error}
           </div>
         </div>
@@ -89,7 +107,10 @@ export function SignInForm() {
 
       <form onSubmit={(e) => void onSubmit(e)} className="space-y-6">
         <div>
-          <label htmlFor="email" className="mb-2 block text-sm font-medium text-gray-700">
+          <label
+            htmlFor="email"
+            className="mb-2 block text-sm font-medium text-gray-700"
+          >
             メールアドレス
           </label>
           <input
@@ -98,46 +119,62 @@ export function SignInForm() {
             autoComplete="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            className={`input-field ${fieldErrors.email ? 'error' : ''}`}
+            className={`input-field ${fieldErrors.email ? "error" : ""}`}
             placeholder="example@email.com"
           />
           {fieldErrors.email ? (
             <p className="mt-2 flex items-center text-sm text-red-600">
-              <span className="mr-2 inline-block h-1 w-1 rounded-full bg-red-500" aria-hidden />
+              <span
+                className="mr-2 inline-block h-1 w-1 rounded-full bg-red-500"
+                aria-hidden
+              />
               {fieldErrors.email}
             </p>
           ) : null}
         </div>
 
         <div>
-          <label htmlFor="password" className="mb-2 block text-sm font-medium text-gray-700">
+          <label
+            htmlFor="password"
+            className="mb-2 block text-sm font-medium text-gray-700"
+          >
             パスワード
           </label>
           <div className="mb-2 text-right">
-            <Link to="/forgot-password" className="text-sm text-purple-700 hover:text-purple-900">パスワードを忘れた方</Link>
+            <Link
+              to="/forgot-password"
+              className="text-sm text-purple-700 hover:text-purple-900"
+            >
+              パスワードを忘れた方
+            </Link>
           </div>
           <div className="relative">
             <input
               id="password"
-              type={showPassword ? 'text' : 'password'}
+              type={showPassword ? "text" : "password"}
               autoComplete="current-password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className={`input-field pr-12 ${fieldErrors.password ? 'error' : ''}`}
+              className={`input-field pr-12 ${fieldErrors.password ? "error" : ""}`}
               placeholder="パスワード"
             />
             <button
               type="button"
               onClick={() => setShowPassword((v) => !v)}
               className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-500 hover:text-gray-800"
-              aria-label={showPassword ? 'パスワードを隠す' : 'パスワードを表示'}
+              aria-label={
+                showPassword ? "パスワードを隠す" : "パスワードを表示"
+              }
             >
-              {showPassword ? '非表示' : '表示'}
+              {showPassword ? "非表示" : "表示"}
             </button>
           </div>
           {fieldErrors.password ? (
             <p className="mt-2 flex items-center text-sm text-red-600">
-              <span className="mr-2 inline-block h-1 w-1 rounded-full bg-red-500" aria-hidden />
+              <span
+                className="mr-2 inline-block h-1 w-1 rounded-full bg-red-500"
+                aria-hidden
+              />
               {fieldErrors.password}
             </p>
           ) : null}
@@ -146,17 +183,20 @@ export function SignInForm() {
         <button
           type="submit"
           disabled={isSubmitting}
-          className={`btn-primary w-full rounded-full font-bold ${isSubmitting ? 'cursor-not-allowed opacity-50' : ''}`}
+          className={`btn-primary w-full rounded-full font-bold ${isSubmitting ? "cursor-not-allowed opacity-50" : ""}`}
         >
-          {isSubmitting ? 'ログイン中...' : 'ログイン'}
+          {isSubmitting ? "ログイン中..." : "ログイン"}
         </button>
       </form>
 
       <div className="mt-6 rounded-xl border border-amber-100 bg-amber-50 p-4 text-sm text-amber-900">
-        <p className="font-semibold">出品者（Seller）の方へ — 二段階認証について</p>
+        <p className="font-semibold">
+          出品者（Seller）の方へ — 二段階認証について
+        </p>
         <p className="mt-2 leading-relaxed">
-          出品者・管理者アカウントはログイン後に<strong>6桁の認証コード</strong>の入力が必要です。
-          Google Authenticator などの認証アプリを使い、表示されたコードを入力してください。
+          出品者・管理者アカウントはログイン後に<strong>6桁の認証コード</strong>
+          の入力が必要です。 Google Authenticator
+          などの認証アプリを使い、表示されたコードを入力してください。
         </p>
         <p className="mt-2 text-xs text-amber-800">
           デモ環境: seller@example.com / password123 → 認証アプリにシークレット
@@ -175,51 +215,26 @@ export function SignInForm() {
           </div>
         </div>
 
-        <button type="button" onClick={onGoogleSignIn} className="btn-secondary mt-6 w-full rounded-full font-medium">
-          Google でログイン
-        </button>
-
         <button
           type="button"
-          onClick={() => setShowGoogleHelp((v) => !v)}
-          className="mt-3 w-full text-center text-sm text-purple-700 hover:text-purple-900"
+          onClick={onGoogleSignIn}
+          className="btn-secondary mt-6 w-full rounded-full font-medium"
         >
-          {showGoogleHelp ? 'Google ログインの説明を閉じる' : 'Google ログインのやり方を見る'}
+          Google でログイン
         </button>
-
-        {showGoogleHelp ? (
-          <div className="mt-3 rounded-xl border border-purple-100 bg-purple-50 p-4 text-sm text-gray-700">
-            <ol className="list-decimal space-y-2 pl-5">
-              <li>上の「Google でログイン」ボタンをクリックします。</li>
-              <li>Google のアカウント選択画面が開くので、使う Google アカウントを選びます。</li>
-              <li>初回は FanFunding へのアクセス許可を「続行」で承認してください。</li>
-              <li>自動的にこのサイトに戻り、ログイン完了です（新規の場合はアカウントが作成されます）。</li>
-            </ol>
-            <p className="mt-3 text-xs text-gray-500">
-              ※ Google Cloud Console で OAuth クライアントを作成し、環境変数
-              {' '}
-              <code className="rounded bg-white px-1">GOOGLE_CLIENT_ID</code>
-              {' / '}
-              <code className="rounded bg-white px-1">GOOGLE_CLIENT_SECRET</code>
-              {' '}
-              を backend に設定してください。詳細はリポジトリの
-              {' '}
-              <code className="rounded bg-white px-1">docs/GOOGLE_OAUTH_SETUP.md</code>
-              {' '}
-              を参照。
-            </p>
-          </div>
-        ) : null}
       </div>
 
       <div className="mt-8 text-center">
         <p className="text-gray-600">
-          アカウントをお持ちでない方は{' '}
-          <Link to="/signup" className="rounded-full px-2 py-1 font-medium text-purple-700 hover:text-purple-800">
+          アカウントをお持ちでない方は{" "}
+          <Link
+            to="/signup"
+            className="rounded-full px-2 py-1 font-medium text-purple-700 hover:text-purple-800"
+          >
             新規登録
           </Link>
         </p>
       </div>
     </div>
-  )
+  );
 }

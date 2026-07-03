@@ -2,10 +2,12 @@ import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import type { ReactNode } from 'react'
 
 import { AuthProvider } from '@/auth/AuthProvider'
+import { AdminRoute, MemberRoute, SellerRoute } from '@/components/auth/RoleRoutes'
 import { AuthGuard } from '@/components/auth/AuthGuard'
 import { MainLayout } from '@/components/layout/MainLayout'
 import { AdminPage } from '@/pages/admin/AdminPage'
 import { AuthCallbackPage } from '@/pages/AuthCallbackPage'
+import { OAuthLinkConfirmPage } from '@/pages/OAuthLinkConfirmPage'
 import { CheckoutPage } from '@/pages/CheckoutPage'
 import { FavoritesPage } from '@/pages/FavoritesPage'
 import { ForgotPasswordPage } from '@/pages/ForgotPasswordPage'
@@ -30,7 +32,7 @@ import { SellerProjectsPage } from '@/pages/seller/SellerProjectsPage'
 function buyerGuard(children: ReactNode) {
   return (
     <MainLayout>
-      <AuthGuard requiredRole="BUYER">{children}</AuthGuard>
+      <MemberRoute>{children}</MemberRoute>
     </MainLayout>
   )
 }
@@ -38,7 +40,7 @@ function buyerGuard(children: ReactNode) {
 function sellerGuard(children: ReactNode) {
   return (
     <MainLayout>
-      <AuthGuard requiredRole="SELLER">{children}</AuthGuard>
+      <SellerRoute>{children}</SellerRoute>
     </MainLayout>
   )
 }
@@ -46,7 +48,7 @@ function sellerGuard(children: ReactNode) {
 function adminGuard(children: ReactNode) {
   return (
     <MainLayout>
-      <AuthGuard requiredRole="ADMIN">{children}</AuthGuard>
+      <AdminRoute>{children}</AdminRoute>
     </MainLayout>
   )
 }
@@ -62,6 +64,7 @@ export function AppRoutes() {
           <Route element={<MainLayout><SellerSignUpPage /></MainLayout>} path="/signup/seller" />
           <Route element={<MainLayout><TwoFactorPage /></MainLayout>} path="/auth/2fa" />
           <Route element={<AuthCallbackPage />} path="/auth/callback" />
+          <Route element={<MainLayout><OAuthLinkConfirmPage /></MainLayout>} path="/auth/oauth/link" />
           <Route element={<MainLayout><ForgotPasswordPage /></MainLayout>} path="/forgot-password" />
           <Route element={<MainLayout><ResetPasswordPage /></MainLayout>} path="/reset-password" />
 
@@ -86,6 +89,7 @@ export function AppRoutes() {
 
           <Route element={sellerGuard(<SellerDashboardPage />)} path="/seller/dashboard" />
           <Route element={sellerGuard(<SellerProjectsPage />)} path="/seller/projects" />
+          <Route element={sellerGuard(<ProfilePage heading="アカウント設定" />)} path="/seller/profile" />
           <Route element={sellerGuard(<SellerProjectFormPage />)} path="/seller/projects/new" />
           <Route element={sellerGuard(<SellerProjectFormPage />)} path="/seller/projects/:projectId/edit" />
           <Route element={sellerGuard(<SellerConnectReturnPage />)} path="/seller/connect/return" />

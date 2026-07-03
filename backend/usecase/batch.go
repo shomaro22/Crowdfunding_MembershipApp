@@ -10,11 +10,9 @@ import (
 	"crowdfund-app/validator"
 
 	"github.com/google/uuid"
-	"gorm.io/gorm"
 )
 
 type BatchUseCase struct {
-	DB         *gorm.DB
 	Runs       repository.IBatchRepo
 	Supporters *SupporterUseCase
 	WSTokens   repository.IWSTokenRepo

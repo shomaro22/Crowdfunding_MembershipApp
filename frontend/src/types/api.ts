@@ -15,6 +15,7 @@ export interface User {
   role: UserRole
   is_active: boolean
   avatar_url: string | null
+  totp_enabled?: boolean
   created_at: string
   updated_at: string
 }
@@ -146,7 +147,7 @@ export function isApiErrorBody(value: unknown): value is ApiErrorBody {
 
 export type SupporterStatus = 'ACTIVE' | 'CANCELLED' | 'EXPIRED' | 'PENDING'
 export type BillingMode = 'SUBSCRIPTION' | 'ONE_TIME'
-export type PurchaseStatus = 'PENDING' | 'COMPLETED' | 'FAILED' | 'REFUNDED' | 'CANCELLED'
+export type PurchaseStatus = 'PENDING' | 'PAID' | 'FAILED' | 'REFUNDED' | 'CANCELLED' | 'DISPUTED'
 export type PaymentMethod = 'CARD' | 'KONBINI'
 export type RegistrationStatus = 'PENDING' | 'APPROVED' | 'REJECTED'
 export type ReportStatus = 'PENDING' | 'IN_REVIEW' | 'RESOLVED' | 'DISMISSED'
@@ -388,6 +389,7 @@ export interface NotificationsResponse {
 export interface UpgradePlanResponse {
   supporter: Supporter
   payment_intent_client_secret: string | null
+  payment_intent_id?: string | null
 }
 
 export interface WSTokenResponse {

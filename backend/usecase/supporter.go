@@ -9,16 +9,16 @@ import (
 	"crowdfund-app/stripe"
 
 	"github.com/google/uuid"
-	"gorm.io/gorm"
 )
 
 type UpgradeOut struct {
 	Supporter                 SupporterView
 	PaymentIntentClientSecret *string
+	PaymentIntentID           *string
 }
 
 type SupporterUseCase struct {
-	DB         *gorm.DB
+	Tx         repository.TxBeginner
 	Users      repository.IUserRepo
 	Projects   repository.IProjectRepo
 	Supporters repository.ISupporterRepo
@@ -251,14 +251,17 @@ func (s *SupporterUseCase) startPaidUpgrade(
 	now time.Time,
 ) (UpgradeOut, error) {
 	var (
-		diff     int64
-		meta     map[string]string
-		pi       stripe.UpgradePaymentOut
-		purchase model.Purchase
-		key      string
-		client   *string
-		out      UpgradeOut
-		err      error
+		diff      int64
+		meta      map[string]string
+		pi        stripe.UpgradePaymentOut
+		purchase  model.Purchase
+		key       string
+		client    *string
+		pid       string
+		piSnap    stripe.PaymentIntentSnapshot
+		finalized SupporterView
+		out       UpgradeOut
+		err       error
 	)
 	diff = int64(target.Price - current.Price)
 	if diff <= 0 {
@@ -316,8 +319,26 @@ func (s *SupporterUseCase) startPaidUpgrade(
 	}
 	client = &pi.ClientSecret
 	out.PaymentIntentClientSecret = client
+	pid = pi.PaymentIntentID
+	out.PaymentIntentID = &pid
 	out.Supporter, err = s.enrichView(ctx, supporter)
-	return out, err
+	if err != nil {
+		return UpgradeOut{}, err
+	}
+	piSnap, err = s.Stripe.GetPaymentIntent(ctx, pi.PaymentIntentID)
+	if err != nil {
+		return out, nil
+	}
+	if piSnap.Status == stripe.PaymentIntentStatusSucceeded {
+		finalized, err = s.finalizePaidUpgrade(ctx, supporter, purchase, now)
+		if err != nil {
+			return UpgradeOut{}, err
+		}
+		out.Supporter = finalized
+		out.PaymentIntentClientSecret = nil
+		out.PaymentIntentID = nil
+	}
+	return out, nil
 }
 
 func (s *SupporterUseCase) UpgradeConfirm(ctx context.Context, userID, supporterID uuid.UUID, intentID string) (SupporterView, error) {
@@ -362,7 +383,7 @@ func (s *SupporterUseCase) finalizePaidUpgrade(ctx context.Context, supporter mo
 		newPlanID uuid.UUID
 		err       error
 	)
-	err = repository.WithTx(ctx, s.DB, func(txCtx context.Context) error {
+	err = s.Tx.WithTx(ctx, func(txCtx context.Context) error {
 		locked, err = s.Supporters.GetID(txCtx, supporter.ID)
 		if err != nil {
 			return mapRepoNotFound(err)
@@ -372,7 +393,7 @@ func (s *SupporterUseCase) finalizePaidUpgrade(ctx context.Context, supporter mo
 		}
 		newPlanID = *locked.PendingPlanID
 		if purchase.Status != model.PurchaseStatusPaid {
-			if err = markPurchasePaidSimple(txCtx, s.Purchases, purchase); err != nil {
+			if err = MarkPurchasePaid(txCtx, s.Purchases, nil, purchase, MarkPaidOptions{}); err != nil {
 				return err
 			}
 		}
@@ -459,7 +480,7 @@ func (s *SupporterUseCase) applyPendingChanges(ctx context.Context, supporter mo
 	if !due {
 		return false, nil
 	}
-	err = repository.WithTx(ctx, s.DB, func(txCtx context.Context) error {
+	err = s.Tx.WithTx(ctx, func(txCtx context.Context) error {
 		var locked model.ProjectSupporter
 		locked, err = s.Supporters.GetID(txCtx, supporter.ID)
 		if err != nil {

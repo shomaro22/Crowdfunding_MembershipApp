@@ -38,6 +38,8 @@ services:
       SEED_TEST_USER_TEAM: "1"
       SEED_TEST_USER_RESET: "1"
       PRIVATE_ROOT: /app/data/private
+    volumes:
+      - private_data:/app/data/private
     command: ["dev", "-team", "-reset"]
     restart: "no"
     depends_on:
@@ -72,6 +74,7 @@ services:
       GOOGLE_REDIRECT_URI: ${GOOGLE_REDIRECT_URI:-http://localhost/auth/google/callback}
     volumes:
       - uploads:/app/data/public
+      - private_data:/app/data/private
     depends_on:
       backend-seed:
         condition: service_completed_successfully
@@ -93,3 +96,4 @@ services:
 volumes:
   pgdata:
   uploads:
+  private_data:

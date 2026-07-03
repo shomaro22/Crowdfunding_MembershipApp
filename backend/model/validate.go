@@ -116,7 +116,14 @@ func ValidateSellerIDDoc(docType IDDocType) error {
 }
 
 func ValidateDuration(duration DurationType, start time.Time, end *time.Time) error {
+	var (
+		now time.Time
+	)
 	if !duration.Valid() {
+		return ErrBadDuration
+	}
+	now = time.Now().UTC()
+	if start.Before(now.Add(-5 * time.Minute)) {
 		return ErrBadDuration
 	}
 	if duration == DurationLimited {
@@ -169,7 +176,6 @@ func ValidateProject(title, description string, targetAmount int64, duration Dur
 	var (
 		seen map[MembershipType]bool
 		p    PlanInput
-		mt   MembershipType
 		err  error
 	)
 	err = ValidateTitle(title)
@@ -186,7 +192,7 @@ func ValidateProject(title, description string, targetAmount int64, duration Dur
 	if err != nil {
 		return err
 	}
-	if len(plans) != 3 {
+	if len(plans) < 1 || len(plans) > 3 {
 		return ErrBadProject
 	}
 	seen = map[MembershipType]bool{}
@@ -206,10 +212,24 @@ func ValidateProject(title, description string, targetAmount int64, duration Dur
 			return err
 		}
 	}
-	for _, mt = range []MembershipType{MembershipBronze, MembershipSilver, MembershipGold} {
-		if !seen[mt] {
-			return ErrBadProject
-		}
+	return ValidateMembershipTierCombo(seen)
+}
+
+// ValidateMembershipTierCombo はブロンズのみ / ブロンズ+シルバー / ブロンズ+シルバー+ゴールド のみ許可。
+func ValidateMembershipTierCombo(enabled map[MembershipType]bool) error {
+	var (
+		hasBronze = enabled[MembershipBronze]
+		hasSilver = enabled[MembershipSilver]
+		hasGold   = enabled[MembershipGold]
+	)
+	if !hasBronze {
+		return ErrBadMembership
+	}
+	if hasGold && !hasSilver {
+		return ErrBadMembership
+	}
+	if hasSilver && !hasBronze {
+		return ErrBadMembership
 	}
 	return nil
 }

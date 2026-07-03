@@ -77,6 +77,7 @@ export async function registerSeller(payload: SellerRegistrationPayload): Promis
     full_name: payload.full_name,
     birth_date: payload.birth_date,
     address: payload.address,
+    photo_present: true,
   }))
   form.append('identity_document_front', payload.identity_document_front)
   form.append('identity_document_back', payload.identity_document_back)
@@ -88,6 +89,16 @@ export async function exchangeOAuthCode(code: string): Promise<AuthTokenResponse
   const res = await apiRequest<AuthTokenResponse>('/auth/oauth/exchange', {
     method: 'POST',
     body: { code },
+    skipRefresh: true,
+  })
+  setAccessToken(res.auth_token)
+  return res
+}
+
+export async function confirmOAuthLink(linkCode: string): Promise<AuthTokenResponse> {
+  const res = await apiRequest<AuthTokenResponse>('/auth/oauth/link-confirm', {
+    method: 'POST',
+    body: { link_code: linkCode },
     skipRefresh: true,
   })
   setAccessToken(res.auth_token)

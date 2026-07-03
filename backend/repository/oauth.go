@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"time"
@@ -12,6 +13,15 @@ import (
 	"github.com/redis/go-redis/v9"
 	"gorm.io/gorm"
 )
+
+// OAuthStateData は OAuth state に紐づくメタデータ（PKCE・リプレイ防止）。
+type OAuthStateData struct {
+	From         string `json:"from"`
+	CodeVerifier string `json:"code_verifier,omitempty"`
+	IP           string `json:"ip,omitempty"`
+	UserAgent    string `json:"ua,omitempty"`
+	Nonce        string `json:"nonce,omitempty"`
+}
 
 type IOAuthRepo interface {
 	Create(ctx context.Context, row *model.OAuthAccount) error
@@ -43,11 +53,23 @@ func (r *oauthRepo) GetUserID(ctx context.Context, userID uuid.UUID, provider mo
 	)
 }
 
+// OAuthLinkPending は既存メールアカウントへの Google 連携確認待ちデータ。
+type OAuthLinkPending struct {
+	UserID      uuid.UUID `json:"user_id"`
+	ProviderSub string    `json:"provider_sub"`
+	GoogleEmail string    `json:"google_email"`
+	GoogleName  string    `json:"google_name"`
+}
+
 type IOAuthCache interface {
 	SetState(ctx context.Context, state, from string, ttl time.Duration) error
 	PopState(ctx context.Context, state string) (from string, ok bool, err error)
+	SetOAuthState(ctx context.Context, state string, data OAuthStateData, ttl time.Duration) error
+	PopOAuthState(ctx context.Context, state string) (OAuthStateData, bool, error)
 	SetCallbackCode(ctx context.Context, code string, userID uuid.UUID, ttl time.Duration) error
 	PopCallback(ctx context.Context, code string) (uuid.UUID, bool, error)
+	SetLinkCode(ctx context.Context, code string, pending OAuthLinkPending, ttl time.Duration) error
+	PopLinkCode(ctx context.Context, code string) (OAuthLinkPending, bool, error)
 }
 
 type redisOAuthCache struct {
@@ -59,30 +81,60 @@ func NewOAuthCache(rdb *redis.Client) IOAuthCache {
 }
 
 func (c *redisOAuthCache) SetState(ctx context.Context, state, from string, ttl time.Duration) error {
+	return c.SetOAuthState(ctx, state, OAuthStateData{From: from}, ttl)
+}
+
+func (c *redisOAuthCache) SetOAuthState(ctx context.Context, state string, data OAuthStateData, ttl time.Duration) error {
+	var (
+		raw []byte
+		err error
+	)
 	if c.rdb == nil {
 		return fmt.Errorf("redis unavailable")
 	}
-	return c.rdb.Set(ctx, "oauth:state:"+state, from, ttl).Err()
+	raw, err = json.Marshal(data)
+	if err != nil {
+		return err
+	}
+	return c.rdb.Set(ctx, "oauth:state:"+state, raw, ttl).Err()
+}
+
+func (c *redisOAuthCache) PopOAuthState(ctx context.Context, state string) (OAuthStateData, bool, error) {
+	var (
+		key  string
+		raw  string
+		data OAuthStateData
+		err  error
+	)
+	if c.rdb == nil {
+		return OAuthStateData{}, false, fmt.Errorf("redis unavailable")
+	}
+	key = "oauth:state:" + state
+	raw, err = c.rdb.GetDel(ctx, key).Result()
+	if errors.Is(err, redis.Nil) {
+		return OAuthStateData{}, false, nil
+	}
+	if err != nil {
+		return OAuthStateData{}, false, err
+	}
+	if err = json.Unmarshal([]byte(raw), &data); err != nil {
+		// 旧形式（from のみ）との互換
+		return OAuthStateData{From: raw}, true, nil
+	}
+	return data, true, nil
 }
 
 func (c *redisOAuthCache) PopState(ctx context.Context, state string) (string, bool, error) {
 	var (
-		key  string
-		from string
+		data OAuthStateData
+		ok   bool
 		err  error
 	)
-	if c.rdb == nil {
-		return "", false, fmt.Errorf("redis unavailable")
+	data, ok, err = c.PopOAuthState(ctx, state)
+	if err != nil || !ok {
+		return "", ok, err
 	}
-	key = "oauth:state:" + state
-	from, err = c.rdb.GetDel(ctx, key).Result()
-	if errors.Is(err, redis.Nil) {
-		return "", false, nil
-	}
-	if err != nil {
-		return "", false, err
-	}
-	return from, true, nil
+	return data.From, true, nil
 }
 
 func (c *redisOAuthCache) SetCallbackCode(ctx context.Context, code string, userID uuid.UUID, ttl time.Duration) error {
@@ -113,4 +165,41 @@ func (c *redisOAuthCache) PopCallback(ctx context.Context, code string) (uuid.UU
 		return uuid.Nil, false, nil
 	}
 	return id, true, nil
+}
+
+func (c *redisOAuthCache) SetLinkCode(ctx context.Context, code string, pending OAuthLinkPending, ttl time.Duration) error {
+	var (
+		raw []byte
+		err error
+	)
+	if c.rdb == nil {
+		return fmt.Errorf("redis unavailable")
+	}
+	raw, err = json.Marshal(pending)
+	if err != nil {
+		return err
+	}
+	return c.rdb.Set(ctx, "oauth:link:"+code, raw, ttl).Err()
+}
+
+func (c *redisOAuthCache) PopLinkCode(ctx context.Context, code string) (OAuthLinkPending, bool, error) {
+	var (
+		raw     string
+		pending OAuthLinkPending
+		err     error
+	)
+	if c.rdb == nil {
+		return OAuthLinkPending{}, false, fmt.Errorf("redis unavailable")
+	}
+	raw, err = c.rdb.GetDel(ctx, "oauth:link:"+code).Result()
+	if errors.Is(err, redis.Nil) {
+		return OAuthLinkPending{}, false, nil
+	}
+	if err != nil {
+		return OAuthLinkPending{}, false, err
+	}
+	if err = json.Unmarshal([]byte(raw), &pending); err != nil {
+		return OAuthLinkPending{}, false, nil
+	}
+	return pending, true, nil
 }
