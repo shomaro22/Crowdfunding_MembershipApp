@@ -26,9 +26,11 @@ test.describe('管理画面', () => {
 
   test('ユーザー一覧で有効切替ができる', async ({ page }) => {
     await page.goto('/admin?tab=users')
-    const targetRow = page.locator('li.card').filter({ hasNotText: 'admin@example.com' }).first()
+    // E2E で使うデモアカウント（seller / buyer / admin）は切替対象にしない
+    const targetEmail = 'buyer2@example.com'
+    const targetRow = page.locator('li.card').filter({ hasText: targetEmail })
     if (await targetRow.count() === 0) {
-      test.skip(true, '切替対象ユーザーが一覧にありません')
+      test.skip(true, `${targetEmail} がシードされていません`)
       return
     }
     const toggle = targetRow.getByRole('button', { name: '有効切替' })

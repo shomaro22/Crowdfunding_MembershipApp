@@ -1,6 +1,7 @@
 package controller
 
 import (
+	"errors"
 	"net/http"
 	"strings"
 
@@ -90,6 +91,10 @@ func (h *authController) Refresh(c echo.Context) error {
 	}
 	authToken, refreshToken, err = h.Auth.Refresh(reqCtx(c), plain, requestMeta(c))
 	if err != nil {
+		if errors.Is(err, usecase.ErrInvalidToken) || errors.Is(err, usecase.ErrTokenRevoked) || errors.Is(err, usecase.ErrInactiveUser) {
+			ClearRefreshCookie(c, h.CookieCfg)
+			return c.NoContent(http.StatusNoContent)
+		}
 		return mapUseCaseError(err)
 	}
 	SetRefreshCookie(c, h.CookieCfg, refreshToken)
