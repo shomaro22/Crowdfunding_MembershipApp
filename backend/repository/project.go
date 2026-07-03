@@ -25,6 +25,8 @@ type IProjectRepo interface {
 	IncrementSupportCounts(ctx context.Context, projectID, planID uuid.UUID) error
 	TransferPlanSupportCount(ctx context.Context, projectID, fromPlanID, toPlanID uuid.UUID) error
 	AddCurrentAmount(ctx context.Context, projectID uuid.UUID, amount int64) error
+	ListPlansByProjectIDs(ctx context.Context, projectIDs []uuid.UUID) (map[uuid.UUID][]model.ProjectPlan, error)
+	ListImagesByProjectIDs(ctx context.Context, projectIDs []uuid.UUID) (map[uuid.UUID][]model.ProjectImage, error)
 }
 
 type projectRepo struct {
@@ -311,4 +313,48 @@ func paginate(limit, offset int) (int, int) {
 		offset = 0
 	}
 	return limit, offset
+}
+
+func (r *projectRepo) ListPlansByProjectIDs(ctx context.Context, projectIDs []uuid.UUID) (map[uuid.UUID][]model.ProjectPlan, error) {
+	var (
+		rows []model.ProjectPlan
+		out  map[uuid.UUID][]model.ProjectPlan
+		i    int
+		err  error
+	)
+	out = map[uuid.UUID][]model.ProjectPlan{}
+	if len(projectIDs) == 0 {
+		return out, nil
+	}
+	err = r.dbCtx(ctx).Where("project_id IN ?", projectIDs).Order("membership_type ASC").Find(&rows).Error
+	if err != nil {
+		return nil, err
+	}
+	for i = range rows {
+		pid := rows[i].ProjectID
+		out[pid] = append(out[pid], rows[i])
+	}
+	return out, nil
+}
+
+func (r *projectRepo) ListImagesByProjectIDs(ctx context.Context, projectIDs []uuid.UUID) (map[uuid.UUID][]model.ProjectImage, error) {
+	var (
+		rows []model.ProjectImage
+		out  map[uuid.UUID][]model.ProjectImage
+		i    int
+		err  error
+	)
+	out = map[uuid.UUID][]model.ProjectImage{}
+	if len(projectIDs) == 0 {
+		return out, nil
+	}
+	err = r.dbCtx(ctx).Where("project_id IN ?", projectIDs).Order("sort_order ASC").Find(&rows).Error
+	if err != nil {
+		return nil, err
+	}
+	for i = range rows {
+		pid := rows[i].ProjectID
+		out[pid] = append(out[pid], rows[i])
+	}
+	return out, nil
 }

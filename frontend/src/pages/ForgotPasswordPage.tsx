@@ -3,7 +3,8 @@ import { Link } from 'react-router-dom'
 
 import { forgotPassword } from '@/api/auth'
 import { ApiError } from '@/lib/api-client'
-import { isValidEmail, sanitizeEmail } from '@/lib/utils'
+import { validateEmail } from '@/lib/validation'
+import { sanitizeEmail } from '@/lib/utils'
 
 export function ForgotPasswordPage() {
   const [email, setEmail] = useState('')
@@ -14,8 +15,9 @@ export function ForgotPasswordPage() {
   const onSubmit = async (e: FormEvent) => {
     e.preventDefault()
     setError('')
-    if (!isValidEmail(email)) {
-      setError('有効なメールアドレスを入力してください')
+    const emailErr = validateEmail(email)
+    if (emailErr) {
+      setError(emailErr)
       return
     }
     setLoading(true)

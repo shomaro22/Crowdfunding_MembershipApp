@@ -3,12 +3,10 @@ package usecase
 import (
 	"crowdfund-app/repository"
 	"crowdfund-app/stripe"
-
-	"gorm.io/gorm"
 )
 
-func NewProjectUsecase(projects repository.IProjectRepo, users repository.IUserRepo, favorites repository.IFavoriteRepo, reports repository.IReportRepo, db *gorm.DB) *ProjectUseCase {
-	return &ProjectUseCase{Projects: projects, Users: users, Favorites: favorites, Reports: reports, DB: db}
+func NewProjectUsecase(projects repository.IProjectRepo, users repository.IUserRepo, favorites repository.IFavoriteRepo, reports repository.IReportRepo, tx repository.TxBeginner) *ProjectUseCase {
+	return &ProjectUseCase{Projects: projects, Users: users, Favorites: favorites, Reports: reports, Tx: tx}
 }
 
 func NewKYCAccessUsecase(kyc repository.IKYCStore, jwtSecret string) *KYCAccessUseCase {
@@ -19,9 +17,9 @@ func NewConnectUsecase(users repository.IUserRepo, connect repository.IConnectRe
 	return &ConnectUseCase{Users: users, Connect: connect, Stripe: stripeClient}
 }
 
-func NewSupporterUsecase(db *gorm.DB, users repository.IUserRepo, projects repository.IProjectRepo, supporters repository.ISupporterRepo, purchases repository.IPurchaseRepo, connect repository.IConnectRepo, activity repository.IActivityRepo, stripeClient stripe.Client) *SupporterUseCase {
+func NewSupporterUsecase(tx repository.TxBeginner, users repository.IUserRepo, projects repository.IProjectRepo, supporters repository.ISupporterRepo, purchases repository.IPurchaseRepo, connect repository.IConnectRepo, activity repository.IActivityRepo, stripeClient stripe.Client) *SupporterUseCase {
 	return &SupporterUseCase{
-		DB: db, Users: users, Projects: projects, Supporters: supporters,
+		Tx: tx, Users: users, Projects: projects, Supporters: supporters,
 		Purchases: purchases, Connect: connect, Activity: activity, Stripe: stripeClient,
 	}
 }
@@ -30,20 +28,20 @@ func NewPurchaseUsecase(users repository.IUserRepo, projects repository.IProject
 	return &PurchaseUseCase{Users: users, Projects: projects, Purchases: purchases}
 }
 
-func NewPaymentUsecase(db *gorm.DB, users repository.IUserRepo, projects repository.IProjectRepo, purchases repository.IPurchaseRepo, supporters repository.ISupporterRepo, connect repository.IConnectRepo, webhooks repository.IWebhookEventRepo, activity repository.IActivityRepo, stripeClient stripe.Client, connectSync *ConnectUseCase, supporterViewer *SupporterUseCase) IPaymentUsecase {
+func NewPaymentUsecase(tx repository.TxBeginner, users repository.IUserRepo, projects repository.IProjectRepo, purchases repository.IPurchaseRepo, supporters repository.ISupporterRepo, connect repository.IConnectRepo, webhooks repository.IWebhookEventRepo, activity repository.IActivityRepo, stripeClient stripe.Client, connectSync *ConnectUseCase, supporterViewer *SupporterUseCase) IPaymentUsecase {
 	return &PaymentUseCase{
-		DB: db, Users: users, Projects: projects, Purchases: purchases, Supporters: supporters,
+		Tx: tx, Users: users, Projects: projects, Purchases: purchases, Supporters: supporters,
 		Connect: connect, Webhooks: webhooks, Activity: activity, Stripe: stripeClient,
 		ConnectSync: connectSync, SupporterViewer: supporterViewer, PlanUpgrades: supporterViewer,
 	}
 }
 
-func NewAdminUsecase(db *gorm.DB, repos AdminRepos, kyc repository.IKYCStore, projectUC *ProjectUseCase, kycAccess *KYCAccessUseCase, purchaseUC *PurchaseUseCase) IAdminUsecase {
+func NewAdminUsecase(tx repository.TxBeginner, repos AdminRepos, kyc repository.IKYCStore, projectUC *ProjectUseCase, kycAccess *KYCAccessUseCase, purchaseUC *PurchaseUseCase) IAdminUsecase {
 	return &AdminUseCase{
 		Users: repos.Users, SellerRegs: repos.SellerRegs, Projects: repos.Projects,
 		Audit: repos.Audit, ReviewDecisions: repos.ReviewDecisions, RefreshTokens: repos.RefreshTokens,
 		TOTPBackup: repos.TOTPBackup, KYC: kyc, ProjectsUC: projectUC, KYCAccess: kycAccess,
-		AdminStats: repos.Admin, Purchases: repos.Purchases, PurchaseViews: purchaseUC, DB: db,
+		AdminStats: repos.Admin, Purchases: repos.Purchases, PurchaseViews: purchaseUC, Tx: tx,
 	}
 }
 
@@ -93,6 +91,6 @@ func NewSellerUsecase(projects repository.IProjectRepo, seller repository.ISelle
 	return &SellerUseCase{Projects: projects, Seller: seller, Supporters: supporters}
 }
 
-func NewBatchUsecase(db *gorm.DB, runs repository.IBatchRepo, supporters *SupporterUseCase, wsTokens repository.IWSTokenRepo) *BatchUseCase {
-	return &BatchUseCase{DB: db, Runs: runs, Supporters: supporters, WSTokens: wsTokens}
+func NewBatchUsecase(runs repository.IBatchRepo, supporters *SupporterUseCase, wsTokens repository.IWSTokenRepo) *BatchUseCase {
+	return &BatchUseCase{Runs: runs, Supporters: supporters, WSTokens: wsTokens}
 }

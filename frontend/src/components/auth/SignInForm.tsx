@@ -10,7 +10,8 @@ import { useAuth } from "@/auth/AuthProvider";
 import { ApiError } from "@/lib/api-client";
 import { googleOAuthStartUrl } from "@/lib/api-client";
 import { postLoginPath } from "@/lib/auth-routes";
-import { isValidEmail, sanitizeAppPath, sanitizeEmail } from "@/lib/utils";
+import { validateEmail } from "@/lib/validation";
+import { sanitizeAppPath, sanitizeEmail } from "@/lib/utils";
 
 export function SignInForm() {
   const navigate = useNavigate();
@@ -41,10 +42,9 @@ export function SignInForm() {
 
   const validate = useCallback((): boolean => {
     const next: { email?: string; password?: string } = {};
-    if (!email.trim()) {
-      next.email = "メールアドレスを入力してください";
-    } else if (!isValidEmail(email)) {
-      next.email = "有効なメールアドレスを入力してください";
+    const emailErr = validateEmail(email);
+    if (emailErr) {
+      next.email = emailErr;
     }
     if (!password) {
       next.password = "パスワードを入力してください";

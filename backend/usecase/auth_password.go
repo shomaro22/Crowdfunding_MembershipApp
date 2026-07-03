@@ -95,7 +95,7 @@ func (p *PasswordUseCase) ResetPassword(ctx context.Context, plainToken, newPass
 	if err = p.deps.ResetToks.MarkUsed(ctx, row.ID, now); err != nil {
 		return err
 	}
-	return InvalidateUserSessions(ctx, p.deps.DB, p.deps.Users, p.deps.RefreshTokens, u.ID)
+	return InvalidateUserSessions(ctx, p.deps.Tx, p.deps.Users, p.deps.RefreshTokens, u.ID)
 }
 
 func (p *PasswordUseCase) ChangePassword(ctx context.Context, userID uuid.UUID, current, newPassword, totpCode string) error {
@@ -137,6 +137,6 @@ func (p *PasswordUseCase) ChangePassword(ctx context.Context, userID uuid.UUID, 
 	if err = p.deps.Users.Update(ctx, &u); err != nil {
 		return err
 	}
-	return InvalidateUserSessions(ctx, p.deps.DB, p.deps.Users, p.deps.RefreshTokens, u.ID)
+	return InvalidateUserSessions(ctx, p.deps.Tx, p.deps.Users, p.deps.RefreshTokens, u.ID)
 }
 
