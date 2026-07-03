@@ -4,8 +4,10 @@ interface ZipCloudResult {
   address3: string
 }
 
+import { digitsOnly } from '@/lib/validation'
+
 export async function lookupJapaneseAddress(postalCode: string): Promise<string | null> {
-  const digits = postalCode.replace(/\D/g, '')
+  const digits = digitsOnly(postalCode, 7)
   if (digits.length !== 7) {
     return null
   }

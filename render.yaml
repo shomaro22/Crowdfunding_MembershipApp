@@ -1,0 +1,44 @@
+# Render Blueprint（任意）
+# Dashboard → New → Blueprint → このリポジトリを選択
+services:
+  - type: web
+    name: crowdfund-api
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    dockerTarget: backend-runtime
+    plan: starter
+    healthCheckPath: /health
+    envVars:
+      - key: APP_ENV
+        value: production
+      - key: COOKIE_SECURE
+        value: "true"
+      - key: TOTP_ISSUER
+        value: CrowdfundApp
+      - key: PUBLIC_ROOT
+        value: /app/data/public
+      - key: PRIVATE_ROOT
+        value: /app/data/private
+      - key: DATABASE_URL
+        sync: false
+      - key: REDIS_ADDR
+        sync: false
+      - key: REDIS_PASSWORD
+        sync: false
+      - key: JWT_SECRET
+        generateValue: true
+      - key: REFRESH_SECRET
+        generateValue: true
+      - key: TOTP_ENCRYPTION_KEY
+        generateValue: true
+      - key: KYC_SIGNING_KEY
+        generateValue: true
+      - key: PENDING_2FA_KEY
+        generateValue: true
+      - key: API_PUBLIC_URL
+        sync: false
+      - key: PUBLIC_APP_URL
+        sync: false
+      - key: CORS_ALLOW_ORIGINS
+        sync: false

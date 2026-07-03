@@ -9,6 +9,7 @@ import { normalizeMediaUrl } from '@/lib/media-url'
 import { planTierLabel, validateMembershipTierCombo } from '@/lib/plans'
 import { formatCurrencyYen, formatYenInput, parseYenInput, sanitizeDisplayText } from '@/lib/utils'
 import {
+  digitsOnly,
   validatePlanPrice,
   validatePositiveAmount,
   validateProjectTitle,
@@ -153,7 +154,7 @@ export function SellerProjectFormPage() {
   const onUpload = async (file: File) => {
     const check = validateImageFile(file)
     if (!check.valid) {
-      setError(check.error ?? '画像が無効です')
+      setError(check.message ?? '画像が無効です')
       return
     }
     try {
@@ -222,9 +223,9 @@ export function SellerProjectFormPage() {
 
   const goNext = () => {
     setError('')
-    const err = validateStep(step)
-    if (err) {
-      setError(err)
+    const validationMessage = validateStep(step)
+    if (validationMessage !== null) {
+      setError(validationMessage)
       return
     }
     setStep((s) => Math.min(s + 1, STEPS.length - 1))
@@ -239,9 +240,9 @@ export function SellerProjectFormPage() {
     e.preventDefault()
     setError('')
     for (let i = 0; i < STEPS.length - 1; i++) {
-      const err = validateStep(i)
-      if (err) {
-        setError(err)
+      const validationMessage = validateStep(i)
+      if (validationMessage !== null) {
+        setError(validationMessage)
         setStep(i)
         return
       }
@@ -425,11 +426,13 @@ export function SellerProjectFormPage() {
                       {planTierLabel(pl.membership_type)}
                     </label>
                     <div className={`grid gap-2 sm:grid-cols-2 ${!isEdit && !planEnabled[pl.membership_type] ? 'pointer-events-none opacity-40' : ''}`}>
-                      <input className="input-field" type="number" value={pl.price} disabled={isEdit} onChange={(e) => {
-                        setPlans((prev) => prev.map((row, idx) => idx === i ? { ...row, price: e.target.value } : row))
+                      <input className="input-field" inputMode="numeric" value={pl.price} disabled={isEdit} onChange={(e) => {
+                        const price = digitsOnly(e.target.value, 6)
+                        setPlans((prev) => prev.map((row, idx) => idx === i ? { ...row, price } : row))
                       }} placeholder="月額（円）" />
-                      <input className="input-field" type="number" value={pl.max_supporters} disabled={isEdit} onChange={(e) => {
-                        setPlans((prev) => prev.map((row, idx) => idx === i ? { ...row, max_supporters: e.target.value } : row))
+                      <input className="input-field" inputMode="numeric" value={pl.max_supporters} disabled={isEdit} onChange={(e) => {
+                        const maxSupporters = digitsOnly(e.target.value, 6)
+                        setPlans((prev) => prev.map((row, idx) => idx === i ? { ...row, max_supporters: maxSupporters } : row))
                       }} placeholder="上限人数（任意）" />
                       <input className="input-field sm:col-span-2" value={pl.benefits} disabled={isEdit} onChange={(e) => {
                         setPlans((prev) => prev.map((row, idx) => idx === i ? { ...row, benefits: e.target.value } : row))
