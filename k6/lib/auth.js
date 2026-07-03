@@ -5,7 +5,10 @@ export function loginBuyer() {
   const res = http.post(
     `${BASE_URL}/auth/login`,
     JSON.stringify({ email: BUYER_EMAIL, password: BUYER_PASSWORD }),
-    { headers: jsonHeaders() },
+    {
+      headers: jsonHeaders(),
+      responseCallback: http.expectedStatuses(200, 429),
+    },
   );
   if (res.status !== 200) {
     return null;
