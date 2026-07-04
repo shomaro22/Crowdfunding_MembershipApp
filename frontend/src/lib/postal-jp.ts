@@ -1,3 +1,5 @@
+import { digitsOnly } from '@/lib/digits'
+
 interface ZipCloudResult {
   address1: string
   address2: string
@@ -5,7 +7,7 @@ interface ZipCloudResult {
 }
 
 export async function lookupJapaneseAddress(postalCode: string): Promise<string | null> {
-  const digits = postalCode.replace(/\D/g, '')
+  const digits = digitsOnly(postalCode, 7)
   if (digits.length !== 7) {
     return null
   }

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 
-import { exchangeOAuthCode, fetchMe } from '@/api/auth'
+import { exchangeOAuthCode } from '@/api/auth'
 import { useAuth } from '@/auth/AuthProvider'
 import { Loading } from '@/components/common/Loading'
 import { ErrorMessage } from '@/components/common/ErrorMessage'
@@ -12,8 +12,8 @@ import { postLoginPath } from '@/lib/auth-routes'
 export function AuthCallbackPage() {
   const [searchParams] = useSearchParams()
   const navigate = useNavigate()
-  const { refreshUser } = useAuth()
-  const [error, setError] = useState('')
+  const { acceptAuthenticatedUser } = useAuth()
+  const [errorMessage, setErrorMessage] = useState('')
   const started = useRef(false)
 
   useEffect(() => {
@@ -25,13 +25,13 @@ export function AuthCallbackPage() {
     const oauthError = searchParams.get('error')
     if (oauthError) {
       if (oauthError === 'user_inactive') {
-        setError('アカウントが有効化されていません。メール登録の場合は管理者の承認をお待ちください。')
+        setErrorMessage('アカウントが有効化されていません。メール登録の場合は管理者の承認をお待ちください。')
       } else if (oauthError === 'oauth_failed') {
-        setError('Google ログインに失敗しました。しばらくしてから再度お試しください。')
+        setErrorMessage('Google ログインに失敗しました。しばらくしてから再度お試しください。')
       } else if (oauthError === 'oauth_forbidden') {
-        setError('この Google アカウントではログインできません（出品者アカウント等）。')
+        setErrorMessage('この Google アカウントではログインできません（出品者アカウント等）。')
       } else {
-        setError('Google ログインに失敗しました')
+        setErrorMessage('Google ログインに失敗しました')
       }
       return
     }
@@ -60,26 +60,25 @@ export function AuthCallbackPage() {
     const from = sanitizeAppPath(searchParams.get('from'), '/')
 
     if (!code) {
-      setError('認可コードがありません')
+      setErrorMessage('認可コードがありません')
       return
     }
 
     void (async () => {
       try {
-        await exchangeOAuthCode(code)
-        await refreshUser()
-        const me = await fetchMe()
-        void navigate(postLoginPath(me, from), { replace: true })
+        const res = await exchangeOAuthCode(code)
+        acceptAuthenticatedUser(res.user)
+        void navigate(postLoginPath(res.user, from), { replace: true })
       } catch {
-        setError('ログインセッションの確立に失敗しました')
+        setErrorMessage('ログインセッションの確立に失敗しました')
       }
     })()
-  }, [navigate, refreshUser, searchParams])
+  }, [acceptAuthenticatedUser, navigate, searchParams])
 
-  if (error) {
+  if (errorMessage) {
     return (
       <MainLayout>
-        <ErrorMessage message={error} onRetry={() => { void navigate('/signin', { replace: true }) }} />
+        <ErrorMessage message={errorMessage} onRetry={() => { void navigate('/signin', { replace: true }) }} />
       </MainLayout>
     )
   }

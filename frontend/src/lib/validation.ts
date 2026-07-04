@@ -1,5 +1,7 @@
 /** 入力検証（クライアント側防御 — 最終判定は常にサーバー） */
 
+import { digitsOnly, normalizeAsciiDigits } from '@/lib/digits'
+
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 const TOTP_RE = /^[0-9]{6}$/
 const TOTP_BACKUP_RE = /^[0-9A-Z]{8,10}$/
@@ -23,12 +25,83 @@ export function validateTOTPCode(code: string): boolean {
 
 /** 全角数字・空白を半角 OTP 用に正規化 */
 export function normalizeOtpCode(value: string): string {
-  return value
-    .replace(/[\uFF10-\uFF19]/g, (ch) => String.fromCharCode(ch.charCodeAt(0) - 0xff10 + 0x30))
+  return normalizeAsciiDigits(value)
     .replace(/[\uFF21-\uFF3A]/g, (ch) => String.fromCharCode(ch.charCodeAt(0) - 0xff21 + 0x41))
     .replace(/[\uFF41-\uFF5A]/g, (ch) => String.fromCharCode(ch.charCodeAt(0) - 0xff41 + 0x61))
     .replace(/\s+/g, '')
     .replace(/[^\dA-Za-z-]/g, '')
+}
+
+function luhnCheck(cardDigits: string): boolean {
+  let sum = 0
+  let alternate = false
+  for (let i = cardDigits.length - 1; i >= 0; i -= 1) {
+    let n = Number.parseInt(cardDigits[i] ?? '0', 10)
+    if (alternate) {
+      n *= 2
+      if (n > 9) {
+        n -= 9
+      }
+    }
+    sum += n
+    alternate = !alternate
+  }
+  return sum % 10 === 0
+}
+
+export function formatCardNumberInput(value: string): string {
+  const digits = digitsOnly(value, 19)
+  const groups = digits.match(/.{1,4}/g)
+  return groups ? groups.join(' ') : ''
+}
+
+export function formatCardExpiryInput(value: string): string {
+  const digits = digitsOnly(value, 4)
+  if (digits.length <= 2) {
+    return digits
+  }
+  return `${digits.slice(0, 2)} / ${digits.slice(2)}`
+}
+
+export function validateDemoCardNumber(cardNumber: string): string | null {
+  const digits = digitsOnly(cardNumber)
+  if (digits.length < 13) {
+    return 'カード番号の桁数が足りません'
+  }
+  if (digits.length > 19) {
+    return 'カード番号が長すぎます'
+  }
+  if (!luhnCheck(digits)) {
+    return 'カード番号が正しくありません'
+  }
+  return null
+}
+
+export function validateDemoCardExpiry(expiry: string): string | null {
+  const digits = digitsOnly(expiry)
+  if (digits.length !== 4) {
+    return '有効期限を MM / YY 形式で入力してください'
+  }
+  const month = Number.parseInt(digits.slice(0, 2), 10)
+  const year = Number.parseInt(digits.slice(2, 4), 10)
+  if (month < 1 || month > 12) {
+    return '有効期限の月が正しくありません'
+  }
+  const now = new Date()
+  const currentYear = now.getFullYear() % 100
+  const currentMonth = now.getMonth() + 1
+  if (year < currentYear || (year === currentYear && month < currentMonth)) {
+    return '有効期限が過去の日付です'
+  }
+  return null
+}
+
+export function validateDemoCardCvc(cvc: string): string | null {
+  const digits = digitsOnly(cvc, 3)
+  if (digits.length !== 3) {
+    return 'セキュリティコードは3桁で入力してください'
+  }
+  return null
 }
 
 export function validateMessageContent(content: string): { valid: boolean; error?: string } {

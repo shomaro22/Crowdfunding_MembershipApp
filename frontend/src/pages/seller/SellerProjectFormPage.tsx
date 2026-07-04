@@ -7,6 +7,7 @@ import { Loading } from '@/components/common/Loading'
 import { ApiError } from '@/lib/api-client'
 import { normalizeMediaUrl } from '@/lib/media-url'
 import { planTierLabel, validateMembershipTierCombo } from '@/lib/plans'
+import { digitsOnly } from '@/lib/digits'
 import { formatCurrencyYen, formatYenInput, parseYenInput, sanitizeDisplayText } from '@/lib/utils'
 import {
   validatePlanPrice,
@@ -60,7 +61,7 @@ export function SellerProjectFormPage() {
   const isEdit = projectId !== undefined && projectId !== 'new'
   const [step, setStep] = useState(0)
   const [loading, setLoading] = useState(isEdit)
-  const [error, setError] = useState('')
+  const [errorMessage, setErrorMessage] = useState('')
   const [submitting, setSubmitting] = useState(false)
 
   const [title, setTitle] = useState('')
@@ -99,7 +100,7 @@ export function SellerProjectFormPage() {
     }
     const id = parseUUID(projectId)
     if (!id) {
-      setError('ID が不正です')
+      setErrorMessage('ID が不正です')
       setLoading(false)
       return
     }
@@ -143,7 +144,7 @@ export function SellerProjectFormPage() {
           setPlans(formPlans)
         }
       } catch {
-        setError('プロジェクトの取得に失敗しました')
+        setErrorMessage('プロジェクトの取得に失敗しました')
       } finally {
         setLoading(false)
       }
@@ -153,14 +154,14 @@ export function SellerProjectFormPage() {
   const onUpload = async (file: File) => {
     const check = validateImageFile(file)
     if (!check.valid) {
-      setError(check.error ?? '画像が無効です')
+      setErrorMessage(check.message ?? '画像が無効です')
       return
     }
     try {
       const res = await uploadImage(file)
       setImageUrl(normalizeMediaUrl(res.url))
     } catch {
-      setError('画像アップロードに失敗しました')
+      setErrorMessage('画像アップロードに失敗しました')
     }
   }
 
@@ -221,27 +222,27 @@ export function SellerProjectFormPage() {
   }
 
   const goNext = () => {
-    setError('')
-    const err = validateStep(step)
-    if (err) {
-      setError(err)
+    setErrorMessage('')
+    const validationMessage = validateStep(step)
+    if (validationMessage !== null) {
+      setErrorMessage(validationMessage)
       return
     }
     setStep((s) => Math.min(s + 1, STEPS.length - 1))
   }
 
   const goBack = () => {
-    setError('')
+    setErrorMessage('')
     setStep((s) => Math.max(s - 1, 0))
   }
 
   const onSubmit = async (e: FormEvent) => {
     e.preventDefault()
-    setError('')
+    setErrorMessage('')
     for (let i = 0; i < STEPS.length - 1; i++) {
-      const err = validateStep(i)
-      if (err) {
-        setError(err)
+      const validationMessage = validateStep(i)
+      if (validationMessage !== null) {
+        setErrorMessage(validationMessage)
         setStep(i)
         return
       }
@@ -293,7 +294,7 @@ export function SellerProjectFormPage() {
       }
       void navigate('/seller/projects')
     } catch (err) {
-      setError(err instanceof Error ? err.message : err instanceof ApiError ? err.message : '保存に失敗しました')
+      setErrorMessage(err instanceof Error ? err.message : err instanceof ApiError ? err.message : '保存に失敗しました')
     } finally {
       setSubmitting(false)
     }
@@ -331,7 +332,7 @@ export function SellerProjectFormPage() {
         </div>
 
         <div className="p-6 md:col-span-3 md:p-8">
-          {error ? <p className="mb-4 text-sm text-red-600">{error}</p> : null}
+          {errorMessage ? <p className="mb-4 text-sm text-red-600">{errorMessage}</p> : null}
 
           <form onSubmit={(e) => void onSubmit(e)} className="space-y-5">
             {step === 0 ? (
@@ -425,11 +426,13 @@ export function SellerProjectFormPage() {
                       {planTierLabel(pl.membership_type)}
                     </label>
                     <div className={`grid gap-2 sm:grid-cols-2 ${!isEdit && !planEnabled[pl.membership_type] ? 'pointer-events-none opacity-40' : ''}`}>
-                      <input className="input-field" type="number" value={pl.price} disabled={isEdit} onChange={(e) => {
-                        setPlans((prev) => prev.map((row, idx) => idx === i ? { ...row, price: e.target.value } : row))
+                      <input className="input-field" inputMode="numeric" value={pl.price} disabled={isEdit} onChange={(e) => {
+                        const price = digitsOnly(e.target.value, 6)
+                        setPlans((prev) => prev.map((row, idx) => idx === i ? { ...row, price } : row))
                       }} placeholder="月額（円）" />
-                      <input className="input-field" type="number" value={pl.max_supporters} disabled={isEdit} onChange={(e) => {
-                        setPlans((prev) => prev.map((row, idx) => idx === i ? { ...row, max_supporters: e.target.value } : row))
+                      <input className="input-field" inputMode="numeric" value={pl.max_supporters} disabled={isEdit} onChange={(e) => {
+                        const maxSupporters = digitsOnly(e.target.value, 6)
+                        setPlans((prev) => prev.map((row, idx) => idx === i ? { ...row, max_supporters: maxSupporters } : row))
                       }} placeholder="上限人数（任意）" />
                       <input className="input-field sm:col-span-2" value={pl.benefits} disabled={isEdit} onChange={(e) => {
                         setPlans((prev) => prev.map((row, idx) => idx === i ? { ...row, benefits: e.target.value } : row))

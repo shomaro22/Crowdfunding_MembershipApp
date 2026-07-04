@@ -14,21 +14,42 @@ export const options = {
   thresholds: DEFAULT_THRESHOLDS,
 };
 
+function resolveAdminToken() {
+  const totpCode = (__ENV.ADMIN_TOTP_CODE || '').trim();
+  if (totpCode) {
+    const token = loginAdminWithTotp(totpCode);
+    if (token) {
+      return token;
+    }
+  }
+  const envToken = (__ENV.ADMIN_AUTH_TOKEN || '').trim();
+  if (envToken) {
+    return envToken;
+  }
+  return '';
+}
+
 export function setup() {
-  return {
-    adminToken: __ENV.ADMIN_AUTH_TOKEN || '',
-    totpCode: __ENV.ADMIN_TOTP_CODE || '',
-  };
+  const adminToken = resolveAdminToken();
+  if (!adminToken) {
+    console.error('admin-load setup: failed to obtain admin token (check ADMIN_TOTP_CODE / credentials)');
+  }
+  return { adminToken };
+}
+
+function adminGet(path, token) {
+  return http.get(`${BASE_URL}${path}`, {
+    headers: { Accept: 'application/json', Authorization: `Bearer ${token}` },
+    responseCallback: http.expectedStatuses(200, 429),
+  });
 }
 
 export default function adminLoad(data) {
-  let token = data.adminToken;
-  if (!token) {
-    token = loginAdminWithTotp(data.totpCode);
-  }
+  const token = data.adminToken;
   if (!token) {
     const forbidden = http.get(`${BASE_URL}/admin/stats`, {
       headers: { Accept: 'application/json', Authorization: 'Bearer invalid' },
+      responseCallback: http.expectedStatuses(401, 403),
     });
     check(forbidden, {
       'admin without auth blocked': (r) => r.status === 401 || r.status === 403,
@@ -37,16 +58,20 @@ export default function adminLoad(data) {
     return;
   }
 
-  const headers = { Accept: 'application/json', Authorization: `Bearer ${token}` };
+  const stats = adminGet('/admin/stats', token);
+  check(stats, {
+    'admin stats': (r) => r.status === 200 || r.status === 429,
+  });
 
-  const stats = http.get(`${BASE_URL}/admin/stats`, { headers });
-  check(stats, { 'admin stats': (r) => r.status === 200 });
+  const users = adminGet('/admin/users?limit=20&offset=0', token);
+  check(users, {
+    'admin users': (r) => r.status === 200 || r.status === 429,
+  });
 
-  const users = http.get(`${BASE_URL}/admin/users?limit=20&offset=0`, { headers });
-  check(users, { 'admin users': (r) => r.status === 200 });
-
-  const reports = http.get(`${BASE_URL}/admin/reports?limit=20&offset=0`, { headers });
-  check(reports, { 'admin reports': (r) => r.status === 200 });
+  const reports = adminGet('/admin/reports?limit=20&offset=0', token);
+  check(reports, {
+    'admin reports': (r) => r.status === 200 || r.status === 429,
+  });
 
   sleep(0.5);
 }

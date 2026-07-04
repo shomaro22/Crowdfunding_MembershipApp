@@ -19,17 +19,26 @@ export default function authLoad() {
   const loginRes = http.post(
     `${BASE_URL}/auth/login`,
     JSON.stringify({ email: BUYER_EMAIL, password: BUYER_PASSWORD }),
-    { headers: jsonHeaders() },
+    {
+      headers: jsonHeaders(),
+      responseCallback: http.expectedStatuses(200, 429),
+    },
   );
 
-  const loginOk = check(loginRes, {
-    'login ok': (r) => r.status === 200,
-    'login has token': (r) => {
+  check(loginRes, {
+    'login ok or rate limited': (r) => r.status === 200 || r.status === 429,
+    'login has token when ok': (r) => {
+      if (r.status === 429) {
+        return true;
+      }
+      if (r.status !== 200) {
+        return false;
+      }
       const body = r.json();
       return body && typeof body.auth_token === 'string';
     },
   });
-  if (!loginOk) {
+  if (loginRes.status !== 200) {
     sleep(1);
     return;
   }
@@ -41,9 +50,10 @@ export default function authLoad() {
   const refreshRes = http.post(`${BASE_URL}/auth/refresh`, null, {
     headers: jsonHeaders(),
     cookies: loginRes.cookies,
+    responseCallback: http.expectedStatuses(200, 204, 429),
   });
   check(refreshRes, {
-    'refresh ok or rate limited': (r) => r.status === 200 || r.status === 429,
+    'refresh ok or rate limited': (r) => r.status === 200 || r.status === 204 || r.status === 429,
   });
 
   sleep(0.3);

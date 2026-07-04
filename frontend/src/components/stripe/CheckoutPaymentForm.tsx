@@ -3,6 +3,14 @@ import { loadStripe } from '@stripe/stripe-js'
 import { Elements, PaymentElement, useElements, useStripe } from '@stripe/react-stripe-js'
 
 import { verifyPaymentIntent } from '@/api/payments'
+import { digitsOnly } from '@/lib/digits'
+import {
+  formatCardExpiryInput,
+  formatCardNumberInput,
+  validateDemoCardCvc,
+  validateDemoCardExpiry,
+  validateDemoCardNumber,
+} from '@/lib/validation'
 
 const stripePublishableKey = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY as string | undefined
 
@@ -102,9 +110,19 @@ function DemoPaymentElement({
   const [cardNumber, setCardNumber] = useState('')
   const [expiry, setExpiry] = useState('')
   const [cvc, setCvc] = useState('')
+  const [errorMessage, setErrorMessage] = useState('')
 
   const onPay = async () => {
+    const cardErr = validateDemoCardNumber(cardNumber)
+    const expiryErr = validateDemoCardExpiry(expiry)
+    const cvcErr = validateDemoCardCvc(cvc)
+    if (cardErr || expiryErr || cvcErr) {
+      setErrorMessage(cardErr ?? expiryErr ?? cvcErr ?? 'カード情報を確認してください')
+      return
+    }
+
     setProcessing(true)
+    setErrorMessage('')
     try {
       if (paymentPurpose === 'checkout') {
         await verifyPaymentIntent(paymentIntentId)
@@ -129,7 +147,10 @@ function DemoPaymentElement({
           className="mb-3 w-full rounded-md border border-gray-300 px-3 py-2.5 text-sm"
           placeholder="4242 4242 4242 4242"
           value={cardNumber}
-          onChange={(e) => setCardNumber(e.target.value)}
+          onChange={(e) => {
+            setCardNumber(formatCardNumberInput(e.target.value))
+            setErrorMessage('')
+          }}
           inputMode="numeric"
           autoComplete="cc-number"
         />
@@ -140,26 +161,36 @@ function DemoPaymentElement({
               className="w-full rounded-md border border-gray-300 px-3 py-2.5 text-sm"
               placeholder="MM / YY"
               value={expiry}
-              onChange={(e) => setExpiry(e.target.value)}
+              onChange={(e) => {
+                setExpiry(formatCardExpiryInput(e.target.value))
+                setErrorMessage('')
+              }}
+              inputMode="numeric"
               autoComplete="cc-exp"
             />
           </div>
           <div>
             <label className="mb-1 block text-xs font-medium text-gray-600">セキュリティコード</label>
             <input
-              className="w-full rounded-md border border-gray-300 px-3 py-2.5 text-sm"
-              placeholder="CVC"
+              className="w-full rounded-md border border-gray-300 px-3 py-2.5 text-sm tracking-widest"
+              placeholder="•••"
               value={cvc}
-              onChange={(e) => setCvc(e.target.value)}
+              onChange={(e) => {
+                setCvc(digitsOnly(e.target.value, 3))
+                setErrorMessage('')
+              }}
+              type="password"
               inputMode="numeric"
               autoComplete="cc-csc"
+              maxLength={3}
             />
           </div>
         </div>
         <p className="mt-3 text-xs text-gray-500">
-          デモ環境: カード情報は入力できますが検証はされません。「決済を完了する」でシミュレートします。テスト番号は README を参照してください。
+          デモ環境: カード番号・有効期限・セキュリティコードを検証します。テスト番号は README を参照してください。
         </p>
       </div>
+      {errorMessage ? <p className="text-sm text-red-600">{errorMessage}</p> : null}
       <button
         type="button"
         disabled={processing}

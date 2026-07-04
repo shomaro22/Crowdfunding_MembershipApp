@@ -179,28 +179,21 @@ jobs:
         working-directory: e2e
         run: npm ci
 
-      - name: Prepare admin TOTP
-        id: totp
-        working-directory: e2e
-        run: |
-          CODE=$(node -e "const {authenticator}=require('otplib'); console.log(authenticator.generate('JBSWY3DPEHPK3PXP'))")
-          echo "code=$CODE" >> "$GITHUB_OUTPUT"
-
       - name: k6 suites
         env:
           K6_ENV: development
           BASE_URL: http://localhost
-          ADMIN_TOTP_CODE: ${{ steps.totp.outputs.code }}
         run: |
           mkdir -p k6/reports
           k6 run k6/smoke.js
+          ADMIN_TOTP_CODE=$(cd e2e && node -e "const {authenticator}=require('otplib'); console.log(authenticator.generate('JBSWY3DPEHPK3PXP'))")
+          ADMIN_TOTP_CODE="${ADMIN_TOTP_CODE}" k6 run k6/admin-load.js
           k6 run k6/project-list.js
           k6 run k6/notification-load.js
           k6 run k6/auth-load.js
           k6 run k6/checkout-load.js
           k6 run k6/ws-load.js
           k6 run k6/oauth-load.js
-          ADMIN_TOTP_CODE=${{ steps.totp.outputs.code }} k6 run k6/admin-load.js
 
       - uses: actions/upload-artifact@v4
         if: always()

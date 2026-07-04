@@ -10,9 +10,9 @@ import { sanitizeAppPath } from '@/lib/utils'
 export function OAuthLinkConfirmPage() {
   const [searchParams] = useSearchParams()
   const navigate = useNavigate()
-  const { refreshUser } = useAuth()
+  const { acceptAuthenticatedUser } = useAuth()
   const [submitting, setSubmitting] = useState(false)
-  const [error, setError] = useState('')
+  const [errorMessage, setErrorMessage] = useState('')
 
   const linkCode = searchParams.get('link_code') ?? ''
   const accountEmail = searchParams.get('account_email') ?? ''
@@ -30,13 +30,13 @@ export function OAuthLinkConfirmPage() {
 
   const onConfirm = async () => {
     setSubmitting(true)
-    setError('')
+    setErrorMessage('')
     try {
       const res = await confirmOAuthLink(linkCode)
-      await refreshUser()
+      acceptAuthenticatedUser(res.user)
       void navigate(postLoginPath(res.user, from), { replace: true })
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'アカウント連携に失敗しました')
+      setErrorMessage(err instanceof ApiError ? err.message : 'アカウント連携に失敗しました')
     } finally {
       setSubmitting(false)
     }
@@ -57,7 +57,7 @@ export function OAuthLinkConfirmPage() {
       <p className="mb-6 text-xs text-gray-500">
         連携後は Google でも同じアカウントでログインできます。応援履歴やメッセージはそのまま引き継がれます。
       </p>
-      {error ? <p className="mb-4 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p> : null}
+      {errorMessage ? <p className="mb-4 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">{errorMessage}</p> : null}
       <div className="flex flex-col gap-3 sm:flex-row">
         <button
           type="button"

@@ -13,17 +13,17 @@ export function SellerProjectsPage() {
   const { toast } = useToast()
   const [projects, setProjects] = useState<ProjectSummary[]>([])
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState('')
+  const [errorMessage, setErrorMessage] = useState('')
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null)
 
   const load = async () => {
     setLoading(true)
-    setError('')
+    setErrorMessage('')
     try {
       const res = await listMyProjects()
       setProjects(res.projects)
     } catch {
-      setError('プロジェクト一覧の取得に失敗しました')
+      setErrorMessage('プロジェクト一覧の取得に失敗しました')
     } finally {
       setLoading(false)
     }
@@ -48,8 +48,8 @@ export function SellerProjectsPage() {
   if (loading) {
     return <Loading />
   }
-  if (error) {
-    return <ErrorMessage message={error} onRetry={() => void load()} />
+  if (errorMessage) {
+    return <ErrorMessage message={errorMessage} onRetry={() => void load()} />
   }
 
   return (

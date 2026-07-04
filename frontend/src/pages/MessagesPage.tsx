@@ -27,13 +27,13 @@ export function MessagesPage() {
   const [active, setActive] = useState<MessageThread | null>(null)
   const [draft, setDraft] = useState('')
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState('')
+  const [errorMessage, setErrorMessage] = useState('')
   const [sendError, setSendError] = useState('')
   const wsRef = useRef<MessageWebSocket | null>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
-    setError('')
+    setErrorMessage('')
     try {
       const res = await listMessageThreads()
       setThreads(res.threads)
@@ -41,7 +41,7 @@ export function MessagesPage() {
         setActive((cur) => cur ?? res.threads[0] ?? null)
       }
     } catch {
-      setError('メッセージの取得に失敗しました')
+      setErrorMessage('メッセージの取得に失敗しました')
     } finally {
       setLoading(false)
     }
@@ -133,8 +133,8 @@ export function MessagesPage() {
   if (loading) {
     return <Loading />
   }
-  if (error) {
-    return <ErrorMessage message={error} onRetry={() => void load()} />
+  if (errorMessage) {
+    return <ErrorMessage message={errorMessage} onRetry={() => void load()} />
   }
 
   return (

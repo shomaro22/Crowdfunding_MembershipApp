@@ -18,7 +18,7 @@ export function TwoFactorForm() {
   )
 
   const [code, setCode] = useState('')
-  const [error, setError] = useState('')
+  const [errorMessage, setErrorMessage] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   if (status !== 'pending_2fa' && status !== 'authenticated') {
@@ -27,11 +27,11 @@ export function TwoFactorForm() {
 
   const onSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
-    setError('')
+    setErrorMessage('')
 
     const normalized = normalizeOtpCode(code)
     if (!validateTOTPCode(normalized)) {
-      setError('認証コードを入力してください')
+      setErrorMessage('認証コードを入力してください')
       return
     }
 
@@ -41,9 +41,9 @@ export function TwoFactorForm() {
       void navigate(postLoginPath(loggedIn, from), { replace: true })
     } catch (err) {
       if (err instanceof ApiError) {
-        setError(err.message)
+        setErrorMessage(err.message)
       } else {
-        setError('認証に失敗しました')
+        setErrorMessage('認証に失敗しました')
       }
     } finally {
       setIsSubmitting(false)
@@ -70,7 +70,7 @@ export function TwoFactorForm() {
         </p>
       </div>
 
-      {error ? <p className="mb-4 text-sm text-red-600">{error}</p> : null}
+      {errorMessage ? <p className="mb-4 text-sm text-red-600">{errorMessage}</p> : null}
 
       <form onSubmit={(e) => void onSubmit(e)} className="space-y-4">
         <div>

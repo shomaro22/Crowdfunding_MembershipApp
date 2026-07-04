@@ -1,6 +1,10 @@
 import { clsx, type ClassValue } from 'clsx'
 import { twMerge } from 'tailwind-merge'
 
+import { normalizeAsciiDigits } from '@/lib/digits'
+
+export { digitsOnly, normalizeAsciiDigits, postalCodeInput } from '@/lib/digits'
+
 export function cn(...inputs: ClassValue[]): string {
   return twMerge(clsx(inputs))
 }
@@ -100,7 +104,7 @@ export function formatCurrencyYen(amount: number): string {
 
 /** 目標金額など: 半角数字のみ受け付け、表示はカンマ区切り */
 export function formatYenInput(raw: string): string {
-  const digits = raw.replace(/\D/g, '').slice(0, 12)
+  const digits = normalizeAsciiDigits(raw).replace(/\D/g, '').slice(0, 12)
   if (digits === '') {
     return ''
   }
@@ -108,7 +112,7 @@ export function formatYenInput(raw: string): string {
 }
 
 export function parseYenInput(formatted: string): number {
-  const digits = formatted.replace(/\D/g, '')
+  const digits = normalizeAsciiDigits(formatted).replace(/\D/g, '')
   if (digits === '') {
     return 0
   }

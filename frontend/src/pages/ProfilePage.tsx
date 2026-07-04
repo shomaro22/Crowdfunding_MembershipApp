@@ -55,7 +55,7 @@ export function ProfilePage({ heading = 'プロフィール' }: { heading?: stri
   const onAvatarUpload = async (file: File) => {
     const check = validateImageFile(file)
     if (!check.valid) {
-      toast(check.error ?? '画像が無効です', 'error')
+      toast(check.message ?? '画像が無効です', 'error')
       return
     }
     setUploading(true)

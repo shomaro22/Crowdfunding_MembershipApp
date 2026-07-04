@@ -98,7 +98,7 @@ func (c *StubClient) nextCheckoutIDs() (string, string) {
 func (c *StubClient) CreateExpressAccount(ctx context.Context, email string) (string, error) {
 	_ = ctx
 	_ = email
-	return "acct_test_stub", nil
+	return "acct_test_" + strings.ReplaceAll(uuid.New().String(), "-", ""), nil
 }
 
 func (c *StubClient) CreateAccountLink(ctx context.Context, accountID, returnURL, refreshURL string) (string, error) {
