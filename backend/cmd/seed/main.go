@@ -6,7 +6,7 @@
 //
 // 環境変数: DATABASE_URL, JWT_SECRET, TEST_USER_PASSWORD,
 //
-//	SEED_TEST_USER_TEAM=1, SEED_TEST_USER_RESET=1
+//	SEED_TEST_USER_TEAM=1, SEED_TEST_USER_RESET=1, TOTP_ENCRYPTION_KEY（未設定時 JWT_SECRET）
 package main
 
 import (
@@ -139,6 +139,7 @@ func runDevSeed(flagArgs []string) {
 		databaseURL    string
 		password       string
 		jwtSecret      string
+		totpKey        string
 		privateRoot    string
 		gormDB         *gorm.DB
 		sqlDB          interface{ Close() error }
@@ -179,6 +180,10 @@ func runDevSeed(flagArgs []string) {
 	if len(jwtSecret) < 32 {
 		log.Fatal("JWT_SECRET must be at least 32 characters")
 	}
+	totpKey = strings.TrimSpace(os.Getenv("TOTP_ENCRYPTION_KEY"))
+	if len(totpKey) < 32 {
+		totpKey = jwtSecret
+	}
 
 	if err = db.Up(databaseURL); err != nil {
 		log.Fatalf("migrate: %v", err)
@@ -197,7 +202,7 @@ func runDevSeed(flagArgs []string) {
 	if err != nil {
 		log.Fatalf("hash: %v", err)
 	}
-	totpEnc, err = usecase.EncryptSecret([]byte(jwtSecret), devTOTPSecret)
+	totpEnc, err = usecase.EncryptSecret([]byte(totpKey), devTOTPSecret)
 	if err != nil {
 		log.Fatalf("totp encrypt: %v", err)
 	}

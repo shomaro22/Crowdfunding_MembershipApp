@@ -1,6 +1,7 @@
 package usecase
 
 import (
+	"bytes"
 	"context"
 	"crypto/rand"
 	"encoding/hex"
@@ -54,10 +55,22 @@ func (d *authDeps) verifyTOTPOrBackup(ctx context.Context, u model.User, code st
 }
 
 func (d *authDeps) decryptTOTP(u model.User) (string, error) {
+	var (
+		plain string
+		err   error
+	)
+
 	if u.TOTPSecret == nil || strings.TrimSpace(*u.TOTPSecret) == "" {
 		return "", Err2FANotConfigured
 	}
-	return DecryptSecret(d.TOTPKey, *u.TOTPSecret)
+	plain, err = DecryptSecret(d.TOTPKey, *u.TOTPSecret)
+	if err == nil {
+		return plain, nil
+	}
+	if len(d.legacyTOTPKey) >= 32 && !bytes.Equal(d.legacyTOTPKey, d.TOTPKey) {
+		return DecryptSecret(d.legacyTOTPKey, *u.TOTPSecret)
+	}
+	return "", err
 }
 
 func (d *authDeps) genBackupCodes(ctx context.Context, userID uuid.UUID) ([]string, error) {

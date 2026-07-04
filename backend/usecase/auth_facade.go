@@ -122,6 +122,7 @@ func newAuthDeps(cfg AuthConfig) *authDeps {
 		Mailer:        cfg.Mailer,
 		KYCStore:      cfg.KYCStore,
 		TOTPKey:       cfg.TOTPEncryptionKey,
+		legacyTOTPKey: []byte(cfg.JWTSecret),
 		TOTPIssuer:    cfg.TOTPIssuer,
 		pendingSecret: cfg.Pending2FAKey,
 		Tx:            cfg.Tx,

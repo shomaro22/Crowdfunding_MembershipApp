@@ -25,6 +25,7 @@ type authDeps struct {
 	KYCStore      repository.IKYCStore
 	Google        *GoogleOAuth
 	TOTPKey       []byte
+	legacyTOTPKey []byte
 	TOTPIssuer    string
 	pendingSecret []byte
 	Tx            repository.TxBeginner
