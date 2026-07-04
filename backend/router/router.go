@@ -31,7 +31,6 @@ type Config struct {
 	KYCFiles           controller.IKYCFileController
 	RateLimit         *middleware.RateLimiter
 	Policy2FAChallenge middleware.RatePolicy
-	OAuthEnabled      bool
 	WSTokenAuth       echo.MiddlewareFunc
 	PreAuthMiddleware []echo.MiddlewareFunc
 	Protected         []echo.MiddlewareFunc
@@ -91,12 +90,10 @@ func New(cfg Config) *echo.Echo {
 		e.POST("/auth/refresh", authCtl.Refresh, rl(middleware.PolicyRefresh))
 		e.POST("/auth/2fa/challenge", authCtl.Challenge2FA, rl(cfg.Policy2FAChallenge))
 
-		if cfg.OAuthEnabled {
-			e.GET("/auth/google", authCtl.GoogleStart, rl(middleware.PolicyGoogleOAuth))
-			e.GET("/auth/google/callback", authCtl.GoogleCallback, rl(middleware.PolicyGoogleOAuth))
-			e.POST("/auth/oauth/exchange", authCtl.OAuthExchange, rl(middleware.PolicyOAuthExchange))
-			e.POST("/auth/oauth/link-confirm", authCtl.OAuthLinkConfirm, rl(middleware.PolicyOAuthExchange))
-		}
+		e.GET("/auth/google", authCtl.GoogleStart, rl(middleware.PolicyGoogleOAuth))
+		e.GET("/auth/google/callback", authCtl.GoogleCallback, rl(middleware.PolicyGoogleOAuth))
+		e.POST("/auth/oauth/exchange", authCtl.OAuthExchange, rl(middleware.PolicyOAuthExchange))
+		e.POST("/auth/oauth/link-confirm", authCtl.OAuthLinkConfirm, rl(middleware.PolicyOAuthExchange))
 
 		e.POST("/auth/logout", authCtl.Logout)
 		pm = cfg.Protected

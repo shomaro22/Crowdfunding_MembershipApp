@@ -131,7 +131,6 @@ func BuildRouter(
 		KYCFiles:           ctls.KYCFiles,
 		RateLimit:          mw.RateLimiter,
 		Policy2FAChallenge: mw.Policy2FAChallenge,
-		OAuthEnabled:       ucs.Auth.OAuthEnabled(),
 		Protected:          mw.Protected,
 		OptionalJWT:        mw.OptionalJWT,
 		SellerRead:         mw.SellerRead,

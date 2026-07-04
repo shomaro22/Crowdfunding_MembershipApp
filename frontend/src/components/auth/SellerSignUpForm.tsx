@@ -1,4 +1,4 @@
-import { useState, type ChangeEvent, type FormEvent } from "react";
+import { useState, type ChangeEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
 
 import { checkEmailAvailable, registerSeller } from "@/api/auth";
@@ -150,8 +150,7 @@ export function SellerSignUpForm() {
     setStep((s) => Math.max(s - 1, 0));
   };
 
-  const onSubmit = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
+  const submitRegistration = async () => {
     setErrorMessage("");
     for (let i = 0; i < STEPS.length - 1; i++) {
       const validationMessage = validateStep(i);
@@ -248,7 +247,7 @@ export function SellerSignUpForm() {
           </p>
         ) : null}
 
-        <form onSubmit={(e) => void onSubmit(e)} className="space-y-4">
+        <div className="space-y-4">
           {step === 0 ? (
             <>
               <div>
@@ -486,11 +485,14 @@ export function SellerSignUpForm() {
               <p className="text-xs text-gray-500">
                 送信後、管理者による KYC 審査が行われます（通常 1〜3 営業日）。
               </p>
+              <p className="text-sm font-medium text-gray-700">
+                この内容で登録申請してよろしいですか？
+              </p>
             </div>
           ) : null}
 
           <div className="flex gap-3 pt-2">
-            {step > 0 ? (
+            {step > 0 && step < STEPS.length - 1 ? (
               <button
                 type="button"
                 onClick={goBack}
@@ -508,16 +510,27 @@ export function SellerSignUpForm() {
                 {step === STEPS.length - 2 ? "確認画面へ" : "次へ"}
               </button>
             ) : (
-              <button
-                type="submit"
-                disabled={isSubmitting || emailTaken}
-                className="btn-primary flex-1 rounded-full font-bold"
-              >
-                {isSubmitting ? "送信中..." : "この内容で登録申請する"}
-              </button>
+              <>
+                <button
+                  type="button"
+                  onClick={goBack}
+                  disabled={isSubmitting}
+                  className="btn-secondary flex-1 rounded-full font-bold"
+                >
+                  いいえ
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void submitRegistration()}
+                  disabled={isSubmitting || emailTaken}
+                  className="btn-primary flex-1 rounded-full font-bold"
+                >
+                  {isSubmitting ? "送信中..." : "はい"}
+                </button>
+              </>
             )}
           </div>
-        </form>
+        </div>
 
         <p className="mt-6 text-center text-sm text-gray-600">
           ファン（購入者）の方は{" "}

@@ -1,0 +1,325 @@
+// ER 図正本 — backend/db/migrations/000001〜000012 と一致
+// dbdiagram.io に Import し、Export → PDF でリポジトリルート dbdiagram.pdf を更新
+
+Project crowdfund_membership_app {
+  database_type: 'PostgreSQL'
+  Note: '''
+    クラウドファンディング・メンバーシップアプリ
+    本番: Neon / ローカル: Docker Compose postgres
+  '''
+}
+
+// ── 認証・ユーザー ──────────────────────────────────────
+
+Table users {
+  id uuid [pk, default: `gen_random_uuid()`]
+  email varchar [unique, not null]
+  name varchar
+  password_hash varchar [not null]
+  avatar_url varchar
+  role varchar [not null, default: 'BUYER', note: 'BUYER | SELLER | ADMIN']
+  account_status varchar [not null, default: 'PENDING']
+  seller_status varchar [not null, default: 'NOT_APPLICABLE']
+  admin_role varchar [note: 'SUPER_ADMIN | REVIEW_ADMIN | SUPPORT_ADMIN | FINANCE_ADMIN']
+  totp_enabled boolean [not null, default: false]
+  totp_secret_encrypted varchar
+  token_version bigint [not null, default: 0, note: 'JWT 失効用（2FA リセット等）']
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+
+  Note: '000002 + 000005'
+}
+
+Table refresh_tokens {
+  id uuid [pk, default: `gen_random_uuid()`]
+  user_id uuid [not null, ref: > users.id]
+  token_hash varchar [unique, not null]
+  expires_at timestamptz [not null]
+  created_at timestamptz [not null, default: `now()`]
+  revoked_at timestamptz
+
+  Note: 'RefreshToken（httpOnly Cookie）'
+}
+
+Table password_reset_tokens {
+  id uuid [pk, default: `gen_random_uuid()`]
+  user_id uuid [not null, ref: > users.id]
+  token_hash varchar [unique, not null]
+  expires_at timestamptz [not null]
+  used_at timestamptz
+  created_at timestamptz [not null, default: `now()`]
+}
+
+Table oauth_accounts {
+  id uuid [pk, default: `gen_random_uuid()`]
+  user_id uuid [not null, ref: > users.id]
+  provider varchar [not null, note: 'google']
+  provider_sub varchar [not null]
+  email varchar [not null]
+  created_at timestamptz [not null, default: `now()`]
+
+  indexes {
+    (provider, provider_sub) [unique]
+  }
+
+  Note: 'Google OIDC 連携（000005）'
+}
+
+Table totp_backup_codes {
+  id uuid [pk, default: `gen_random_uuid()`]
+  user_id uuid [not null, ref: > users.id]
+  code_hash varchar [not null]
+  used_at timestamptz
+  created_at timestamptz [not null, default: `now()`]
+}
+
+Table blacklist_entries {
+  id uuid [pk, default: `gen_random_uuid()`]
+  email_hash varchar [unique, not null]
+  stripe_customer_id varchar
+  stripe_connect_account_id varchar
+  reason text
+  banned_by uuid [ref: > users.id]
+  created_at timestamptz [not null, default: `now()`]
+}
+
+// ── KYC・審査 ───────────────────────────────────────────
+
+Table seller_registrations {
+  id uuid [pk, default: `gen_random_uuid()`]
+  user_id uuid [not null, ref: > users.id]
+  full_name varchar [not null]
+  birth_date date [not null]
+  address text [not null]
+  photo_present boolean [not null]
+  identity_document_front_key varchar
+  identity_document_back_key varchar
+  status varchar [not null, default: 'PENDING']
+  rejection_reason text
+  reviewed_at timestamptz
+  reviewed_by uuid [ref: > users.id]
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+
+  Note: '出品者 KYC §5.1.8（運転免許証 DRIVERS_LICENSE）'
+}
+
+Table audit_logs {
+  id uuid [pk, default: `gen_random_uuid()`]
+  admin_id uuid [not null, ref: > users.id]
+  action varchar [not null]
+  resource varchar [not null]
+  resource_id varchar [not null]
+  details text
+  reason text
+  created_at timestamptz [not null, default: `now()`]
+}
+
+Table review_decisions {
+  id uuid [pk, default: `gen_random_uuid()`]
+  reviewer_id uuid [not null, ref: > users.id]
+  resource_type varchar [not null]
+  resource_id uuid [not null]
+  decision varchar [not null]
+  reason text
+  created_at timestamptz [not null, default: `now()`]
+}
+
+// ── プロジェクト ────────────────────────────────────────
+
+Table projects {
+  id uuid [pk, default: `gen_random_uuid()`]
+  seller_id uuid [not null, ref: > users.id]
+  title varchar [not null]
+  description text [not null]
+  target_amount bigint [not null, default: 0]
+  current_amount bigint [not null, default: 0]
+  supporter_count int [not null, default: 0]
+  duration_type varchar [not null, note: 'UNLIMITED | LIMITED']
+  start_date timestamptz [not null]
+  end_date timestamptz [note: 'UNLIMITED 時 null']
+  status varchar [not null, default: 'PENDING']
+  main_image_url varchar
+  delete_requested boolean [not null, default: false]
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+}
+
+Table project_plans {
+  id uuid [pk, default: `gen_random_uuid()`]
+  project_id uuid [not null, ref: > projects.id]
+  membership_type varchar [not null, note: 'BRONZE | SILVER | GOLD']
+  price int [not null]
+  max_supporters int
+  benefits text [not null]
+  is_active boolean [not null, default: true]
+  supporter_count int [not null, default: 0]
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+
+  indexes {
+    (project_id, membership_type) [unique]
+  }
+}
+
+Table project_images {
+  id uuid [pk, default: `gen_random_uuid()`]
+  project_id uuid [not null, ref: > projects.id]
+  image_url varchar [not null]
+  is_main boolean [not null, default: false]
+  sort_order int [not null, default: 0]
+  created_at timestamptz [not null, default: `now()`]
+}
+
+Table favorites {
+  id uuid [pk, default: `gen_random_uuid()`]
+  user_id uuid [not null, ref: > users.id]
+  project_id uuid [not null, ref: > projects.id]
+  created_at timestamptz [not null, default: `now()`]
+
+  indexes {
+    (user_id, project_id) [unique]
+  }
+}
+
+// ── 支援・決済 ──────────────────────────────────────────
+
+Table connect_accounts {
+  id uuid [pk, default: `gen_random_uuid()`]
+  user_id uuid [unique, not null, ref: > users.id]
+  stripe_account_id varchar [unique, not null]
+  charges_enabled boolean [not null, default: false]
+  payouts_enabled boolean [not null, default: false]
+  details_submitted boolean [not null, default: false]
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+}
+
+Table project_supporters {
+  id uuid [pk, default: `gen_random_uuid()`]
+  project_id uuid [not null, ref: > projects.id]
+  user_id uuid [not null, ref: > users.id]
+  plan_id uuid [not null, ref: > project_plans.id]
+  status varchar [not null, default: 'ACTIVE']
+  billing_mode varchar [not null, note: 'AUTO | KONBINI']
+  pending_billing_mode varchar [note: '000008']
+  current_period_start timestamptz [not null]
+  current_period_end timestamptz [not null]
+  pending_plan_id uuid [ref: > project_plans.id]
+  plan_change_date timestamptz
+  stripe_customer_id varchar
+  stripe_subscription_id varchar
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+
+  Note: '同一 user×project で ACTIVE は 1 件（部分 UNIQUE）'
+}
+
+Table purchases {
+  id uuid [pk, default: `gen_random_uuid()`]
+  project_id uuid [not null, ref: > projects.id]
+  supporter_id uuid [ref: > project_supporters.id, note: 'KONBINI 初回未払い時 null']
+  buyer_id uuid [not null, ref: > users.id]
+  quantity int [not null, default: 1]
+  total_price int [not null]
+  status varchar [not null, default: 'PENDING']
+  payment_method varchar [not null]
+  period_start timestamptz
+  period_end timestamptz
+  stripe_invoice_id varchar
+  stripe_payment_intent_id varchar [unique]
+  stripe_checkout_session_id varchar [unique]
+  idempotency_key varchar [unique]
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+}
+
+Table purchase_events {
+  id uuid [pk, default: `gen_random_uuid()`]
+  purchase_id uuid [not null, ref: > purchases.id]
+  from_status varchar
+  to_status varchar [not null]
+  reason text
+  created_at timestamptz [not null, default: `now()`]
+
+  Note: 'Purchase 不変 + イベント追記'
+}
+
+Table stripe_webhook_events {
+  id uuid [pk, default: `gen_random_uuid()`]
+  stripe_event_id varchar [unique, not null]
+  event_type varchar [not null]
+  processed_at timestamptz [not null]
+  payload_hash varchar
+}
+
+Table batch_job_runs {
+  id uuid [pk, default: `gen_random_uuid()`]
+  job_name varchar [not null]
+  status varchar [not null]
+  started_at timestamptz [not null]
+  finished_at timestamptz
+  processed int [not null, default: 0]
+  failed int [not null, default: 0]
+  error_message text
+  triggered_by varchar [not null]
+  dry_run boolean [not null, default: false]
+}
+
+// ── メッセージ・WebSocket ─────────────────────────────────
+
+Table messages {
+  id uuid [pk, default: `gen_random_uuid()`]
+  project_id uuid [not null, ref: > projects.id]
+  sender_id uuid [not null, ref: > users.id]
+  receiver_id uuid [not null, ref: > users.id]
+  content text [not null]
+  is_read boolean [not null, default: false]
+  read_at timestamptz
+  created_at timestamptz [not null, default: `now()`]
+}
+
+Table ws_tokens {
+  id uuid [pk, default: `gen_random_uuid()`]
+  user_id uuid [not null, ref: > users.id]
+  token_hash varchar [unique, not null]
+  expires_at timestamptz [not null]
+  used_at timestamptz
+  created_at timestamptz [not null, default: `now()`]
+}
+
+// ── 通報 ────────────────────────────────────────────────
+
+Table reports {
+  id uuid [pk, default: `gen_random_uuid()`]
+  reporter_id uuid [not null, ref: > users.id]
+  target_type varchar [not null]
+  target_id uuid [not null]
+  reason varchar [not null]
+  detail text
+  status varchar [not null, default: 'PENDING']
+  reviewed_by uuid [ref: > users.id]
+  reviewed_at timestamptz
+  resolution text
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+
+  Note: '同一 reporter×target で PENDING/IN_REVIEW は 1 件（部分 UNIQUE）'
+}
+
+// ── ログ ────────────────────────────────────────────────
+
+Table activity_logs {
+  id uuid [pk, default: `gen_random_uuid()`]
+  user_id uuid [ref: > users.id]
+  action varchar [not null]
+  resource varchar
+  resource_id varchar
+  ip_address varchar
+  user_agent text
+  request_id varchar
+  metadata jsonb
+  created_at timestamptz [not null, default: `now()`]
+
+  Note: '000010: idx on (ip_address, created_at)'
+}

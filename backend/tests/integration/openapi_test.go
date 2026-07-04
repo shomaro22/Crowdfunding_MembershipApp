@@ -13,7 +13,7 @@ func TestOpenAPIIncludesConnectAndKYCEndpoints(t *testing.T) {
 		doc  string
 		path string
 	)
-	data, err = os.ReadFile("../../openapi.yaml")
+	data, err = os.ReadFile("../../../openapi.yaml")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -22,6 +22,9 @@ func TestOpenAPIIncludesConnectAndKYCEndpoints(t *testing.T) {
 		"/seller/connect:",
 		"/seller/connect/onboarding:",
 		"/admin/kyc-documents:",
+		"/auth/oauth/link-confirm:",
+		"/auth/logout-all:",
+		"/projects/featured:",
 		"ConnectAccountResponse:",
 		"ConnectOnboardingResponse:",
 	} {
