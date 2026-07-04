@@ -52,11 +52,11 @@ export function AdminPage() {
   const activeTab: AdminTab = tabParam && tabs.includes(tabParam) ? tabParam : (tabs[0] ?? 'reviews-buyers')
 
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState('')
+  const [errorMessage, setErrorMessage] = useState('')
 
   useEffect(() => {
     if (!canAccessAdminTab(adminRole, activeTab)) {
-      setError('この管理機能へのアクセス権がありません')
+      setErrorMessage('この管理機能へのアクセス権がありません')
       setLoading(false)
       return
     }
@@ -65,7 +65,7 @@ export function AdminPage() {
 
   const setTab = (tab: AdminTab) => {
     setSearchParams({ tab })
-    setError('')
+    setErrorMessage('')
   }
 
   if (!adminRole) {
@@ -91,8 +91,8 @@ export function AdminPage() {
           </button>
         ))}
       </nav>
-      {error ? <p className="mb-4 text-red-600">{error}</p> : null}
-      <AdminTabPanel tab={activeTab} onToast={toast} onError={setError} />
+      {errorMessage ? <p className="mb-4 text-red-600">{errorMessage}</p> : null}
+      <AdminTabPanel tab={activeTab} onToast={toast} onError={setErrorMessage} />
     </div>
   )
 }

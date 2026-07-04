@@ -22,7 +22,7 @@ export function HomePage() {
   const [total, setTotal] = useState(0)
   const [loading, setLoading] = useState(true)
   const [loadingMore, setLoadingMore] = useState(false)
-  const [error, setError] = useState('')
+  const [errorMessage, setErrorMessage] = useState('')
 
   useEffect(() => {
     if (status !== 'authenticated' || !hasRole('BUYER')) {
@@ -42,7 +42,7 @@ export function HomePage() {
     } else {
       setLoading(true)
     }
-    setError('')
+    setErrorMessage('')
     try {
       const res = await listPublicProjects({
         search: term || undefined,
@@ -52,7 +52,7 @@ export function HomePage() {
       setTotal(res.total)
       setProjects((prev) => (append ? [...prev, ...res.projects] : res.projects))
     } catch {
-      setError('プロジェクト一覧の取得に失敗しました')
+      setErrorMessage('プロジェクト一覧の取得に失敗しました')
     } finally {
       setLoading(false)
       setLoadingMore(false)
@@ -109,9 +109,9 @@ export function HomePage() {
       </form>
 
       {loading && projects.length === 0 ? <Loading label="プロジェクトを読み込み中..." /> : null}
-      {error ? <ErrorMessage message={error} onRetry={() => void loadPage(query, 0, false)} /> : null}
+      {errorMessage ? <ErrorMessage message={errorMessage} onRetry={() => void loadPage(query, 0, false)} /> : null}
 
-      {!error && projects.length > 0 ? (
+      {!errorMessage && projects.length > 0 ? (
         <>
           <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
             {projects.map((project) => (
@@ -127,7 +127,7 @@ export function HomePage() {
         </>
       ) : null}
 
-      {!loading && !error && projects.length === 0 ? (
+      {!loading && !errorMessage && projects.length === 0 ? (
         <p className="text-center text-gray-500">公開中のプロジェクトがありません</p>
       ) : null}
     </div>

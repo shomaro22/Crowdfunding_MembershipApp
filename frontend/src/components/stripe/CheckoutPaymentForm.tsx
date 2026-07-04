@@ -3,8 +3,8 @@ import { loadStripe } from '@stripe/stripe-js'
 import { Elements, PaymentElement, useElements, useStripe } from '@stripe/react-stripe-js'
 
 import { verifyPaymentIntent } from '@/api/payments'
+import { digitsOnly } from '@/lib/digits'
 import {
-  digitsOnly,
   formatCardExpiryInput,
   formatCardNumberInput,
   validateDemoCardCvc,
