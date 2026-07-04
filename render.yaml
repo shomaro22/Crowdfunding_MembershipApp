@@ -4,9 +4,8 @@ services:
   - type: web
     name: crowdfund-api
     runtime: docker
-    dockerfilePath: ./Dockerfile
+    dockerfilePath: ./Dockerfile.render
     dockerContext: .
-    dockerTarget: backend-runtime
     plan: starter
     healthCheckPath: /health
     envVars:
@@ -41,4 +40,10 @@ services:
       - key: PUBLIC_APP_URL
         sync: false
       - key: CORS_ALLOW_ORIGINS
+        sync: false
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false
+      - key: GOOGLE_REDIRECT_URI
         sync: false

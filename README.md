@@ -1,5 +1,7 @@
 # Crowdfunding Membership App
 
+クラウドファンディング型メンバーシップアプリ（React + Go）。API 契約はリポジトリ直下の [`openapi.yaml`](openapi.yaml) を正本とする。
+
 ## デモアカウント
 
 | ロール | メール | パスワード |
@@ -29,9 +31,12 @@
 3. **既存のメール登録アカウントがある場合** → 連携確認画面で「連携する」を押す
 4. **新規の場合** → そのままログイン完了
 
-設定手順: [docs/GOOGLE_OAUTH_SETUP.md](docs/GOOGLE_OAUTH_SETUP.md)
+設定手順: [docs/GOOGLE_OAUTH_SETUP.md](docs/GOOGLE_OAUTH_SETUP.md)  
+フロー詳細: [docs/architecture/google-oauth-oidc.md](docs/architecture/google-oauth-oidc.md)
 
 ## 起動
+
+Docker はリポジトリ直下の [`Dockerfile`](Dockerfile) のみを使用する（`docker compose` / CI の `backend-runtime` ターゲット）。
 
 ```bash
 docker compose up -d --build
@@ -42,3 +47,15 @@ docker compose up -d --build
 ```bash
 docker compose run --rm backend-seed dev -team -reset
 ```
+
+Render 本番 API は [`Dockerfile.render`](Dockerfile.render) を参照。
+
+## データベース ER 図
+
+| ファイル | 用途 |
+|----------|------|
+| [`docs/database/schema.dbml`](docs/database/schema.dbml) | ER 図ソース（dbdiagram.io 用） |
+| `backend/db/migrations/*.up.sql` | 実装の正本（矛盾時は migration を優先） |
+| [`dbdiagram.pdf`](dbdiagram.pdf) | エクスポート済み PDF |
+
+PDF の更新: [dbdiagram.io](https://dbdiagram.io/) で `schema.dbml` を Import → Export to PDF → ルートの `dbdiagram.pdf` を上書き。
