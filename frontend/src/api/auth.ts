@@ -1,5 +1,5 @@
 import { apiRequest, ApiError, apiUpload } from '@/lib/api-client'
-import { clearPending2FAToken, getPending2FAToken } from '@/lib/pending-2fa-store'
+import { clearPending2FASession, getPending2FAToken } from '@/lib/pending-2fa-store'
 import { setAccessToken } from '@/lib/token-store'
 import type {
   AuthTokenResponse,
@@ -30,17 +30,20 @@ export async function challenge2FA(code: string): Promise<AuthTokenResponse> {
     body: { code, pending_token: pendingToken },
     skipRefresh: true,
   })
-  clearPending2FAToken()
+  clearPending2FASession()
   setAccessToken(res.auth_token)
   return res
 }
 
 export async function refreshSession(): Promise<string | null> {
   try {
-    const res = await apiRequest<RefreshResponse>('/auth/refresh', {
+    const res = await apiRequest<RefreshResponse | undefined>('/auth/refresh', {
       method: 'POST',
       skipRefresh: true,
     })
+    if (!res || typeof res.auth_token !== 'string') {
+      return null
+    }
     setAccessToken(res.auth_token)
     return res.auth_token
   } catch {

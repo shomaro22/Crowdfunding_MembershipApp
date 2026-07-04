@@ -127,19 +127,22 @@ export async function apiRequest<T>(
     headers.set('Content-Type', 'application/json')
   }
 
-  if (auth) {
-    const token = getAccessToken()
-    if (token) {
-      headers.set('Authorization', `Bearer ${token}`)
-    }
-  }
-
   const abortFromCaller = (): void => {
     controller.abort()
   }
   signal?.addEventListener('abort', abortFromCaller)
 
   try {
+    if (auth) {
+      if (!skipRefresh && !getAccessToken()) {
+        await refreshAccessToken()
+      }
+      const token = getAccessToken()
+      if (token) {
+        headers.set('Authorization', `Bearer ${token}`)
+      }
+    }
+
     let response = await fetch(`${apiBaseUrl()}${path}`, {
       method,
       credentials: 'include',
@@ -192,14 +195,17 @@ export async function apiUpload<T>(
   const timer = window.setTimeout(() => controller.abort(), DEFAULT_TIMEOUT_MS)
   const headers = new Headers({ Accept: 'application/json' })
 
-  if (auth) {
-    const token = getAccessToken()
-    if (token) {
-      headers.set('Authorization', `Bearer ${token}`)
-    }
-  }
-
   try {
+    if (auth) {
+      if (!getAccessToken()) {
+        await refreshAccessToken()
+      }
+      const token = getAccessToken()
+      if (token) {
+        headers.set('Authorization', `Bearer ${token}`)
+      }
+    }
+
     let response = await fetch(`${apiBaseUrl()}${path}`, {
       method: 'POST',
       credentials: 'include',

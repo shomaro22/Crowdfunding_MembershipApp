@@ -41,7 +41,13 @@ export function TwoFactorForm() {
       void navigate(postLoginPath(loggedIn, from), { replace: true })
     } catch (err) {
       if (err instanceof ApiError) {
-        setErrorMessage(err.message)
+        if (err.code === 'UNAUTHORIZED') {
+          setErrorMessage('2FA の有効期限が切れました。再度ログインしてください。')
+        } else if (err.code === 'INVALID_2FA_CODE') {
+          setErrorMessage('認証コードが正しくありません。認証アプリのコードを確認してください。')
+        } else {
+          setErrorMessage(err.message)
+        }
       } else {
         setErrorMessage('認証に失敗しました')
       }
