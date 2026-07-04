@@ -1,10 +1,10 @@
+import { digitsOnly } from '@/lib/digits'
+
 interface ZipCloudResult {
   address1: string
   address2: string
   address3: string
 }
-
-import { digitsOnly } from '@/lib/validation'
 
 export async function lookupJapaneseAddress(postalCode: string): Promise<string | null> {
   const digits = digitsOnly(postalCode, 7)

@@ -13,12 +13,12 @@ export function CreatorProjectsPage() {
   const [projects, setProjects] = useState<ProjectSummary[]>([])
   const [creatorName, setCreatorName] = useState('')
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState('')
+  const [errorMessage, setErrorMessage] = useState('')
 
   useEffect(() => {
     const id = parseUUID(sellerId)
     if (!id) {
-      setError('クリエイター ID が不正です')
+      setErrorMessage('クリエイター ID が不正です')
       setLoading(false)
       return
     }
@@ -31,7 +31,7 @@ export function CreatorProjectsPage() {
         const name = filtered[0]?.seller?.name ?? filtered[0]?.seller?.email ?? 'クリエイター'
         setCreatorName(name)
       } catch {
-        setError('出品一覧の取得に失敗しました')
+        setErrorMessage('出品一覧の取得に失敗しました')
       } finally {
         setLoading(false)
       }
@@ -41,8 +41,8 @@ export function CreatorProjectsPage() {
   if (loading) {
     return <Loading />
   }
-  if (error) {
-    return <ErrorMessage message={error} />
+  if (errorMessage) {
+    return <ErrorMessage message={errorMessage} />
   }
 
   return (

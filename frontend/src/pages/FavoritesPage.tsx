@@ -10,16 +10,16 @@ import type { ProjectSummary } from '@/types/api'
 export function FavoritesPage() {
   const [items, setItems] = useState<ProjectSummary[]>([])
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState('')
+  const [errorMessage, setErrorMessage] = useState('')
 
   const load = async () => {
     setLoading(true)
-    setError('')
+    setErrorMessage('')
     try {
       const res = await listFavorites()
       setItems(res.favorites)
     } catch {
-      setError('お気に入りの取得に失敗しました')
+      setErrorMessage('お気に入りの取得に失敗しました')
     } finally {
       setLoading(false)
     }
@@ -37,8 +37,8 @@ export function FavoritesPage() {
   if (loading) {
     return <Loading />
   }
-  if (error) {
-    return <ErrorMessage message={error} onRetry={() => void load()} />
+  if (errorMessage) {
+    return <ErrorMessage message={errorMessage} onRetry={() => void load()} />
   }
 
   return (
