@@ -299,6 +299,9 @@ paths:
                 code:
                   type: string
                   description: 6-digit TOTP code (backup codes also accepted per §5.1.6)
+                pending_token:
+                  type: string
+                  description: POST /auth/login の pending_token（クロスオリジン時は Cookie より優先）
       responses:
         "200":
           description: AuthToken issued; RefreshToken in httpOnly Cookie
@@ -2474,6 +2477,10 @@ components:
           type: boolean
           description: |
             true のとき AuthToken は未発行。POST /auth/2fa/challenge で TOTP 検証後に AuthToken を取得する（§5.1.6）。
+        pending_token:
+          type: string
+          description: |
+            requires_2fa が true のときに返る短期トークン。クロスオリジン SPA 向けに POST /auth/2fa/challenge の pending_token に渡す（Cookie 2fa_pending の代替）。
 
     RefreshResponse:
       type: object

@@ -89,17 +89,24 @@ func Pending2FAFrom(c echo.Context) string {
 }
 
 func NewCookieCfg(refreshCookieName string, secure bool) CookieCfg {
+	var sameSite http.SameSite
+
 	if strings.TrimSpace(refreshCookieName) == "" {
 		refreshCookieName = DefaultRefreshCookie
 	}
 	if secure && !strings.HasPrefix(refreshCookieName, "__Secure-") && !strings.HasPrefix(refreshCookieName, "__Host-") {
 		refreshCookieName = "__Secure-" + refreshCookieName
 	}
+	sameSite = http.SameSiteLaxMode
+	if secure {
+		// Vercel (フロント) → Render (API) などクロスオリジン fetch で Cookie を送る
+		sameSite = http.SameSiteNoneMode
+	}
 
 	return CookieCfg{
 		Name:     refreshCookieName,
 		Secure:   secure,
-		SameSite: http.SameSiteStrictMode,
+		SameSite: sameSite,
 		Path:     "/auth",
 	}
 }

@@ -153,17 +153,21 @@ func (h *authController) Challenge2FA(c echo.Context) error {
 	var (
 		pending string
 		body    struct {
-			Code string `json:"code"`
+			Code         string `json:"code"`
+			PendingToken string `json:"pending_token"`
 		}
 		res *usecase.LoginResult
 		err error
 	)
-	pending = Pending2FAFrom(c)
-	if pending == "" {
-		return echo.NewHTTPError(http.StatusUnauthorized, apiError("2fa session expired", "UNAUTHORIZED"))
-	}
 	if err = bindBody(c, &body); err != nil || body.Code == "" {
 		return badRequest(c, "code required")
+	}
+	pending = Pending2FAFrom(c)
+	if pending == "" {
+		pending = strings.TrimSpace(body.PendingToken)
+	}
+	if pending == "" {
+		return echo.NewHTTPError(http.StatusUnauthorized, apiError("2fa session expired", "UNAUTHORIZED"))
 	}
 	res, err = h.Auth.Challenge2FA(reqCtx(c), pending, body.Code, requestMeta(c))
 	if err != nil {
