@@ -187,13 +187,7 @@ jobs:
           mkdir -p k6/reports
           k6 run k6/smoke.js
           ADMIN_TOTP_CODE=$(cd e2e && node -e "const {authenticator}=require('otplib'); console.log(authenticator.generate('JBSWY3DPEHPK3PXP'))")
-          ADMIN_AUTH_TOKEN=$(curl -sf -c /tmp/k6-admin-cookie.txt -X POST http://localhost/auth/login \
-            -H 'Content-Type: application/json' \
-            -d '{"email":"admin@example.com","password":"password123"}' \
-            && curl -sf -b /tmp/k6-admin-cookie.txt -X POST http://localhost/auth/2fa/challenge \
-            -H 'Content-Type: application/json' \
-            -d "{\"code\":\"${ADMIN_TOTP_CODE}\"}" | jq -r '.auth_token // empty')
-          ADMIN_AUTH_TOKEN="${ADMIN_AUTH_TOKEN}" k6 run k6/admin-load.js
+          ADMIN_TOTP_CODE="${ADMIN_TOTP_CODE}" k6 run k6/admin-load.js
           k6 run k6/project-list.js
           k6 run k6/notification-load.js
           k6 run k6/auth-load.js
