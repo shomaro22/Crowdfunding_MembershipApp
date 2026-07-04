@@ -1,5 +1,7 @@
 /** 入力検証（クライアント側防御 — 最終判定は常にサーバー） */
 
+import { digitsOnly, normalizeAsciiDigits } from '@/lib/digits'
+
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 const TOTP_RE = /^[0-9]{6}$/
 const TOTP_BACKUP_RE = /^[0-9A-Z]{8,10}$/
@@ -19,22 +21,6 @@ export function parseUUID(value: string | undefined | null): string | null {
 export function validateTOTPCode(code: string): boolean {
   const trimmed = normalizeOtpCode(code)
   return TOTP_RE.test(trimmed) || TOTP_BACKUP_RE.test(trimmed)
-}
-
-/** 全角数字（０-９）を半角に変換 */
-export function normalizeAsciiDigits(value: string): string {
-  return value.replace(/[\uFF10-\uFF19]/g, (ch) =>
-    String.fromCharCode(ch.charCodeAt(0) - 0xff10 + 0x30),
-  )
-}
-
-/** 半角数字のみ抽出（全角数字は先に半角化） */
-export function digitsOnly(value: string, maxLength?: number): string {
-  let digits = normalizeAsciiDigits(value).replace(/\D/g, '')
-  if (maxLength !== undefined) {
-    digits = digits.slice(0, maxLength)
-  }
-  return digits
 }
 
 /** 全角数字・空白を半角 OTP 用に正規化 */

@@ -1,7 +1,9 @@
 import { clsx, type ClassValue } from 'clsx'
 import { twMerge } from 'tailwind-merge'
 
-import { normalizeAsciiDigits } from '@/lib/validation'
+import { normalizeAsciiDigits } from '@/lib/digits'
+
+export { digitsOnly, normalizeAsciiDigits, postalCodeInput } from '@/lib/digits'
 
 export function cn(...inputs: ClassValue[]): string {
   return twMerge(clsx(inputs))

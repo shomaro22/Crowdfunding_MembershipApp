@@ -15,22 +15,21 @@ export const options = {
 };
 
 export function setup() {
+  const envToken = __ENV.ADMIN_AUTH_TOKEN || '';
+  if (envToken) {
+    return { adminToken: envToken };
+  }
   const totpCode = __ENV.ADMIN_TOTP_CODE || '';
   const adminToken = loginAdminWithTotp(totpCode);
-  return {
-    adminToken: __ENV.ADMIN_AUTH_TOKEN || adminToken || '',
-    totpCode,
-  };
+  return { adminToken: adminToken || '' };
 }
 
 export default function adminLoad(data) {
-  let token = data.adminToken;
-  if (!token) {
-    token = loginAdminWithTotp(data.totpCode);
-  }
+  const token = data.adminToken;
   if (!token) {
     const forbidden = http.get(`${BASE_URL}/admin/stats`, {
       headers: { Accept: 'application/json', Authorization: 'Bearer invalid' },
+      responseCallback: http.expectedStatuses(401, 403),
     });
     check(forbidden, {
       'admin without auth blocked': (r) => r.status === 401 || r.status === 403,

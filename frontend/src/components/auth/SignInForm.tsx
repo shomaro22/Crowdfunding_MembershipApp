@@ -26,7 +26,7 @@ export function SignInForm() {
     email?: string;
     password?: string;
   }>({});
-  const [error, setError] = useState("");
+  const [errorMessage, setErrorMessage] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const fromState =
@@ -55,7 +55,7 @@ export function SignInForm() {
 
   const onSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    setError("");
+    setErrorMessage("");
     if (!validate()) {
       return;
     }
@@ -73,9 +73,9 @@ export function SignInForm() {
       void navigate(postLoginPath(result, callbackPath), { replace: true });
     } catch (err) {
       if (err instanceof ApiError) {
-        setError(err.message);
+        setErrorMessage(err.message);
       } else {
-        setError("ログインに失敗しました");
+        setErrorMessage("ログインに失敗しました");
       }
     } finally {
       setIsSubmitting(false);
@@ -93,14 +93,14 @@ export function SignInForm() {
         <p className="text-gray-600">アカウントにアクセスしてください</p>
       </div>
 
-      {error ? (
+      {errorMessage ? (
         <div className="mb-6 rounded-2xl border border-red-200 bg-red-50 p-4 text-red-700">
           <div className="flex items-center">
             <span
               className="mr-3 inline-block h-2 w-2 rounded-full bg-red-500"
               aria-hidden
             />
-            {error}
+            {errorMessage}
           </div>
         </div>
       ) : null}
