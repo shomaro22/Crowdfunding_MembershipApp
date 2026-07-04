@@ -31,7 +31,7 @@ export function ProjectDetailPage() {
   const [related, setRelated] = useState<ProjectSummary[]>([])
   const [relatedTotal, setRelatedTotal] = useState(0)
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState('')
+  const [errorMessage, setErrorMessage] = useState('')
   const [favorited, setFavorited] = useState(false)
   const [reportOpen, setReportOpen] = useState(false)
   const [reportReason, setReportReason] = useState('')
@@ -50,7 +50,7 @@ export function ProjectDetailPage() {
   useEffect(() => {
     const id = parseUUID(projectId)
     if (!id) {
-      setError('プロジェクト ID が不正です')
+      setErrorMessage('プロジェクト ID が不正です')
       setLoading(false)
       return
     }
@@ -73,9 +73,9 @@ export function ProjectDetailPage() {
         }
       } catch (err) {
         if (err instanceof ApiError && err.status === 403) {
-          setError('このプロジェクトは表示できません（通報済み、またはアクセス権がありません）')
+          setErrorMessage('このプロジェクトは表示できません（通報済み、またはアクセス権がありません）')
         } else {
-          setError('プロジェクトの取得に失敗しました')
+          setErrorMessage('プロジェクトの取得に失敗しました')
         }
       } finally {
         setLoading(false)
@@ -153,8 +153,8 @@ export function ProjectDetailPage() {
     return <Loading />
   }
 
-  if (error || !project) {
-    return <ErrorMessage message={error || 'プロジェクトが見つかりません'} />
+  if (errorMessage || !project) {
+    return <ErrorMessage message={errorMessage || 'プロジェクトが見つかりません'} />
   }
 
   const progressPercent = fundingProgressPercent(project.current_amount, project.target_amount)

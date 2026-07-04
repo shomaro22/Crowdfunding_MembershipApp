@@ -18,7 +18,7 @@ export function BuyerSignUpForm() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
-  const [error, setError] = useState('')
+  const [errorMessage, setErrorMessage] = useState('')
   const [success, setSuccess] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [emailTaken, setEmailTaken] = useState(false)
@@ -40,27 +40,27 @@ export function BuyerSignUpForm() {
 
   const onSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
-    setError('')
+    setErrorMessage('')
     setSuccess('')
 
     if (!isValidEmail(email)) {
-      setError('有効なメールアドレスを入力してください')
+      setErrorMessage('有効なメールアドレスを入力してください')
       return
     }
 
     if (emailTaken) {
-      setError('このメールアドレスは既に登録されています')
+      setErrorMessage('このメールアドレスは既に登録されています')
       return
     }
 
     const pwCheck = validatePassword(password)
     if (!pwCheck.valid) {
-      setError(pwCheck.errors[0] ?? 'パスワードが無効です')
+      setErrorMessage(pwCheck.errors[0] ?? 'パスワードが無効です')
       return
     }
 
     if (password !== confirmPassword) {
-      setError('確認用パスワードが一致しません')
+      setErrorMessage('確認用パスワードが一致しません')
       return
     }
 
@@ -71,9 +71,9 @@ export function BuyerSignUpForm() {
       window.setTimeout(() => { void navigate('/signin') }, 2000)
     } catch (err) {
       if (err instanceof ApiError) {
-        setError(err.message)
+        setErrorMessage(err.message)
       } else {
-        setError('登録に失敗しました')
+        setErrorMessage('登録に失敗しました')
       }
     } finally {
       setIsSubmitting(false)
@@ -101,7 +101,7 @@ export function BuyerSignUpForm() {
           <p className="mt-1 text-sm text-gray-600">メールアドレスでアカウントを作成します</p>
         </div>
 
-        {error ? <p className="mb-4 text-sm text-red-600">{error}</p> : null}
+        {errorMessage ? <p className="mb-4 text-sm text-red-600">{errorMessage}</p> : null}
         {success ? <p className="mb-4 text-sm text-green-700">{success}</p> : null}
 
         <form onSubmit={(e) => void onSubmit(e)} className="space-y-4">
