@@ -67,8 +67,9 @@ func (h *authController) Login(c echo.Context) error {
 		}
 		SetPending2FA(c, h.CookieCfg, token)
 		return jsonOK(c, login2FAResponse{
-			Requires2FA: true,
-			User:        UserWireFrom(res.User),
+			Requires2FA:  true,
+			PendingToken: token,
+			User:         UserWireFrom(res.User),
 		})
 	}
 	SetRefreshCookie(c, h.CookieCfg, res.RefreshToken)
@@ -107,8 +108,11 @@ func (h *authController) Logout(c echo.Context) error {
 		err   error
 	)
 	plain = RefreshTokenFrom(c, h.CookieCfg)
-	if err = h.Auth.Logout(reqCtx(c), plain, requestMeta(c)); err != nil {
-		return mapUseCaseError(err)
+	if plain != "" {
+		err = h.Auth.Logout(reqCtx(c), plain, requestMeta(c))
+		if err != nil && !errors.Is(err, usecase.ErrInvalidToken) && !errors.Is(err, usecase.ErrTokenRevoked) {
+			return mapUseCaseError(err)
+		}
 	}
 	ClearRefreshCookie(c, h.CookieCfg)
 	return noContent(c)

@@ -32,6 +32,7 @@ export interface AuthTokenResponse {
 
 export interface Login2FAResponse {
   requires_2fa: true
+  pending_token: string
   user: User
 }
 

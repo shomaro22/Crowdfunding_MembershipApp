@@ -16,6 +16,7 @@ import {
   refreshSession,
 } from '@/api/auth'
 import { clearAccessToken, getAccessToken, setAccessToken } from '@/lib/token-store'
+import { clearPending2FAToken, setPending2FAToken } from '@/lib/pending-2fa-store'
 import { parseJWTClaims } from '@/lib/jwt-claims'
 import { isLogin2FAResponse, type AdminRole, type User, type UserRole } from '@/types/api'
 
@@ -100,6 +101,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const login = useCallback(async (email: string, password: string): Promise<User | '2fa'> => {
     const res = await loginApi(email, password)
     if (isLogin2FAResponse(res)) {
+      if (!res.pending_token) {
+        throw new Error('2FA session could not be started')
+      }
+      setPending2FAToken(res.pending_token)
       setUser(res.user)
       setStatus('pending_2fa')
       return '2fa'
@@ -122,8 +127,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const logout = useCallback(async () => {
     try {
       await logoutApi()
+    } catch {
+      /* Cookie 未送信等でもクライアント側はログアウト完了とする */
     } finally {
       clearAccessToken()
+      clearPending2FAToken()
       setUser(null)
       setAdminRole(null)
       setStatus('anonymous')

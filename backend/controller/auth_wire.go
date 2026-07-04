@@ -14,8 +14,9 @@ type registerResponse struct {
 }
 
 type login2FAResponse struct {
-	Requires2FA bool     `json:"requires_2fa"`
-	User        UserWire `json:"user"`
+	Requires2FA  bool     `json:"requires_2fa"`
+	PendingToken string   `json:"pending_token"`
+	User         UserWire `json:"user"`
 }
 
 type authTokenResponse struct {
