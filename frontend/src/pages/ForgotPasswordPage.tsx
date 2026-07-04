@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react'
+import { useState, type ChangeEvent, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
 
 import { forgotPassword } from '@/api/auth'
@@ -9,15 +9,15 @@ import { sanitizeEmail } from '@/lib/utils'
 export function ForgotPasswordPage() {
   const [email, setEmail] = useState('')
   const [sent, setSent] = useState(false)
-  const [error, setError] = useState('')
+  const [errorMessage, setErrorMessage] = useState('')
   const [loading, setLoading] = useState(false)
 
   const onSubmit = async (e: FormEvent) => {
     e.preventDefault()
-    setError('')
+    setErrorMessage('')
     const emailValidationMessage = validateEmail(email)
     if (emailValidationMessage !== null) {
-      setError(emailValidationMessage)
+      setErrorMessage(emailValidationMessage)
       return
     }
     setLoading(true)
@@ -26,7 +26,7 @@ export function ForgotPasswordPage() {
       setSent(true)
     } catch (err) {
       if (err instanceof ApiError && err.code === 'RATE_LIMITED') {
-        setError('リクエストが多すぎます。しばらく待ってから再試行してください')
+        setErrorMessage('リクエストが多すぎます。しばらく待ってから再試行してください')
       } else {
         setSent(true)
       }
@@ -58,14 +58,14 @@ export function ForgotPasswordPage() {
         </div>
       ) : (
         <form onSubmit={(e) => void onSubmit(e)} className="space-y-4">
-          {error ? <p className="text-sm text-red-600">{error}</p> : null}
+          {errorMessage ? <p className="text-sm text-red-600">{errorMessage}</p> : null}
           <input
             type="email"
             autoComplete="email"
             className="input-field"
             placeholder="メールアドレス"
             value={email}
-            onChange={(ev) => setEmail(ev.target.value)}
+            onChange={(event: ChangeEvent<HTMLInputElement>) => setEmail(event.currentTarget.value)}
           />
           <button type="submit" disabled={loading} className="btn-primary w-full rounded-full">
             {loading ? '送信中...' : '送信'}

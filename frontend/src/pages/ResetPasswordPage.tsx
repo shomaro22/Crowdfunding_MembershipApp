@@ -11,23 +11,23 @@ export function ResetPasswordPage() {
   const token = searchParams.get('token') ?? ''
   const [password, setPassword] = useState('')
   const [confirm, setConfirm] = useState('')
-  const [error, setError] = useState('')
+  const [errorMessage, setErrorMessage] = useState('')
   const [loading, setLoading] = useState(false)
 
   const onSubmit = async (e: FormEvent) => {
     e.preventDefault()
-    setError('')
+    setErrorMessage('')
     if (!token || token.length > 256) {
-      setError('再設定リンクが無効です')
+      setErrorMessage('再設定リンクが無効です')
       return
     }
     const v = validatePassword(password)
     if (!v.valid) {
-      setError(v.errors[0] ?? 'パスワードが無効です')
+      setErrorMessage(v.errors[0] ?? 'パスワードが無効です')
       return
     }
     if (password !== confirm) {
-      setError('確認用パスワードが一致しません')
+      setErrorMessage('確認用パスワードが一致しません')
       return
     }
     setLoading(true)
@@ -35,7 +35,7 @@ export function ResetPasswordPage() {
       await resetPassword(token, password)
       void navigate('/signin', { replace: true })
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : '再設定に失敗しました')
+      setErrorMessage(err instanceof ApiError ? err.message : '再設定に失敗しました')
     } finally {
       setLoading(false)
     }
@@ -45,7 +45,7 @@ export function ResetPasswordPage() {
     <div className="card mx-auto max-w-md">
       <h1 className="mb-4 text-2xl font-bold">新しいパスワード</h1>
       <form onSubmit={(e) => void onSubmit(e)} className="space-y-4">
-        {error ? <p className="text-sm text-red-600">{error}</p> : null}
+        {errorMessage ? <p className="text-sm text-red-600">{errorMessage}</p> : null}
         <input
           type="password"
           autoComplete="new-password"

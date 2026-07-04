@@ -1,11 +1,11 @@
-import { useState, type FormEvent } from "react";
+import { useState, type ChangeEvent, type FormEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
 
 import { checkEmailAvailable, registerSeller } from "@/api/auth";
 import { ApiError } from "@/lib/api-client";
 import { lookupJapaneseAddress } from "@/lib/postal-jp";
 import { PasswordInput } from "@/components/common/PasswordInput";
-import { digitsOnly } from "@/lib/validation";
+import { postalCodeInput } from "@/lib/digits";
 import {
   isValidEmail,
   sanitizeDisplayText,
@@ -54,7 +54,7 @@ export function SellerSignUpForm() {
   const [address, setAddress] = useState("");
   const [frontFile, setFrontFile] = useState<File | null>(null);
   const [backFile, setBackFile] = useState<File | null>(null);
-  const [error, setError] = useState("");
+  const [errorMessage, setErrorMessage] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [emailTaken, setEmailTaken] = useState(false);
   const [postalLoading, setPostalLoading] = useState(false);
@@ -92,13 +92,13 @@ export function SellerSignUpForm() {
       }
     }
     if (targetStep === 2) {
-      const frontErr = validateImageFile(frontFile, "身分証（表面）");
-      if (frontErr) {
-        return frontErr;
+      const frontValidationMessage = validateImageFile(frontFile, "身分証（表面）");
+      if (frontValidationMessage !== null) {
+        return frontValidationMessage;
       }
-      const backErr = validateImageFile(backFile, "身分証（裏面）");
-      if (backErr) {
-        return backErr;
+      const backValidationMessage = validateImageFile(backFile, "身分証（裏面）");
+      if (backValidationMessage !== null) {
+        return backValidationMessage;
       }
     }
     return null;
@@ -136,33 +136,33 @@ export function SellerSignUpForm() {
   };
 
   const goNext = () => {
-    setError("");
+    setErrorMessage("");
     const validationMessage = validateStep(step);
     if (validationMessage !== null) {
-      setError(validationMessage);
+      setErrorMessage(validationMessage);
       return;
     }
     setStep((s) => Math.min(s + 1, STEPS.length - 1));
   };
 
   const goBack = () => {
-    setError("");
+    setErrorMessage("");
     setStep((s) => Math.max(s - 1, 0));
   };
 
   const onSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    setError("");
+    setErrorMessage("");
     for (let i = 0; i < STEPS.length - 1; i++) {
       const validationMessage = validateStep(i);
       if (validationMessage !== null) {
-        setError(validationMessage);
+        setErrorMessage(validationMessage);
         setStep(i);
         return;
       }
     }
     if (!frontFile || !backFile) {
-      setError("身分証画像が不足しています");
+      setErrorMessage("身分証画像が不足しています");
       setStep(2);
       return;
     }
@@ -187,16 +187,16 @@ export function SellerSignUpForm() {
     } catch (err) {
       if (err instanceof ApiError) {
         if (err.code === "BAD_SELLER_KYC") {
-          setError(
+          setErrorMessage(
             "本人情報が不足しています。氏名・生年月日・住所を確認してください。",
           );
         } else if (err.code === "CONFLICT") {
-          setError("このメールアドレスは既に登録されています");
+          setErrorMessage("このメールアドレスは既に登録されています");
         } else {
-          setError(err.message);
+          setErrorMessage(err.message);
         }
       } else {
-        setError("出品者登録に失敗しました");
+        setErrorMessage("出品者登録に失敗しました");
       }
     } finally {
       setIsSubmitting(false);
@@ -242,9 +242,9 @@ export function SellerSignUpForm() {
           </p>
         </div>
 
-        {error ? (
+        {errorMessage ? (
           <p className="mb-4 rounded-lg bg-red-50 px-4 py-2 text-sm text-red-600">
-            {error}
+            {errorMessage}
           </p>
         ) : null}
 
@@ -385,7 +385,9 @@ export function SellerSignUpForm() {
                   inputMode="numeric"
                   className="input-field"
                   value={postalCode}
-                  onChange={(e) => setPostalCode(digitsOnly(e.target.value, 7))}
+                  onChange={(event: ChangeEvent<HTMLInputElement>) => {
+                    setPostalCode(postalCodeInput(event.currentTarget.value));
+                  }}
                   onBlur={() => void onPostalBlur()}
                   placeholder="例: 1000001"
                 />

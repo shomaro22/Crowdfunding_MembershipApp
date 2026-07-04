@@ -45,12 +45,12 @@ export function SellerDashboardPage() {
   const [supporterRows, setSupporterRows] = useState<SellerSupporterRow[]>([])
   const [supporterVisible, setSupporterVisible] = useState(10)
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState('')
+  const [errorMessage, setErrorMessage] = useState('')
   const [connectMsg, setConnectMsg] = useState('')
 
   const load = async () => {
     setLoading(true)
-    setError('')
+    setErrorMessage('')
     try {
       const [s, c, a, sup] = await Promise.all([
         getDashboardStats(),
@@ -64,7 +64,7 @@ export function SellerDashboardPage() {
       setSupporterTotal(sup.total)
       setSupporterRows(sup.supporters)
     } catch {
-      setError('ダッシュボードの取得に失敗しました')
+      setErrorMessage('ダッシュボードの取得に失敗しました')
     } finally {
       setLoading(false)
     }
@@ -113,8 +113,8 @@ export function SellerDashboardPage() {
   if (loading) {
     return <Loading />
   }
-  if (error || !stats) {
-    return <ErrorMessage message={error || 'データがありません'} onRetry={() => void load()} />
+  if (errorMessage || !stats) {
+    return <ErrorMessage message={errorMessage || 'データがありません'} onRetry={() => void load()} />
   }
 
   return (

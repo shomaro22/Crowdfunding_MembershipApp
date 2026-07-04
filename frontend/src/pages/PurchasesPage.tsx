@@ -25,7 +25,7 @@ export function PurchasesPage() {
   const [purchases, setPurchases] = useState<Purchase[]>([])
   const [supporters, setSupporters] = useState<Supporter[]>([])
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState('')
+  const [errorMessage, setErrorMessage] = useState('')
   const [cancelTarget, setCancelTarget] = useState<string | null>(null)
   const [planChangeTarget, setPlanChangeTarget] = useState<Supporter | null>(null)
   const [planChangeProject, setPlanChangeProject] = useState<ProjectDetail | null>(null)
@@ -42,13 +42,13 @@ export function PurchasesPage() {
 
   const load = async () => {
     setLoading(true)
-    setError('')
+    setErrorMessage('')
     try {
       const [p, s] = await Promise.all([listPurchases(), listSupporters()])
       setPurchases(p.purchases)
       setSupporters(s.supporters)
     } catch {
-      setError('履歴の取得に失敗しました')
+      setErrorMessage('履歴の取得に失敗しました')
     } finally {
       setLoading(false)
     }
@@ -148,8 +148,8 @@ export function PurchasesPage() {
   if (loading) {
     return <Loading />
   }
-  if (error) {
-    return <ErrorMessage message={error} onRetry={() => void load()} />
+  if (errorMessage) {
+    return <ErrorMessage message={errorMessage} onRetry={() => void load()} />
   }
 
   const changePlans = planChangeProject
