@@ -7,9 +7,9 @@ import { Loading } from '@/components/common/Loading'
 import { ApiError } from '@/lib/api-client'
 import { normalizeMediaUrl } from '@/lib/media-url'
 import { planTierLabel, validateMembershipTierCombo } from '@/lib/plans'
+import { digitsOnly } from '@/lib/digits'
 import { formatCurrencyYen, formatYenInput, parseYenInput, sanitizeDisplayText } from '@/lib/utils'
 import {
-  digitsOnly,
   validatePlanPrice,
   validatePositiveAmount,
   validateProjectTitle,
@@ -61,7 +61,7 @@ export function SellerProjectFormPage() {
   const isEdit = projectId !== undefined && projectId !== 'new'
   const [step, setStep] = useState(0)
   const [loading, setLoading] = useState(isEdit)
-  const [error, setError] = useState('')
+  const [errorMessage, setErrorMessage] = useState('')
   const [submitting, setSubmitting] = useState(false)
 
   const [title, setTitle] = useState('')
@@ -100,7 +100,7 @@ export function SellerProjectFormPage() {
     }
     const id = parseUUID(projectId)
     if (!id) {
-      setError('ID が不正です')
+      setErrorMessage('ID が不正です')
       setLoading(false)
       return
     }
@@ -144,7 +144,7 @@ export function SellerProjectFormPage() {
           setPlans(formPlans)
         }
       } catch {
-        setError('プロジェクトの取得に失敗しました')
+        setErrorMessage('プロジェクトの取得に失敗しました')
       } finally {
         setLoading(false)
       }
@@ -154,14 +154,14 @@ export function SellerProjectFormPage() {
   const onUpload = async (file: File) => {
     const check = validateImageFile(file)
     if (!check.valid) {
-      setError(check.message ?? '画像が無効です')
+      setErrorMessage(check.message ?? '画像が無効です')
       return
     }
     try {
       const res = await uploadImage(file)
       setImageUrl(normalizeMediaUrl(res.url))
     } catch {
-      setError('画像アップロードに失敗しました')
+      setErrorMessage('画像アップロードに失敗しました')
     }
   }
 
@@ -222,27 +222,27 @@ export function SellerProjectFormPage() {
   }
 
   const goNext = () => {
-    setError('')
+    setErrorMessage('')
     const validationMessage = validateStep(step)
     if (validationMessage !== null) {
-      setError(validationMessage)
+      setErrorMessage(validationMessage)
       return
     }
     setStep((s) => Math.min(s + 1, STEPS.length - 1))
   }
 
   const goBack = () => {
-    setError('')
+    setErrorMessage('')
     setStep((s) => Math.max(s - 1, 0))
   }
 
   const onSubmit = async (e: FormEvent) => {
     e.preventDefault()
-    setError('')
+    setErrorMessage('')
     for (let i = 0; i < STEPS.length - 1; i++) {
       const validationMessage = validateStep(i)
       if (validationMessage !== null) {
-        setError(validationMessage)
+        setErrorMessage(validationMessage)
         setStep(i)
         return
       }
@@ -294,7 +294,7 @@ export function SellerProjectFormPage() {
       }
       void navigate('/seller/projects')
     } catch (err) {
-      setError(err instanceof Error ? err.message : err instanceof ApiError ? err.message : '保存に失敗しました')
+      setErrorMessage(err instanceof Error ? err.message : err instanceof ApiError ? err.message : '保存に失敗しました')
     } finally {
       setSubmitting(false)
     }
@@ -332,7 +332,7 @@ export function SellerProjectFormPage() {
         </div>
 
         <div className="p-6 md:col-span-3 md:p-8">
-          {error ? <p className="mb-4 text-sm text-red-600">{error}</p> : null}
+          {errorMessage ? <p className="mb-4 text-sm text-red-600">{errorMessage}</p> : null}
 
           <form onSubmit={(e) => void onSubmit(e)} className="space-y-5">
             {step === 0 ? (

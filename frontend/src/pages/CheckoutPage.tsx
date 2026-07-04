@@ -47,7 +47,7 @@ export function CheckoutPage() {
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('CARD')
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
-  const [error, setError] = useState('')
+  const [errorMessage, setErrorMessage] = useState('')
   const [clientSecret, setClientSecret] = useState<string | null>(null)
   const [paymentIntentId, setPaymentIntentId] = useState<string | null>(null)
   const [showPaymentForm, setShowPaymentForm] = useState(false)
@@ -55,7 +55,7 @@ export function CheckoutPage() {
   useEffect(() => {
     const id = parseUUID(projectId)
     if (!id) {
-      setError('プロジェクト ID が不正です')
+      setErrorMessage('プロジェクト ID が不正です')
       setLoading(false)
       return
     }
@@ -73,7 +73,7 @@ export function CheckoutPage() {
           }
         }
       } catch {
-        setError('プロジェクトの取得に失敗しました')
+        setErrorMessage('プロジェクトの取得に失敗しました')
       } finally {
         setLoading(false)
       }
@@ -87,7 +87,7 @@ export function CheckoutPage() {
       return
     }
     setSubmitting(true)
-    setError('')
+    setErrorMessage('')
     setShowPaymentForm(false)
     setClientSecret(null)
     setPaymentIntentId(null)
@@ -105,7 +105,7 @@ export function CheckoutPage() {
           cancelUrl: cancel,
         })
         if (!session.url.startsWith('http://') && !session.url.startsWith('https://')) {
-          setError('決済 URL が無効です')
+          setErrorMessage('決済 URL が無効です')
           return
         }
         window.location.assign(session.url)
@@ -114,14 +114,14 @@ export function CheckoutPage() {
 
       const intent = await createPaymentIntent(project.id, selectedPlanId)
       if (!intent.client_secret || !intent.payment_intent_id) {
-        setError('決済セッションの作成に失敗しました')
+        setErrorMessage('決済セッションの作成に失敗しました')
         return
       }
       setClientSecret(intent.client_secret)
       setPaymentIntentId(intent.payment_intent_id)
       setShowPaymentForm(true)
     } catch (err) {
-      setError(checkoutErrorMessage(err))
+      setErrorMessage(checkoutErrorMessage(err))
     } finally {
       setSubmitting(false)
     }
@@ -140,8 +140,8 @@ export function CheckoutPage() {
   if (loading) {
     return <Loading />
   }
-  if (error && !project) {
-    return <ErrorMessage message={error} />
+  if (errorMessage && !project) {
+    return <ErrorMessage message={errorMessage} />
   }
   if (!project) {
     return <ErrorMessage message="プロジェクトが見つかりません" />
@@ -153,7 +153,7 @@ export function CheckoutPage() {
     <div className="mx-auto max-w-2xl">
       <h1 className="mb-2 text-2xl font-bold">応援する</h1>
       <p className="mb-6 text-gray-600">{project.title}</p>
-      {error ? <p className="mb-4 rounded-lg bg-red-50 px-4 py-2 text-sm text-red-600">{error}</p> : null}
+      {errorMessage ? <p className="mb-4 rounded-lg bg-red-50 px-4 py-2 text-sm text-red-600">{errorMessage}</p> : null}
 
       {!showPaymentForm ? (
         <>
@@ -220,7 +220,7 @@ export function CheckoutPage() {
           paymentIntentId={paymentIntentId}
           amountLabel={`${formatCurrencyYen(selectedPlan.price)}/月`}
           onSuccess={onPaymentSuccess}
-          onError={(msg) => setError(msg)}
+          onError={(msg) => setErrorMessage(msg)}
         />
       ) : null}
 
