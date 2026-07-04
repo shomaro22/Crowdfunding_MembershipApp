@@ -76,7 +76,7 @@ func KeyPending2FAUser(secret []byte) func(c echo.Context) string {
 			uid uuid.UUID
 			err error
 		)
-		tok = pending2FACookieFrom(c)
+		tok = pending2FATokenFrom(c)
 		if tok == "" || len(secret) == 0 {
 			return ""
 		}
@@ -102,6 +102,30 @@ func pending2FACookieFrom(c echo.Context) string {
 		return ""
 	}
 	return strings.TrimSpace(ck.Value)
+}
+
+func pending2FATokenFrom(c echo.Context) string {
+	var (
+		tok  string
+		body []byte
+		err  error
+		m    struct {
+			PendingToken string `json:"pending_token"`
+		}
+	)
+	tok = pending2FACookieFrom(c)
+	if tok != "" {
+		return tok
+	}
+	body, err = io.ReadAll(c.Request().Body)
+	if err != nil {
+		return ""
+	}
+	c.Request().Body = io.NopCloser(strings.NewReader(string(body)))
+	if json.Unmarshal(body, &m) != nil {
+		return ""
+	}
+	return strings.TrimSpace(m.PendingToken)
 }
 
 var (
