@@ -156,7 +156,3 @@ type ConnectSyncer interface {
 type SupporterViewer interface {
 	ViewForSupporter(ctx context.Context, supporter model.ProjectSupporter) (SupporterView, error)
 }
-
-type PlanUpgradeConfirmer interface {
-	UpgradeConfirm(ctx context.Context, userID, supporterID uuid.UUID, intentID string) (SupporterView, error)
-}

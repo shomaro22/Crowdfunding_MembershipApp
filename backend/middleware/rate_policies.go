@@ -113,19 +113,18 @@ func pending2FATokenFrom(c echo.Context) string {
 			PendingToken string `json:"pending_token"`
 		}
 	)
-	tok = pending2FACookieFrom(c)
+	body, err = io.ReadAll(c.Request().Body)
+	if err != nil {
+		return pending2FACookieFrom(c)
+	}
+	c.Request().Body = io.NopCloser(strings.NewReader(string(body)))
+	if json.Unmarshal(body, &m) == nil {
+		tok = strings.TrimSpace(m.PendingToken)
+	}
 	if tok != "" {
 		return tok
 	}
-	body, err = io.ReadAll(c.Request().Body)
-	if err != nil {
-		return ""
-	}
-	c.Request().Body = io.NopCloser(strings.NewReader(string(body)))
-	if json.Unmarshal(body, &m) != nil {
-		return ""
-	}
-	return strings.TrimSpace(m.PendingToken)
+	return pending2FACookieFrom(c)
 }
 
 var (

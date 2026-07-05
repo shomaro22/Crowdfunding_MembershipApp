@@ -441,10 +441,9 @@ func SupporterItemFrom(s model.ProjectSupporter) SupporterItemView {
 }
 
 type SupporterView struct {
-	Supporter   SupporterItemView
-	Project     *ProjectItemView
-	Plan        *ProjectPlanView
-	PendingPlan *ProjectPlanView
+	Supporter SupporterItemView
+	Project   *ProjectItemView
+	Plan      *ProjectPlanView
 }
 
 func ProjectItemPtrFrom(p model.Project) *ProjectItemView {

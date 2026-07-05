@@ -539,7 +539,7 @@ function AdminBatchesPanel({ onToast, onError }: { onToast: (m: string, k?: 'suc
   const reload = () => listBatchRuns().then((r) => setRuns(r.runs)).catch(() => onError('取得失敗'))
   useEffect(() => { void reload() }, [onError])
   const jobs = [
-    { id: 'apply_plans' as const, label: 'プラン変更の適用' },
+    { id: 'apply_plans' as const, label: '請求モード変更の適用' },
     { id: 'expire_supporters' as const, label: '期限切れ支援者の処理' },
     { id: 'purge_tokens' as const, label: '期限切れトークンの削除' },
   ]

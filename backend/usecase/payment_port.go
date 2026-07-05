@@ -25,8 +25,6 @@ type IPurchaseUsecase interface {
 
 type ISupporterUsecase interface {
 	ListMine(ctx context.Context, userID uuid.UUID) ([]SupporterView, error)
-	Upgrade(ctx context.Context, userID, supporterID, planID uuid.UUID) (UpgradeOut, error)
-	UpgradeConfirm(ctx context.Context, userID, supporterID uuid.UUID, intentID string) (SupporterView, error)
 	Cancel(ctx context.Context, userID, supporterID uuid.UUID) (SupporterView, error)
 	Rejoin(ctx context.Context, userID, supporterID uuid.UUID) (SupporterView, error)
 	ChangeBilling(ctx context.Context, userID, supporterID uuid.UUID, in ChangeBillingIn) (SupporterView, error)

@@ -11,7 +11,7 @@ import (
 	"github.com/google/uuid"
 )
 
-const pending2FATTL = 5 * time.Minute
+const pending2FATTL = 10 * time.Minute
 
 func SignPending2FA(secret []byte, userID uuid.UUID, now time.Time) string {
 	exp := now.Add(pending2FATTL).Unix()

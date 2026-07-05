@@ -37,9 +37,18 @@ export function MessagesPage() {
     try {
       const res = await listMessageThreads()
       setThreads(res.threads)
-      if (res.threads.length > 0) {
-        setActive((cur) => cur ?? res.threads[0] ?? null)
-      }
+      setActive((cur) => {
+        if (res.threads.length === 0) {
+          return null
+        }
+        if (!cur) {
+          return res.threads[0] ?? null
+        }
+        const updated = res.threads.find(
+          (t) => t.project_id === cur.project_id && t.partner.id === cur.partner.id,
+        )
+        return updated ?? cur
+      })
     } catch {
       setErrorMessage('メッセージの取得に失敗しました')
     } finally {
@@ -142,7 +151,11 @@ export function MessagesPage() {
       <aside className="card md:col-span-1">
         <h1 className="mb-4 text-lg font-bold">メッセージ</h1>
         {threads.length === 0 ? (
-          <p className="text-sm text-gray-500">会話はまだありません。応援中のプロジェクトでクリエイターとやり取りできます。</p>
+          <p className="text-sm text-gray-500">
+            {user?.role === 'SELLER'
+              ? '会話はまだありません。応援メンバーとやり取りできます。'
+              : '会話はまだありません。応援中のプロジェクトでクリエイターとやり取りできます。'}
+          </p>
         ) : (
         <ul className="space-y-2">
           {threads.map((t) => (

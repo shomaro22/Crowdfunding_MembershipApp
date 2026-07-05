@@ -206,29 +206,6 @@ func (c *StubClient) ResumeSubscription(ctx context.Context, subID string) error
 	return nil
 }
 
-func (c *StubClient) UpdateSubscriptionAmount(ctx context.Context, subID string, amount int64) error {
-	_ = ctx
-	_ = subID
-	_ = amount
-	return nil
-}
-
-func (c *StubClient) CreateUpgradePaymentIntent(ctx context.Context, in UpgradePaymentIn) (UpgradePaymentOut, error) {
-	_ = ctx
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	var piID = "pi_test_" + strings.ReplaceAll(uuid.New().String(), "-", "")
-	c.intents[piID] = &stubIntent{
-		metadata: cloneStringMap(in.Metadata),
-		status:   PaymentIntentStatusSucceeded,
-		custID:   in.CustomerID,
-	}
-	return UpgradePaymentOut{
-		PaymentIntentID: piID,
-		ClientSecret:    "cs_test_secret_" + piID,
-	}, nil
-}
-
 func (c *StubClient) GetPaymentIntent(ctx context.Context, intentID string) (PaymentIntentSnapshot, error) {
 	_ = ctx
 	c.mu.Lock()

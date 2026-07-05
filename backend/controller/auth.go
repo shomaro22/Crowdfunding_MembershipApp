@@ -65,6 +65,7 @@ func (h *authController) Login(c echo.Context) error {
 		if err != nil {
 			return mapUseCaseError(err)
 		}
+		ClearPending2FA(c, h.CookieCfg)
 		SetPending2FA(c, h.CookieCfg, token)
 		return jsonOK(c, login2FAResponse{
 			Requires2FA:  true,

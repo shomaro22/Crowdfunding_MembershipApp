@@ -4,6 +4,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from 'react'
@@ -16,7 +17,7 @@ import {
   refreshSession,
 } from '@/api/auth'
 import { clearAccessToken, getAccessToken, setAccessToken } from '@/lib/token-store'
-import { clearPending2FASession, getPending2FAUser, setPending2FASession } from '@/lib/pending-2fa-store'
+import { clearPending2FASession, getPending2FAUser, getPending2FAToken, setPending2FASession } from '@/lib/pending-2fa-store'
 import { parseJWTClaims } from '@/lib/jwt-claims'
 import { isLogin2FAResponse, type AdminRole, type User, type UserRole } from '@/types/api'
 
@@ -40,6 +41,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [status, setStatus] = useState<AuthStatus>('loading')
   const [user, setUser] = useState<User | null>(null)
   const [adminRole, setAdminRole] = useState<AdminRole | null>(null)
+  const pending2FATokenRef = useRef<string | null>(null)
 
   const syncAdminRoleFromToken = useCallback(() => {
     const token = getAccessToken()
@@ -68,12 +70,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     void (async () => {
       const pendingUser = getPending2FAUser()
-      if (pendingUser) {
+      const pendingToken = getPending2FAToken()
+      if (pendingUser && pendingToken) {
         if (!cancelled) {
+          pending2FATokenRef.current = pendingToken
           setUser(pendingUser)
           setStatus('pending_2fa')
         }
         return
+      }
+      if (pendingUser || pendingToken) {
+        clearPending2FASession()
       }
 
       const token = await refreshSession()
@@ -113,6 +120,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (!res.pending_token) {
         throw new Error('2FA session could not be started')
       }
+      pending2FATokenRef.current = res.pending_token
       setPending2FASession(res.pending_token, res.user)
       setUser(res.user)
       setStatus('pending_2fa')
@@ -126,7 +134,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [syncAdminRoleFromToken])
 
   const complete2FA = useCallback(async (code: string): Promise<User> => {
-    const res = await challenge2FA(code)
+    const pendingToken = pending2FATokenRef.current ?? getPending2FAToken()
+    const res = await challenge2FA(code, pendingToken ?? undefined)
+    pending2FATokenRef.current = null
     setUser(res.user)
     syncAdminRoleFromToken()
     setStatus('authenticated')
@@ -140,6 +150,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       /* Cookie 未送信等でもクライアント側はログアウト完了とする */
     } finally {
       clearAccessToken()
+      pending2FATokenRef.current = null
       clearPending2FASession()
       setUser(null)
       setAdminRole(null)

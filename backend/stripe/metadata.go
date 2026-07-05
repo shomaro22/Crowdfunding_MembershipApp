@@ -11,5 +11,4 @@ const (
 
 	PurposeFirstSupport   = "first_support"
 	PurposeKonbiniRenewal = "konbini_renewal"
-	PurposePlanUpgrade    = "plan_upgrade"
 )

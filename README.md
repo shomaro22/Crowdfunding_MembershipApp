@@ -277,7 +277,7 @@ Nightly（[`.github/workflows/nightly.yml`](.github/workflows/nightly.yml)）で
 
 - OpenAPI 定義: [`openapi.yaml`](openapi.yaml)
 - DB スキーマの正本: `backend/db/migrations/*.up.sql`
-- ER 図 PDF（参考）: [`dbdiagram.pdf`](dbdiagram.pdf)
+- ER 図（DBML）: [`docs/database/schema.dbml`](docs/database/schema.dbml) → [dbdiagram.io](https://dbdiagram.io) で Import し PDF を [`dbdiagram.pdf`](dbdiagram.pdf) に反映
 
 ## 注意点
 

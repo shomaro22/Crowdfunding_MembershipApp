@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 
+import { clearPending2FASession } from '@/lib/pending-2fa-store'
 import { useAuth } from '@/auth/AuthProvider'
 import { ApiError } from '@/lib/api-client'
 import { normalizeOtpCode, validateTOTPCode } from '@/lib/validation'
@@ -41,10 +42,15 @@ export function TwoFactorForm() {
       void navigate(postLoginPath(loggedIn, from), { replace: true })
     } catch (err) {
       if (err instanceof ApiError) {
-        if (err.code === 'UNAUTHORIZED') {
+        if (err.code === 'UNAUTHORIZED' || err.code === 'INVALID_TOKEN') {
+          clearPending2FASession()
           setErrorMessage('2FA の有効期限が切れました。再度ログインしてください。')
         } else if (err.code === 'INVALID_2FA_CODE') {
-          setErrorMessage('認証コードが正しくありません。認証アプリのコードを確認してください。')
+          setErrorMessage(
+            '認証コードが正しくありません。認証アプリのシークレットと Render の TOTP_ENCRYPTION_KEY 設定を確認してください。',
+          )
+        } else if (err.code === '2FA_NOT_CONFIGURED') {
+          setErrorMessage('2FA が未設定です。管理画面または API から 2FA をセットアップしてください。')
         } else {
           setErrorMessage(err.message)
         }

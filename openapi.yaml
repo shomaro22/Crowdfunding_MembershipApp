@@ -739,7 +739,7 @@ paths:
   /supporters:
     get:
       tags: [Supporters]
-      summary: List current user's supporters (auto-applies pending plan changes)
+      summary: List current user's supporters
       responses:
         "200":
           description: Supporter list
@@ -747,62 +747,6 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ListSupportersResponse"
-        "401":
-          $ref: "#/components/responses/Unauthorized"
-
-  /supporters/{supporterId}/upgrade:
-    post:
-      tags: [Supporters]
-      summary: Schedule plan upgrade (creates Stripe PaymentIntent for price diff)
-      parameters:
-        - $ref: "#/components/parameters/SupporterId"
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/UpgradePlanRequest"
-      responses:
-        "200":
-          description: Upgrade initiated
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/UpgradePlanResponse"
-        "400":
-          $ref: "#/components/responses/BadRequest"
-        "401":
-          $ref: "#/components/responses/Unauthorized"
-        "403":
-          $ref: "#/components/responses/Forbidden"
-        "404":
-          $ref: "#/components/responses/NotFound"
-
-  /supporters/{supporterId}/upgrade-confirm:
-    post:
-      tags: [Supporters]
-      summary: Confirm upgrade after PaymentIntent succeeded
-      parameters:
-        - $ref: "#/components/parameters/SupporterId"
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required: [payment_intent_id]
-              properties:
-                payment_intent_id:
-                  type: string
-      responses:
-        "200":
-          description: Confirmed
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Supporter"
-        "400":
-          $ref: "#/components/responses/BadRequest"
         "401":
           $ref: "#/components/responses/Unauthorized"
 
@@ -2804,8 +2748,6 @@ components:
           $ref: "#/components/schemas/ProjectSummary"
         plan:
           $ref: "#/components/schemas/ProjectPlan"
-        pending_plan:
-          $ref: "#/components/schemas/ProjectPlan"
 
     ListSupportersResponse:
       type: object
@@ -2816,24 +2758,6 @@ components:
             $ref: "#/components/schemas/Supporter"
         total:
           type: integer
-
-    UpgradePlanRequest:
-      type: object
-      required: [plan_id]
-      properties:
-        plan_id:
-          type: string
-          format: uuid
-
-    UpgradePlanResponse:
-      type: object
-      properties:
-        supporter:
-          $ref: "#/components/schemas/Supporter"
-        payment_intent_client_secret:
-          type: string
-          nullable: true
-          description: Present only for upgrade (higher price)
 
     ChangeBillingRequest:
       type: object

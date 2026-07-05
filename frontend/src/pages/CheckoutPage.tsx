@@ -21,7 +21,7 @@ import type { PaymentMethod, ProjectDetail } from '@/types/api'
 function checkoutErrorMessage(err: unknown): string {
   if (err instanceof ApiError) {
     if (err.code === 'ALREADY_SUPPORTING' || (err.status === 409 && err.message.includes('already supporting'))) {
-      return 'このプロジェクトは既に応援中です。応援履歴からプラン変更・解約ができます。'
+      return 'このプロジェクトは既に応援中です。応援履歴から解約できます。'
     }
     if (err.code === 'PENDING_CHECKOUT') {
       return '未完了の決済があります。しばらく待ってから再度お試しください。'

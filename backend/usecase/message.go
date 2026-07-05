@@ -179,6 +179,7 @@ func (m *MessageUseCase) listBuyerThreads(ctx context.Context, userID uuid.UUID,
 
 func (m *MessageUseCase) listSellerThreads(ctx context.Context, sellerID uuid.UUID, qNorm ListThreadsQuery) (ListThreadsResult, error) {
 	var (
+		summaries  []repository.MessageThreadSummary
 		supporters []model.ProjectSupporter
 		total      int64
 		offset     int
@@ -187,44 +188,43 @@ func (m *MessageUseCase) listSellerThreads(ctx context.Context, sellerID uuid.UU
 		now        time.Time
 		i          int
 		j          int
+		k          int
+		s          repository.MessageThreadSummary
 		sup        model.ProjectSupporter
 		t          MessageThreadView
 		msg        model.Message
-		unread     int
+		seen       map[string]struct{}
+		key        string
+		ok         bool
 		err        error
 	)
 	offset = (qNorm.Page - 1) * qNorm.PerPage
-	supporters, total, err = m.Sellers.ListSupporters(ctx, sellerID, nil, qNorm.PerPage, offset)
+	summaries, total, err = m.Messages.ListThreadSummaries(ctx, sellerID, offset, qNorm.PerPage)
 	if err != nil {
 		return ListThreadsResult{}, err
 	}
-	now = time.Now().UTC()
+	seen = make(map[string]struct{}, len(summaries))
 	out = ListThreadsResult{
 		Total:   total,
 		Page:    qNorm.Page,
 		PerPage: qNorm.PerPage,
-		Threads: make([]MessageThreadView, 0, len(supporters)),
+		Threads: make([]MessageThreadView, 0, len(summaries)),
 	}
-	for i = range supporters {
-		sup = supporters[i]
-		if !sup.HasBenefits(now) {
+	for i = range summaries {
+		s = summaries[i]
+		if err = m.CanSubscribeProject(ctx, s.ProjectID, sellerID); err != nil {
 			continue
 		}
-		rows, err = m.Messages.ListMessagesInThread(ctx, sellerID, sup.ProjectID, sup.UserID, qNorm.MessagesPerThread)
+		key = s.ProjectID.String() + ":" + s.PartnerID.String()
+		seen[key] = struct{}{}
+		rows, err = m.Messages.ListMessagesInThread(ctx, sellerID, s.ProjectID, s.PartnerID, qNorm.MessagesPerThread)
 		if err != nil {
-			rows = nil
-		}
-		unread = 0
-		for j = range rows {
-			msg = rows[j]
-			if !msg.IsRead && msg.ReceiverID == sellerID {
-				unread++
-			}
+			continue
 		}
 		t = MessageThreadView{
-			ProjectID:   sup.ProjectID,
-			Partner:     UserView{ID: sup.UserID},
-			UnreadCount: unread,
+			ProjectID:   s.ProjectID,
+			Partner:     UserView{ID: s.PartnerID},
+			UnreadCount: s.UnreadCount,
 			Messages:    make([]MessageItemView, 0, len(rows)),
 		}
 		for j = range rows {
@@ -235,6 +235,35 @@ func (m *MessageUseCase) listSellerThreads(ctx context.Context, sellerID uuid.UU
 			continue
 		}
 		out.Threads = append(out.Threads, t)
+	}
+	if qNorm.Page != 1 || m.Sellers == nil {
+		return out, nil
+	}
+	now = time.Now().UTC()
+	supporters, _, err = m.Sellers.ListSupporters(ctx, sellerID, nil, repository.MaxSellerSupporterExport, 0)
+	if err != nil {
+		return out, nil
+	}
+	for k = range supporters {
+		sup = supporters[k]
+		if !sup.HasBenefits(now) {
+			continue
+		}
+		key = sup.ProjectID.String() + ":" + sup.UserID.String()
+		if _, ok = seen[key]; ok {
+			continue
+		}
+		seen[key] = struct{}{}
+		t = MessageThreadView{
+			ProjectID: sup.ProjectID,
+			Partner:   UserView{ID: sup.UserID},
+			Messages:  []MessageItemView{},
+		}
+		if err = m.enrichThread(ctx, &t); err != nil {
+			continue
+		}
+		out.Threads = append(out.Threads, t)
+		out.Total++
 	}
 	return out, nil
 }

@@ -91,25 +91,6 @@ func (p *PaymentUseCase) VerifyIntent(ctx context.Context, buyerID uuid.UUID, in
 	if err != nil {
 		return SupporterView{}, ErrBadRequest
 	}
-	if pi.Metadata[stripe.MetaCheckoutPurpose] == stripe.PurposePlanUpgrade {
-		if p.PlanUpgrades == nil {
-			return SupporterView{}, ErrNotFound
-		}
-		purchase, err = p.Purchases.GetIntentID(ctx, intentID)
-		if err != nil {
-			return SupporterView{}, mapRepoNotFound(err)
-		}
-		if err = verifyPurchaseBuyer(purchase, buyerID); err != nil {
-			return SupporterView{}, err
-		}
-		if purchase.SupporterID == nil {
-			return SupporterView{}, ErrBadRequest
-		}
-		if pi.Status != stripe.PaymentIntentStatusSucceeded {
-			return SupporterView{}, ErrBadRequest
-		}
-		return p.PlanUpgrades.UpgradeConfirm(ctx, buyerID, *purchase.SupporterID, intentID)
-	}
 	purchase, err = p.Purchases.GetIntentID(ctx, intentID)
 	if err != nil {
 		return SupporterView{}, mapRepoNotFound(err)

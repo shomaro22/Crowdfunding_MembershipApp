@@ -1,7 +1,6 @@
 package controller
 
 import (
-	"net/http"
 	"time"
 
 	"crowdfund-app/usecase"
@@ -33,62 +32,6 @@ func (h *supporterController) List(c echo.Context) error {
 		return mapUseCaseError(err)
 	}
 	return jsonOK(c, listSupportersJSON(rows))
-}
-
-func (h *supporterController) Upgrade(c echo.Context) error {
-	var (
-		userID      uuid.UUID
-		supporterID uuid.UUID
-		body        upgradePlanJSON
-		out         usecase.UpgradeOut
-		err         error
-	)
-	userID, err = requireUserID(c)
-	if err != nil {
-		return err
-	}
-	supporterID, err = pathUUID(c, "supporterId", "invalid supporter id")
-	if err != nil {
-		return err
-	}
-	if err = bindBody(c, &body); err != nil {
-		return err
-	}
-	planID, err := uuid.Parse(body.PlanID)
-	if err != nil {
-		return echo.NewHTTPError(http.StatusBadRequest, apiError("invalid plan id", "BAD_REQUEST"))
-	}
-	out, err = h.Supporters.Upgrade(reqCtx(c), userID, supporterID, planID)
-	if err != nil {
-		return mapUseCaseError(err)
-	}
-	return jsonOK(c, upgradePlanJSONResponse(out))
-}
-
-func (h *supporterController) UpgradeConfirm(c echo.Context) error {
-	var (
-		userID      uuid.UUID
-		supporterID uuid.UUID
-		body        upgradeConfirmJSON
-		view        usecase.SupporterView
-		err         error
-	)
-	userID, err = requireUserID(c)
-	if err != nil {
-		return err
-	}
-	supporterID, err = pathUUID(c, "supporterId", "invalid supporter id")
-	if err != nil {
-		return err
-	}
-	if err = bindBody(c, &body); err != nil {
-		return err
-	}
-	view, err = h.Supporters.UpgradeConfirm(reqCtx(c), userID, supporterID, body.PaymentIntentID)
-	if err != nil {
-		return mapUseCaseError(err)
-	}
-	return jsonOK(c, supporterToJSON(view))
 }
 
 func (h *supporterController) Cancel(c echo.Context) error {
@@ -164,14 +107,6 @@ func (h *supporterController) ChangeBilling(c echo.Context) error {
 	return jsonOK(c, supporterToJSON(view))
 }
 
-type upgradePlanJSON struct {
-	PlanID string `json:"plan_id"`
-}
-
-type upgradeConfirmJSON struct {
-	PaymentIntentID string `json:"payment_intent_id"`
-}
-
 type changeBillingJSON struct {
 	BillingMode   string `json:"billing_mode"`
 	PaymentMethod string `json:"payment_method"`
@@ -190,18 +125,11 @@ type supporterJSON struct {
 	PlanChangeDate *string             `json:"plan_change_date"`
 	Project        *projectSummaryJSON `json:"project,omitempty"`
 	Plan           *projectPlanJSON    `json:"plan,omitempty"`
-	PendingPlan    *projectPlanJSON    `json:"pending_plan,omitempty"`
 }
 
 type listSupportersResponse struct {
 	Supporters []supporterJSON `json:"supporters"`
 	Total      int             `json:"total"`
-}
-
-type upgradePlanResponse struct {
-	Supporter                 supporterJSON `json:"supporter"`
-	PaymentIntentClientSecret *string       `json:"payment_intent_client_secret"`
-	PaymentIntentID           *string       `json:"payment_intent_id"`
 }
 
 type purchaseJSON struct {
@@ -215,7 +143,7 @@ type purchaseJSON struct {
 	PaymentMethod string              `json:"payment_method"`
 	CreatedAt     string              `json:"created_at"`
 	Project       *projectSummaryJSON `json:"project,omitempty"`
-	Buyer         *UserWire     `json:"buyer,omitempty"`
+	Buyer         *UserWire           `json:"buyer,omitempty"`
 }
 
 type listPurchasesResponse struct {
@@ -235,14 +163,6 @@ func listSupportersJSON(rows []usecase.SupporterView) listSupportersResponse {
 	return listSupportersResponse{Supporters: items, Total: len(items)}
 }
 
-func upgradePlanJSONResponse(out usecase.UpgradeOut) upgradePlanResponse {
-	return upgradePlanResponse{
-		Supporter:                 supporterToJSON(out.Supporter),
-		PaymentIntentClientSecret: out.PaymentIntentClientSecret,
-		PaymentIntentID:           out.PaymentIntentID,
-	}
-}
-
 func supporterToJSON(v usecase.SupporterView) supporterJSON {
 	var (
 		s      usecase.SupporterItemView
@@ -251,7 +171,6 @@ func supporterToJSON(v usecase.SupporterView) supporterJSON {
 		change *string
 		project projectSummaryJSON
 		plan   projectPlanJSON
-		pend   projectPlanJSON
 	)
 	s = v.Supporter
 	out = supporterJSON{
@@ -281,10 +200,6 @@ func supporterToJSON(v usecase.SupporterView) supporterJSON {
 	if v.Plan != nil {
 		plan = projectPlanViewToJSON(*v.Plan)
 		out.Plan = &plan
-	}
-	if v.PendingPlan != nil {
-		pend = projectPlanViewToJSON(*v.PendingPlan)
-		out.PendingPlan = &pend
 	}
 	return out
 }

@@ -60,7 +60,7 @@ func SetPending2FA(c echo.Context, cfg CookieCfg, token string) {
 		Name:     Pending2FACookie,
 		Value:    token,
 		Path:     cfg.Path,
-		MaxAge:   300,
+		MaxAge:   600,
 		HttpOnly: true,
 		Secure:   cfg.Secure,
 		SameSite: cfg.SameSite,
@@ -86,6 +86,16 @@ func Pending2FAFrom(c echo.Context) string {
 		return ""
 	}
 	return strings.TrimSpace(ck.Value)
+}
+
+// ResolvePending2FAToken は SPA クロスオリジン向けに JSON body を Cookie より優先する（openapi §5.1.6）。
+func ResolvePending2FAToken(c echo.Context, bodyToken string) string {
+	var pending string
+	pending = strings.TrimSpace(bodyToken)
+	if pending != "" {
+		return pending
+	}
+	return Pending2FAFrom(c)
 }
 
 func NewCookieCfg(refreshCookieName string, secure bool) CookieCfg {

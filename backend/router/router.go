@@ -143,8 +143,6 @@ func New(cfg Config) *echo.Echo {
 	if cfg.Supporters != nil {
 		pm = cfg.Protected
 		e.GET("/supporters", cfg.Supporters.List, pm...)
-		e.POST("/supporters/:supporterId/upgrade", cfg.Supporters.Upgrade, pm...)
-		e.POST("/supporters/:supporterId/upgrade-confirm", cfg.Supporters.UpgradeConfirm, pm...)
 		e.POST("/supporters/:supporterId/cancel", cfg.Supporters.Cancel, pm...)
 		e.POST("/supporters/:supporterId/rejoin", cfg.Supporters.Rejoin, pm...)
 		e.POST("/supporters/:supporterId/billing/change", cfg.Supporters.ChangeBilling, pm...)

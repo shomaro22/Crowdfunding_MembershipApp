@@ -119,6 +119,10 @@ func (t *TwoFactorUseCase) Challenge2FA(ctx context.Context, pendingToken, code 
 	if !u.TOTPEnabled {
 		return nil, Err2FANotConfigured
 	}
+	_, err = t.deps.decryptTOTP(u)
+	if err != nil {
+		return nil, Err2FANotConfigured
+	}
 	if !t.deps.verifyTOTPOrBackup(ctx, u, code) {
 		t.deps.logActivity(ctx, &u.ID, model.UserLoginFail, "user", u.ID.String(), meta, model.StepMeta("2fa_fail"))
 		return nil, ErrInvalid2FACode

@@ -162,15 +162,16 @@ func (h *authController) Challenge2FA(c echo.Context) error {
 	if err = bindBody(c, &body); err != nil || body.Code == "" {
 		return badRequest(c, "code required")
 	}
-	pending = Pending2FAFrom(c)
+	pending = ResolvePending2FAToken(c, body.PendingToken)
 	if pending == "" {
-		pending = strings.TrimSpace(body.PendingToken)
-	}
-	if pending == "" {
+		ClearPending2FA(c, h.CookieCfg)
 		return echo.NewHTTPError(http.StatusUnauthorized, apiError("2fa session expired", "UNAUTHORIZED"))
 	}
 	res, err = h.Auth.Challenge2FA(reqCtx(c), pending, body.Code, requestMeta(c))
 	if err != nil {
+		if errors.Is(err, usecase.ErrInvalidToken) {
+			ClearPending2FA(c, h.CookieCfg)
+		}
 		return mapUseCaseError(err)
 	}
 	ClearPending2FA(c, h.CookieCfg)

@@ -64,8 +64,6 @@ type IPaymentController interface {
 
 type ISupporterController interface {
 	List(c echo.Context) error
-	Upgrade(c echo.Context) error
-	UpgradeConfirm(c echo.Context) error
 	Cancel(c echo.Context) error
 	Rejoin(c echo.Context) error
 	ChangeBilling(c echo.Context) error

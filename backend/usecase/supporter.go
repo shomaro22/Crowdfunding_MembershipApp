@@ -11,12 +11,6 @@ import (
 	"github.com/google/uuid"
 )
 
-type UpgradeOut struct {
-	Supporter                 SupporterView
-	PaymentIntentClientSecret *string
-	PaymentIntentID           *string
-}
-
 type SupporterUseCase struct {
 	Tx         repository.TxBeginner
 	Users      repository.IUserRepo
@@ -168,253 +162,6 @@ func (s *SupporterUseCase) ViewForSupporter(ctx context.Context, supporter model
 	return s.enrichView(ctx, supporter)
 }
 
-func (s *SupporterUseCase) Upgrade(ctx context.Context, userID, supporterID, planID uuid.UUID) (UpgradeOut, error) {
-	var (
-		supporter model.ProjectSupporter
-		current   model.ProjectPlan
-		target    model.ProjectPlan
-		project   model.Project
-		conn      model.ConnectAccount
-		now       time.Time
-		err       error
-	)
-	now = time.Now().UTC()
-	supporter, err = s.loadOwned(ctx, userID, supporterID)
-	if err != nil {
-		return UpgradeOut{}, err
-	}
-	if !supporterCanManage(supporter, now) || supporter.Status == model.SupporterStatusCancelled {
-		return UpgradeOut{}, ErrForbidden
-	}
-	if supporter.PendingPlanID != nil {
-		return UpgradeOut{}, ErrBadRequest
-	}
-	target, err = s.Projects.GetPlan(ctx, supporter.ProjectID, planID)
-	if err != nil {
-		return UpgradeOut{}, mapRepoNotFound(err)
-	}
-	if !target.IsActive {
-		return UpgradeOut{}, ErrNotFound
-	}
-	if target.ID == supporter.PlanID {
-		return UpgradeOut{}, ErrBadRequest
-	}
-	current, err = s.Projects.GetPlan(ctx, supporter.ProjectID, supporter.PlanID)
-	if err != nil {
-		return UpgradeOut{}, mapRepoNotFound(err)
-	}
-	if target.MembershipType.Rank() <= current.MembershipType.Rank() {
-		return s.scheduleDowngrade(ctx, supporter, target, now)
-	}
-	if s.Stripe == nil {
-		return UpgradeOut{}, ErrStripeUnavailable
-	}
-	project, _, _, err = s.Projects.GetID(ctx, supporter.ProjectID)
-	if err != nil {
-		return UpgradeOut{}, mapRepoNotFound(err)
-	}
-	conn, err = s.Connect.GetUserID(ctx, project.SellerID)
-	if isRepoNotFound(err) {
-		return UpgradeOut{}, ErrForbidden
-	}
-	if err != nil {
-		return UpgradeOut{}, err
-	}
-	if !conn.CanCharge() {
-		return UpgradeOut{}, ErrForbidden
-	}
-	return s.startPaidUpgrade(ctx, supporter, current, target, conn, now)
-}
-
-func (s *SupporterUseCase) scheduleDowngrade(ctx context.Context, supporter model.ProjectSupporter, target model.ProjectPlan, now time.Time) (UpgradeOut, error) {
-	var (
-		changeAt time.Time
-		out      UpgradeOut
-		err      error
-	)
-	changeAt = supporter.CurrentPeriodEnd
-	supporter.PendingPlanID = &target.ID
-	supporter.PlanChangeDate = &changeAt
-	supporter.UpdatedAt = now
-	if err = s.Supporters.Update(ctx, &supporter); err != nil {
-		return UpgradeOut{}, err
-	}
-	out.Supporter, err = s.enrichView(ctx, supporter)
-	return out, err
-}
-
-func (s *SupporterUseCase) startPaidUpgrade(
-	ctx context.Context,
-	supporter model.ProjectSupporter,
-	current, target model.ProjectPlan,
-	conn model.ConnectAccount,
-	now time.Time,
-) (UpgradeOut, error) {
-	var (
-		diff      int64
-		meta      map[string]string
-		pi        stripe.UpgradePaymentOut
-		purchase  model.Purchase
-		key       string
-		client    *string
-		pid       string
-		piSnap    stripe.PaymentIntentSnapshot
-		finalized SupporterView
-		out       UpgradeOut
-		err       error
-	)
-	diff = int64(target.Price - current.Price)
-	if diff <= 0 {
-		return UpgradeOut{}, ErrBadRequest
-	}
-	meta = map[string]string{
-		stripe.MetaSupporterID:     supporter.ID.String(),
-		stripe.MetaPlanID:          target.ID.String(),
-		stripe.MetaProjectID:       supporter.ProjectID.String(),
-		stripe.MetaBuyerID:         supporter.UserID.String(),
-		stripe.MetaCheckoutPurpose: stripe.PurposePlanUpgrade,
-		stripe.MetaBillingMode:     string(supporter.BillingMode),
-	}
-	custID := ""
-	if supporter.StripeCustomerID != nil {
-		custID = *supporter.StripeCustomerID
-	}
-	pi, err = s.Stripe.CreateUpgradePaymentIntent(ctx, stripe.UpgradePaymentIn{
-		Amount:           diff,
-		ConnectAccountID: conn.StripeAccountID,
-		CustomerID:       custID,
-		Metadata:         meta,
-	})
-	if err != nil {
-		return UpgradeOut{}, err
-	}
-	key = uuid.New().String()
-	purchase = model.Purchase{
-		ID:             uuid.New(),
-		ProjectID:      supporter.ProjectID,
-		SupporterID:    &supporter.ID,
-		BuyerID:        supporter.UserID,
-		Quantity:       1,
-		TotalPrice:     int(diff),
-		Status:         model.PurchaseStatusPending,
-		PaymentMethod:  model.PaymentMethodCard,
-		StripeIntentID: &pi.PaymentIntentID,
-		IdempotencyKey: &key,
-		CreatedAt:      now,
-		UpdatedAt:      now,
-	}
-	if err = s.Purchases.Create(ctx, &purchase); err != nil {
-		return UpgradeOut{}, err
-	}
-	LogActivity(ctx, s.Activity, &supporter.UserID, model.PurchaseCreated, "purchase", purchase.ID.String(), RequestMeta{}, activityMeta(map[string]string{
-		"project_id": supporter.ProjectID.String(),
-		"purpose":    "plan_upgrade",
-	}))
-	changeAt := now
-	supporter.PendingPlanID = &target.ID
-	supporter.PlanChangeDate = &changeAt
-	supporter.UpdatedAt = now
-	if err = s.Supporters.Update(ctx, &supporter); err != nil {
-		return UpgradeOut{}, err
-	}
-	client = &pi.ClientSecret
-	out.PaymentIntentClientSecret = client
-	pid = pi.PaymentIntentID
-	out.PaymentIntentID = &pid
-	out.Supporter, err = s.enrichView(ctx, supporter)
-	if err != nil {
-		return UpgradeOut{}, err
-	}
-	piSnap, err = s.Stripe.GetPaymentIntent(ctx, pi.PaymentIntentID)
-	if err != nil {
-		return out, nil
-	}
-	if piSnap.Status == stripe.PaymentIntentStatusSucceeded {
-		finalized, err = s.finalizePaidUpgrade(ctx, supporter, purchase, now)
-		if err != nil {
-			return UpgradeOut{}, err
-		}
-		out.Supporter = finalized
-		out.PaymentIntentClientSecret = nil
-		out.PaymentIntentID = nil
-	}
-	return out, nil
-}
-
-func (s *SupporterUseCase) UpgradeConfirm(ctx context.Context, userID, supporterID uuid.UUID, intentID string) (SupporterView, error) {
-	var (
-		supporter model.ProjectSupporter
-		purchase  model.Purchase
-		pi        stripe.PaymentIntentSnapshot
-		now       time.Time
-		err       error
-	)
-	if s.Stripe == nil {
-		return SupporterView{}, ErrStripeUnavailable
-	}
-	now = time.Now().UTC()
-	supporter, err = s.loadOwned(ctx, userID, supporterID)
-	if err != nil {
-		return SupporterView{}, err
-	}
-	if supporter.PendingPlanID == nil {
-		return SupporterView{}, ErrBadRequest
-	}
-	purchase, err = s.Purchases.GetIntentID(ctx, intentID)
-	if err != nil {
-		return SupporterView{}, mapRepoNotFound(err)
-	}
-	if purchase.SupporterID == nil || *purchase.SupporterID != supporter.ID {
-		return SupporterView{}, ErrNotFound
-	}
-	pi, err = s.Stripe.GetPaymentIntent(ctx, intentID)
-	if err != nil {
-		return SupporterView{}, err
-	}
-	if pi.Status != stripe.PaymentIntentStatusSucceeded {
-		return SupporterView{}, ErrBadRequest
-	}
-	return s.finalizePaidUpgrade(ctx, supporter, purchase, now)
-}
-
-func (s *SupporterUseCase) finalizePaidUpgrade(ctx context.Context, supporter model.ProjectSupporter, purchase model.Purchase, now time.Time) (SupporterView, error) {
-	var (
-		locked    model.ProjectSupporter
-		newPlanID uuid.UUID
-		err       error
-	)
-	err = s.Tx.WithTx(ctx, func(txCtx context.Context) error {
-		locked, err = s.Supporters.GetID(txCtx, supporter.ID)
-		if err != nil {
-			return mapRepoNotFound(err)
-		}
-		if locked.PendingPlanID == nil {
-			return ErrNotFound
-		}
-		newPlanID = *locked.PendingPlanID
-		if purchase.Status != model.PurchaseStatusPaid {
-			if err = MarkPurchasePaid(txCtx, s.Purchases, nil, purchase, MarkPaidOptions{}); err != nil {
-				return err
-			}
-		}
-		locked, err = s.commitPendingPlan(txCtx, locked, newPlanID, false)
-		if err != nil {
-			return err
-		}
-		locked.PlanChangeDate = nil
-		locked.UpdatedAt = now
-		if err = s.Supporters.Update(txCtx, &locked); err != nil {
-			return err
-		}
-		supporter = locked
-		return nil
-	})
-	if err != nil {
-		return SupporterView{}, err
-	}
-	return s.enrichView(ctx, supporter)
-}
-
 func (s *SupporterUseCase) EnrichSupporterRows(ctx context.Context, rows []model.ProjectSupporter) ([]SupporterView, error) {
 	return s.enrichViews(ctx, rows)
 }
@@ -463,7 +210,6 @@ func (s *SupporterUseCase) RunApplyPlans(ctx context.Context, dryRun bool) (proc
 func (s *SupporterUseCase) applyPendingChanges(ctx context.Context, supporter model.ProjectSupporter) (bool, error) {
 	var (
 		now time.Time
-		due bool
 		err error
 	)
 	if supporter.ID == uuid.Nil {
@@ -476,8 +222,7 @@ func (s *SupporterUseCase) applyPendingChanges(ctx context.Context, supporter mo
 	if now.Before(*supporter.PlanChangeDate) {
 		return false, nil
 	}
-	due = supporter.PendingPlanID != nil || supporter.PendingBillingMode != nil
-	if !due {
+	if supporter.PendingBillingMode == nil {
 		return false, nil
 	}
 	err = s.Tx.WithTx(ctx, func(txCtx context.Context) error {
@@ -489,23 +234,18 @@ func (s *SupporterUseCase) applyPendingChanges(ctx context.Context, supporter mo
 		if locked.PlanChangeDate == nil || now.Before(*locked.PlanChangeDate) {
 			return nil
 		}
+		if locked.PendingBillingMode == nil {
+			return nil
+		}
 		_, _, _, err = s.Projects.GetID(txCtx, locked.ProjectID)
 		if err != nil {
 			return mapRepoNotFound(err)
 		}
-		if locked.PendingPlanID != nil {
-			locked, err = s.commitPendingPlan(txCtx, locked, *locked.PendingPlanID, true)
-			if err != nil {
-				return err
-			}
+		if err = s.applyBillingMode(txCtx, locked, *locked.PendingBillingMode); err != nil {
+			return err
 		}
-		if locked.PendingBillingMode != nil {
-			if err = s.applyBillingMode(txCtx, locked, *locked.PendingBillingMode); err != nil {
-				return err
-			}
-			locked.BillingMode = *locked.PendingBillingMode
-			locked.PendingBillingMode = nil
-		}
+		locked.BillingMode = *locked.PendingBillingMode
+		locked.PendingBillingMode = nil
 		locked.PlanChangeDate = nil
 		locked.UpdatedAt = now
 		return s.Supporters.Update(txCtx, &locked)
@@ -513,7 +253,7 @@ func (s *SupporterUseCase) applyPendingChanges(ctx context.Context, supporter mo
 	if err != nil {
 		return false, err
 	}
-	return due, nil
+	return true, nil
 }
 
 func (s *SupporterUseCase) enrichViews(ctx context.Context, rows []model.ProjectSupporter) ([]SupporterView, error) {
@@ -536,11 +276,10 @@ func (s *SupporterUseCase) enrichViews(ctx context.Context, rows []model.Project
 
 func (s *SupporterUseCase) enrichView(ctx context.Context, supporter model.ProjectSupporter) (SupporterView, error) {
 	var (
-		v           SupporterView
-		project     model.Project
-		plan        model.ProjectPlan
-		pendingPlan model.ProjectPlan
-		err         error
+		v       SupporterView
+		project model.Project
+		plan    model.ProjectPlan
+		err     error
 	)
 	if supporter.ID == uuid.Nil {
 		return SupporterView{}, ErrNotFound
@@ -556,13 +295,6 @@ func (s *SupporterUseCase) enrichView(ctx context.Context, supporter model.Proje
 		return SupporterView{}, mapRepoNotFound(err)
 	}
 	v.Plan = ProjectPlanPtrFrom(plan)
-	if supporter.PendingPlanID != nil {
-		pendingPlan, err = s.Projects.GetPlan(ctx, supporter.ProjectID, *supporter.PendingPlanID)
-		if err != nil {
-			return SupporterView{}, mapRepoNotFound(err)
-		}
-		v.PendingPlan = ProjectPlanPtrFrom(pendingPlan)
-	}
 	return v, nil
 }
 
@@ -576,51 +308,6 @@ func (s *SupporterUseCase) loadOwned(ctx context.Context, userID, supporterID uu
 		return model.ProjectSupporter{}, mapRepoNotFound(err)
 	}
 	return row, nil
-}
-
-func (s *SupporterUseCase) commitPendingPlan(
-	ctx context.Context,
-	locked model.ProjectSupporter,
-	newPlanID uuid.UUID,
-	validatePlan bool,
-) (model.ProjectSupporter, error) {
-	var (
-		oldPlanID uuid.UUID
-		newPlan   model.ProjectPlan
-		plan      model.ProjectPlan
-		err       error
-	)
-	if validatePlan {
-		newPlan, err = s.Projects.GetPlan(ctx, locked.ProjectID, newPlanID)
-		if err != nil {
-			return model.ProjectSupporter{}, mapRepoNotFound(err)
-		}
-		if !newPlan.IsActive {
-			return model.ProjectSupporter{}, ErrBadRequest
-		}
-	}
-	if err = s.Projects.TransferPlanSupportCount(ctx, locked.ProjectID, locked.PlanID, newPlanID); err != nil {
-		return model.ProjectSupporter{}, err
-	}
-	oldPlanID = locked.PlanID
-	if locked.BillingMode == model.BillingModeAuto && locked.StripeSubscriptionID != nil && s.Stripe != nil {
-		plan, err = s.Projects.GetPlan(ctx, locked.ProjectID, newPlanID)
-		if err != nil {
-			return model.ProjectSupporter{}, mapRepoNotFound(err)
-		}
-		if err = s.Stripe.UpdateSubscriptionAmount(ctx, *locked.StripeSubscriptionID, int64(plan.Price)); err != nil {
-			return model.ProjectSupporter{}, err
-		}
-	}
-	locked.PlanID = newPlanID
-	locked.PendingPlanID = nil
-	if newPlanID != oldPlanID {
-		LogActivity(ctx, s.Activity, &locked.UserID, model.PurchasePlanChange, "supporter", locked.ID.String(), RequestMeta{}, activityMeta(map[string]string{
-			"from_plan_id": oldPlanID.String(),
-			"to_plan_id":   newPlanID.String(),
-		}))
-	}
-	return locked, nil
 }
 
 func isExpirableStatus(status model.SupporterStatus) bool {

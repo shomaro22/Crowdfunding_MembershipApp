@@ -32,7 +32,7 @@ func NewPaymentUsecase(tx repository.TxBeginner, users repository.IUserRepo, pro
 	return &PaymentUseCase{
 		Tx: tx, Users: users, Projects: projects, Purchases: purchases, Supporters: supporters,
 		Connect: connect, Webhooks: webhooks, Activity: activity, Stripe: stripeClient,
-		ConnectSync: connectSync, SupporterViewer: supporterViewer, PlanUpgrades: supporterViewer,
+		ConnectSync: connectSync, SupporterViewer: supporterViewer,
 	}
 }
 

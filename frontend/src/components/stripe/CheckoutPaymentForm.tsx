@@ -59,7 +59,6 @@ function LivePaymentForm({
       return
     }
     try {
-      // 初回応援・プラン変更アップグレードとも /payments/verify/intent で確定（plan_upgrade は UpgradeConfirm へ）
       await verifyPaymentIntent(paymentIntentId)
       onSuccess()
     } catch {

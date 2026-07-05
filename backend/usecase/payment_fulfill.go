@@ -328,9 +328,6 @@ func (p *PaymentUseCase) fulfillPaymentIntent(ctx context.Context, pi stripe.Pay
 		planID uuid.UUID
 		err    error
 	)
-	if pi.Metadata[stripe.MetaCheckoutPurpose] == stripe.PurposePlanUpgrade {
-		return nil
-	}
 	if pi.Metadata[stripe.MetaBillingMode] == string(model.BillingModeAuto) {
 		planID, err = uuid.Parse(pi.Metadata[stripe.MetaPlanID])
 		if err != nil {

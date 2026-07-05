@@ -28,7 +28,6 @@ type PaymentUseCase struct {
 	Stripe          stripe.Client
 	ConnectSync     ConnectSyncer
 	SupporterViewer SupporterViewer
-	PlanUpgrades    PlanUpgradeConfirmer
 	supportEvents   *events.Bus
 }
 

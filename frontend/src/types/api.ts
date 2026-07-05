@@ -171,7 +171,6 @@ export interface Supporter {
   plan_change_date: string | null
   project?: ProjectSummary
   plan?: ProjectPlan
-  pending_plan?: ProjectPlan
 }
 
 export interface ListSupportersResponse {
@@ -385,12 +384,6 @@ export interface ListAuditLogsResponse {
 
 export interface NotificationsResponse {
   unread_messages: number
-}
-
-export interface UpgradePlanResponse {
-  supporter: Supporter
-  payment_intent_client_secret: string | null
-  payment_intent_id?: string | null
 }
 
 export interface WSTokenResponse {

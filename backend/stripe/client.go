@@ -29,8 +29,6 @@ type Client interface {
 	CreateSubscriptionIntent(ctx context.Context, in SubscriptionIntentIn) (SubscriptionIntentOut, error)
 	CancelSubscriptionAtPeriodEnd(ctx context.Context, subID string) error
 	ResumeSubscription(ctx context.Context, subID string) error
-	UpdateSubscriptionAmount(ctx context.Context, subID string, amount int64) error
-	CreateUpgradePaymentIntent(ctx context.Context, in UpgradePaymentIn) (UpgradePaymentOut, error)
 	GetPaymentIntent(ctx context.Context, intentID string) (PaymentIntentSnapshot, error)
 	GetCheckoutSession(ctx context.Context, sessionID string) (CheckoutSessionSnapshot, error)
 	GetPaymentIntentDetail(ctx context.Context, intentID string) (PaymentIntentDetail, error)

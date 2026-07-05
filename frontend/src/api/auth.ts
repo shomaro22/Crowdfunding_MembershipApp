@@ -1,6 +1,7 @@
 import { apiRequest, ApiError, apiUpload } from '@/lib/api-client'
 import { clearPending2FASession, getPending2FAToken } from '@/lib/pending-2fa-store'
 import { setAccessToken } from '@/lib/token-store'
+import { sanitizeEmail } from '@/lib/utils'
 import type {
   AuthTokenResponse,
   LoginResponse,
@@ -15,13 +16,13 @@ import type {
 export async function login(email: string, password: string): Promise<LoginResponse> {
   return apiRequest<LoginResponse>('/auth/login', {
     method: 'POST',
-    body: { email, password },
+    body: { email: sanitizeEmail(email), password: password.trim() },
     skipRefresh: true,
   })
 }
 
-export async function challenge2FA(code: string): Promise<AuthTokenResponse> {
-  const pendingToken = getPending2FAToken()
+export async function challenge2FA(code: string, pendingTokenOverride?: string): Promise<AuthTokenResponse> {
+  const pendingToken = pendingTokenOverride?.trim() || getPending2FAToken()
   if (!pendingToken) {
     throw new ApiError(401, 'UNAUTHORIZED', '2fa session expired')
   }

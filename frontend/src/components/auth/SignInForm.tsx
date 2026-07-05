@@ -1,4 +1,4 @@
-import { useCallback, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useState, type FormEvent } from "react";
 import {
   Link,
   useLocation,
@@ -10,6 +10,7 @@ import { useAuth } from "@/auth/AuthProvider";
 import { ApiError } from "@/lib/api-client";
 import { googleOAuthStartUrl } from "@/lib/api-client";
 import { postLoginPath } from "@/lib/auth-routes";
+import { clearPending2FASession } from "@/lib/pending-2fa-store";
 import { validateEmail } from "@/lib/validation";
 import { sanitizeAppPath, sanitizeEmail } from "@/lib/utils";
 
@@ -18,6 +19,10 @@ export function SignInForm() {
   const location = useLocation();
   const [searchParams] = useSearchParams();
   const { login } = useAuth();
+
+  useEffect(() => {
+    clearPending2FASession();
+  }, []);
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");

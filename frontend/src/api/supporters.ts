@@ -4,34 +4,11 @@ import type {
   ListFavoritesResponse,
   ListSupportersResponse,
   Supporter,
-  UpgradePlanResponse,
 } from '@/types/api'
 import { isValidUUID } from '@/lib/validation'
 
 export async function listSupporters(): Promise<ListSupportersResponse> {
   return apiRequest<ListSupportersResponse>('/supporters', { auth: true })
-}
-
-export async function upgradeSupporter(supporterId: string, planId: string): Promise<UpgradePlanResponse> {
-  if (!isValidUUID(supporterId) || !isValidUUID(planId)) {
-    throw new Error('invalid id')
-  }
-  return apiRequest<UpgradePlanResponse>(`/supporters/${supporterId}/upgrade`, {
-    method: 'POST',
-    auth: true,
-    body: { plan_id: planId },
-  })
-}
-
-export async function confirmUpgrade(supporterId: string, paymentIntentId: string): Promise<Supporter> {
-  if (!isValidUUID(supporterId) || !paymentIntentId.trim()) {
-    throw new Error('invalid id')
-  }
-  return apiRequest<Supporter>(`/supporters/${supporterId}/upgrade-confirm`, {
-    method: 'POST',
-    auth: true,
-    body: { payment_intent_id: paymentIntentId.trim() },
-  })
 }
 
 export async function cancelSupporter(supporterId: string): Promise<Supporter> {
