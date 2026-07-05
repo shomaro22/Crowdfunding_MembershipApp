@@ -5,7 +5,6 @@ import { getProject } from '@/api/projects'
 import { listPurchases } from '@/api/payments'
 import {
   cancelSupporter,
-  confirmUpgrade,
   listSupporters,
   rejoinSupporter,
   upgradeSupporter,
@@ -122,6 +121,8 @@ export function PurchasesPage() {
       if (err instanceof ApiError) {
         if (err.code === 'FORBIDDEN') {
           msg = '出品者の Stripe 設定が未完了のため、プラン変更できません'
+        } else if (err.code === 'STRIPE_UNAVAILABLE') {
+          msg = '決済機能が利用できません。Render の STRIPE_SECRET_KEY 設定を確認してください'
         } else if (err.code === 'BAD_REQUEST' && err.message.includes('bad request')) {
           msg = 'プラン変更の処理中です。しばらく待ってから再度お試しください'
         }
@@ -131,15 +132,11 @@ export function PurchasesPage() {
   }
 
   const onUpgradePaymentSuccess = async () => {
-    if (!upgradePayment) {
-      return
-    }
     try {
-      await confirmUpgrade(upgradePayment.supporterId, upgradePayment.paymentIntentId)
       await load()
       toast('プラン変更が完了しました', 'success')
-    } catch (err) {
-      toast(err instanceof ApiError ? err.message : 'プラン変更の確定に失敗しました', 'error')
+    } catch {
+      toast('応援履歴の更新に失敗しました', 'error')
     } finally {
       setUpgradePayment(null)
     }
@@ -248,7 +245,6 @@ export function PurchasesPage() {
               clientSecret={upgradePayment.clientSecret}
               paymentIntentId={upgradePayment.paymentIntentId}
               amountLabel={upgradePayment.amountLabel}
-              paymentPurpose="plan-upgrade"
               onSuccess={() => void onUpgradePaymentSuccess()}
               onError={(msg) => toast(msg, 'error')}
             />

@@ -4,6 +4,7 @@ import { Elements, PaymentElement, useElements, useStripe } from '@stripe/react-
 
 import { verifyPaymentIntent } from '@/api/payments'
 import { digitsOnly } from '@/lib/digits'
+import { canUseLiveStripe, liveStripeConfigMissing, stripePublishableKey } from '@/lib/stripe-env'
 import {
   formatCardExpiryInput,
   formatCardNumberInput,
@@ -12,22 +13,10 @@ import {
   validateDemoCardNumber,
 } from '@/lib/validation'
 
-const stripePublishableKey = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY as string | undefined
-
-function isStubClientSecret(secret: string): boolean {
-  return secret.includes('cs_test_secret') || secret.includes('pi_test_')
-}
-
-function canUseLiveStripe(clientSecret: string): boolean {
-  return Boolean(stripePublishableKey?.trim()) && !isStubClientSecret(clientSecret)
-}
-
 interface CheckoutPaymentFormProps {
   clientSecret: string
   paymentIntentId: string
   amountLabel: string
-  /** checkout: 初回応援の verify/intent。plan-upgrade: 呼び出し元が upgrade-confirm を行う */
-  paymentPurpose?: 'checkout' | 'plan-upgrade'
   onSuccess: () => void
   onError: (message: string) => void
 }
@@ -35,10 +24,9 @@ interface CheckoutPaymentFormProps {
 function LivePaymentForm({
   clientSecret,
   paymentIntentId,
-  paymentPurpose = 'checkout',
   onSuccess,
   onError,
-}: Pick<CheckoutPaymentFormProps, 'clientSecret' | 'paymentIntentId' | 'paymentPurpose' | 'onSuccess' | 'onError'>) {
+}: Pick<CheckoutPaymentFormProps, 'clientSecret' | 'paymentIntentId' | 'onSuccess' | 'onError'>) {
   const stripe = useStripe()
   const elements = useElements()
   const [processing, setProcessing] = useState(false)
@@ -70,12 +58,8 @@ function LivePaymentForm({
       setProcessing(false)
       return
     }
-    if (paymentPurpose === 'plan-upgrade') {
-      onSuccess()
-      setProcessing(false)
-      return
-    }
     try {
+      // 初回応援・プラン変更アップグレードとも /payments/verify/intent で確定（plan_upgrade は UpgradeConfirm へ）
       await verifyPaymentIntent(paymentIntentId)
       onSuccess()
     } catch {
@@ -102,10 +86,9 @@ function LivePaymentForm({
 
 function DemoPaymentElement({
   paymentIntentId,
-  paymentPurpose = 'checkout',
   onSuccess,
   onError,
-}: Pick<CheckoutPaymentFormProps, 'paymentIntentId' | 'paymentPurpose' | 'onSuccess' | 'onError'>) {
+}: Pick<CheckoutPaymentFormProps, 'paymentIntentId' | 'onSuccess' | 'onError'>) {
   const [processing, setProcessing] = useState(false)
   const [cardNumber, setCardNumber] = useState('')
   const [expiry, setExpiry] = useState('')
@@ -124,9 +107,7 @@ function DemoPaymentElement({
     setProcessing(true)
     setErrorMessage('')
     try {
-      if (paymentPurpose === 'checkout') {
-        await verifyPaymentIntent(paymentIntentId)
-      }
+      await verifyPaymentIntent(paymentIntentId)
       onSuccess()
     } catch {
       onError('決済の確認に失敗しました')
@@ -207,14 +188,28 @@ export function CheckoutPaymentForm({
   clientSecret,
   paymentIntentId,
   amountLabel,
-  paymentPurpose = 'checkout',
   onSuccess,
   onError,
 }: CheckoutPaymentFormProps) {
-  const [stripePromise] = useState(() =>
-    stripePublishableKey?.trim() ? loadStripe(stripePublishableKey) : null,
-  )
+  const [stripePromise] = useState(() => {
+    const key = stripePublishableKey()
+    return key ? loadStripe(key) : null
+  })
   const useLive = canUseLiveStripe(clientSecret)
+  const missingLiveConfig = liveStripeConfigMissing(clientSecret)
+
+  if (missingLiveConfig) {
+    return (
+      <div className="card space-y-3 border-2 border-red-200 bg-red-50 p-4">
+        <h2 className="text-lg font-bold text-red-900">決済を開始できません</h2>
+        <p className="text-sm text-red-800">
+          本番 API から決済情報を取得しましたが、フロントに Stripe 公開鍵（
+          <code className="rounded bg-red-100 px-1">VITE_STRIPE_PUBLISHABLE_KEY</code>
+          ）が設定されていません。Vercel の Environment Variables を設定して再デプロイしてください。
+        </p>
+      </div>
+    )
+  }
 
   return (
     <div className="card space-y-4 border-2 border-purple-200">
@@ -233,18 +228,12 @@ export function CheckoutPaymentForm({
           <LivePaymentForm
             clientSecret={clientSecret}
             paymentIntentId={paymentIntentId}
-            paymentPurpose={paymentPurpose}
             onSuccess={onSuccess}
             onError={onError}
           />
         </Elements>
       ) : (
-        <DemoPaymentElement
-          paymentIntentId={paymentIntentId}
-          paymentPurpose={paymentPurpose}
-          onSuccess={onSuccess}
-          onError={onError}
-        />
+        <DemoPaymentElement paymentIntentId={paymentIntentId} onSuccess={onSuccess} onError={onError} />
       )}
     </div>
   )

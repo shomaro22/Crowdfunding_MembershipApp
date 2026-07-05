@@ -16,8 +16,12 @@ func StripeFromEnv() stripe.Client {
 	}
 	cfg, err := stripe.ConfigFromEnv()
 	if err != nil {
-		slog.Info("stripe disabled", "reason", err.Error())
-		return nil
+		if isProduction() {
+			slog.Info("stripe disabled", "reason", err.Error())
+			return nil
+		}
+		slog.Info("stripe using stub client", "reason", err.Error())
+		return stripe.NewStubClient()
 	}
 	return stripe.New(cfg)
 }
