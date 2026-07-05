@@ -14,12 +14,16 @@ export const options = {
   thresholds: DEFAULT_THRESHOLDS,
 };
 
-export default function checkoutLoad() {
+export function setup() {
   const token = loginBuyer();
   if (!token) {
-    sleep(1);
-    return;
+    throw new Error('checkout-load setup: buyer login failed');
   }
+  return { token };
+}
+
+export default function checkoutLoad(data) {
+  const token = data.token;
   const headers = { 'Content-Type': 'application/json', Accept: 'application/json', Authorization: `Bearer ${token}` };
 
   const projectsRes = http.get(`${BASE_URL}/projects?limit=1&status=ACTIVE`, { headers });

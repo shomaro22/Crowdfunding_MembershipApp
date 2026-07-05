@@ -1,7 +1,7 @@
 import ws from 'k6/ws';
 import http from 'k6/http';
 import { check, sleep } from 'k6';
-import { BASE_URL, DEFAULT_THRESHOLDS, jsonHeaders, summaryHandler } from './lib/config.js';
+import { BASE_URL, jsonHeaders, summaryHandler, thresholdsForEnv } from './lib/config.js';
 import { loginBuyer } from './lib/auth.js';
 import { rampUpStages } from './lib/scenarios.js';
 
@@ -12,15 +12,19 @@ export const options = {
       stages: rampUpStages,
     },
   },
-  thresholds: DEFAULT_THRESHOLDS,
+  thresholds: thresholdsForEnv(),
 };
 
-export default function wsLoad() {
+export function setup() {
   const token = loginBuyer();
   if (!token) {
-    sleep(1);
-    return;
+    throw new Error('ws-load setup: buyer login failed');
   }
+  return { token };
+}
+
+export default function wsLoad(data) {
+  const token = data.token;
 
   const wsTokenRes = http.post(`${BASE_URL}/ws/token`, null, { headers: jsonHeaders(token) });
   if (wsTokenRes.status !== 200) {

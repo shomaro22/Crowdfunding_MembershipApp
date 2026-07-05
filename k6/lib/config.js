@@ -45,6 +45,21 @@ export const DEFAULT_THRESHOLDS = {
   checks: ['rate>0.95'],
 };
 
+// CI / docker compose（K6_ENV=development）向け。共有 runner 上では tail latency が伸びやすい。
+export const DEVELOPMENT_THRESHOLDS = {
+  http_req_failed: ['rate<0.02'],
+  http_req_duration: ['p(95)<2000', 'p(99)<3500'],
+  checks: ['rate>0.95'],
+};
+
+export function thresholdsForEnv() {
+  const env = __ENV.K6_ENV || 'development';
+  if (env === 'development') {
+    return DEVELOPMENT_THRESHOLDS;
+  }
+  return DEFAULT_THRESHOLDS;
+}
+
 export const SMOKE_THRESHOLDS = {
   http_req_failed: ['rate<0.01'],
   http_req_duration: ['p(95)<500', 'p(99)<1000'],

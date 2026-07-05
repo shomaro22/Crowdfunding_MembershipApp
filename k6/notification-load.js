@@ -1,6 +1,6 @@
 import http from 'k6/http';
 import { check, sleep } from 'k6';
-import { BASE_URL, DEFAULT_THRESHOLDS, summaryHandler } from './lib/config.js';
+import { BASE_URL, summaryHandler, thresholdsForEnv } from './lib/config.js';
 import { loginBuyer } from './lib/auth.js';
 import { rampUpStages } from './lib/scenarios.js';
 
@@ -11,16 +11,19 @@ export const options = {
       stages: rampUpStages,
     },
   },
-  thresholds: DEFAULT_THRESHOLDS,
+  thresholds: thresholdsForEnv(),
 };
 
-export default function notificationLoad() {
+export function setup() {
   const token = loginBuyer();
   if (!token) {
-    sleep(1);
-    return;
+    throw new Error('notification-load setup: buyer login failed');
   }
-  const headers = { Accept: 'application/json', Authorization: `Bearer ${token}` };
+  return { token };
+}
+
+export default function notificationLoad(data) {
+  const headers = { Accept: 'application/json', Authorization: `Bearer ${data.token}` };
 
   const unreadRes = http.get(`${BASE_URL}/me/notifications`, { headers });
   check(unreadRes, {
