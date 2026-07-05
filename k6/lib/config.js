@@ -71,6 +71,20 @@ export const STRESS_THRESHOLDS = {
   http_req_duration: ['p(95)<2000', 'p(99)<4000'],
 };
 
+// CI docker compose: stress_auth は最大 40 VU が login（bcrypt）を叩くため tail が大きい
+export const DEVELOPMENT_STRESS_THRESHOLDS = {
+  http_req_failed: ['rate<0.05'],
+  http_req_duration: ['p(95)<8000', 'p(99)<12000'],
+};
+
+export function stressThresholdsForEnv() {
+  const env = __ENV.K6_ENV || 'development';
+  if (env === 'development') {
+    return DEVELOPMENT_STRESS_THRESHOLDS;
+  }
+  return STRESS_THRESHOLDS;
+}
+
 export function jsonHeaders(token = '') {
   const headers = {
     'Content-Type': 'application/json',

@@ -1,6 +1,6 @@
 import http from 'k6/http';
 import { check, sleep } from 'k6';
-import { BASE_URL, BUYER_EMAIL, BUYER_PASSWORD, STRESS_THRESHOLDS, jsonHeaders, summaryHandler } from './lib/config.js';
+import { BASE_URL, BUYER_EMAIL, BUYER_PASSWORD, jsonHeaders, stressThresholdsForEnv, summaryHandler } from './lib/config.js';
 import { stressStages } from './lib/scenarios.js';
 
 export const options = {
@@ -11,7 +11,7 @@ export const options = {
     },
   },
   thresholds: {
-    ...STRESS_THRESHOLDS,
+    ...stressThresholdsForEnv(),
     checks: ['rate>0.99'],
   },
 };
