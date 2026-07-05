@@ -149,6 +149,8 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Start stack
+        env:
+          RATE_LIMIT_DISABLED: "1"
         run: |
           docker compose up -d
           for i in $(seq 1 90); do

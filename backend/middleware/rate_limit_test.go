@@ -75,3 +75,24 @@ func TestRateLimiterOnDeniedNilHook(t *testing.T) {
 		t.Fatalf("status=%d want 429", rec.Code)
 	}
 }
+
+func TestRateLimiterDisabledBypassesPolicy(t *testing.T) {
+	var (
+		e       *echo.Echo
+		limiter *middleware.RateLimiter
+		rec     *httptest.ResponseRecorder
+		req     *http.Request
+	)
+	t.Setenv("RATE_LIMIT_DISABLED", "1")
+	e = echo.New()
+	limiter = middleware.NewRateLimiter(&usecase.RateLimitUseCase{Repo: denyIRateLimitRepo{}})
+	rec = httptest.NewRecorder()
+	req = httptest.NewRequest(http.MethodPost, "/auth/login", nil)
+	e.POST("/auth/login", func(c echo.Context) error {
+		return c.NoContent(http.StatusOK)
+	}, limiter.Middleware(middleware.PolicyLogin))
+	e.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status=%d want 200 when RATE_LIMIT_DISABLED=1", rec.Code)
+	}
+}

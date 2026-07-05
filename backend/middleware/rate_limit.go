@@ -47,7 +47,7 @@ func (l *RateLimiter) Middleware(policy RatePolicy) echo.MiddlewareFunc {
 				retry int
 				err   error
 			)
-			if l == nil || l.UC == nil {
+			if l == nil || l.UC == nil || RateLimitDisabled() {
 				return next(c)
 			}
 			ctx = c.Request().Context()

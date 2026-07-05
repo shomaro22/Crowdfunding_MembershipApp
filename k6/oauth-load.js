@@ -11,8 +11,9 @@ export const options = {
     },
   },
   thresholds: {
-    ...DEFAULT_THRESHOLDS,
-    http_req_failed: ['rate<0.1'],
+    http_req_failed: ['rate<0.02'],
+    http_req_duration: DEFAULT_THRESHOLDS.http_req_duration,
+    checks: ['rate>0.95'],
   },
 };
 
@@ -23,7 +24,7 @@ export default function oauthLoad() {
   });
   check(startRes, {
     'google start redirect or disabled': (r) =>
-      r.status === 302 || r.status === 503 || r.status === 200 || r.status === 404,
+      r.status === 302 || r.status === 200 || r.status === 404 || r.status === 503,
   });
 
   const exchangeRes = http.post(
@@ -36,7 +37,7 @@ export default function oauthLoad() {
   );
   check(exchangeRes, {
     'oauth exchange rejects invalid code or disabled': (r) =>
-      r.status === 400 || r.status === 401 || r.status === 503 || r.status === 404,
+      r.status === 400 || r.status === 401 || r.status === 404 || r.status === 503,
   });
 
   const callbackRes = http.get(`${BASE_URL}/auth/callback?error=oauth_failed`, {
