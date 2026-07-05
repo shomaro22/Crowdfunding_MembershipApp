@@ -1,6 +1,6 @@
 import http from 'k6/http';
 import { check, sleep } from 'k6';
-import { BASE_URL, DEFAULT_THRESHOLDS, summaryHandler } from './lib/config.js';
+import { BASE_URL, summaryHandler, thresholdsForEnv } from './lib/config.js';
 import { loginBuyer } from './lib/auth.js';
 import { soakStages } from './lib/scenarios.js';
 
@@ -11,7 +11,7 @@ export const options = {
       stages: soakStages,
     },
   },
-  thresholds: DEFAULT_THRESHOLDS,
+  thresholds: thresholdsForEnv(),
 };
 
 export function setup() {

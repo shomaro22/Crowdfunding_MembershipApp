@@ -1,6 +1,6 @@
 import http from 'k6/http';
 import { check, sleep } from 'k6';
-import { BASE_URL, DEFAULT_THRESHOLDS, summaryHandler } from './lib/config.js';
+import { BASE_URL, summaryHandler, thresholdsForEnv } from './lib/config.js';
 import { spikeStages } from './lib/scenarios.js';
 
 export const options = {
@@ -10,11 +10,7 @@ export const options = {
       stages: spikeStages,
     },
   },
-  thresholds: {
-    http_req_failed: ['rate<0.02'],
-    http_req_duration: DEFAULT_THRESHOLDS.http_req_duration,
-    checks: ['rate>0.95'],
-  },
+  thresholds: thresholdsForEnv(),
 };
 
 export default function oauthLoad() {

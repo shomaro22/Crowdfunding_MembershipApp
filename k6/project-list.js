@@ -1,6 +1,6 @@
 import http from 'k6/http';
 import { check, sleep } from 'k6';
-import { BASE_URL, DEFAULT_THRESHOLDS, checkOK, summaryHandler } from './lib/config.js';
+import { BASE_URL, checkOK, summaryHandler, thresholdsForEnv } from './lib/config.js';
 import { rampUpStages } from './lib/scenarios.js';
 
 export const options = {
@@ -10,7 +10,7 @@ export const options = {
       stages: rampUpStages,
     },
   },
-  thresholds: DEFAULT_THRESHOLDS,
+  thresholds: thresholdsForEnv(),
 };
 
 const searchTerms = ['デモ', 'ファン', 'クラブ', 'イラスト'];

@@ -1,6 +1,6 @@
 import http from 'k6/http';
 import { check, sleep } from 'k6';
-import { BASE_URL, BUYER_EMAIL, BUYER_PASSWORD, DEFAULT_THRESHOLDS, jsonHeaders, summaryHandler } from './lib/config.js';
+import { BASE_URL, BUYER_EMAIL, BUYER_PASSWORD, jsonHeaders, summaryHandler, thresholdsForEnv } from './lib/config.js';
 import { rampUpStages, stressStages } from './lib/scenarios.js';
 
 const profile = __ENV.K6_PROFILE || 'ramp';
@@ -12,7 +12,7 @@ export const options = {
       stages: profile === 'stress' ? stressStages : rampUpStages,
     },
   },
-  thresholds: DEFAULT_THRESHOLDS,
+  thresholds: thresholdsForEnv(),
 };
 
 export default function authLoad() {

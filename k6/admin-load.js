@@ -1,6 +1,6 @@
 import http from 'k6/http';
 import { check, sleep } from 'k6';
-import { BASE_URL, DEFAULT_THRESHOLDS, summaryHandler } from './lib/config.js';
+import { BASE_URL, summaryHandler, thresholdsForEnv } from './lib/config.js';
 import { loginAdminWithTotp } from './lib/auth.js';
 import { rampUpStages } from './lib/scenarios.js';
 
@@ -11,7 +11,7 @@ export const options = {
       stages: rampUpStages,
     },
   },
-  thresholds: DEFAULT_THRESHOLDS,
+  thresholds: thresholdsForEnv(),
 };
 
 function resolveAdminToken() {
